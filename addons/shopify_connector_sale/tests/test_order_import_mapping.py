@@ -51,6 +51,7 @@ class OrderImportCase(TransactionCase):
             'state': 'connected',
             'granted_scopes': json.dumps(['read_orders', 'read_customers']),
         })
+        cls.store._p15_set_activation('active')
         cls.fallback_partner = cls.env['res.partner'].create({
             'name': 'Order Import Fallback',
         })

@@ -60,6 +60,7 @@ class TestU3ExportTours(HttpCase):
             'api_version': SHOPIFY_API_VERSION,
         })
         store.sudo().write({'state': 'connected'})
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].sudo().create({
             'store_id': store.id,
             'product_export_domain_enabled': True,
@@ -179,6 +180,7 @@ class TestU3ExportTours(HttpCase):
             'api_version': SHOPIFY_API_VERSION,
         })
         store.sudo().write({'state': 'connected'})
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].sudo().create({
             'store_id': store.id,
             'product_export_domain_enabled': True,
@@ -333,6 +335,7 @@ class TestU3ExportTours(HttpCase):
             'api_version': SHOPIFY_API_VERSION,
         })
         store.sudo().write({'state': 'connected', 'connection_generation': 3})
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].sudo().create({
             'store_id': store.id,
             'product_export_domain_enabled': True,

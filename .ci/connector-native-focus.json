@@ -1,0 +1,14 @@
+{
+  "scope": "activation, API/DTO foundations, matching, mutation recovery, and core job admission/dispatch",
+  "classes": [
+    {"addon": "shopify_connector_core", "class": "TestBusinessAdmission"},
+    {"addon": "shopify_connector_inventory", "class": "TestInventoryPushMechanics"},
+    {"addon": "shopify_connector_product", "class": "TestProductMatchDecision"},
+    {"addon": "shopify_connector_product", "class": "TestProductImportMatching"},
+    {"addon": "shopify_connector_core", "class": "TestMutationRecovery"},
+    {"addon": "shopify_connector_core", "class": "TestV2RuntimeAdapter"},
+    {"addon": "shopify_connector_core", "class": "TestP15StoreAdmin"},
+    {"addon": "shopify_connector_core", "class": "TestJobEnqueue"},
+    {"addon": "shopify_connector_core", "class": "TestJobDispatch"}
+  ]
+}

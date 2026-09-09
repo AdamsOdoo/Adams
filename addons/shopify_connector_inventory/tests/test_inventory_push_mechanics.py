@@ -21,6 +21,11 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     InventoryActivationSupersededError,
     InventoryPreC2FailClosedError,
 )
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_mutation_gateway import (
+    INVENTORY_ACTIVATE_DOCUMENT,
+    INVENTORY_PAIR_QUERY,
+    INVENTORY_SET_QUANTITIES_DOCUMENT,
+)
 from odoo.tools import mute_logger
 
 
@@ -68,6 +73,7 @@ class TestInventoryPushMechanics(TransactionCase):
             'inventory_domain_enabled': True,
         })
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         cls.warehouse = cls.env['stock.warehouse'].search(
             [('company_id', '=', cls.env.company.id)], limit=1,
         )
@@ -1480,19 +1486,26 @@ class TestInventoryPushMechanics(TransactionCase):
         `inventoryItemId`/`locationId` -- the pair read must always go
         through `inventoryItem(id:) { inventoryLevel(locationId:) }`
         (PR #182 comment 5025765389 item 1)."""
-        source, _tree = self._service_source_tree()
-        self.assertIn('inventoryItem(id: $itemId)', source)
-        self.assertIn('inventoryLevel(locationId: $locationId)', source)
-        self.assertNotIn('inventoryLevel(inventoryItemId:', source)
+        self.assertIn('inventoryItem(id: $itemId)', INVENTORY_PAIR_QUERY)
+        self.assertIn(
+            'inventoryLevel(locationId: $locationId)',
+            INVENTORY_PAIR_QUERY,
+        )
+        self.assertNotIn(
+            'inventoryLevel(inventoryItemId:', INVENTORY_PAIR_QUERY,
+        )
 
     def test_both_mutations_declare_idempotent_directive(self):
-        source, _tree = self._service_source_tree()
-        self.assertIn('$idempotencyKey: String!', source)
-        self.assertEqual(
-            source.count('@idempotent(key: $idempotencyKey)'), 2,
-            'Both inventorySetQuantities and inventoryActivate must '
-            'declare the @idempotent directive exactly once each.',
-        )
+        for document in (
+            INVENTORY_ACTIVATE_DOCUMENT,
+            INVENTORY_SET_QUANTITIES_DOCUMENT,
+        ):
+            self.assertIn('$idempotencyKey: String!', document)
+            self.assertEqual(
+                document.count('@idempotent(key: $idempotencyKey)'), 1,
+                'Each inventory mutation must declare exactly one '
+                '@idempotent directive.',
+            )
 
     def test_change_from_quantity_present_compare_quantity_absent(self):
         source, _tree = self._service_source_tree()
@@ -3817,6 +3830,7 @@ class TestInventoryPreC2RecoverySeam(TransactionCase):
                 'api_version': '2026-07',
                 'state': 'connected',
             })
+            store._p15_set_activation('active')
             token = uuid.uuid4().hex
             job = env['shopify.connector.job'].sudo().create({
                 'store_id': store.id,
@@ -3835,19 +3849,22 @@ class TestInventoryPreC2RecoverySeam(TransactionCase):
         self.addCleanup(self._cleanup_fixture, store.id, job.id)
         return ids
 
-    def _cleanup_fixture(self, store_id, job_id):
+    def _cleanup_fixture(self, store_id, _job_id):
         with db_connect(self.env.cr.dbname).cursor() as cr:
             cr.execute(
-                'DELETE FROM shopify_connector_job_log WHERE job_id = %s',
-                (job_id,),
+                'DELETE FROM shopify_connector_job_log WHERE job_id IN '
+                '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
+                (store_id,),
             )
             cr.execute(
                 'DELETE FROM shopify_connector_mutation_attempt '
-                'WHERE job_id = %s',
-                (job_id,),
+                'WHERE job_id IN (SELECT id FROM shopify_connector_job '
+                'WHERE store_id = %s)',
+                (store_id,),
             )
             cr.execute(
-                'DELETE FROM shopify_connector_job WHERE id = %s', (job_id,),
+                'DELETE FROM shopify_connector_job WHERE store_id = %s',
+                (store_id,),
             )
             cr.execute(
                 'DELETE FROM shopify_connector_store WHERE id = %s',
@@ -3916,6 +3933,7 @@ class TestInventoryPreC2RecoverySeam(TransactionCase):
                 'api_version': '2026-07',
                 'state': 'connected',
             })
+            store._p15_set_activation('active')
             warehouse = env['stock.warehouse'].search(
                 [('company_id', '=', env.company.id)], limit=1,
             )

@@ -75,6 +75,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             'inventory_domain_enabled': True,
         })
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         warehouse = cls.env['stock.warehouse'].search(
             [('company_id', '=', cls.env.company.id)], limit=1,
         )

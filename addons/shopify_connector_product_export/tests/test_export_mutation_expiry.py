@@ -630,6 +630,7 @@ class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
             'credential_epoch': 1,
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         env['shopify.connector.store.settings'].create({
             'store_id': store.id,
             'product_export_domain_enabled': True,

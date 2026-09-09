@@ -30,6 +30,7 @@ class TestJobEnqueue(TransactionCase):
             'shop_domain': 'job-enqueue-test.myshopify.com',
             'api_version': '2026-07',
         })
+        cls.store._p15_set_activation('active')
         cls.Enqueue = cls.env['shopify.connector.job.enqueue']
         cls.Job = cls.env['shopify.connector.job']
 

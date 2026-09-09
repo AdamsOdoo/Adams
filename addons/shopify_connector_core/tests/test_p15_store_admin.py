@@ -5,6 +5,7 @@ menus and browser affordances are deliberately not involved.
 """
 
 from datetime import datetime, timezone
+import json
 from uuid import uuid4
 
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -289,6 +290,11 @@ class TestP15StoreAdmin(TransactionCase):
         self.assertNotIn("access_token", rendered)
         self.assertNotIn("client_secret", rendered)
         self.assertTrue(projection["data"]["credentials"]["present"])
+        actions = projection["data"]["lifecycle"]["allowed_actions"]
+        self.assertTrue(actions)
+        self.assertTrue(all(isinstance(action, dict) for action in actions))
+        self.assertEqual(actions, projection["data"]["allowed_actions"])
+        json.dumps(projection)
 
     def test_capacity_admission_rejects_the_eleventh_service_create(self):
         # Existing fixtures may have stores, so fill only the remaining slots

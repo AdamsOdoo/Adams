@@ -38,6 +38,7 @@ class TestProductScanP10(TransactionCase):
             'product_domain_enabled': True,
             'product_first_sync_source': 'shopify_source',
         })
+        cls.store._p15_set_activation('active')
         cls.roles = {
             label: cls.env['res.users'].create({
                 'name': 'P10 %s' % label,

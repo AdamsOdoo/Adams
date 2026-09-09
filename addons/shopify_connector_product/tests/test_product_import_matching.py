@@ -106,11 +106,12 @@ class TestProductImportMatching(TransactionCase):
         self.registry_enter_test_mode()
 
     def _import_job(self, shopify_target_gid):
-        """Connect the store (the business-job create gate requires `connected`)
+        """Connect and activate the store for business-job admission
         and return a product-import job at generation 0 (matching the store), so
         `execute_business._admit` admits it. Flush so the admission side cursor
         observes the connected store and the job."""
         self.store.write({'state': 'connected'})
+        self.store._p15_set_activation('active')
         job = self.Job.create({
             'store_id': self.store.id,
             'job_source': 'scheduled_sync',
@@ -1864,6 +1865,7 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
         cls.env['shopify.connector.store.credential'].action_set_token(
             cls.store, DUMMY_TOKEN,
         )
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):

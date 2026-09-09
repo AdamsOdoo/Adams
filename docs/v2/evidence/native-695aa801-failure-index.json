@@ -1,0 +1,5954 @@
+{
+  "source_sha": "695aa801fbc04ea78376bf675f81451207577ef8",
+  "run_url": "https://github.com/AdamsOdoo/Adams/actions/runs/34320216972",
+  "artifact_id": 10093285071,
+  "artifact_sha256": "6c70fe20efa913e316c3ec6dc577ae6ce7049cebcfac970de1241d2a104cadcb",
+  "log": "fresh.log",
+  "scope": "All 743 named error/failure headers, including subtests; not distinct root defects.",
+  "failures": [
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_body_error_with_release_failure_preserves_primary",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1526,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_body_exception_bare_reraise_preserves_traceback_and_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1552,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_business_read_admission_owns_lease_until_body_exit",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1578,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_business_read_wrong_purpose_fails_before_lease",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1604,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_disconnected_store_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1630,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_exception_exit_releases_and_reraises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1656,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_generation_mismatch_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1682,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_graphql_error_normalized_taxonomy_preserved_and_releases",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1708,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_lease_opaque_committed_before_send_and_visible_in_context",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1734,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_missing_credential_raises_shopify_client_error",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1760,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_missing_store_config_raises_user_error_before_admission",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1787,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_normal_exit_releases_lease",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1813,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_release_failure_after_successful_body_propagates",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1839,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_request_exception_mapped_to_temporary_and_releases",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1865,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_success_yields_normalized_dict_like_execute",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1892,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_token_never_appears_in_lease_rows",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1918,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_token_read_once_and_passed_to_send",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1944,
+      "activation": true
+    },
+    {
+      "class": "TestBusinessAdmission",
+      "test": "test_wrong_store_job_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 1970,
+      "activation": true
+    },
+    {
+      "class": "TestGenuineRealAdmission",
+      "test": "test_real_admission_survives_caller_rollback",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2000,
+      "activation": true
+    },
+    {
+      "class": "TestGenuineRealAdmission",
+      "test": "test_real_admission_visible_before_send_and_released",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2026,
+      "activation": true
+    },
+    {
+      "class": "TestGenuineRealAdmission",
+      "test": "test_response_telemetry_cannot_invalidate_caller_fk_snapshot",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2052,
+      "activation": true
+    },
+    {
+      "class": "TestGenuineRealAdmission",
+      "test": "test_two_real_concurrent_admissions_commit_distinct_leases",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2079,
+      "activation": true
+    },
+    {
+      "class": "TestDisconnectPhase1",
+      "test": "test_disconnecting_business_job_not_startable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2114,
+      "activation": true
+    },
+    {
+      "class": "TestDisconnectPhase1",
+      "test": "test_phase1_sweep_never_writes_running_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2135,
+      "activation": true
+    },
+    {
+      "class": "TestDisconnectPhase1",
+      "test": "test_phase1_sweeps_queued_and_retry_waiting_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2155,
+      "activation": true
+    },
+    {
+      "class": "TestCredentialReplacementRaceGenuine",
+      "test": "test_admission_first_uses_old_token_then_replacement_proceeds",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2225,
+      "activation": true
+    },
+    {
+      "class": "TestCredentialReplacementRaceGenuine",
+      "test": "test_replacement_first_old_generation_admission_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2251,
+      "activation": true
+    },
+    {
+      "class": "TestPublicClearAdmissionRaceGenuine",
+      "test": "test_business_admission_first_defers_clear_until_release",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2307,
+      "activation": true
+    },
+    {
+      "class": "TestPublicClearAdmissionRaceGenuine",
+      "test": "test_public_clear_first_business_admission_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2333,
+      "activation": true
+    },
+    {
+      "class": "TestLifecycleServiceRetryGenuine",
+      "test": "test_scheduled_run_drain_serialization_retry_refuses_after_disconnect",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2362,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_a_rollback_reclaim_race_one_owner_one_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2392,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_b_still_connected_post_transport_serialization_routes_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2421,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_c_conflict_exhaustion_routes_to_failed_final_after_reacquire",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2450,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_c_recovery_refuses_to_overwrite_a_job_worker_b_completed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2479,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_conservative_replay_policy_routes_to_blocked_manual_review_not_retry",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2508,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_d_batch_integrity_neighbor_conflict_preserves_committed_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2537,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_recovery_queued_and_due_retry_exhaustion_routes_failed_final",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2566,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_recovery_queued_and_due_retry_remote_effect_routes_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2594,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_recovery_queued_and_due_retry_safe_budget_routes_retry_waiting",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2622,
+      "activation": true
+    },
+    {
+      "class": "TestDrainOwnershipReplayGenuine",
+      "test": "test_recovery_queued_and_due_retry_undeclared_routes_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2650,
+      "activation": true
+    },
+    {
+      "class": "TestJobDispatch",
+      "test": "test_disconnect_sweeps_only_ab_business_jobs_across_dispatch_states",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2729,
+      "activation": true
+    },
+    {
+      "class": "TestJobDispatch",
+      "test": "test_dispatch_skips_after_store_disconnect",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2750,
+      "activation": true
+    },
+    {
+      "class": "TestJobDispatch",
+      "test": "test_start_running_blocked_by_store_state_becomes_visible_audited",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2786,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_captures_connection_generation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2811,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_distinct_payload_hash_does_not_collide",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2835,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_idempotency_key_collision_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2858,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_never_calls_shopify_api_client",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2883,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_operation_scope_collision_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2906,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_operation_scope_does_not_collide_for_distinct_targets",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2931,
+      "activation": true
+    },
+    {
+      "class": "TestJobEnqueue",
+      "test": "test_enqueue_succeeds_when_connected",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 2954,
+      "activation": true
+    },
+    {
+      "class": "TestMutationConcurrency",
+      "test": "test_committed_c3_outcomes_clear_active_owner",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3042,
+      "activation": true
+    },
+    {
+      "class": "TestMutationConcurrency",
+      "test": "test_pre_c2_recovery_that_discovers_c2_marks_uncertain",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3088,
+      "activation": true
+    },
+    {
+      "class": "TestMutationConcurrency",
+      "test": "test_serialization_failure_recovers_to_reconciliation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3137,
+      "activation": true
+    },
+    {
+      "class": "TestMutationConcurrency",
+      "test": "test_success_path_commits_c1_c2_then_runs_net_and_fresh_c3",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3178,
+      "activation": true
+    },
+    {
+      "class": "TestMutationConcurrency",
+      "test": "test_valid_recovery_still_admits_one_reconciliation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3231,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_callback_failure_rolls_back_job_and_created_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3267,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_historic_reconciliation_keeps_attempt_evidence_link",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3291,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_inconclusive_cap_is_per_attempt_and_fail_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3314,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_missing_strategy_routes_original_job_not_read_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3337,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_not_applied_resolution_never_requeues_same_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3360,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_recovered_pending_attempt_reconciles_end_to_end",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3383,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_resolution_preserves_direct_and_appends_read_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3417,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_store_identity_mismatch_blocks_original_without_verdict",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3440,
+      "activation": true
+    },
+    {
+      "class": "TestMutationReconciliation",
+      "test": "test_valid_reconciliation_consequence_is_atomic_and_terminal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3463,
+      "activation": true
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_admin_stale_sweep_excludes_older_foreign_c1_and_c2_before_limit",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3487,
+      "activation": false
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_c2_same_company_run_drift_projects_authoritative_attempt_run",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3501,
+      "activation": false
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_committed_c2_routes_to_one_reconciliation_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3514,
+      "activation": true
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_committed_c2_token_drift_still_reconciles_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3556,
+      "activation": true
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_v2_c2_job_drift_is_discovered_and_only_reconciled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3603,
+      "activation": false
+    },
+    {
+      "class": "TestMutationRecovery",
+      "test": "test_v2_c2_selection_limits_after_oldest_job_ordering",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 3616,
+      "activation": false
+    },
+    {
+      "class": "TestMutationSourceGuards",
+      "test": "test_accepted_split_real_inventory_service_passes",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4146,
+      "activation": false
+    },
+    {
+      "class": "TestMutationSourceGuards",
+      "test": "test_accepted_split_real_webhook_subscription_service_passes",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4154,
+      "activation": false
+    },
+    {
+      "class": "TestMutationSourceGuards",
+      "test": "test_mutation_literals_require_guarded_transport_or_selftest",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4170,
+      "activation": false
+    },
+    {
+      "class": "TestMutationSourceGuards",
+      "test": "test_no_attempt_direct_write_call_outside_closed_surface",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4178,
+      "activation": false
+    },
+    {
+      "class": "TestMutationSourceGuards",
+      "test": "test_no_production_direct_send_caller",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4186,
+      "activation": false
+    },
+    {
+      "class": "TestP15StoreAdmin",
+      "test": "test_admin_projection_never_contains_raw_credential",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4338,
+      "activation": false
+    },
+    {
+      "class": "TestSec2Roles",
+      "test": "test_create_admission_blocks_state_injection_and_duplicate_settings",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4645,
+      "activation": false
+    },
+    {
+      "class": "TestSec3ModelMatrix",
+      "test": "test_write_to_a_foreign_row_is_refused_with_no_side_effect",
+      "subtest": "(model='shopify.connector.store.credential')",
+      "kind": "ERROR",
+      "line": 4745,
+      "activation": false
+    },
+    {
+      "class": "TestSec3InventoryCompleteness",
+      "test": "test_no_durable_store_scoped_model_escapes_this_matrix",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4770,
+      "activation": false
+    },
+    {
+      "class": "TestSec3InventoryCompleteness",
+      "test": "test_no_undeclared_connector_relation_exists",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 4778,
+      "activation": false
+    },
+    {
+      "class": "TestSec3HistoricRows",
+      "test": "test_administrative_remediation_assigns_a_company",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4807,
+      "activation": false
+    },
+    {
+      "class": "TestSec3HistoricRows",
+      "test": "test_company_less_historic_store_is_invisible_to_everyone",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4826,
+      "activation": false
+    },
+    {
+      "class": "TestSec3HistoricRows",
+      "test": "test_remediation_refuses_a_company_the_caller_does_not_belong_to",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4850,
+      "activation": false
+    },
+    {
+      "class": "TestSecurityHardening",
+      "test": "test_enqueue_is_sanctioned_and_does_not_return_sudo_record",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 4872,
+      "activation": true
+    },
+    {
+      "class": "TestUiSourceGuards",
+      "test": "test_no_out_of_scope_ui",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 22290,
+      "activation": false
+    },
+    {
+      "class": "TestV2MutationRuntime",
+      "test": "test_v2_identity_fields_are_optional_readonly_and_defaulted",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 22553,
+      "activation": false
+    },
+    {
+      "class": "TestV2RecoveryCommands",
+      "test": "test_cancel_v2_run_settles_queued_but_not_running_or_uncertain",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 22757,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorWebhookP11",
+      "test": "test_admission_fences_generation_and_runtime_mode",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 22942,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookP11",
+      "test": "test_admission_rejects_job_from_foreign_company",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 22971,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookP11",
+      "test": "test_admission_requires_connector_admin_actor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 22991,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorWebhookP11",
+      "test": "test_enqueue_creates_one_admitted_run_and_job_without_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23041,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookP11",
+      "test": "test_post_c2_scope_drift_still_allows_exact_readback",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23072,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_admin_replacement_is_fresh_read_exact_gid_and_durable_delete",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23105,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_inline_context_never_runs_lifecycle_handler",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 23145,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_stale_app_uninstalled_delivery_cannot_fence_new_generation",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 23169,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_subscription_queries_select_the_api_version_object",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 23177,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_uninstall_preparation_fresh_reads_then_queues_exact_delete",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23188,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorWebhookW1",
+      "test": "test_wrong_callback_preserves_exact_identity_for_operator_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23211,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_a_confirmed_decision_on_real_data_is_actually_consumed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23232,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_a_foreign_decision_is_refused_before_its_row_is_locked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23258,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_manual_product_import_survives_a_disabled_cron",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23284,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_recording_one_ambiguity_does_not_supersede_an_unrelated_one",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23317,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_the_display_scrubber_rewrites_every_shape_used_here",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23344,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_the_stored_identity_is_the_identity_shopify_sent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23370,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchRealDataAtAnyHead",
+      "test": "test_two_real_products_never_share_or_repoint_one_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23396,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_c_product_import_end_to_end",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23423,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_c_scheduled_route_reaches_the_same_place",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 23457,
+      "activation": false
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_j_two_companies_share_nothing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23467,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_k_a_concurrent_decision_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23486,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_k_a_failed_scan_leaves_the_checkpoint_alone",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23505,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2ProductJourneys",
+      "test": "test_journey_k_safe_retry_works_unsafe_generic_retry_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23537,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_ambiguous_match_routes_job_to_blocked_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23600,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_can_start_when_product_domain_enabled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23622,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cannot_start_when_product_domain_disabled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23645,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cannot_start_when_settings_missing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23668,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cross_page_changed_updated_at_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23692,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cross_page_first_missing_second_present_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23717,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cross_page_first_present_second_missing_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23742,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cross_page_identical_updated_at_accepted",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23767,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_cursor_equal_to_current_cursor_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23790,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_duplicate_variant_gid_across_pages_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23816,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_duplicate_variant_gid_within_one_page_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23841,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_has_next_page_missing_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23869,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_has_next_page_true_empty_end_cursor_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23894,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_has_next_page_wrong_type_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23919,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_import_product_sync_only_issues_read_query_calls",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23945,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_malformed_payload_missing_product_node_blocked_end_to_end",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 23975,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_missing_end_cursor_with_has_next_page_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24000,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_nodes_wrong_type_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24023,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_non_mapping_variant_node_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24049,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_null_product_first_page_no_binding_is_data_error",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24074,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_over_ceiling_variant_count_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24097,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_page_info_missing_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24120,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_page_info_null_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24145,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_page_info_wrong_type_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24170,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_previously_seen_cursor_replayed_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24195,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_repeated_cursor_repeated_nodes_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24224,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_repeated_cursor_zero_nodes_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24249,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_returned_product_gid_mismatch_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24274,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_shopify_client_error_never_calls_execute_a_second_time",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24297,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_shopify_client_error_permission_scope_auth_preserved_not_unknown",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24320,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_shopify_client_error_temporary_network_preserved_not_unknown",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24343,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_shopify_client_error_throttling_preserved_not_unknown",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24366,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_two_hundred_fifty_variants_across_pages_import_completely",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24392,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_valid_single_page_shape_accepted",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24415,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_valid_two_page_progressing_cursors_accepted",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24438,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_variant_node_missing_gid_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24461,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_variant_single_page_not_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24486,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_variants_wrong_type_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24509,
+      "activation": true
+    },
+    {
+      "class": "TestProductImportMatching",
+      "test": "test_zero_node_pages_with_fresh_cursors_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24535,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_generation_bump_between_pages_refuses_next_admission_m9_m10",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24559,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_media_error_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24582,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_multi_page_existing_cursor_and_dedup_guards_still_fire",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24605,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_multi_page_one_lease_per_page_terminal_reconciles",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24628,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_no_legacy_execute_fallback_at_runtime",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24651,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_normalization_error_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24674,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_quiesced_admission_propagates_uncaught_no_transport_no_write",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24697,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_reconciliation_error_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24720,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_single_page_one_lease_reconciles_flushes_releases",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24743,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_single_page_return_and_bindings_come_from_terminal_context",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24766,
+      "activation": true
+    },
+    {
+      "class": "TestProductCallSiteExecuteBusiness",
+      "test": "test_transport_client_error_routes_and_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24791,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_candidate_bound_meanwhile_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24815,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_changed_updated_at_refuses_the_confirmed_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24841,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_competing_decision_on_the_same_odoo_record_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24867,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_confirmed_decision_is_consumed_and_binds_with_the_actor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24893,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_confirmed_variant_decision_is_consumed_and_binds",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24919,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_decision_cannot_select_a_foreign_company_record",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24945,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_decision_for_another_store_is_never_consumed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24971,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_decision_selecting_a_candidate_that_vanished_is_not_consumed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 24997,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_decision_whose_job_moved_on_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25023,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_decision_written_inside_the_importer_savepoint_would_not_survive",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25049,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_foreign_company_administrator_cannot_decide",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25073,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_foreign_company_administrator_sees_no_decision_at_all",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25099,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_foreign_decision_id_forged_into_the_context_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25125,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_foreign_decision_is_refused_before_its_row_is_locked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25151,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_forged_candidate_id_is_refused_on_its_live_identifier",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25177,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_hyphenated_numeric_sku_still_finds_its_candidates",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25203,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_numeric_sku_still_finds_its_candidates",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25229,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_real_product_gid_is_stored_and_keyed_exactly",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25255,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_real_variant_gid_is_stored_and_keyed_exactly",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25281,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_second_confirmation_of_the_same_decision_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25304,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_stale_payload_identity_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25330,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_a_stored_decision_carries_no_secret",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25356,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_ambiguous_template_persists_a_durable_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25382,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_ambiguous_variant_persists_a_durable_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25408,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_auditor_may_not_decide_a_match",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25434,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_ean13_barcode_ambiguity_matches_and_stays_company_scoped",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25460,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_empty_choice_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25483,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_ineligible_candidate_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25509,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_operator_may_start_an_import_but_not_decide_a_match",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25535,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_an_unresolved_ambiguity_cannot_loop",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25561,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_bindings_stay_unique_and_store_company_correct",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25589,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_candidates_never_include_a_foreign_company_record",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25615,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_generic_resolve_review_is_allowed_once_the_decision_is_made",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25639,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_generic_resolve_review_refuses_while_a_decision_is_pending",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25665,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_generic_review_still_refuses_on_production_shaped_data",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25691,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_identity_is_read_from_the_payload_not_from_the_sentence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25717,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_needs_attention_opens_the_product_match_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25742,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_no_decision_is_recorded_without_a_provable_remote_identity",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25768,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_no_raw_identifier_reaches_a_log_a_payload_or_a_ui_field",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25791,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_one_confirmation_resumes_exactly_one_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25818,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_one_confirmed_decision_resumes_the_exact_source_job_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25844,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_only_an_administrator_may_decide",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25870,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_supersession_never_reaches_an_unrelated_product",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25896,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_decision_model_makes_no_binding_field_editable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25923,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_display_preview_stays_sanitized_while_identity_does_not",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25949,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_durable_decision_is_read_only_over_rpc_for_every_role",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 25976,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_importer_consumes_only_the_matching_remote_identity",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26003,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_real_dispatcher_reaches_the_importer_and_binds",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26029,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_whole_template_route_completes_on_production_shaped_data",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26052,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_the_whole_variant_route_completes_on_production_shaped_data",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26078,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_two_real_products_sharing_an_updated_at_stay_two_decisions",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26101,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_two_stores_do_not_see_one_another_decisions",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26127,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecision",
+      "test": "test_zero_shopify_mutation_reaches_the_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26153,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecisionV2Migration",
+      "test": "test_a_consumed_v1_row_and_its_history_are_left_alone",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26176,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecisionV2Migration",
+      "test": "test_a_v2_row_is_not_touched",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26202,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecisionV2Migration",
+      "test": "test_the_migration_is_idempotent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26228,
+      "activation": true
+    },
+    {
+      "class": "TestProductMatchDecisionV2Migration",
+      "test": "test_undecided_v1_rows_are_retired_rather_than_reinterpreted",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26257,
+      "activation": true
+    },
+    {
+      "class": "TestProductRefreshAndStale",
+      "test": "test_deleted_bound_product_marks_binding_stale",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26337,
+      "activation": true
+    },
+    {
+      "class": "TestProductRefreshAndStale",
+      "test": "test_deleted_unbound_product_is_data_error",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26360,
+      "activation": true
+    },
+    {
+      "class": "TestProductRefreshAndStale",
+      "test": "test_deletion_does_not_delete_any_odoo_product",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26383,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_claim_owned_continuation_page_persists_cursor_without_advancing_checkpoint",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26418,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_claim_owned_initialization_persists_fixed_window",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26453,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_claim_owned_terminal_page_coalesces_same_page_children_and_clears_window",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26488,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_legacy_manual_route_remains_runless",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26524,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_malformed_timestamp_is_rejected_before_any_child_or_checkpoint_write",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26556,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_policy_change_after_claim_rejects_page_before_local_effects",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26592,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_read_only_manual_route_creates_run_before_v2_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26628,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanP10",
+      "test": "test_read_only_scheduled_route_records_cron_actor_on_run",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 26661,
+      "activation": false
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_a_failed_scan_does_not_advance_the_checkpoint",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26670,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_a_successful_scan_advances_checkpoint_and_success_stamp",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26699,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_child_payload_hash_is_the_exact_remote_stamp",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26734,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_duplicate_identity_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26769,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_exactly_one_non_terminal_scan_per_store",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26803,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_incremental_scan_reaches_behind_the_checkpoint",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26835,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_initial_scan_admits_archived_and_draft_products",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26870,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_initial_scan_has_no_time_lower_bound",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26904,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_malformed_shapes_fail_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26939,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_manual_import_survives_a_disabled_cron_and_stays_role_gated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 26968,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_manual_route_enqueues_the_real_scan_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27000,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_non_progressing_cursor_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27034,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_pagination_advances_by_server_cursor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27068,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_repeated_cursor_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27103,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_repeated_enumeration_of_an_unchanged_product_coalesces",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27137,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_resumable_scan_continues_beyond_legacy_page_ceiling",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27174,
+      "activation": true
+    },
+    {
+      "class": "TestProductScanProducer",
+      "test": "test_scheduled_route_enqueues_the_real_scan_job",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 27210,
+      "activation": false
+    },
+    {
+      "class": "TestProductVariantGeneration",
+      "test": "test_one_hundred_fifty_variant_paginated_fixture",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27246,
+      "activation": true
+    },
+    {
+      "class": "TestUiB2ProductTours",
+      "test": "test_match_decision_control_is_absent_for_an_operator",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27277,
+      "activation": true
+    },
+    {
+      "class": "TestUiB2ProductTours",
+      "test": "test_match_decision_tour_records_the_choice_and_resumes",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27300,
+      "activation": true
+    },
+    {
+      "class": "TestUiB2ProductTours",
+      "test": "test_product_controls_tour_starts_a_real_scan",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 27444,
+      "activation": false
+    },
+    {
+      "class": "TestUiB2ProductTours",
+      "test": "test_resolved_binding_tour_shows_a_human_made_match",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27452,
+      "activation": true
+    },
+    {
+      "class": "TestExportApplyHandoff",
+      "test": "test_a_failed_handoff_does_not_strand_a_succeeded_parent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27514,
+      "activation": true
+    },
+    {
+      "class": "TestExportApplyHandoff",
+      "test": "test_a_second_live_job_for_the_same_target_is_still_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27543,
+      "activation": true
+    },
+    {
+      "class": "TestExportApplyHandoff",
+      "test": "test_apply_hands_off_to_its_first_step_through_the_dispatcher",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27574,
+      "activation": true
+    },
+    {
+      "class": "TestExportApplyHandoff",
+      "test": "test_the_child_holds_the_scope_against_a_further_duplicate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27603,
+      "activation": true
+    },
+    {
+      "class": "TestExportApplyHandoff",
+      "test": "test_the_parent_is_transitioned_exactly_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27635,
+      "activation": true
+    },
+    {
+      "class": "TestExportCreateDedup",
+      "test": "test_binding_definition_uses_id_type_without_unique_capability",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27665,
+      "activation": true
+    },
+    {
+      "class": "TestExportCreateDedup",
+      "test": "test_create_carries_the_custom_id_identifier",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27692,
+      "activation": true
+    },
+    {
+      "class": "TestExportCreateDedup",
+      "test": "test_reconciliation_adopts_a_single_matching_product",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27726,
+      "activation": true
+    },
+    {
+      "class": "TestExportCreateDedup",
+      "test": "test_reconciliation_reports_not_applied_when_nothing_matches",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27756,
+      "activation": true
+    },
+    {
+      "class": "TestExportCreateDedup",
+      "test": "test_reconciliation_uses_the_exact_custom_id_lookup",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27785,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_a_live_confirmation_is_never_refused",
+      "subtest": "(family='product_export_update')",
+      "kind": "ERROR",
+      "line": 27827,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_a_live_confirmation_is_never_refused",
+      "subtest": "(family='product_export_variants_update')",
+      "kind": "ERROR",
+      "line": 27852,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_an_unexpired_plan_still_advances_normally",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 27878,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_a_clock_expired_preview",
+      "subtest": "(family='product_export_create')",
+      "kind": "ERROR",
+      "line": 27910,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_a_clock_expired_preview",
+      "subtest": "(family='product_export_update')",
+      "kind": "ERROR",
+      "line": 27935,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_a_clock_expired_preview",
+      "subtest": "(family='product_export_variants_update')",
+      "kind": "ERROR",
+      "line": 27960,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_a_clock_expired_preview",
+      "subtest": "(family='product_export_variants_create')",
+      "kind": "ERROR",
+      "line": 27985,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_a_clock_expired_preview",
+      "subtest": "(family='product_export_binding_namespace')",
+      "kind": "ERROR",
+      "line": 28010,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_an_edited_source",
+      "subtest": "(family='product_export_create')",
+      "kind": "ERROR",
+      "line": 28036,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_an_edited_source",
+      "subtest": "(family='product_export_update')",
+      "kind": "ERROR",
+      "line": 28061,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_an_edited_source",
+      "subtest": "(family='product_export_variants_update')",
+      "kind": "ERROR",
+      "line": 28086,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_an_edited_source",
+      "subtest": "(family='product_export_variants_create')",
+      "kind": "ERROR",
+      "line": 28111,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_every_product_mutation_family_refuses_an_edited_source",
+      "subtest": "(family='product_export_binding_namespace')",
+      "kind": "ERROR",
+      "line": 28136,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_media_associate_refuses_an_expired_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28164,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_media_associate_still_builds_on_a_live_confirmation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28190,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_media_file_create_refuses_an_expired_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28216,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_media_stage_refuses_an_expired_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28242,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationExpiry",
+      "test": "test_valid_at_admission_expired_immediately_before_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28269,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_create_input_claims_no_merchant_owned_lists",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28296,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_create_refused_when_a_binding_appeared_after_the_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28322,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_create_refused_without_the_binding_metafield_definition",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28348,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_every_update_path_operation_avoids_product_set",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28374,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_scalar_update_carries_only_confirmed_fields",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28402,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_update_variables_carry_no_merchant_list_state",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28427,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_variant_create_fresh_remote_sku_collision_fails_before_c2",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28453,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_variant_create_preserves_the_standalone_variant",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28480,
+      "activation": true
+    },
+    {
+      "class": "TestExportMutationStrategy",
+      "test": "test_variant_create_refuses_skuless_new_variant_before_remote_read",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28506,
+      "activation": true
+    },
+    {
+      "class": "TestExportPreviewGuard",
+      "test": "test_apply_admits_and_enqueues_the_first_step_when_current",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28565,
+      "activation": true
+    },
+    {
+      "class": "TestExportPreviewGuard",
+      "test": "test_apply_refuses_an_unconfirmed_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28593,
+      "activation": true
+    },
+    {
+      "class": "TestExportPreviewGuard",
+      "test": "test_apply_refuses_when_the_remote_changed_since_the_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28621,
+      "activation": true
+    },
+    {
+      "class": "TestExportPreviewGuard",
+      "test": "test_confirmation_records_the_actor_and_enqueues_apply",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28649,
+      "activation": true
+    },
+    {
+      "class": "TestExportPreviewGuard",
+      "test": "test_no_js_admin_confirmation_records_its_route_and_diff_counts",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 28683,
+      "activation": true
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_no_module_file_hard_codes_an_api_version",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 29156,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_commands.py')",
+      "kind": "FAIL",
+      "line": 29175,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_payloads.py')",
+      "kind": "FAIL",
+      "line": 29182,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='_support.py')",
+      "kind": "FAIL",
+      "line": 29189,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_authority.py')",
+      "kind": "FAIL",
+      "line": 29196,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_binding.py')",
+      "kind": "FAIL",
+      "line": 29203,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_policy.py')",
+      "kind": "FAIL",
+      "line": 29210,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_preview.py')",
+      "kind": "FAIL",
+      "line": 29217,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_readback.py')",
+      "kind": "FAIL",
+      "line": 29224,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_sequence.py')",
+      "kind": "FAIL",
+      "line": 29231,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_export_mutation_gateway.py')",
+      "kind": "FAIL",
+      "line": 29238,
+      "activation": false
+    },
+    {
+      "class": "TestExportSourceGuards",
+      "test": "test_the_sudo_inventory_is_frozen",
+      "subtest": "(file='product_media_mutation_gateway.py')",
+      "kind": "FAIL",
+      "line": 29245,
+      "activation": false
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_a_file_gid_placeholder_can_never_be_associated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29284,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_association_is_built_only_with_references_to_add",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29313,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_association_is_refused_before_ready",
+      "subtest": "(status='staged')",
+      "kind": "ERROR",
+      "line": 29339,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_association_is_refused_before_ready",
+      "subtest": "(status='uploaded')",
+      "kind": "ERROR",
+      "line": 29364,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_association_is_refused_before_ready",
+      "subtest": "(status='processing')",
+      "kind": "ERROR",
+      "line": 29389,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_poll_fails_closed_on_a_failed_file",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29421,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_poll_keeps_withholding_while_processing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29447,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_poll_promotes_to_ready_and_enqueues_the_association",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29473,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_upload_refuses_a_non_https_target",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29502,
+      "activation": true
+    },
+    {
+      "class": "TestMediaExportPipeline",
+      "test": "test_upload_refuses_when_the_image_changed_after_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29528,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_duplicate_admission_does_not_poison_the_transaction",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29555,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_repeated_resume_request_keeps_advancing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29587,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resolved_ambiguous_outcome_no_longer_blocks",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29619,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_after_a_failed_non_associated_step_re_enters_correctly",
+      "subtest": "(remote_status='processing')",
+      "kind": "ERROR",
+      "line": 29651,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_after_a_failed_non_associated_step_re_enters_correctly",
+      "subtest": "(remote_status='ready')",
+      "kind": "ERROR",
+      "line": 29682,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_after_a_failed_non_associated_step_re_enters_correctly",
+      "subtest": "(remote_status='staged')",
+      "kind": "ERROR",
+      "line": 29713,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_after_a_failed_non_associated_step_re_enters_correctly",
+      "subtest": "(remote_status='uploaded')",
+      "kind": "ERROR",
+      "line": 29744,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_after_a_terminal_pre_transport_failure_is_admitted",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29776,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_a_resume_preserves_the_old_job_and_the_media_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29808,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_an_ambiguous_previous_outcome_blocks_a_new_mutation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29842,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_no_media_row_is_ever_unlinked_by_a_resume",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29875,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_readmitting_the_same_step_is_the_same_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29907,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_the_resume_issues_no_shopify_request",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29940,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResume",
+      "test": "test_the_uniqueness_constraint_is_not_weakened",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 29972,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_a_repeated_click_coalesces_without_a_second_admission",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30005,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_a_resume_is_admitted_again_once_the_previous_one_stopped",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30040,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_an_already_associated_row_is_refused_through_the_action",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30076,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_an_authorised_operator_admits_the_resume_through_the_action",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30111,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_an_unauthorised_role_is_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30146,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_an_unresolved_previous_outcome_is_refused_through_the_action",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30181,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_another_companys_store_is_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30216,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_the_action_issues_no_shopify_request",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30253,
+      "activation": true
+    },
+    {
+      "class": "TestMediaResumeProductionRoute",
+      "test": "test_the_admitted_job_is_queued_not_running",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30288,
+      "activation": true
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_create_finalization_rejects_duplicate_remote_sku_atomically",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30331,
+      "activation": false
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_create_preflight_rejects_duplicate_local_identity",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30369,
+      "activation": true
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_create_preflight_rejects_missing_identity_without_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30395,
+      "activation": true
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_recovery_action_is_server_denied_to_non_administrator",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30423,
+      "activation": true
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_recovery_and_managed_clear_controls_are_exposed_with_safe_copy",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 30449,
+      "activation": false
+    },
+    {
+      "class": "TestProductContractRepair",
+      "test": "test_singleton_product_set_uses_top_level_sku_and_transport_option",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30457,
+      "activation": true
+    },
+    {
+      "class": "TestU3ExportTours",
+      "test": "test_media_resume_tour_reaches_the_resume_from_the_browser",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30726,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorProductWebhookW2",
+      "test": "test_registry_removed_product_topic_queues_exact_gid_cleanup",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 30853,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorProductWebhookW2",
+      "test": "test_terminal_old_generation_does_not_suppress_current_import",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30868,
+      "activation": false
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_concurrent_activation_superseded_recovery_one_successor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30917,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_concurrent_cas_successor_creates_exactly_one_at_next_ordinal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30948,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_concurrent_manual_review_release_one_successor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 30979,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_concurrent_reconciliation_replacement_one_ordinal_zero",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31010,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_handoff_child_creation_failure_rolls_back_atomically",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31041,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_orchestration_level_change_yields_one_set_quantities_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31072,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_orchestration_no_level_yields_exactly_one_activation_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31114,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryConcurrency",
+      "test": "test_simultaneous_admission_serializes_to_exactly_one_pair_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31162,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushGuard",
+      "test": "test_guard_leaves_no_blocked_scope_owner",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31242,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushGuard",
+      "test": "test_push_before_confirm_terminally_skips_and_returns_to_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31267,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_a_confirmed_pair_still_gets_its_push_sync",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31292,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_a_second_scan_does_not_admit_a_duplicate_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31320,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_scan_refreshes_previewed_pair_without_admitting_push",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31350,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_full_ceremony_runs_through_production_surfaces_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31378,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_preview_does_not_become_an_unconfirmed_push",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31409,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_preview_issues_no_shopify_request",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31437,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_preview_job_moves_a_pending_pair_to_previewed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31465,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_scheduled_pass_admits_a_preview_for_a_pending_pair",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31493,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryFirstPushReachability",
+      "test": "test_the_scheduled_pass_admits_no_push_sync_for_a_pending_pair",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31521,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_enqueue_location_sync_admission_service",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31569,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_invalid_has_next_page_type_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31597,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_malformed_node_missing_gid_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31620,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_malformed_response_edges_not_a_list_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31643,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_malformed_response_locations_not_a_dict_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31666,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_malformed_response_no_data_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31689,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_missing_next_cursor_when_has_next_page_true_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31712,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_missing_page_info_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31735,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_pagination_across_two_pages",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31761,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryLocationCacheSync",
+      "test": "test_upsert_creates_then_updates_via_named_sudo",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31784,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPairBootstrap",
+      "test": "test_scan_repairs_missing_pair_and_admits_first_preview",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31816,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPairBootstrapFromProductImport",
+      "test": "test_raw_import_response_creates_one_pair_and_replay_is_idempotent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31847,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_aba_freshness_protects_not_applied_verdict",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31871,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_pre_c2_conflicting_gid_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31897,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_pre_c2_level_already_exists_raises_superseded",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31920,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_pre_c2_missing_item_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31943,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_pre_c2_store_identity_mismatch_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31966,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_pre_c2_untracked_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 31989,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_success_conflicting_gid_flags_review_not_overwrite",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32014,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activate_success_persists_real_gid_never_synthetic",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32040,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activation_and_set_quantities_are_distinct_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32069,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activation_handoff_race_preserves_terminal_evidence_without_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32092,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activation_success_handoff_creates_fresh_push_sync",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32115,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_activation_success_rejects_corrupt_cross_store_binding",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32138,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_active_binding_remains_eligible_for_admission",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32161,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_applied_verdict_has_no_updated_at_condition",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32190,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_blocked_manual_review_creates_no_automatic_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32214,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_both_mutations_declare_idempotent_directive",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 32237,
+      "activation": false
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_prepare_uses_fresh_read_not_binding_field",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32246,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_replacement_denied_at_or_above_ceiling",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32269,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_replacement_denied_for_non_set_quantities_job_type",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32292,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_replacement_ordinal_always_derived_predecessor_plus_one",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32315,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_replacement_race_preserves_attempt_without_successor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32338,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_retry_ordinal_denied_on_generic_write",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32362,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_retry_ordinal_sudo_write_allowed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32387,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cas_stale_bounded_replacement_chain_four_distinct_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32410,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_at_ceiling",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32436,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_missing_user_errors_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32459,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_non_dict_entry_in_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32485,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_non_failed_clean_outcome",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32511,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_non_list_user_errors_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32534,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_substring_code_match",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32560,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_without_any_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32586,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_denies_wrong_code",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32609,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_derives_ordinal_from_locked_predecessor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32635,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_create_cas_successor_job_requires_set_quantities_job_type",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32661,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_cron_enqueues_typed_scan_job_not_inline",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32685,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_different_pair_admitted_despite_first_pair_in_progress",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32711,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_duplicate_pair_rejected_via_operation_scope_key",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32733,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fractional_target_blocks_before_c2_no_attempt_no_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32762,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_captures_gid_when_binding_empty",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32785,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_conflicting_gid_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32808,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_level_absence_blocks_no_zero_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32831,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_missing_item_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32854,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_store_identity_mismatch_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32877,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_fresh_pre_c2_untracked_blocks_no_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32900,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_handoff_supersede_rejects_arbitrary_ordinal_kwarg",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32923,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_idempotency_key_lives_only_on_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32947,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_job_type_equals_mutation_domain_for_both_mutation_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32972,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_malformed_freshness_timestamp_never_defaults_to_not_applied",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 32996,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_manual_review_release_replacement_ordinal_zero",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33019,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_missing_freshness_never_defaults_to_not_applied",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33042,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_one_attempt_per_job_lifetime_enforced",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33072,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_cleared_on_cancelled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33095,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_cleared_on_succeeded",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33118,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_cleared_when_superseded",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33141,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_exact_literal_for_pair_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33164,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_not_pair_literal_for_reconciliation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33187,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_operation_scope_key_retained_while_blocked",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33210,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_ordinary_admission_never_sets_nonzero_cas_ordinal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33233,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_ordinary_admission_routes_through_core_enqueue_service",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33259,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_push_sync_captures_gid_when_binding_empty_on_noop",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33293,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_push_sync_conflicting_gid_blocks_before_child_creation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33316,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_read_query_uses_nested_inventory_item_level",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 33344,
+      "activation": false
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_activate_missing_item_blocks_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33352,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_handler_blocks_on_malformed_result_shape",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33375,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_handler_reraises_job_handler_error_from_read",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33399,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_set_quantities_absent_level_routes_location_missing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33422,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_set_quantities_applied_captures_real_gid",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33445,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconcile_set_quantities_missing_item_blocks_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33468,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconciliation_not_applied_creates_new_activate_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33491,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconciliation_not_applied_creates_new_set_quantities_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33514,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconciliation_replacement_never_inherits_cas_ordinal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33537,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_reconciliation_replacement_race_preserves_terminal_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33560,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_cas_exhaustion_with_different_code",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33584,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_cas_exhaustion_without_stale_code",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33607,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_for_cas_ordinal_below_three",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33630,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_for_operator",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33653,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_for_store_identity_mismatch",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33676,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_for_uncertain",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33699,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_denied_without_reason",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33722,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_evidence_immutable_through_release",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33745,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_never_rewrites_outcome_or_disposition",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33768,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_positive_cas_exhaustion_ordinal_three",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33791,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_positive_location_missing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33814,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_positive_ordinary_validation_conflict",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33837,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_no_message_text_routing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33860,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_redacts_email",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33883,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_redacts_phone",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33908,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_redacts_token",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33933,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_retains_ordinary_text",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33958,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_reason_uses_audit_safe_helper",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 33983,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_release_resolves_attempt_by_forward_job_id_not_reconciliation_link",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34009,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_review_binding_refused_by_cas_replacement_admission",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34032,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_review_binding_refused_by_direct_orchestration_dispatch",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34055,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_review_binding_refused_by_reconciliation_replacement_admission",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34075,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_review_binding_refused_by_scheduled_scan",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34098,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_review_flagged_after_unlocked_check_blocks_before_child_creation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34120,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_scan_handler_enqueues_deltas_for_its_own_store_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34144,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_set_quantities_success_rejects_corrupt_cross_store_binding",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34171,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_shared_reconciliation_identity_idempotent_on_reuse",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34205,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_shared_reconciliation_identity_includes_store_and_domain",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34228,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_stale_freshness_evidence_supports_not_applied",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34252,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_store_identity_mismatch_routes_reconciliation_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34275,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_successful_activation_handoff_race_preserves_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34298,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_try_enqueue_push_sync_coalesces_only_exact_scope_collision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34323,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPushMechanics",
+      "test": "test_verified_noop_baseline_prevents_endless_rescan",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34346,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPreC2RecoverySeam",
+      "test": "test_activation_superseded_corrupt_scope_blocks_without_identity_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34368,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPreC2RecoverySeam",
+      "test": "test_activation_superseded_race_commits_skip_and_identity_without_child",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34391,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPreC2RecoverySeam",
+      "test": "test_activation_superseded_recovery_skips_and_hands_off",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34414,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPreC2RecoverySeam",
+      "test": "test_pre_c2_fail_closed_recovery_seam_applies_domain_disposition",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34437,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryPreC2RecoverySeam",
+      "test": "test_pre_c2_recovery_delegates_unrelated_exceptions_to_super",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34460,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_confirmed_stale_mapping_blocks_enqueue_and_dispatch",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34485,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_confirmed_stale_variant_blocks_enqueue_and_dispatch",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34509,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_cron_enqueues_one_typed_scan_job_per_eligible_store",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34532,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_inventory_scan_rpc_requires_connector_administrator",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34558,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_manual_push_requires_operator_or_admin",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34584,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_missing_inventory_item_never_enqueues_activation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34618,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_no_prior_push_known_local_change_enqueues_set_quantities",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34641,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_odoo_event_enqueues_only_mapped_pairs",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 34689,
+      "activation": false
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_pending_pair_stale_mapping_skips_scan_until_reactivated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34697,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_pending_pair_stale_variant_skips_scan_until_reactivated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34720,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_push_sync_handoff_logs_predecessor_and_successor_ids",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34743,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_push_sync_handoff_raises_when_binding_lock_unavailable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34766,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_push_sync_handoff_rolls_back_on_child_creation_failure",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34789,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_admits_never_pushed_pair_even_at_zero_target",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34812,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_admits_never_pushed_pair_with_positive_target",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34835,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_handler_enqueues_deltas_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34858,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_handler_enqueues_push_sync_for_changed_pair",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34881,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_skips_previously_pushed_zero_unchanged",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34901,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_skips_pushed_quantity_unchanged",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34924,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_scan_skips_when_domain_disabled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34947,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_shopify_equals_target_is_never_drift_even_if_differs_from_last_pushed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34970,
+      "activation": true
+    },
+    {
+      "class": "TestInventoryTriggers",
+      "test": "test_unexplained_drift_blocks_and_is_logged",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 34992,
+      "activation": true
+    },
+    {
+      "class": "TestLocationRemap",
+      "test": "test_a_finished_job_does_not_block_a_remap",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35042,
+      "activation": true
+    },
+    {
+      "class": "TestLocationRemap",
+      "test": "test_non_terminal_inventory_work_blocks_a_remap",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35076,
+      "activation": true
+    },
+    {
+      "class": "TestFirstPushWithdrawal",
+      "test": "test_a_pair_that_already_pushed_can_still_be_withdrawn",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35104,
+      "activation": true
+    },
+    {
+      "class": "TestFirstPushWithdrawal",
+      "test": "test_an_unresolved_mutation_attempt_blocks_a_withdrawal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35131,
+      "activation": true
+    },
+    {
+      "class": "TestFirstPushWithdrawal",
+      "test": "test_non_terminal_inventory_work_blocks_a_withdrawal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35155,
+      "activation": true
+    },
+    {
+      "class": "TestLocationRefreshAdmission",
+      "test": "test_a_connected_store_uses_the_business_gated_source",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35198,
+      "activation": true
+    },
+    {
+      "class": "TestSetupLocationStep",
+      "test": "test_activation_admits_fresh_location_proof_after_generation_change",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35294,
+      "activation": true
+    },
+    {
+      "class": "TestUiU2InventoryActionTours",
+      "test": "test_failed_clean_attention_route_reaches_inventory_pair",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35369,
+      "activation": true
+    },
+    {
+      "class": "TestUiU2InventoryActionTours",
+      "test": "test_first_push_reaches_confirmed_from_a_genuine_pending_pair",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 35584,
+      "activation": true
+    },
+    {
+      "class": "TestUiU2InventoryActionTours",
+      "test": "test_recheck_blank_reason_is_refused_in_the_browser",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36048,
+      "activation": true
+    },
+    {
+      "class": "TestUiU2InventoryActionTours",
+      "test": "test_recheck_tour_enqueues_exactly_one_successor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36071,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_authoritative_graphql_read_uses_quantity_timestamp_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36190,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_dispatch_retries_remote_read_then_replays_to_success",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36214,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_dispatch_routes_missing_binding_to_manual_fix_retryable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36234,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_http_context_expands_to_child_without_waiting_for_parent_worker",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 36256,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_inline_expansion_failure_preserves_parent_recovery_job",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 36267,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_missing_or_naive_quantity_timestamp_never_uses_level_timestamp",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36279,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_production_delivery_entry_coalesces_and_later_stamp_is_new_work",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 36303,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_real_handler_applies_read_evidence_without_stock_or_mutation_work",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36314,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorInventoryWebhookW3",
+      "test": "test_w3_is_read_first_and_suite_is_fail_closed",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 36344,
+      "activation": false
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_a_different_choice_never_replaces_the_mapping_that_won",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36355,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_an_administrator_cannot_reach_a_foreign_job_through_the_dialog",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36384,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_an_ordinary_tax_is_eligible_for_an_excluded_shopify_tax",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36407,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_manual_order_import_survives_a_disabled_cron",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36433,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_one_administrator_cannot_read_another_open_dialog",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36462,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleCorrectionAtAnyHead",
+      "test": "test_the_whole_tax_route_completes_on_an_ordinary_tax",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36489,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleJourneys",
+      "test": "test_journey_d_a_second_unmapped_tax_stops_again_rather_than_guessing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36516,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleJourneys",
+      "test": "test_journey_d_an_operator_cannot_map_a_tax",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36544,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleJourneys",
+      "test": "test_journey_d_orders_and_tax_end_to_end",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36572,
+      "activation": true
+    },
+    {
+      "class": "TestBatch2SaleJourneys",
+      "test": "test_journey_d_the_whole_journey_issues_no_shopify_mutation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36602,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_ambiguous_match_routes_job_to_blocked_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36665,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_can_start_when_sale_domain_enabled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36688,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_cannot_start_when_sale_domain_disabled",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36711,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_cannot_start_when_settings_missing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36734,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_created_partner_is_person_even_with_raw_company_string",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36762,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_import_customer_sync_only_issues_read_query_calls",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36792,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_null_email_and_null_address_tolerated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36817,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_unresolved_country_logs_informational_note_via_job_path",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36843,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerImportMatching",
+      "test": "test_unresolved_state_logs_informational_note_via_job_path",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36866,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_ambiguity_failure_releases_lease_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36890,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_binding_conflict_failure_releases_lease_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36913,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_disconnected_store_fails_closed_uncaught_no_transport",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36936,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_normalization_failure_releases_lease_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36964,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_partner_write_failure_releases_lease_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 36987,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_quiesced_error_propagates_uncaught_no_transport_no_lease",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37010,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_shopify_client_error_maps_to_job_handler_error_releases_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37033,
+      "activation": true
+    },
+    {
+      "class": "TestCustomerCallsiteExecuteBusiness",
+      "test": "test_single_context_lease_through_reconciliation_and_release",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37056,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_changed_money_never_confirms_stale_quotation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37124,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_divergence_log_does_not_claim_review_without_transition",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37148,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_null_status_routes_failed_final_without_handler_replay",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37171,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_pending_wait_and_expiry_use_existing_job_states",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37194,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_post_confirmation_cancellation_routes_to_review_without_rewrite",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37217,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_post_confirmation_payment_evidence_loss_is_note_only",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37240,
+      "activation": true
+    },
+    {
+      "class": "TestOrderConfirmationPolicy",
+      "test": "test_reviewed_order_handler_enters_main_needs_attention_state",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37264,
+      "activation": true
+    },
+    {
+      "class": "TestOrderDuplicatePrevention",
+      "test": "test_every_discovery_source_collides_on_same_entity_identity",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37299,
+      "activation": true
+    },
+    {
+      "class": "TestOrderDuplicatePrevention",
+      "test": "test_overlapping_windows_and_repeated_pages_do_not_duplicate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37326,
+      "activation": true
+    },
+    {
+      "class": "TestOrderDuplicatePrevention",
+      "test": "test_same_second_changed_webhook_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37355,
+      "activation": true
+    },
+    {
+      "class": "TestOrderImportMappingFunctional",
+      "test": "test_connector_service_products_are_idempotent_and_store_scoped",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37388,
+      "activation": true
+    },
+    {
+      "class": "TestOrderManualGatewayOverlay",
+      "test": "test_approval_permissions_reason_provenance_and_redaction",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37415,
+      "activation": true
+    },
+    {
+      "class": "TestOrderManualGatewayOverlay",
+      "test": "test_approval_refreshes_before_confirm_and_is_idempotent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37439,
+      "activation": true
+    },
+    {
+      "class": "TestOrderManualGatewayOverlay",
+      "test": "test_changed_evidence_supersedes_approval_without_confirming",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37464,
+      "activation": true
+    },
+    {
+      "class": "TestOrderManualGatewayOverlay",
+      "test": "test_paid_change_after_recorded_approval_stays_review_draft",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37493,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_a_cancelled_scan_job_remains_blocking",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37522,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_a_skipped_policy_row_remains_non_blocking",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37547,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_blocking_failure_prevents_the_stamp",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37572,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_cancelled_import_blocks_until_linked_replacement_succeeds",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37597,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_cancelled_import_covered_by_binding_alone_without_replacement",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37625,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_cancelled_import_linked_replacement_success_without_binding_does_not_cover",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37650,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_cancelled_import_linked_replacement_with_stale_binding_does_not_cover",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37675,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_cancelled_import_resumes_exactly_once_with_a_deterministic_key",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37700,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_failed_scan_records_no_pending_lineage",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37728,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_long_gap_without_read_all_orders_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37751,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_other_store_or_generation_successor_never_covers",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37774,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_promotion_waits_for_descendants_then_stamps",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37799,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_reconnect_admits_exactly_one_catchup_and_retires_stale_jobs",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37824,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_run_scan_records_pending_lineage_in_the_same_pass",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37851,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_skipped_and_failed_final_priors_do_not_auto_resume",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37874,
+      "activation": true
+    },
+    {
+      "class": "TestOrderReconnectCatchup",
+      "test": "test_stale_lineage_never_stamps_a_newer_generation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37902,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_cron_requires_both_flags_and_connected_store",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 37928,
+      "activation": false
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37940,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_scan_enumerates_and_enqueues_but_never_imports_inline",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37970,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_scan_persists_cursor_and_resumes_in_successor_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 37993,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_scan_uses_graphql_null_then_the_server_cursor",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38016,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_selected_binding_trigger_is_enqueue_only_and_collision_safe",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38039,
+      "activation": true
+    },
+    {
+      "class": "TestOrderScanTriggers",
+      "test": "test_store_progress_helpers_are_nonstored_and_state_accurate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38065,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_confirm_requires_exact_current_preview_token_then_enqueues",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38119,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_partial_page_failure_holds_watermark_and_remains_resumable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38142,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_preview_classifies_all_buckets_and_creates_nothing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38165,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_read_all_orders_honesty_never_silently_truncates",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38188,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_stale_or_boolean_confirmation_never_enqueues",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38211,
+      "activation": true
+    },
+    {
+      "class": "TestOrderWatermarkBackfill",
+      "test": "test_watermark_advances_only_after_complete_pagination",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38234,
+      "activation": true
+    },
+    {
+      "class": "TestStore360Aggregates",
+      "test": "test_bridge_incomplete_on_failures_drives_the_critical_band",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38331,
+      "activation": true
+    },
+    {
+      "class": "TestStore360Aggregates",
+      "test": "test_bridge_reports_processing_while_a_scan_is_live",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38350,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_a_different_choice_against_an_existing_mapping_refuses",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38400,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_a_healthy_job_offers_no_decision_route",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38429,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_a_mismatching_effective_posture_is_still_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38452,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_a_multi_company_admin_is_still_not_offered_a_foreign_tax",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38478,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_a_second_confirmation_adds_no_mapping_and_no_second_resume",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38504,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_administrator_cannot_create_a_dialog_for_a_foreign_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38530,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_administrator_cannot_move_a_dialog_onto_a_foreign_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38553,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_explicit_matching_override_is_still_eligible",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38579,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_identical_earlier_mapping_is_proved_before_it_is_reused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38605,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_inherited_posture_tax_completes_the_whole_route",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38634,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_ordinary_tax_on_an_excluded_company_is_eligible",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38660,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_an_ordinary_tax_on_an_included_company_is_eligible",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38686,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_binding_refresh_admits_one_per_gid_import_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38706,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_candidates_are_bounded_same_company_and_right_posture",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38733,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_confirmation_persists_evidence_and_resumes_the_exact_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38759,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_confirmation_refuses_a_foreign_company_tax",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38785,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_confirmation_refuses_a_tax_that_stopped_being_eligible",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38811,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_generic_review_resolution_refuses_a_tax_blocked_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38838,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_malformed_or_substituted_evidence_is_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38864,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_manual_and_scheduled_admission_coalesce",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38890,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_manual_import_survives_a_disabled_cron_and_stays_role_gated",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38919,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_needs_attention_opens_the_tax_mapping_decision",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38948,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_one_administrator_cannot_read_another_open_dialog",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 38976,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_only_an_administrator_may_open_or_confirm",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39002,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_retry_after_mapping_passes_the_prior_tax_blocker",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39029,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_settings_write_makes_the_real_cron_admit_one_scan",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39057,
+      "activation": false
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_the_reason_sentence_is_never_the_identity_source",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39066,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_the_refusal_discloses_nothing_about_the_foreign_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39092,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_the_whole_flow_makes_no_shopify_request",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39115,
+      "activation": true
+    },
+    {
+      "class": "TestTaxDecisionRoute",
+      "test": "test_unknown_fingerprint_becomes_actionable_work",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39142,
+      "activation": true
+    },
+    {
+      "class": "TestUiB2SaleTours",
+      "test": "test_order_controls_tour_starts_a_real_scan",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39300,
+      "activation": false
+    },
+    {
+      "class": "TestUiB2SaleTours",
+      "test": "test_tax_decision_tour_creates_the_mapping_and_resumes",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39308,
+      "activation": true
+    },
+    {
+      "class": "TestUiU2SaleActionTours",
+      "test": "test_order_approval_tour",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39490,
+      "activation": false
+    },
+    {
+      "class": "TestUiU2SaleActionTours",
+      "test": "test_repeated_approval_enqueues_no_second_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39506,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_cancelled_signal_never_coalesces_into_active_update",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39550,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_cancelled_topic_is_evidence_only_and_keeps_child_import_type",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39558,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_delivery_processing_enqueues_one_read_first_import",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39569,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_distinct_active_signal_is_durable_manual_review_not_lost",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39580,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_equal_timestamp_changed_webhook_evidence_is_manual_review",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39591,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_failed_terminal_exact_job_is_not_a_successful_duplicate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39615,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_generation_change_fences_delivery_before_child_admission",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39641,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorSaleWebhook",
+      "test": "test_succeeded_terminal_exact_job_is_a_safe_processed_duplicate",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 39651,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_blocking_fo_status_routes_ambiguous_match",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39661,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_duplicate_admission_enqueue_coalesces_visible_scope_owner",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39684,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_existing_binding_short_circuits_before_read",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39711,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_one_create_job_per_picking",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39734,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_order_in_needs_attention_cannot_admit_fulfillment",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39757,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_two_fos_one_location_yield_single_create_with_min_gid",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39780,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentPickingAdmission",
+      "test": "test_unmatched_shipped_line_routes_mapping_missing",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39804,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentConcurrency",
+      "test": "test_local_validation_cannot_race_past_changed_second_read",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39863,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentConcurrency",
+      "test": "test_overlapping_same_scope_insert_is_refused",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39889,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentConcurrency",
+      "test": "test_shared_reconcile_owns_no_operation_scope",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39911,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentConcurrency",
+      "test": "test_terminal_mutation_job_releases_its_scope",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39931,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_inconclusive_retries_then_caps_to_duplicate_risk",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 39979,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_no_tracking_exact_decrease_is_applied",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40002,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_no_tracking_uncertainty_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40025,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_preflight_blocks_redispatch_with_existing_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40048,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_read_absence_is_inconclusive_never_not_applied",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40071,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_shared_reconcile_never_produces_not_applied_verdict",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40094,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_tracking_update_uncertainty_never_repeats_notification",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40117,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentIdempotency",
+      "test": "test_transport_attempted_true_after_c2",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40140,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_cancelled_attempt_less_job_does_not_block_origin_confirmation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40164,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_existing_attempt_aware_safeguard_unchanged_for_pending_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40187,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_failed_final_attempt_less_job_does_not_block_origin_confirmation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40211,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_genuinely_non_terminal_job_still_blocks",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40233,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_observe_external_unknown_mode1_review_origin_unconfirmed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40257,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentInboundClassification",
+      "test": "test_unknown_pending_with_unresolved_create_attempt",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40280,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentLifecycle",
+      "test": "test_constraint_stays_satisfied_after_normalization",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40311,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentLifecycle",
+      "test": "test_job_type_sink_retypes_to_historic",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40334,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentLifecycle",
+      "test": "test_no_removed_trigger_origin_value_survives",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40357,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentLifecycle",
+      "test": "test_order_independent_with_job_type_sink",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40381,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentLifecycle",
+      "test": "test_trigger_origin_normalized_with_single_audit",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40404,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentMode2Engine",
+      "test": "test_backorder_chain_candidate_exact_remaining_demand",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40480,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentMode2Engine",
+      "test": "test_c14_transport_failure_never_reaches_local_validation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40525,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentMode2Engine",
+      "test": "test_handler_failing_condition_opens_review_and_never_validates",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40579,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentMode2Engine",
+      "test": "test_handler_full_pass_applies_locally",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40602,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_clean_scan_advances_watermark_exactly_once",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40641,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_duplicate_confirmation_coalesces_on_exact_scan_and_nonce",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 40667,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_mode_switch_scan_incomplete_pass_recovers_to_mode1",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40678,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_mode_switch_scan_processes_more_than_200_order_bindings",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40704,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_operator_cannot_retry_or_cancel_a_mode_configuration_scan",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40730,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_retry_action_rearms_the_same_failed_scan",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40756,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_retry_waiting_scan_keeps_request_and_shows_next_retry",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40782,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_retryable_failed_scan_returns_to_recoverable_mode1",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40808,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_rollback_cancels_mode2_evaluations_but_not_layer2",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40834,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_rollback_during_running_scan_prevents_late_mode2_activation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40857,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_scan_clean_completes_to_mode2",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40884,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_scan_external_fulfillment_aborts_to_mode1",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40910,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_scan_read_error_aborts_to_mode1",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40936,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_stale_running_scan_is_detectable_and_recoverable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 40962,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_start_switch_from_mode1_sets_flags_and_enqueues_scan",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 40990,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentModeSwitch",
+      "test": "test_terminal_failed_scan_returns_to_recoverable_mode1",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41000,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReaderPagination",
+      "test": "test_order_fulfillments_reader_accepts_the_actual_list_shape",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41030,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentReaderPagination",
+      "test": "test_order_fulfillments_reader_rejects_connection_shape",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41052,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentReconnectCatchup",
+      "test": "test_a_new_generation_recovers_and_stale_work_cannot_stamp_it",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41090,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReconnectCatchup",
+      "test": "test_cancelled_fulfillment_descendant_blocks_the_stamp",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41109,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReconnectCatchup",
+      "test": "test_catchup_coexists_with_an_inflight_reconciliation_check",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41134,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReconnectCatchup",
+      "test": "test_complete_pass_records_pending_and_partial_pass_does_not",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41160,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReconnectCatchup",
+      "test": "test_promotion_requires_quiescence_and_fences_stale_lineages",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41185,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReviewRelease",
+      "test": "test_release_eligible_failed_clean_creates_manual_sync_replacement",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41222,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReviewRelease",
+      "test": "test_release_empty_reason_rejected",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41245,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReviewRelease",
+      "test": "test_release_post_c2_uncertain_not_eligible_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41268,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentReviewRelease",
+      "test": "test_release_requires_administrator",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41291,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_batched_reader_requires_exact_requested_identity",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41315,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_cancelled_after_validation_opens_review_no_stock_change",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41338,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_cron_enqueues_one_check_per_store_with_nonce",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41383,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_cron_one_store_unexpected_failure_does_not_starve_other_stores",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41391,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_batches_multiple_fulfillment_reads",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41403,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_check_incomplete_pass_saves_cursor_never_advances_watermark",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41426,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_check_is_bounded_and_resumable",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41449,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_check_processes_more_than_200_bindings",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41472,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_check_read_failure_leaves_watermark_unchanged_and_raises",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41495,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconciliation_check_sets_watermark",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41518,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconnect_catchup_external_is_review_even_in_mode2",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41541,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconnect_catchup_incomplete_pass_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41564,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconnect_catchup_processes_more_than_200_order_bindings",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41587,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentScans",
+      "test": "test_reconnect_catchup_read_failure_raises_never_successful_completion",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41610,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentSourceGuards",
+      "test": "test_file_boundary_allowlist",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41639,
+      "activation": false
+    },
+    {
+      "class": "TestFulfillmentTrigger",
+      "test": "test_ordinary_stock_user_tracking_write_enqueues_one_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41714,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentTrigger",
+      "test": "test_ordinary_stock_user_validates_delivery_enqueues_one_job",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41772,
+      "activation": true
+    },
+    {
+      "class": "TestFulfillmentTrigger",
+      "test": "test_second_tracking_write_persists_while_first_job_non_terminal",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41830,
+      "activation": true
+    },
+    {
+      "class": "TestUiActions",
+      "test": "test_mode_switch_wizard_confirm_delegates_to_the_sanctioned_action",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41883,
+      "activation": false
+    },
+    {
+      "class": "TestUiActions",
+      "test": "test_mode_switch_wizard_counts_are_non_authoritative_reads",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41891,
+      "activation": false
+    },
+    {
+      "class": "TestUiVisibilityMatrix",
+      "test": "test_mode_switch_is_allowed_for_a_connector_administrator",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 41944,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_binding_lock_deletion_race_fails_closed",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41961,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_cleanup_delete_is_not_blocked_by_scope_gate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 41987,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_delivery_processing_enqueues_read_only_resolver_not_mutation",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 42010,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_distinct_active_signal_is_durable_manual_review_not_lost",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 42021,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_failed_downstream_observation_is_not_success",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42032,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_failed_terminal_exact_resolver_is_not_successful_duplicate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42058,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_generation_change_fences_fulfillment_delivery",
+      "subtest": "",
+      "kind": "FAIL",
+      "line": 42086,
+      "activation": false
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_generation_race_after_network_read_admits_no_observation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42094,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_missing_order_gid_never_falls_back_to_numeric_webhook_id",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42122,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_present_fulfillment_webhook_scope_allows_subscription_create",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42149,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_resolver_reads_exact_fulfillment_node_then_enqueues_observation",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42173,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_retry_replays_production_resolver_read_and_succeeds_safely",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42200,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_stale_replacement_rechecks_domain_before_delete",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42226,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_unbound_resolved_order_becomes_manual_review_evidence",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42256,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_unknown_resolver_exception_is_unknown_system_error",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42282,
+      "activation": true
+    },
+    {
+      "class": "TestShopifyConnectorFulfillmentWebhook",
+      "test": "test_unrelated_subscription_create_is_not_blocked_by_scope_gate",
+      "subtest": "",
+      "kind": "ERROR",
+      "line": 42308,
+      "activation": true
+    }
+  ]
+}

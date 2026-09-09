@@ -31,6 +31,7 @@ class TestJobDispatch(TransactionCase):
             'shop_domain': 'job-dispatch-test.myshopify.com',
             'api_version': '2026-07',
         })
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.JobLog = cls.env['shopify.connector.job.log']
         cls.Dispatch = cls.env['shopify.connector.job.dispatch']

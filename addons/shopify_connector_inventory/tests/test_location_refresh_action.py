@@ -179,6 +179,7 @@ class TestLocationRefreshAdmission(LocationRefreshCase):
 
     def test_a_connected_store_uses_the_business_gated_source(self):
         self.store.sudo().write({'state': 'connected'})
+        self.store._p15_set_activation('active')
         with self._fail_on_contact():
             job = self._as(self.user_operator).action_refresh_shopify_locations(
                 self.store.id,

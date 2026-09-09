@@ -32,6 +32,7 @@ class TestSecurityHardening(TransactionCase):
             'shop_domain': 'sec1-core.myshopify.com',
             'api_version': '2026-07',
         })
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.JobLog = cls.env['shopify.connector.job.log']
         cls.Enqueue = cls.env['shopify.connector.job.enqueue']

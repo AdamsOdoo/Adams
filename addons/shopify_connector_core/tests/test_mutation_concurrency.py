@@ -179,6 +179,7 @@ class TestMutationConcurrency(TransactionCase):
                 'api_version': '2026-07',
                 'state': 'connected',
             })
+            store._p15_set_activation('active')
             job = env['shopify.connector.job'].sudo().create({
                 'store_id': store.id,
                 'job_source': 'setup_readiness_check',

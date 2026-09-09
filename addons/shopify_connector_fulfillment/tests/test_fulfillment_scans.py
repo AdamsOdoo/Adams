@@ -45,6 +45,7 @@ class TestFulfillmentScans(TransactionCase):
             'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
         cls.settings = cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id, 'fulfillment_domain_enabled': True,
         })
@@ -310,6 +311,7 @@ class TestFulfillmentScans(TransactionCase):
             'shop_domain': 'ful2-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store_2._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store_2.id, 'fulfillment_domain_enabled': True,
         })

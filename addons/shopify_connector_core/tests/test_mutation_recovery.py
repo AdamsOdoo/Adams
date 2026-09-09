@@ -101,6 +101,17 @@ class TestMutationRecovery(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
+        cls.mode_admin = new_test_user(
+            cls.env,
+            login='layer2_recovery_mode_admin_%s' % uuid.uuid4().hex,
+            groups=(
+                'base.group_user,'
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+            company_id=cls.store.company_id.id,
+            company_ids=[(6, 0, [cls.store.company_id.id])],
+        )
         cls.Job = cls.env['shopify.connector.job']
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
         cls.Sweep = cls.env['shopify.connector.stale.owner.sweep']
@@ -149,7 +160,14 @@ class TestMutationRecovery(TransactionCase):
                 '_canonical_settings', {'store_id': store.id},
             )
         if settings.v2_runtime_mode != 'all':
-            settings._set_v2_modes_service(
+            mode_admin = self.mode_admin.sudo()
+            if store.company_id not in mode_admin.company_ids:
+                mode_admin.write({
+                    'company_ids': [(4, store.company_id.id)],
+                })
+            settings.with_user(mode_admin).with_company(
+                store.company_id,
+            )._set_v2_modes_service(
                 {'v2_runtime_mode': 'all'},
                 reason='Layer 2 recovery native regression',
                 expected_configuration_generation=(
@@ -484,11 +502,12 @@ class TestMutationRecovery(TransactionCase):
                     store = env['shopify.connector.store'].create({
                         'name': 'Layer 2 death %s' % phase,
                         'shop_domain': 'layer2-death-%s-%s.myshopify.com' % (
-                            phase, uuid.uuid4().hex,
+                            phase.replace('_', '-'), uuid.uuid4().hex[:16],
                         ),
                         'api_version': '2026-07',
                         'state': 'connected',
                     })
+                    store._p15_set_activation('active')
                     job = env['shopify.connector.job'].sudo().create({
                         'store_id': store.id,
                         'job_source': 'setup_readiness_check',
@@ -607,8 +626,9 @@ class TestMutationRecovery(TransactionCase):
                         (job_ids,),
                     )
                     cr.execute(
-                        'DELETE FROM shopify_connector_job WHERE id = ANY(%s)',
-                        (job_ids,),
+                        'DELETE FROM shopify_connector_job '
+                        'WHERE store_id = ANY(%s)',
+                        (store_ids,),
                     )
                     cr.execute(
                         'DELETE FROM shopify_connector_store WHERE id = ANY(%s)',

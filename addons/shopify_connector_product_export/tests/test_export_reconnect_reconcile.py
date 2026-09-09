@@ -321,6 +321,7 @@ class TestExportReconnectReconcile(ExportCase):
             'api_version': self.store.api_version,
         })
         fresh.sudo().write({'state': 'connected'})
+        fresh._p15_set_activation('active')
         fresh._require_export_reconnect_reconciliation()
         fresh.invalidate_recordset()
         self.assertEqual(fresh.export_reconcile_state, 'complete')
@@ -2599,6 +2600,7 @@ class TestExportReconnectSettlementRace(TransactionCase):
                 'credential_epoch': 1,
             })
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id,
                 'product_export_domain_enabled': True,

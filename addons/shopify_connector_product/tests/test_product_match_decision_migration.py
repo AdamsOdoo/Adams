@@ -67,6 +67,7 @@ class TestProductMatchDecisionV2Migration(TransactionCase):
             'product_domain_enabled': True,
             'product_first_sync_source': 'shopify_source',
         })
+        cls.store._p15_set_activation('active')
 
     def _job(self):
         return self.env['shopify.connector.job'].sudo().create({

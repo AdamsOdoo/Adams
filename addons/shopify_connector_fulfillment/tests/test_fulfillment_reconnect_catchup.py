@@ -39,6 +39,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
             'state': 'connected',
             'credential_present': True,
         })
+        cls.store._p15_set_activation('active')
         cls.settings = cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id,
             'sale_domain_enabled': False,

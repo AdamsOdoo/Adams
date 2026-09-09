@@ -565,6 +565,7 @@ class TestLocationRemap(TransactionCase):
         cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id, 'inventory_domain_enabled': True,
         })
+        cls.store._p15_set_activation('active')
         cls.warehouse = cls.env['stock.warehouse'].search(
             [('company_id', '=', cls.env.company.id)], limit=1,
         )
@@ -928,6 +929,7 @@ class TestFirstPushWithdrawal(TransactionCase):
         cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id, 'inventory_domain_enabled': True,
         })
+        cls.store._p15_set_activation('active')
         cls.warehouse = cls.env['stock.warehouse'].search(
             [('company_id', '=', cls.env.company.id)], limit=1,
         )

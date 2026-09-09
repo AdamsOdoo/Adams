@@ -51,6 +51,7 @@ class TestProductScanProducer(TransactionCase):
             'product_domain_enabled': True,
             'product_first_sync_source': 'shopify_source',
         })
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.Scan = cls.env['shopify.connector.product.scan']
         cls.Dispatch = cls.env['shopify.connector.job.dispatch']

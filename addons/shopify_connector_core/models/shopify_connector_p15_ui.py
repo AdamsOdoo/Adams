@@ -685,7 +685,7 @@ class ShopifyConnectorP15UiFacade(models.AbstractModel):
                 ),
                 "retire_representation": "durable_activation_state",
                 "retire_requires": "disconnected_quiesced",
-                "allowed_actions": admin_actions,
+                "allowed_actions": self._serialize(admin_actions),
             },
             credentials={
                 # Presence/verification only.  No credential search/read is

@@ -132,6 +132,12 @@ jobs:
           # anyway before running anything.
           key: odoo-src-${{ hashFiles('tools/odoo-pin.txt') }}
 
+      - name: Run focused native prerequisite
+        # Fast native diagnosis for activation/API/DTO foundations and the
+        # current core job roots. Its summary is scoped and cannot claim the
+        # full connector gate. The no-argument campaign below remains required.
+        run: python tools/run_connector_focus.py
+
       - name: Run the connector suite
         # No arguments on purpose. The script runs the fresh-install pass, the
         # warm-update pass AND the complete non-standard tag suite by default,
@@ -152,6 +158,7 @@ jobs:
           path: |
             ci-artifacts/*.log
             ci-artifacts/summary.json
+            ci-artifacts/focus-summary.json
           retention-days: 30
           if-no-files-found: warn
 
@@ -165,6 +172,16 @@ jobs:
             echo "GitHub event: \`${SOURCE_EVENT_NAME}\`"
             echo "\`github.sha\` (merge ref on pull_request; NOT what ran): \`${{ github.sha }}\`"
             echo
+            echo '### Focused native prerequisite'
+            if [ -f ci-artifacts/focus-summary.json ]; then
+              echo '```json'
+              cat ci-artifacts/focus-summary.json
+              echo '```'
+            else
+              echo '_No focused summary produced._'
+            fi
+            echo
+            echo '### Full release campaign'
             if [ -f ci-artifacts/summary.json ]; then
               echo '```json'
               cat ci-artifacts/summary.json

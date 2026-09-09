@@ -671,6 +671,7 @@ class TestSetupLocationStep(TransactionCase):
         self.store.sudo().write({
             'state': 'connected', 'connection_generation': 1,
         })
+        self.store._p15_set_activation('active')
 
         with patch.object(
             type(self.Service), '_trigger_dispatch_after_location_refresh',

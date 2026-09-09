@@ -277,6 +277,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })
@@ -312,6 +313,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })
@@ -343,6 +345,7 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
                 'api_version': '2026-07', 'state': 'connected',
             })
+            store._p15_set_activation('active')
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id, 'fulfillment_domain_enabled': True,
             })
@@ -903,6 +906,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         settings = self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })

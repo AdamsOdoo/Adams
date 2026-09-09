@@ -106,6 +106,7 @@ class TestBatch2ProductJourneys(TransactionCase):
             'store_id': store.id,
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         return store
 
     @classmethod

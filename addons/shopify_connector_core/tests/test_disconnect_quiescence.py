@@ -456,6 +456,8 @@ class TestBusinessAdmission(TransactionCase):
         # `connected` so business enqueue + admission gates pass, mirroring the
         # canonical pattern in the existing dispatch/retry tests.
         cls.store.write({'state': 'connected'})
+        # Operational admission fixtures must satisfy the separate activation gate.
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):
@@ -507,6 +509,7 @@ class TestBusinessAdmission(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        other._p15_set_activation('active')
         job_other = self._make_job(store=other)
         self.env.flush_all()
         with self.assertRaises(ShopifyQuiescedError):
@@ -617,6 +620,7 @@ class TestBusinessAdmission(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        nocred._p15_set_activation('active')
         job = self._make_job(store=nocred)
         Cred = type(self.env['shopify.connector.store.credential'])
         reads = []
@@ -1034,6 +1038,7 @@ class TestGenuineRealAdmission(TransactionCase):
             # action_set_token() demotes `connected` -> `reconnect_needed`;
             # re-assert `connected` before enqueue/admission (see setUpClass).
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             job_ids = []
             for _ in range(n_jobs):
                 job = env['shopify.connector.job.enqueue'].enqueue(
@@ -1069,17 +1074,16 @@ class TestGenuineRealAdmission(TransactionCase):
             return
         cr = self._open_bounded(dbname)
         try:
-            if job_ids:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job_log "
-                    "WHERE job_id = ANY(%s)", (list(job_ids),))
+            cr.execute(
+                "DELETE FROM shopify_connector_job_log WHERE job_id IN "
+                "(SELECT id FROM shopify_connector_job WHERE store_id = %s)",
+                (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_call_lease "
                 "WHERE store_id = %s", (store_id,))
-            if job_ids:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job WHERE id = ANY(%s)",
-                    (list(job_ids),))
+            cr.execute(
+                "DELETE FROM shopify_connector_job WHERE store_id = %s",
+                (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_store_credential "
                 "WHERE store_id = %s", (store_id,))
@@ -1663,6 +1667,7 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
     # Phase-1 A/B sweep cancels queued/retry_waiting business jobs only.
     def test_phase1_sweeps_queued_and_retry_waiting_only(self):
         store = self._make_store(state='connected')
+        store._p15_set_activation('active')
         Job = self.env['shopify.connector.job']
         queued = Job.create({
             'store_id': store.id, 'job_source': 'manual_sync',
@@ -1684,6 +1689,7 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
     # 18. Phase-1 sweep never writes a running/claimed business job row.
     def test_phase1_sweep_never_writes_running_job(self):
         store = self._make_store(state='connected')
+        store._p15_set_activation('active')
         running = self.env['shopify.connector.job'].create({
             'store_id': store.id, 'job_source': 'scheduled_sync',
             'job_type': 'core_dispatch_selftest', 'state': 'running',
@@ -1700,6 +1706,7 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
     # 19. disconnecting is non-startable for business jobs.
     def test_disconnecting_business_job_not_startable(self):
         store = self._make_store(state='connected')
+        store._p15_set_activation('active')
         job = self.env['shopify.connector.job'].create({
             'store_id': store.id, 'job_source': 'manual_sync',
             'job_type': 'core_dispatch_selftest', 'state': 'queued',
@@ -2649,6 +2656,7 @@ class TestCredentialReplacementRaceGenuine(TransactionCase):
                 store, DUMMY_TOKEN)
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             job = env['shopify.connector.job.enqueue'].enqueue(
                 store, 'manual_sync', 'core_dispatch_selftest',
                 payload_hash=uuid.uuid4().hex,
@@ -2684,16 +2692,16 @@ class TestCredentialReplacementRaceGenuine(TransactionCase):
             return
         cr = self._open_bounded(dbname)
         try:
-            if job_id is not None:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job_log WHERE job_id = %s",
-                    (job_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_job_log WHERE job_id IN "
+                "(SELECT id FROM shopify_connector_job WHERE store_id = %s)",
+                (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
                 (store_id,))
-            if job_id is not None:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job WHERE id = %s", (job_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_job WHERE store_id = %s",
+                (store_id,))
             cr.execute(
                 "DELETE FROM shopify_connector_store_credential "
                 "WHERE store_id = %s", (store_id,))
@@ -3189,6 +3197,7 @@ class _GenuineRaceHelpers:
             store.write({'state': 'connected'})
             job_id = None
             if with_job:
+                store._p15_set_activation('active')
                 job = env['shopify.connector.job.enqueue'].enqueue(
                     store, 'manual_sync', 'core_dispatch_selftest',
                     payload_hash=uuid.uuid4().hex,
@@ -4616,6 +4625,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
                 store, DUMMY_TOKEN)
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             states = initial_states or ['queued'] * n_jobs
             counts = retry_counts or [0] * n_jobs
             self.assertEqual(len(states), n_jobs)

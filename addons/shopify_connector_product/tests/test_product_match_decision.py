@@ -139,6 +139,7 @@ class TestProductMatchDecision(TransactionCase):
             'product_first_sync_source': 'shopify_source',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         return store
 
     @classmethod

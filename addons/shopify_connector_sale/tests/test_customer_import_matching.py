@@ -88,6 +88,7 @@ class TestCustomerImportMatching(TransactionCase):
             'shop_domain': 'customer-import-matching-test.myshopify.com',
             'api_version': '2026-07',
         })
+        cls.store._p15_set_activation('active')
         cls.Importer = cls.env['shopify.connector.customer.importer']
         cls.CustomerBinding = cls.env['shopify.connector.customer.binding']
         cls.Job = cls.env['shopify.connector.job']
@@ -904,6 +905,7 @@ class TestCustomerCallsiteExecuteBusiness(TransactionCase):
         # action_set_token demotes connected -> reconnect_needed and bumps
         # the generation; re-assert connected for the admission gate.
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):

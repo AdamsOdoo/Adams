@@ -50,6 +50,7 @@ class TestShopifyConnectorWebhookP11(TransactionCase):
             'company_id': self.env.company.id,
         })
         store._store_service_write('_lifecycle', {'state': 'connected'})
+        store._p15_set_activation('active')
         settings = self.env[
             'shopify.connector.store.settings'
         ].sudo().create({'store_id': store.id})
@@ -216,6 +217,7 @@ class TestShopifyConnectorWebhookP11(TransactionCase):
             'company_id': foreign.id,
         })
         store._store_service_write('_lifecycle', {'state': 'connected'})
+        store._p15_set_activation('active')
         settings = self.env[
             'shopify.connector.store.settings'
         ].sudo().create({'store_id': store.id})

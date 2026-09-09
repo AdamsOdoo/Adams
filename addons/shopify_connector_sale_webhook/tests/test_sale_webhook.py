@@ -35,6 +35,7 @@ class TestShopifyConnectorSaleWebhook(TransactionCase):
             'store_id': store.id,
             'sale_domain_enabled': True,
         })
+        store._p15_set_activation('active')
         return store
 
     def _delivery(

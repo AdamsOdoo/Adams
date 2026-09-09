@@ -70,6 +70,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_domain_enabled': True,
             'inventory_scheduled_sync_enabled': True,
         })
+        store._p15_set_activation('active')
         return store
 
     def test_webhook_settings_fields_have_canonical_classification(self):
@@ -900,6 +901,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_domain_enabled': True,
             'inventory_scheduled_sync_enabled': True,
         })
+        other_store._p15_set_activation('active')
         own_store = self._store('allowed-company')
         service = self.env[
             'shopify.connector.inventory.observation.service'

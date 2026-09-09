@@ -176,6 +176,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        store._p15_set_activation('active')
         delivery, duplicate = self.env[
             'shopify.connector.webhook.delivery'
         ].with_context(inline_webhook_expansion=True)._ingest(
@@ -230,6 +231,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         delivery, duplicate = self.env[
             'shopify.connector.webhook.delivery'
         ]._ingest(
@@ -319,6 +321,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env[
             'shopify.connector.webhook.subscription'
         ]
@@ -383,6 +386,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env['shopify.connector.webhook.subscription']
         row = Subscription._ensure_expected_for_store(store).filtered(
             lambda item: item.topic == 'app/uninstalled'
@@ -447,6 +451,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env['shopify.connector.webhook.subscription']
         row = Subscription._ensure_expected_for_store(store).filtered(
             lambda item: item.topic == 'app/uninstalled'

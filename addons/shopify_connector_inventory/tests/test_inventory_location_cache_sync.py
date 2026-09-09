@@ -34,6 +34,7 @@ class TestInventoryLocationCacheSync(TransactionCase):
         # is not `connected`. The store default is `setup_incomplete`, so
         # the fixture must connect it exactly as the other suites do.
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         cls.user_auditor = cls.env['res.users'].create({
             'name': 'Location Cache Sync Auditor',
             'login': 'location_cache_sync_auditor',
