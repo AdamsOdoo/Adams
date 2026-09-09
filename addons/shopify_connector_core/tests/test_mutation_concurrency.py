@@ -592,6 +592,50 @@ class TestMutationConcurrency(TransactionCase):
             )
             self.assertEqual(cr.fetchone()[0], 1)
 
+    def test_prepared_request_distinguishes_legacy_and_missing_run_lane(self):
+        _store_id, job_id = self._durable_fixture()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            dispatch = env['shopify.connector.job.dispatch']
+            job = env['shopify.connector.job'].browse(job_id)
+            request = dispatch._prepare_preconditions_mutation_selftest(
+                dispatch._prepare_local_mutation_selftest(job),
+                {'job_id': job_id},
+            )
+            cr.commit()
+
+            def side_cursor(*_args, **_kwargs):
+                return db_connect(self.env.cr.dbname).cursor()
+
+            with patch.object(self.registry, 'cursor', side_effect=side_cursor), \
+                    patch.object(
+                        type(dispatch), '_get_v2_mutation_job_types',
+                        return_value=frozenset({'mutation_dispatch_selftest'}),
+                    ):
+                identity = dispatch._v2_locked_job_identity(job_id)
+                self.assertFalse(identity['requires_v2'])
+                self.assertFalse(identity['is_v2'])
+                self.assertEqual(dispatch._validate_prepared_request(
+                    request, job_id, 'identity-test-token',
+                    'mutation_dispatch_selftest',
+                ), request)
+                job.write({'lane': 'interactive'})
+                cr.commit()
+                identity = dispatch._v2_locked_job_identity(job_id)
+                self.assertTrue(identity['requires_v2'])
+                self.assertFalse(identity['is_v2'])
+                with self.assertRaisesRegex(
+                    ValidationError, 'lost its durable run identity',
+                ):
+                    dispatch._validate_prepared_request(
+                        request, job_id, 'identity-test-token',
+                        'mutation_dispatch_selftest',
+                    )
+                self.assertEqual(
+                    cr._cnx.get_transaction_status(),
+                    psycopg2.extensions.TRANSACTION_STATUS_IDLE,
+                )
+
     def test_precondition_failure_rolls_back_owned_cursor_before_c2(self):
         store_id, job_id = self._durable_fixture()
         with db_connect(self.env.cr.dbname).cursor() as cr:

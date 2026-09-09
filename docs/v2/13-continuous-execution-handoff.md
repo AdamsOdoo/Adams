@@ -12,13 +12,10 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
-- Frozen correction source `19ce79419f8bfa3beaf9b360cdc30d4971b28e41`, tree `a703831401dd44c826361c901b74a852b3f22997`, matches local `2629574`. Six source artifacts reproduce byte-identically and catalog source metadata is synchronized. Baseline and Lite/Full packaging checks pass. Final evidence commit/branch update remains pending.
-
-- Published source remains head `57c8b6794b8ae26075c80505e4154f70000929d0`; exact-head policy passed, native 34374904144 FAILED: 880 tests, one failure, zero errors, eight selected classes missing. Full campaign skipped. Original artifact digest and summary preserved in document 18.
-- Prepared correction fixes explicit nonstandard class selection and mutation precondition transaction ownership. Successful observed metadata is committed on an owned preparation cursor; failures/invalid shape roll back. The cursor closes before independent V2 identity validation/C2. Main C3 cursor stays idle; no added main commit. V2 lane marker without run still fails closed.
-- Native success proof now includes actual preparation read/write, independent visibility, main idle state and durable C3 success. Rollback regression covers typed exception and malformed request; V2 identity tests retain legitimate legacy and reject missing-run lane markers. Independent review inspected actual boundaries and corrected nested lock risk.
-- All 471 local tests pass after final evidence freeze (28.056 seconds); syntax, static and change-size checks pass. Native qualification remains pending. No live Shopify or production action.
-- First next action: freeze/publish coherent source and synchronized evidence, verify all 48 classes actually execute and inspect full campaign. Keep W2 compatibility and release gates open. Preserve local and API histories.
+- Published head `8727b50cea694590fa4c70cec2e44aba4ee883bc`, source `19ce79419f8bfa3beaf9b360cdc30d4971b28e41`. Policy passed. Native 34379511455 failed: 901 tests, one failure, two errors, all 48 selected classes present, no skips. Full campaign skipped. Original summary/digest in document 18.
+- Production mutation success and preparation rollback regressions passed. Prepared test-only follow-up updates source ordering for the extracted helper and moves identity checks onto the existing committed fixture with real independent cursors. Missing-run rejection remains unchanged; no production correction in this packet.
+- All 471 local tests pass (26.576 seconds); changed Python syntax passes. Final exact-source evidence and native results remain pending.
+- First next action: finish review, freeze and publish the coherent correction with synchronized catalog evidence, inspect expanded prerequisite and full campaign. Preserve histories and W2/release gates. No live Shopify or production activity.
 
 ## Preceding published candidate — 9 September 2026
 

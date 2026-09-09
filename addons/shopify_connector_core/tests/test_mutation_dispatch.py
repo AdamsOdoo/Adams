@@ -214,7 +214,10 @@ class TestMutationDispatch(TransactionCase):
         positions = [
             call_line(strategy_call('prepare_local')),
             fn.body[direct_commit[0]].lineno,
-            call_line(strategy_call('prepare_preconditions')),
+            call_line(
+                lambda call: isinstance(call.func, ast.Attribute)
+                and call.func.attr == '_prepare_mutation_request'
+            ),
             call_line(
                 lambda call: isinstance(call.func, ast.Attribute)
                 and call.func.attr == '_commit_attempt_intent_c2'
