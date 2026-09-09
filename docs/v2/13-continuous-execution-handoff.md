@@ -12,10 +12,12 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
+- Frozen correction source `19ce79419f8bfa3beaf9b360cdc30d4971b28e41`, tree `a703831401dd44c826361c901b74a852b3f22997`, matches local `2629574`. Six source artifacts reproduce byte-identically and catalog source metadata is synchronized. Baseline and Lite/Full packaging checks pass. Final evidence commit/branch update remains pending.
+
 - Published source remains head `57c8b6794b8ae26075c80505e4154f70000929d0`; exact-head policy passed, native 34374904144 FAILED: 880 tests, one failure, zero errors, eight selected classes missing. Full campaign skipped. Original artifact digest and summary preserved in document 18.
 - Prepared correction fixes explicit nonstandard class selection and mutation precondition transaction ownership. Successful observed metadata is committed on an owned preparation cursor; failures/invalid shape roll back. The cursor closes before independent V2 identity validation/C2. Main C3 cursor stays idle; no added main commit. V2 lane marker without run still fails closed.
 - Native success proof now includes actual preparation read/write, independent visibility, main idle state and durable C3 success. Rollback regression covers typed exception and malformed request; V2 identity tests retain legitimate legacy and reject missing-run lane markers. Independent review inspected actual boundaries and corrected nested lock risk.
-- All 471 local tests pass before final evidence freeze; syntax, static and change-size checks pass. Native qualification remains pending. No live Shopify or production action.
+- All 471 local tests pass after final evidence freeze (28.056 seconds); syntax, static and change-size checks pass. Native qualification remains pending. No live Shopify or production action.
 - First next action: freeze/publish coherent source and synchronized evidence, verify all 48 classes actually execute and inspect full campaign. Keep W2 compatibility and release gates open. Preserve local and API histories.
 
 ## Preceding published candidate — 9 September 2026
