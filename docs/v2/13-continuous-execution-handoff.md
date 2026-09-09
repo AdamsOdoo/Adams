@@ -19,8 +19,9 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Old-core W2-only compatibility requires a material decision documented in 19. The existing gate remains unchanged and open; normal owner upgrades cannot be relabeled as W2-only success.
 - First next action: complete/review the worker correction and native positives/negatives, publish a coherent exact-source candidate, and inspect focused then full results. UI remains parked/unapproved. No live Shopify or production promotion performed; development publication can trigger Odoo.sh builds whose state is unverified.
 
-## Prepared next candidate
+## Prepared next candidate — frozen source acaa0e20
 
+- Source `acaa0e2048e6f25fa031fd772fa70371a2efcc03` has tree `3132e06d238fa4a29a6083f19153a0b7b3cba29b`, identical to local `ceea5ef`. Six generated artifacts reproduced identically twice; the evidence-head publication/native result must be verified from the branch ref.
 - Correct remaining export duplicate-variant and W2 callback-ownership fixtures. Direct W3 handler/dispatcher tests use a real operator because they bypass the worker claim boundary.
 - Bound internal worker reads to the claimed job/cursor/store/company; rebind worker execution to the job company. Native worker positives and forged/unclaimed/foreign negatives must pass before qualification.
 - Focus retains all prior classes and adds affected gateway/worker checks. Full fresh/warm, Lite/Full, old-core, migration, nonstandard and browser lanes remain downstream and unchanged.
