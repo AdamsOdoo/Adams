@@ -260,6 +260,7 @@ class TestMutationRecovery(TransactionCase):
             'company_id': foreign_company.id,
             'shop_domain': 'stale-foreign-%s.myshopify.com' % uuid.uuid4().hex,
         })
+        foreign_store._store_service_write('_lifecycle', {'state': 'connected'})
         now = fields.Datetime.now()
         local, local_attempt = self._v2_running(now - timedelta(hours=1))
         foreign, foreign_attempt = self._v2_running(
@@ -305,6 +306,7 @@ class TestMutationRecovery(TransactionCase):
         other_store = self.store.sudo().copy({
             'shop_domain': 'stale-same-company-%s.myshopify.com' % uuid.uuid4().hex,
         })
+        other_store._store_service_write('_lifecycle', {'state': 'connected'})
         _other_job, other_attempt = self._v2_running(now, store=other_store)
         other_run = other_attempt.run_id
         self.env.cr.execute(

@@ -89,6 +89,15 @@ class ShopifyConnectorJobRuntime(models.Model):
         ondelete='set null',
     )
 
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        """Declare every runtime parent checked against the job's store."""
+        return tuple(super()._sec3_parent_scope_relations()) + (
+            ('run_id', 'store'),
+            ('parent_job_id', 'store'),
+            ('blocked_by_job_id', 'store'),
+        )
+
     @api.constrains(
         'store_id', 'run_id', 'parent_job_id', 'blocked_by_job_id',
         'sequence', 'lane_priority', 'expected_configuration_generation',
