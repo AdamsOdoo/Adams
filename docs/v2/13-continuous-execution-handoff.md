@@ -10,7 +10,13 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Only the authorized development environment and `testin-lzhbzhtc.myshopify.com` may be used for live verification after exact build/database/company/store identity checks. Staging/production, other stores and public release require separate authorization.
 - GitHub API publication and native CI are available. Local scratch has no Odoo/PostgreSQL. Current Odoo.sh build/database identity is unverified. No live Shopify work has been performed in this correction campaign.
 
-## Active published candidate — 9 September 2026
+## Current checkpoint
+
+- Frozen source `0aef7df8e8d7e959cb50d405f361cd78988741d1`, tree `4b672d5adb73941ba1f5bebe29ee9f6cf9c845b1`, matches local source commit `8d3565a` exactly. Source objects uploaded; branch still at preceding candidate until final evidence publication.
+- Final evidence generation and catalog source metadata are synchronized to this source and verified. All 467 local tests pass after generation. Native verification remains pending; no qualification claim.
+- First next action: publish the evidence commit as one fast-forward branch update, preserve both histories, verify exact-head policy and expanded 48-class prerequisite, then inspect the full campaign. Keep W2 compatibility and all release gates open.
+
+## Preceding published candidate — 9 September 2026
 
 - Head `a77741a7fc272999078c9cda3afd763589eb8a08`, source `c7543af0864490e4e5c545cbeb634c59bee3d831`; source/evidence trees match local `60894d9`/`82ece74`. Six artifacts reproduced identically twice; frozen baseline and static policy pass. Both local/API histories preserved by a tree-identical merge.
 - [Native 34342033182](https://github.com/AdamsOdoo/Adams/actions/runs/34342033182) completed: focused 834/0/0 passed; full campaign failed. Fresh 3012/3/1, warm 3012/19/2, nonstandard 70/4/31; both meta-installs pass; migrations/repeats and old-core remain failing. Exact full/focused summaries and verified artifact digest are recorded in document 18. No active campaign remains.
@@ -18,14 +24,14 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Unqualified independent-cursor regression draft is preserved in `claim-read-company-unqualified-draft.patch`, excluded from executable tests. Its company cleanup was rejected: pinned stock company creation changes shared locations/partner properties and creates stock configuration. Next test-design task must isolate/restore all fixture effects or use a disposable database; no skip or production bypass. Native published source remains unchanged.
 - First next action: finish consolidated root-family repairs and cross-family review described in document 18, run source plus final generated-evidence checks, then publish one coherent candidate. UI remains parked and document 19 remains proposed.
 
-## Consolidated correction prepared locally
+## Consolidated candidate — source frozen, publication pending
 
 - Repaired activation setup across all identified product/customer/order/tax/visual fixtures, preserving disconnect negatives and tracing actual legacy admission paths for newly reached calls.
 - Fulfillment cleanup removes fixture audit logs before jobs and verifies committed zero residue; this addresses fresh-to-warm and migration-repeat store contamination. Inventory withdrawal checks four newly created administrator audit jobs without including setup history.
 - Mutation C2 success proof uses a genuine independent registry cursor; callback and durable-success assertions remain. Export exact-query expectation includes existing pagination completeness field. Visual measurement lists existing V2/prototype selectors without enabling parked assets.
 - P10 tests use independent cancellation/sweep cursors and one test-local full-admission retry for 40001 only. All eight P10 cases remain mandatory in a separately logged disposable database lane; database disposal removes company hook side effects. No claim that this test retry adds production retry behavior.
 - Native prerequisite expanded from 37 to 48 complete backend classes. Browser and full fresh/warm/migration/nonstandard/P10 lanes remain required, unchanged in acceptance scope.
-- Settled local gate: 467 dependency-free tests pass in 18.736 seconds; Python/bash syntax, static policy, change-size, whitespace and both marketplace package checks pass. Final generated-source evidence must still be checked after freezing.
+- Settled local gate: 467 dependency-free tests pass in 18.736 seconds; Python/bash syntax, static policy, change-size, whitespace and both marketplace package checks pass. After freezing, all 467 tests pass again in 17.571 seconds; baseline and catalog provenance checks pass. Six generated artifacts reproduce byte-identically. Local GraphQL validation is blocked by missing graphql-core; the CI policy gate installs its pinned dependency.
 - P10 production trace: run_drain → run_v2_read_only → coordinator claims → repository transaction. A preclaim 40001 rolls back/rethrows before handlers; no connector immediate retry exists. It aborts this cron invocation including its legacy remainder; future cron can retry eligible jobs. Actual scheduler recovery remains unqualified.
 - No production addon behavior changed in this packet. Independent reviews inspected mutation, query, visual, audit and cleanup corrections. Source/evidence publication and native verification remain pending; keep old-core W2 gate open.
 
