@@ -261,6 +261,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             'expected_include_fields': ['admin_graphql_api_id'],
             'state': 'active',
             'shopify_subscription_gid': gid,
+            'expected_callback_url_digest': 'callback-digest',
         })
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': store.id,

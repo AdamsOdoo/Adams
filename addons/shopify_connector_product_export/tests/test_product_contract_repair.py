@@ -113,11 +113,7 @@ class TestProductContractRepair(ExportCase):
         self.settings.sudo().write({
             'product_export_binding_namespace_ready': True,
         })
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-1',
-            'barcode': '0002',
-        })
+        extra = self.add_template_variant('WIDGET-1', '0002')
         preview = self.make_preview(
             export_path='create', state='applying',
             steps=[{

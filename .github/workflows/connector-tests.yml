@@ -45,7 +45,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: connector-tests-${{ github.ref }}
+  # Push and PR events test the same source head; avoid duplicate campaigns.
+  # Keep fork repositories and the two workflows in separate groups.
+  group: connector-tests-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

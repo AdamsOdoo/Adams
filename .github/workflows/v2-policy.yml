@@ -16,7 +16,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: v2-policy-${{ github.ref }}
+  # Push and PR events test the same source head; avoid duplicate campaigns.
+  # Keep fork repositories and the two workflows in separate groups.
+  group: v2-policy-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

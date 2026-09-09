@@ -167,7 +167,7 @@ class ShopifyConnectorDomainReadGateway(models.AbstractModel):
         webhook: bool = False,
         lifecycle: bool = False,
     ) -> Any:
-        store = self._assert_store(store)
+        store = self._assert_store(store, job=job)
         mode = self._store_mode(store)
         if mode in ("legacy", "compare_reads") and not callable(legacy_reader):
             raise UserError("The V1 rollback reader is not configured.")

@@ -44,6 +44,16 @@ _CONNECTOR_GROUP_PREFIX = "shopify_connector_core.group_shopify_connector_"
 _READ_ROLES = ("admin", "reviewer", "operator", "auditor")
 _COMPARE_SAMPLE_MODULUS = 100
 
+# The normal read surface remains role-gated.  The root cron reaches it only
+# after the dispatcher has acquired a real job row and bound execution to that
+# job's company.  Object identity makes the capability impossible to construct
+# through an RPC context; the owner tuple additionally binds it to this exact
+# cursor/claim path and job/store/company identity.  A copied context on a side
+# cursor therefore cannot inherit worker authority.
+READ_WORKER_CAPABILITY_CONTEXT = "shopify_read_worker_capability"
+READ_WORKER_OWNER_CONTEXT = "shopify_read_worker_owner"
+_READ_WORKER_CAPABILITY = object()
+
 
 class _AuthorizedReadDelegate:
     """Bridge one pure adapter call to the existing Odoo API client.
@@ -122,15 +132,85 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _assert_connector_role(self) -> None:
+    def _claimed_dispatch_scope(self, dispatcher: Any, job: Any) -> tuple:
+        """Bind an already-claimed job worker to its exact owning company.
+
+        This private method is called only by ``_drain_one`` immediately after
+        its row-lock claim.  Root receives the unforgeable read capability;
+        an Administrator-run manual drain receives only the company binding
+        and continues through the ordinary connector-role check.
+        """
+        job.ensure_one()
+        company = job.company_id
+        worker = dispatcher.with_company(company)
+        context = {}
+        if worker.env.su and worker.env.uid == SUPERUSER_ID:
+            context = {
+                READ_WORKER_CAPABILITY_CONTEXT: _READ_WORKER_CAPABILITY,
+                READ_WORKER_OWNER_CONTEXT: (
+                    worker.env.cr, job.id, job.store_id.id, company.id,
+                ),
+            }
+        worker = worker.with_context(**context)
+        scoped_job = worker.env["shopify.connector.job"].browse(job.id)
+        return worker, scoped_job, job.id, job.store_id.id
+
+    @api.model
+    def _is_owned_root_worker_read(self, job: Any, store: Any) -> bool:
+        """Recognize only the claimed root worker scope minted by dispatch."""
+        context = self.env.context
+        if not (
+            self.env.su
+            and self.env.uid == SUPERUSER_ID
+            and context.get(READ_WORKER_CAPABILITY_CONTEXT)
+            is _READ_WORKER_CAPABILITY
+        ):
+            return False
+        owner = context.get(READ_WORKER_OWNER_CONTEXT)
+        if not (
+            isinstance(owner, tuple)
+            and len(owner) == 4
+            and owner[0] is self.env.cr
+        ):
+            return False
+        try:
+            job.ensure_one()
+            store.ensure_one()
+        except Exception:
+            return False
+        if (
+            getattr(job, "_name", None) != "shopify.connector.job"
+            or getattr(store, "_name", None) != "shopify.connector.store"
+            or job.env.cr is not self.env.cr
+            or store.env.cr is not self.env.cr
+            or not job.exists()
+            or not store.exists()
+        ):
+            return False
+        cursor, job_id, store_id, company_id = owner
+        del cursor
+        return bool(
+            job.id == job_id
+            and store.id == store_id
+            and job.state == "running"
+            and job.store_id.id == store.id
+            and job.company_id.id == company_id
+            and store.company_id.id == company_id
+            and self.env.company.id == company_id
+        )
+
+    @api.model
+    def _assert_connector_role(self, job: Any = None, store: Any = None) -> None:
         for suffix in _READ_ROLES:
             if self.env.user.has_group(_CONNECTOR_GROUP_PREFIX + suffix):
                 return
+        if self._is_owned_root_worker_read(job, store):
+            return
         raise AccessError("This Shopify read surface is limited to connector users.")
 
     @api.model
-    def _assert_store(self, store: Any) -> Any:
-        self._assert_connector_role()
+    def _assert_store(self, store: Any, *, job: Any = None) -> Any:
+        self._assert_connector_role(job=job, store=store)
         if not store or not hasattr(store, "ensure_one"):
             raise UserError("Choose one valid Shopify store.")
         try:
@@ -304,7 +384,7 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
         claim: Any = None,
         allow_lifecycle: bool = False,
     ) -> ReadResult[Any]:
-        store = self._assert_store(store)
+        store = self._assert_store(store, job=job)
         adapter, mode, _documents = self._adapter(
             store,
             job,

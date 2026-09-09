@@ -76,9 +76,8 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         store._p15_set_activation('active')
         return store
 
-    def _reader_scope(self, suffix):
-        store = self._store('read-%s' % suffix)
-        actor = self.env['res.users'].create({
+    def _reader_actor(self, suffix):
+        return self.env['res.users'].create({
             'name': 'W3 inventory reader %s' % suffix,
             'login': 'w3-inventory-reader-%s' % suffix,
             'group_ids': [(6, 0, [
@@ -88,6 +87,10 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                 ).id,
             ])],
         })
+
+    def _reader_scope(self, suffix):
+        store = self._store('read-%s' % suffix)
+        actor = self._reader_actor(suffix)
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': store.id,
             'job_source': 'webhook',
@@ -1164,7 +1167,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         ), patch.object(
             Client, 'execute_business_read', new=guarded_read,
         ):
-            dispatch = self.env['shopify.connector.job.dispatch']
+            # This unit entry bypasses the cron claim boundary. Use an
+            # authorized operator; installed-cron coverage lives in core.
+            actor = self._reader_actor('handler-replay')
+            dispatch = self.env['shopify.connector.job.dispatch'].with_user(actor)
+            job = job.with_user(actor)
             dispatch._dispatch_one(job)
             job.invalidate_recordset()
             self.assertEqual(job.state, 'retry_waiting')
@@ -1239,7 +1246,13 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertTrue(job.transitions)
 
     def test_real_handler_applies_read_evidence_without_stock_or_mutation_work(self):
-        """Run the registered child handler against real ORM pair records."""
+        self._assert_real_observation_read()
+
+    def test_claimed_root_worker_applies_real_p07_read_evidence(self):
+        self._assert_real_observation_read(claimed_worker=True)
+
+    def _assert_real_observation_read(self, *, claimed_worker=False):
+        """Real ORM pair and registered handler; only remote I/O is replaced."""
         store = self._store('orm-handler')
         warehouse = self.env['stock.warehouse'].search(
             [('company_id', '=', self.env.company.id)], limit=1,
@@ -1296,7 +1309,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'store_id': store.id,
             'job_source': 'scheduled_sync',
             'job_type': INVENTORY_OBSERVATION_JOB_TYPE,
-            'state': 'running',
+            'state': 'queued' if claimed_worker else 'running',
             'started_at': fields.Datetime.now(),
             'running_since': fields.Datetime.now(),
             'res_model': 'shopify.connector.store',
@@ -1339,11 +1352,21 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             self.assertEqual(purpose, 'inventory')
             yield result
 
-        handler = self.env['shopify.connector.job.dispatch']._get_handlers()[
-            INVENTORY_OBSERVATION_JOB_TYPE
-        ]
+        dispatch = self.env['shopify.connector.job.dispatch']
         with patch.object(Client, 'execute_business_read', new=guarded_read):
-            handler(job)
+            if claimed_worker:
+                # Real claim/start/registered handler/P07 gateway path. This
+                # shared test cursor does not prove scheduler cursor commits.
+                self.assertEqual(dispatch._drain_one(), store.id)
+                self.assertEqual(job.state, 'succeeded')
+            else:
+                # Direct calls have no dispatcher-owned claim capability.
+                actor = self._reader_actor('orm-handler')
+                job = job.with_user(actor)
+                handler = dispatch.with_user(actor)._get_handlers()[
+                    INVENTORY_OBSERVATION_JOB_TYPE
+                ]
+                handler(job)
 
         evidence = self.env[
             'shopify.connector.inventory.observation'

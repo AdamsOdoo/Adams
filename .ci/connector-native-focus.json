@@ -116,6 +116,14 @@
     {
       "addon": "shopify_connector_product_webhook",
       "class": "TestShopifyConnectorProductWebhookW2"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestReadGatewayScope"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestP07DomainReadGateway"
     }
   ]
 }

@@ -449,19 +449,19 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         )
         if not claimed:
             return False
-        job_id = claimed.id
-        claimed_store_id = claimed.store_id.id
-
-        if self._is_mutation_job_type(claimed.job_type):
-            if not self._concurrency_retry_supported():
+        worker, claimed, job_id, claimed_store_id = self.env[
+            'shopify.connector.read.gateway'
+        ]._claimed_dispatch_scope(self, claimed)
+        if worker._is_mutation_job_type(claimed.job_type):
+            if not worker._concurrency_retry_supported():
                 raise ValidationError(
                     'Layer 2 mutation dispatch requires an owned cursor with '
                     'real commit boundaries.'
                 )
-            self._drain_mutation_one(claimed)
+            worker._drain_mutation_one(claimed)
             return claimed_store_id
 
-        if not self._concurrency_retry_supported():
+        if not worker._concurrency_retry_supported():
             # The shared in-test transaction cursor forbids commit/rollback, so
             # the per-job transaction boundary below cannot run here. The
             # standard suite exercises normal dispatch and classified-failure
@@ -469,7 +469,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # on its single shared connection anyway. The genuine
             # independent-connection lifecycle tests drive the real boundary
             # below on real pooled cursors.
-            self._dispatch_one(claimed)
+            worker._dispatch_one(claimed)
             return claimed_store_id
 
         try:
@@ -478,8 +478,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # runs REPEATABLE READ, where 40001 surfaces at statement/flush
             # time) is caught here -- never after the commit, where it would
             # escape as a raw concurrency error.
-            self._dispatch_one(claimed)
-            self.env.cr.flush()
+            worker._dispatch_one(claimed)
+            worker.env.cr.flush()
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY as exc:
             # A genuine 40001/40P01/55P03 aborted this transaction AFTER a
             # transport may already have occurred. The recovery call does NOT
@@ -497,11 +497,11 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 "replayed.",
                 job_id, getattr(exc, 'pgcode', None),
             )
-            self._recover_after_concurrency_conflict(job_id)
+            worker._recover_after_concurrency_conflict(job_id)
         else:
             # Commit this job's own outcome so a later job's rollback can never
             # undo it and it is never re-exposed to a duplicate call.
-            self.env.cr.commit()
+            worker.env.cr.commit()
         return claimed_store_id
 
     @api.model
