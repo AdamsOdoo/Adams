@@ -146,6 +146,11 @@ class ShopifyConnectorStoreSettingsSecurity(models.Model):
             in SETTINGS_CREATE_SURFACES
         )
 
+    @api.model
+    def _prepare_settings_create_values(self, vals_list):
+        """Derive addon-owned values only after structural input admission."""
+        return [dict(vals) for vals in vals_list]
+
     @api.model_create_multi
     def create(self, vals_list):
         """Admit only service-shaped non-root settings creation.
@@ -155,15 +160,14 @@ class ShopifyConnectorStoreSettingsSecurity(models.Model):
         with a future create ACL, cannot create a duplicate row or seed any
         setup/readiness/fulfillment state directly.
         """
-        if self.env.su:
-            return super().create(vals_list)
-        if not self._settings_create_surface_is_open():
-            raise AccessError(
-                'Store settings rows can only be created by the connector '
-                'setup service.'
-            )
-        self._assert_settings_create_values(vals_list)
-        return super().create(vals_list)
+        if not self.env.su:
+            if not self._settings_create_surface_is_open():
+                raise AccessError(
+                    'Store settings rows can only be created by the connector '
+                    'setup service.'
+                )
+            self._assert_settings_create_values(vals_list)
+        return super().create(self._prepare_settings_create_values(vals_list))
 
     def _settings_service_write(self, surface, vals):
         """Write service-owned settings state through a named capability.

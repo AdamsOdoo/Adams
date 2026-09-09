@@ -62,7 +62,10 @@ class TestV2MutationRuntime(TransactionCase):
         self.assertTrue(fields_map['run_id'].readonly)
         self.assertTrue(fields_map['expected_configuration_generation'].readonly)
         self.assertFalse(fields_map['run_id'].required)
-        self.assertEqual(fields_map['expected_configuration_generation'].default, 0)
+        self.assertEqual(
+            self.Attempt.default_get(['expected_configuration_generation']),
+            {'expected_configuration_generation': 0},
+        )
 
     def test_legacy_c2_keeps_identity_empty_and_immutable(self):
         attempt = self._create_attempt()

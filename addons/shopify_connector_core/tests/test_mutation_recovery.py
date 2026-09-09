@@ -269,7 +269,17 @@ class TestMutationRecovery(TransactionCase):
         foreign_c1 = foreign.copy({
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': uuid.uuid4().hex,
+            'state': 'running',
+            'running_since': now - timedelta(hours=3),
+            'owner_worker_ref': 'stale-foreign-c1-regression',
+            'run_id': foreign.run_id.id,
         })
+        self.assertEqual(foreign_c1.state, 'running')
+        self.assertEqual(foreign_c1.running_since, now - timedelta(hours=3))
+        self.assertEqual(foreign_c1.run_id, foreign.run_id)
+        self.assertFalse(self.env['shopify.connector.mutation.attempt'].sudo().search([
+            ('job_id', '=', foreign_c1.id),
+        ]))
         admin = new_test_user(
             self.env, login='stale_scope_%s' % uuid.uuid4().hex,
             groups='base.group_user,shopify_connector_core.group_shopify_connector_admin',

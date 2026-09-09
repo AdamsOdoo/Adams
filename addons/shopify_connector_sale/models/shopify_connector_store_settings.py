@@ -167,9 +167,9 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                 self.env.cr.rowcount,
             )
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        """Derive the order company from the store on every create path.
+    @api.model
+    def _prepare_settings_create_values(self, vals_list):
+        """Derive order company after core validates structural create input.
 
         `default_get` only sees the context, so it can serve the UI (where
         `default_store_id` is present) but not a plain ORM
@@ -179,13 +179,14 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
         constraint below. An explicitly supplied value is left alone -- and then
         validated, so an explicit wrong answer is still refused.
         """
+        vals_list = super()._prepare_settings_create_values(vals_list)
         for vals in vals_list:
             if not vals.get('order_company_id') and vals.get('store_id'):
                 store = self.env['shopify.connector.store'].browse(
                     vals['store_id'])
                 if store.company_id:
                     vals['order_company_id'] = store.company_id.id
-        return super().create(vals_list)
+        return vals_list
 
     @api.model
     def _default_order_company(self):

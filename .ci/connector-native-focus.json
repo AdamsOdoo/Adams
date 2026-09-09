@@ -64,6 +64,26 @@
     {
       "addon": "shopify_connector_core",
       "class": "TestMutationSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2MutationRuntime"
+    },
+    {
+      "addon": "shopify_connector_webhook",
+      "class": "TestShopifyConnectorWebhookP11"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2RecoveryCommands"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec2Roles"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestSec3SaleCompanyIsolation"
     }
   ]
 }

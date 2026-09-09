@@ -133,7 +133,7 @@ class TestShopifyConnectorWebhookP11(TransactionCase):
             'email': 'p11-non-admin@example.invalid',
             'company_id': self.env.company.id,
             'company_ids': [(6, 0, [self.env.company.id])],
-            'groups_id': [(6, 0, [self.env.ref('base.group_user').id])],
+            'group_ids': [(6, 0, [self.env.ref('base.group_user').id])],
         })
         with self.assertRaises(AccessError):
             model.with_user(user)._v2_assert_actor()

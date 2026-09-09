@@ -371,6 +371,8 @@ class TestV2RecoveryCommands(TransactionCase):
             }
         ).create({
             "job_id": uncertain.id,
+            "run_id": uncertain.run_id.id,
+            "expected_configuration_generation": uncertain.expected_configuration_generation,
             "attempt_token": str(uuid4()),
             "mutation_domain": "mutation_dispatch_selftest",
             "observed_outcome": "uncertain",
