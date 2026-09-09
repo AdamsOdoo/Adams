@@ -12,7 +12,7 @@ The complete checkout was refreshed at published PR #212 head `1c75c10288477b3a9
 
 Fresh local baseline: 448 dependency-free tests passed. Historical full native CI is red: fresh/warm 66 failures and 720 errors; Lite install fails; old-core W2 fails; nonstandard/concurrency assertions are partly blocked by setup. See 14 for exact run/artifact provenance. The code is **not assured for controlled UI UAT**. Re-run native gates after corrections; do not infer them from static success.
 
-GitHub writing currently fails (HTTPS credentials unavailable; connector create_tree returns 403). Local development/commits can continue; publication, remote CI and matching Odoo.sh builds require an authorized write connection. The local environment currently lacks PostgreSQL and pinned Odoo. No current live database/build qualification is established. These are explicit dependencies, not reasons to discard progress or weaken tests.
+GitHub publication and native CI became available after this blueprint was drafted. The approved checkpoint is published as `30bde525`; its Lite/Full installations pass, while the broader runtime campaign still fails. Document 13 owns current source, results and access status, including the separate automatic-review restriction on publishing later local changes. The local environment lacks PostgreSQL and pinned Odoo; no current live database/build qualification is established. Preserve the gates while correcting the demonstrated failures.
 
 ## Architecture and scope decisions
 
