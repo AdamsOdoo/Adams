@@ -2629,6 +2629,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             )
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             # Enable the product domain flag so the REAL scheduled-dispatch start
             # gate (`_domain_flag_for_job_type` -> `product_domain_enabled`) admits
             # a `product_import_sync` job driven through run_drain. (The other

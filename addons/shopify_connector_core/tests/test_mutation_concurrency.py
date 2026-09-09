@@ -657,7 +657,14 @@ class TestMutationConcurrency(TransactionCase):
                 'classify_direct_result': classify,
                 'apply_consequence': apply,
             })
-            with patch.object(
+            # Odoo test mode otherwise supplies a shared TestCursor for C2.
+            # Admission must commit on a real independent connection before
+            # the transport observer checks durable intent visibility.
+            def side_cursor(*_args, **_kwargs):
+                return db_connect(self.env.cr.dbname).cursor()
+
+            with patch.object(self.registry, 'cursor', side_effect=side_cursor), \
+                    patch.object(
                 type(Dispatch), '_get_reconciliation_strategies',
                 return_value={'mutation_dispatch_selftest': strategy},
             ):

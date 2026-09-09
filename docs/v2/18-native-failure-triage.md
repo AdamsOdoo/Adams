@@ -153,3 +153,37 @@ Further read-only attribution while `1063cb07` waits: 60 original headers across
 Native run 34337913595 completed 834 tests / 0 failures / 1 error in 296.609 seconds, with 37 selected classes present and no selected skips. Policy and packaging pass; full campaign skipped. Artifact 10098860989 checksum verified: `e2018d4cd8440837f666d9f31b900d9a26529a32aced37ca0faa03694f304660`. Original summary: `evidence/native-focus-1063cb0-summary.json`.
 
 The sole traceback is TestFulfillmentScans.test_batched_reader_requires_exact_requested_identity, rejected by the reader role guard before identity assertions. The follow-up uses an ordinary same-company connector operator for service, store and job, following the qualified pagination fixture. Both exact identity assertions and the production authorization guard remain. Independent read-only review confirmed this diagnosis; native correction proof is pending.
+
+### Process-death evidence scope recovered during continuation
+
+The `1063cb0` focused runner explicitly enables `SHOPIFY_LAYER2_RUN_PROCESS_DEATH=1`. Its raw log starts `TestMutationRecovery.test_real_process_death_harness`, completes the class without a test error, and reports no selected skips. This executes six real child-process termination boundaries with independent database cursors and persisted recovery assertions. Child `KeyboardInterrupt` traces occur at the three intentionally terminated sleep points; they are not recorded test failures. The remaining three boundaries call `os._exit`.
+
+This is supporting proof for the synthetic `mutation_dispatch_selftest` strategy and its persisted recovery contract. It does not qualify actual Shopify mutations, every domain's process-death behavior, or actual Odoo scheduler acquisition. The full runner still treats this harness as opt-in; do not generalize a focused execution into every full lane.
+
+## Consolidated native campaign: a77741a
+
+Run [34342033182](https://github.com/AdamsOdoo/Adams/actions/runs/34342033182), artifact 10101998991 SHA-256 `56717f24eb33445fe954870076613ed63f2a39890af01ff010c5672855a9482d`, downloaded and verified. Exact source and Odoo pin verified; original full/focused summaries preserved alongside previous evidence.
+
+| Lane | Result |
+| --- | --- |
+| Focused | 834 tests, 0 failures, 0 errors; 37 classes, no selected skips |
+| Fresh | 3012 tests, 3 failures, 1 error |
+| Warm | 3012 tests, 19 failures, 2 errors |
+| Lite / Full installation | Both pass |
+| Two genuine migrations | Each 2877 tests, 3 failures, 1 error; 20/19 migration scripts |
+| Each repeated upgrade | 2877 tests, 19 failures, 2 errors |
+| Old-core W2-only | 18 tests, 0 failures, 10 errors |
+| Nonstandard | 70 tests, 4 failures, 31 errors |
+
+### Root-cause grouping before another publication
+
+- Fulfillment concurrency cleanup deletes jobs before their restricted audit logs. Its committed store 669 survives fresh; warm clones fresh and setup/dashboard/uninstall then encounter that store. Both migration/repeat pairs reproduce the same leak with store 614. Fix producer cleanup and assert zero residue; do not change dashboard semantics or erase legitimate stores.
+- Inventory withdrawal actor test includes root's initial activation audit. Snapshot before action; assert exactly four new decision audit jobs, all the deciding administrator, rather than filtering by actor.
+- Mutation success test obtains C2's cursor from Odoo's shared test registry; its independent observer requires real committed C2 visibility. Replace only the test registry cursor factory with genuine pooled cursors; retain full callback trace and terminal succeeded assertion. Native verification still required.
+- Export custom-ID exact-query fixture omits current pageInfo completeness selection; preserve lookup and pagination expectations.
+- Product/customer/order/tax/visual intended-active fixtures omit activation, blocking business setup. Correct sanctioned activation across owning fixtures, retain inactive/disconnect negatives, trace newly reached authorization and transaction boundaries.
+- P10: snapshot serialization conflict in claim/cancel, forbidden shared-test commit during stale-owner case, and company cleanup FK errors. Preserve real concurrency assertions; isolate company-hook side effects in a disposable P10 database and require the entire tag explicitly. Do not ignore deadlocks, skip tests, or represent a fixture-only retry as scheduler retry proof.
+- Visual overflow inventory lacks existing V2 and parked prototype selectors. Measuring a selector does not manifest or approve the prototype.
+- Policy metadata omission: catalog provenance must match frozen inventory; validate final generated evidence before publication.
+
+The old-core compatibility proposal remains unaccepted. Repairs above are in progress, not qualified results.

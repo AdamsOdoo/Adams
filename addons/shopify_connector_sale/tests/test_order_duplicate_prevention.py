@@ -159,6 +159,7 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 'api_version': '2026-07',
                 'state': 'connected',
             })
+            store._p15_set_activation('active')
             settings = env['shopify.connector.store.settings'].create({
                 'store_id': store.id,
                 'sale_domain_enabled': True,

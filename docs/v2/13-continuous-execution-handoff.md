@@ -10,7 +10,26 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Only the authorized development environment and `testin-lzhbzhtc.myshopify.com` may be used for live verification after exact build/database/company/store identity checks. Staging/production, other stores and public release require separate authorization.
 - GitHub API publication and native CI are available. Local scratch has no Odoo/PostgreSQL. Current Odoo.sh build/database identity is unverified. No live Shopify work has been performed in this correction campaign.
 
-## Active continuation — 9 September 2026
+## Active published candidate — 9 September 2026
+
+- Head `a77741a7fc272999078c9cda3afd763589eb8a08`, source `c7543af0864490e4e5c545cbeb634c59bee3d831`; source/evidence trees match local `60894d9`/`82ece74`. Six artifacts reproduced identically twice; frozen baseline and static policy pass. Both local/API histories preserved by a tree-identical merge.
+- [Native 34342033182](https://github.com/AdamsOdoo/Adams/actions/runs/34342033182) completed: focused 834/0/0 passed; full campaign failed. Fresh 3012/3/1, warm 3012/19/2, nonstandard 70/4/31; both meta-installs pass; migrations/repeats and old-core remain failing. Exact full/focused summaries and verified artifact digest are recorded in document 18. No active campaign remains.
+- Policy `34342033177` failed two catalog consistency assertions because generated inventory source provenance was refreshed without the catalog metadata. Local evidence-only correction synchronizes both catalog source fields; all five catalog tests pass. Keep native run uninterrupted, then publish this evidence correction with the next checkpoint.
+- Unqualified independent-cursor regression draft is preserved in `claim-read-company-unqualified-draft.patch`, excluded from executable tests. Its company cleanup was rejected: pinned stock company creation changes shared locations/partner properties and creates stock configuration. Next test-design task must isolate/restore all fixture effects or use a disposable database; no skip or production bypass. Native published source remains unchanged.
+- First next action: finish consolidated root-family repairs and cross-family review described in document 18, run source plus final generated-evidence checks, then publish one coherent candidate. UI remains parked and document 19 remains proposed.
+
+## Consolidated correction prepared locally
+
+- Repaired activation setup across all identified product/customer/order/tax/visual fixtures, preserving disconnect negatives and tracing actual legacy admission paths for newly reached calls.
+- Fulfillment cleanup removes fixture audit logs before jobs and verifies committed zero residue; this addresses fresh-to-warm and migration-repeat store contamination. Inventory withdrawal checks four newly created administrator audit jobs without including setup history.
+- Mutation C2 success proof uses a genuine independent registry cursor; callback and durable-success assertions remain. Export exact-query expectation includes existing pagination completeness field. Visual measurement lists existing V2/prototype selectors without enabling parked assets.
+- P10 tests use independent cancellation/sweep cursors and one test-local full-admission retry for 40001 only. All eight P10 cases remain mandatory in a separately logged disposable database lane; database disposal removes company hook side effects. No claim that this test retry adds production retry behavior.
+- Native prerequisite expanded from 37 to 48 complete backend classes. Browser and full fresh/warm/migration/nonstandard/P10 lanes remain required, unchanged in acceptance scope.
+- Settled local gate: 467 dependency-free tests pass in 18.736 seconds; Python/bash syntax, static policy, change-size, whitespace and both marketplace package checks pass. Final generated-source evidence must still be checked after freezing.
+- P10 production trace: run_drain → run_v2_read_only → coordinator claims → repository transaction. A preclaim 40001 rolls back/rethrows before handlers; no connector immediate retry exists. It aborts this cron invocation including its legacy remainder; future cron can retry eligible jobs. Actual scheduler recovery remains unqualified.
+- No production addon behavior changed in this packet. Independent reviews inspected mutation, query, visual, audit and cleanup corrections. Source/evidence publication and native verification remain pending; keep old-core W2 gate open.
+
+## Preceding continuation evidence — 9 September 2026
 
 - Verified remote head `1063cb0700d78258b3acbfc4808cd526d51fd88e`, source `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`. Preserved local checkpoint `4643f6f` and both prior publication histories; no work discarded.
 - [Native 34337913595](https://github.com/AdamsOdoo/Adams/actions/runs/34337913595), job `102423055779`: **834 tests, zero failures, one error**, 296.609 seconds; all 37 classes present, no selected skips. Policy `34337913613` and packaging passed. Full campaign skipped downstream.

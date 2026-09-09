@@ -13,6 +13,7 @@ import threading
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
+from psycopg2.errors import SerializationFailure
 
 from ..models.shopify_connector_v2_runtime_repository import (
     OdooReadOnlyRuntimeRepository,
@@ -165,20 +166,28 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             return original_lock_scopes(repository, side_env, job_ids)
 
         def claim_worker():
-            cr, env = self._new_env(
-                allowed_company_ids=(store_info['company_id'],),
-            )
-            try:
-                return tuple(OdooReadOnlyRuntimeRepository(env).claim_due(
-                    now=NOW,
-                    worker_ref='p10-cancel-race-claim',
-                    limit=1,
-                    phase=CLAIM_TRANSACTION,
-                    handler_keys=('core_dispatch_selftest',),
-                ))
-            finally:
-                cr.rollback()
-                cr.close()
+            # Cancellation commits a run update after the claim transaction's
+            # repeatable-read snapshot. PostgreSQL may abort that transaction
+            # with 40001. Retry the entire read-only admission once, using a
+            # fresh environment/cursor; never accept deadlocks or lock timeouts.
+            for attempt in range(2):
+                cr, env = self._new_env(
+                    allowed_company_ids=(store_info['company_id'],),
+                )
+                try:
+                    return tuple(OdooReadOnlyRuntimeRepository(env).claim_due(
+                        now=NOW,
+                        worker_ref='p10-cancel-race-claim',
+                        limit=1,
+                        phase=CLAIM_TRANSACTION,
+                        handler_keys=('core_dispatch_selftest',),
+                    ))
+                except SerializationFailure:
+                    if attempt:
+                        raise
+                finally:
+                    cr.rollback()
+                    cr.close()
 
         def cancel_worker():
             if not claim_has_job.wait(self.WORKER_TIMEOUT_SECONDS):
@@ -217,6 +226,14 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             })
         self.assertEqual(records['cancel'], ())
         self.assertEqual(records['claim'], ())
+        self.assertEqual(
+            self._observe(
+                'SELECT count(*) FROM shopify_connector_job_attempt '
+                'WHERE job_id = %s', (fixture['job_ids'][0],),
+            ),
+            [(0,)],
+            'aborted/retried admission must leave no durable attempt',
+        )
         self.assertEqual(
             self._observe(
                 'SELECT j.state, j.current_attempt_token, '
@@ -392,12 +409,17 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         self.assertEqual(len(claims), 1)
         claim = claims[0]
 
-        run = self.env['shopify.connector.run'].browse(
-            fixture['run_ids'][0],
+        cr, env = self._new_env(
+            allowed_company_ids=(fixture['stores'][0]['company_id'],),
         )
-        run._request_cancel_service('P10 cancellation test')
-        self.env.flush_all()
-        self.env.cr.commit()
+        try:
+            run = env['shopify.connector.run'].browse(fixture['run_ids'][0])
+            run._request_cancel_service('P10 cancellation test')
+            env.flush_all()
+            cr.commit()
+        finally:
+            cr.rollback()
+            cr.close()
 
         stale_at = NOW - timedelta(hours=1)
         cr = self._open_bounded()
@@ -422,9 +444,10 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             allowed_company_ids=(fixture['stores'][0]['company_id'],),
         )
         try:
-            count = OdooReadOnlyRuntimeRepository(env).sweep_stale_read_only(
-                now=NOW, limit=1,
-            )
+            with self._real_registry_cursor():
+                count = OdooReadOnlyRuntimeRepository(env).sweep_stale_read_only(
+                    now=NOW, limit=1,
+                )
         finally:
             cr.rollback()
             cr.close()
@@ -467,9 +490,10 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             allowed_company_ids=(fixture['stores'][0]['company_id'],),
         )
         try:
-            processed = OdooReadOnlyRuntimeRepository(
-                env,
-            ).sweep_stale_read_only(now=NOW, limit=1)
+            with self._real_registry_cursor():
+                processed = OdooReadOnlyRuntimeRepository(
+                    env,
+                ).sweep_stale_read_only(now=NOW, limit=1)
         finally:
             cr.rollback()
             cr.close()

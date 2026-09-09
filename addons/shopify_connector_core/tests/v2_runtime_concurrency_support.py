@@ -2,6 +2,7 @@
 
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import os
 import queue
 import threading
 import time
@@ -144,7 +145,18 @@ class V2RuntimeConnectionMixin:
 
 
 class V2RuntimeFixtureMixin:
-    """Committed fixtures and complete teardown for P10 tests."""
+    """Committed fixtures confined to the runner-owned disposable database."""
+
+    def _require_disposable_database(self):
+        dbname = self.env.cr.dbname
+        if (
+            not dbname.startswith('connector_p10_')
+            or os.environ.get('CONNECTOR_P10_DISPOSABLE_DB') != dbname
+        ):
+            raise AssertionError(
+                "P10 committed company fixtures require the suite runner's "
+                'dedicated disposable database; run the complete native suite'
+            )
 
     def _create_fixture(self, *, company_count=1, job_count=1):
         """Create connected/read-only stores, an admitted run and queued jobs."""
@@ -153,14 +165,13 @@ class V2RuntimeFixtureMixin:
         if isinstance(job_count, bool) or not 0 < job_count <= 4:
             raise ValueError('fixture job count must be between 1 and 4')
 
+        self._require_disposable_database()
         tag = uuid.uuid4().hex
         cr = self._open_bounded()
         stores = []
         runs = []
         jobs = []
         companies = []
-        created_company_ids = []
-        created_partner_ids = []
         try:
             env = api.Environment(cr, SUPERUSER_ID, {})
             companies.append(env.company)
@@ -169,14 +180,6 @@ class V2RuntimeFixtureMixin:
                     'name': 'P10 concurrency company %s' % tag,
                 })
                 companies.append(company)
-                created_company_ids.append(company.id)
-                # res.company.create() creates the company's partner on Odoo
-                # versions where partner_id is managed by the base model.  A
-                # committed fixture must retain that identity for cleanup;
-                # deleting only res_company would leave an orphan partner or
-                # fail on the partner FK.
-                if company.partner_id:
-                    created_partner_ids.append(company.partner_id.id)
 
             for index, company in enumerate(companies):
                 store = env['shopify.connector.store'].sudo().create({
@@ -257,8 +260,6 @@ class V2RuntimeFixtureMixin:
             fixture = {
                 'tag': tag,
                 'company_ids': [company.id for company in companies],
-                'created_company_ids': created_company_ids,
-                'created_partner_ids': created_partner_ids,
                 'stores': stores,
                 'store_ids': [item['record'].id for item in stores],
                 'run_ids': runs,
@@ -280,8 +281,6 @@ class V2RuntimeFixtureMixin:
         store_ids = tuple(fixture.get('store_ids', ()))
         run_ids = tuple(fixture.get('run_ids', ()))
         job_ids = tuple(fixture.get('job_ids', ()))
-        created_company_ids = tuple(fixture.get('created_company_ids', ()))
-        created_partner_ids = tuple(fixture.get('created_partner_ids', ()))
         if not store_ids:
             return
         cr = self._open_bounded()
@@ -341,45 +340,14 @@ class V2RuntimeFixtureMixin:
             cr.rollback()
             cr.close()
 
-        if created_company_ids:
-            # Company creation is an ORM operation with base-model side
-            # effects (at least res.partner, and potentially version-specific
-            # calendar/property defaults).  Unlink it in a fresh committed ORM
-            # transaction so those dependencies use Odoo's own ondelete
-            # handling; then explicitly unlink any captured partner that the
-            # company unlink did not cascade.
-            company_cr = self._open_bounded()
-            try:
-                cleanup_env = api.Environment(company_cr, SUPERUSER_ID, {})
-                companies = cleanup_env['res.company'].sudo().browse(
-                    list(created_company_ids),
-                ).exists()
-                partners = cleanup_env['res.partner'].sudo().browse(
-                    list(created_partner_ids),
-                ).exists()
-                companies.unlink()
-                partners.exists().unlink()
-                cleanup_env.flush_all()
-                company_cr.commit()
-                company_cr.execute(
-                    'SELECT count(*) FROM res_company WHERE id = ANY(%s)',
-                    (list(created_company_ids),),
-                )
-                remaining_companies = company_cr.fetchone()[0]
-                company_cr.execute(
-                    'SELECT count(*) FROM res_partner WHERE id = ANY(%s)',
-                    (list(created_partner_ids),),
-                )
-                remaining_partners = company_cr.fetchone()[0]
-                self.assertEqual(
-                    (remaining_companies, remaining_partners), (0, 0),
-                    'P10 company cleanup left base-model residue',
-                )
-            except BaseException:
-                company_cr.rollback()
-                raise
-            finally:
-                company_cr.close()
+        # Pinned Odoo company creation touches shared stock properties and
+        # creates payment providers/warehouses. Company.unlink() neither
+        # reverses those changes nor clears every restrictive foreign key.
+        # This entire lane is isolated by the runner and its database is
+        # dropped in a finally trap, including on assertion/process failure.
+        # Retain the normal connector residue assertions above, but delegate
+        # base/company side effects to whole-database disposal.
+        self._require_disposable_database()
 
 class V2RuntimeObservationMixin:
     """Claim/observation helpers for P10 test assertions."""

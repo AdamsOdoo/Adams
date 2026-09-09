@@ -1419,17 +1419,19 @@ class TestCustomerMatchingConcurrency(TransactionCase):
         try:
             self._apply_cleanup_bounds(cr)
             env = api.Environment(cr, SUPERUSER_ID, {})
+            # Activation creates an audit job alongside the business job.
+            # Remove every job/log owned by this exact committed test store.
+            jobs = env['shopify.connector.job'].search(
+                [('store_id', '=', store_id)])
             env['shopify.connector.job.log'].search(
-                [('job_id', '=', job_id)]).unlink()
+                [('job_id', 'in', jobs.ids)]).unlink()
             # CORE-R2 Slice 2B: execute_business releases its lease on both the
             # collision (exception) and forced-retry paths, so none should
             # remain -- but sweep any residue (e.g. a killed worker) before the
             # job/store FK targets are removed, since the lease references both.
             env['shopify.connector.call.lease'].search(
                 [('store_id', '=', store_id)]).unlink()
-            job = env['shopify.connector.job'].browse(job_id).exists()
-            if job:
-                job.unlink()
+            jobs.unlink()
             env['shopify.connector.customer.binding'].search(
                 [('store_id', '=', store_id)]).unlink()
             env['shopify.connector.store.settings'].search(
@@ -1485,8 +1487,9 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             env = api.Environment(cr, SUPERUSER_ID, {})
             remaining = {
                 'logs': env['shopify.connector.job.log'].search_count(
-                    [('job_id', '=', job_id)]),
-                'jobs': len(env['shopify.connector.job'].browse(job_id).exists()),
+                    [('store_id', '=', store_id)]),
+                'jobs': env['shopify.connector.job'].search_count(
+                    [('store_id', '=', store_id)]),
                 # CORE-R2 review 4695664662 #4: the verification map now counts
                 # leases too, so a lease that outlived its context (a release
                 # regression) is a verified nonzero rather than an unchecked gap.
@@ -1603,6 +1606,7 @@ class TestCustomerMatchingConcurrency(TransactionCase):
             setup_env['shopify.connector.store.credential'].action_set_token(
                 store, DUMMY_TOKEN)
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             setup_env['shopify.connector.store.settings'].create({
                 'store_id': store.id, 'sale_domain_enabled': True,
             })
@@ -2135,6 +2139,7 @@ class _CustomerGenuineHelpers:
             # action_set_token demotes connected -> reconnect_needed and bumps the
             # generation; re-assert connected so the business admission passes.
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id, 'sale_domain_enabled': True})
             partner = env['res.partner'].create({

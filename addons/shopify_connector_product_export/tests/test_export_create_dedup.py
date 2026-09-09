@@ -261,7 +261,7 @@ class TestExportCreateDedup(ExportCase):
             'id title status descriptionHtml vendor productType tags updatedAt '
             'variants(first: 100) { nodes { id sku barcode price '
             'compareAtPrice selectedOptions { name value } '
-            'inventoryItem { id sku tracked } } } } '
+            'inventoryItem { id sku tracked } } pageInfo { hasNextPage } } } '
             'shop { myshopifyDomain } }'
         ))
         self.assertEqual(sent[-1]['variables']['identifier']['customId'], {

@@ -148,6 +148,50 @@
     {
       "addon": "shopify_connector_sale",
       "class": "TestTaxDecisionRoute"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationConcurrency"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportCreateDedup"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentConcurrency"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductCallSiteLifecycleGenuine"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductRuntimePerformance"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerMatchingConcurrency"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteLeaseVisibilityGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteRaceAGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteRaceBGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestOrderDiscoveryConcurrencyGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestTaxMappingCompetingChoiceRace"
     }
   ]
 }

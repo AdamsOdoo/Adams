@@ -13,10 +13,10 @@
 #      verifies it on every run so a cached checkout can never silently execute
 #      a different Odoo
 #   2. installs the connector modules into a disposable PostgreSQL database
-#   3. runs FIVE passes, each into its own database with its own log:
+#   3. runs qualification passes, each with its own database and log:
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
-#        * the complete NON-STANDARD tag suite
+#        * the complete NON-STANDARD tag suite (P10 in a disposable clone)
 #        * W2-only install over an older installed W1 (no W1 upgrade)
 #        * candidate-only DEC-029 Lite and Full meta-addon installs
 #   4. verifies the checked-out connector commit against the commit the caller
@@ -137,6 +137,9 @@ EXTRA_MODULES="account,stock"
 # sessions with distinct backend PIDs, and its first half is written to run
 # unchanged against the vulnerable head as a before/after reproducer.
 NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race,shopify_connector_tax_mapping_race,shopify_connector_v2_runtime_concurrency"
+P10_TAG="shopify_connector_v2_runtime_concurrency"
+SHARED_NONSTANDARD_TAGS="${NONSTANDARD_TAGS//,$P10_TAG/}"
+
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #
@@ -1169,11 +1172,11 @@ STANDARD_TAG_ARGS=(--test-tags "$STANDARD_TAGS")
 clone_db() {  # clone_db <template_db> <new_db>
     local src="$1" dst="$2"
     dropdb --if-exists "$dst" 2>/dev/null || true
-    createdb -T "$src" "$dst"
+    createdb -T "$src" "$dst" || return 1
     local store="${ARTIFACT_DIR}/odoo-data/filestore"
     if [[ -d "${store}/${src}" ]]; then
         rm -rf "${store}/${dst}"
-        cp -a "${store}/${src}" "${store}/${dst}"
+        cp -a "${store}/${src}" "${store}/${dst}" || return 1
     fi
 }
 
@@ -1196,6 +1199,7 @@ result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" 
 FRESH_STATUS="skipped"; FRESH_RESULT=""
 WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
+P10_STATUS="skipped"; P10_RESULT=""; P10_EXECUTED=0; P10_EXPECTED=0
 W2_ONLY_INSTALL_STATUS="skipped"; W2_ONLY_INSTALL_RESULT=""
 META_INSTALL_STATUS="skipped"; META_INSTALL_RESULT=""
 META_LITE_STATUS="skipped"; META_LITE_RESULT=""
@@ -1549,7 +1553,7 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     log "non-standard tag suite -> ${DB}"
     clone_db "$TEMPLATE_DB" "$DB"
     if run_odoo "$DB" "${ARTIFACT_DIR}/nonstandard.log" -u "$MODULES" \
-            --test-enable --test-tags "$NONSTANDARD_TAGS"; then
+            --test-enable --test-tags "$SHARED_NONSTANDARD_TAGS"; then
         NONSTD_STATUS="pass"
     else
         NONSTD_STATUS="fail"; OVERALL=1
@@ -1558,6 +1562,54 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     log "non-standard: ${NONSTD_STATUS} ${NONSTD_RESULT}"
     verify_no_unexpected_skips "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
     verify_hoot_evidence "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
+
+    # Company creation in P10 has committed, cross-model side effects. Confine
+    # them to a dedicated clone and destroy that database even on test failure.
+    run_p10_disposable() (
+        local db="connector_p10_$$"
+        cleanup_p10() {
+            local status=$?
+            if ! dropdb --if-exists "$db"; then
+                status=1
+            fi
+            rm -rf "${ARTIFACT_DIR}/odoo-data/filestore/${db}"
+            exit "$status"
+        }
+        trap cleanup_p10 EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        clone_db "$TEMPLATE_DB" "$db" || return 1
+        CONNECTOR_P10_DISPOSABLE_DB="$db" run_odoo "$db" \
+            "${ARTIFACT_DIR}/p10-runtime.log" -u "$MODULES" \
+            --test-enable --test-tags "$P10_TAG"
+    )
+    if run_p10_disposable; then
+        P10_STATUS="pass"
+    else
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    P10_RESULT="$(result_line "${ARTIFACT_DIR}/p10-runtime.log")"
+    P10_ERRORS_BEFORE=${#EVIDENCE_ERRORS[@]}
+    verify_no_unexpected_skips "${ARTIFACT_DIR}/p10-runtime.log" "P10 runtime"
+    if [[ "${#EVIDENCE_ERRORS[@]}" -gt "$P10_ERRORS_BEFORE" ]]; then
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    # Fail closed for any missing test method, even if Odoo exits zero.
+    while read -r test_name; do
+        P10_EXPECTED=$((P10_EXPECTED + 1))
+        if grep -Eq "Starting [^.]+\.${test_name} \.\.\." "${ARTIFACT_DIR}/p10-runtime.log"; then
+            P10_EXECUTED=$((P10_EXECUTED + 1))
+        else
+            evidence_fail "P10 runtime: missing ${test_name}"
+            P10_STATUS="fail"; OVERALL=1
+        fi
+    done < <(sed -n 's/^    def \(test_[a-zA-Z0-9_]*\)(.*/\1/p' \
+        "${REPO_ROOT}/addons/shopify_connector_core/tests/test_v2_runtime_concurrency.py")
+    if [[ "$P10_EXPECTED" -eq 0 || -z "$P10_RESULT" ]]; then
+        evidence_fail "P10 runtime: empty test inventory or result"
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    log "P10 runtime: ${P10_STATUS} ${P10_RESULT}; ${P10_EXECUTED}/${P10_EXPECTED} executed"
 fi
 
 # --- The fail-closed decision ------------------------------------------------
@@ -1634,7 +1686,8 @@ cat > "$SUMMARY" <<EOF
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
     "w2_only_install_over_old_w1": {"status": "${W2_ONLY_INSTALL_STATUS}", "result": "${W2_ONLY_INSTALL_RESULT}", "db": "${W2_ONLY_INSTALL_DB}", "origin": "${W2_ONLY_INSTALL_ORIGIN}", "w1_version_after": "${W2_ONLY_INSTALL_W1_VERSION}", "w2_version_after": "${W2_ONLY_INSTALL_W2_VERSION}", "jsonb_columns": "${W2_ONLY_INSTALL_COLUMNS}", "log": "w2-only-install.log", "kind": "W2 -i over installed old W1; W1 is not upgraded"},
     "dec029_meta_install": {"status": "${META_INSTALL_STATUS}", "result": "${META_INSTALL_RESULT}", "lite": {"status": "${META_LITE_STATUS}", "result": "${META_LITE_RESULT}", "log": "meta-lite-install.log"}, "full": {"status": "${META_FULL_STATUS}", "result": "${META_FULL_RESULT}", "log": "meta-full-install.log"}, "kind": "candidate-only meta-addon install; excluded from migration module set"},
-    "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
+    "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"},
+    "p10_runtime": {"status": "${P10_STATUS}", "result": "${P10_RESULT}", "executed": ${P10_EXECUTED}, "expected": ${P10_EXPECTED}, "missing": $((P10_EXPECTED - P10_EXECUTED)), "log": "p10-runtime.log", "isolation": "dedicated disposable database"}
   },
   "migration_passes": {
     "status": "${MIGRATION_OVERALL}",
