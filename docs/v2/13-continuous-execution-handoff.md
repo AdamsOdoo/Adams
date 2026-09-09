@@ -1,6 +1,16 @@
 # V2 Continuous Execution Handoff
 
-## Current checkpoint — 9 September 2026; native roots consolidated, focused prerequisite prepared
+## Current checkpoint — 9 September 2026; first focused native result and residual correction
+
+- PR #212 source/evidence is published at `768eadbed92c1552b070d2b8302724208a1a8467`; source object `ab3611a9f8e95f6bc24123933b41ec4ed0763f8b`, local equivalents `c6327432`/`a97bcc72`. Tree-identical local merge preserves both chains. No pending public-disclosure permission applies to this published payload.
+- [Policy run 34327810109](https://github.com/AdamsOdoo/Adams/actions/runs/34327810109) passes. [Focused native run 34327810048](https://github.com/AdamsOdoo/Adams/actions/runs/34327810048) fails with **401 tests / 0 failures / 9 errors / no selected skips or missing classes**, in 233 seconds. Its exact-source artifact/checksum is verified; summary is persisted under evidence and detailed diagnosis is in document 18. Full campaign correctly did not execute after this failed prerequisite.
+- Seven of nine selected classes have no errors/failures, including inventory push mechanics and the repaired credential-safe store-admin DTO projection. This is scoped native evidence, not a full campaign pass.
+- Local follow-up: ProductImportMatching activation moves to class setup, covering direct and alternate job helpers missed by the initial repair. Two secondary-store C2 recovery errors now have a fixture precondition that reports the exact scope mismatch and non-secret state/generation/company facts. No speculative field change or production fence relaxation is made.
+- Local migration follow-up: new `.32` pre-migration seeds legacy activation before Odoo's default initialization, preserving existing explicit states. A PostgreSQL temporary-table regression exercises ordering, repeatability and preservation. Separate Sol read-only review found no defect; it is not yet native-qualified and the old-core W2 gate is separate and still open.
+- First next action: publish this diagnostic/migration follow-up with exact-source regenerated evidence and rerun the focused prerequisite to expose the two C2 mismatch reasons. SEC-3 corrections are a separate in-progress packet and are not part of this diagnostic source. Continue from its real result; do not claim the full campaign passed or trigger it independently of the prerequisite.
+- UI remains parked/unapproved. No live Shopify, Odoo.sh, staging or production action occurred. PR #210/#211 are untouched. SEC-3/security coverage, old-core W2, genuine upgrade, broader domain, browser/live/performance/UAT/canary/release gates remain open.
+
+## Previous checkpoint — 9 September 2026; native roots consolidated, focused prerequisite prepared
 
 - User approved continued development and publication. UI remains parked and unapproved. Remote PR #212 was rechecked at `695aa801fbc04ea78376bf675f81451207577ef8`; PR #210/#211 retain their previously recorded heads. The following correction is local until an explicit publication receipt is recorded.
 - Native run `34320216972` completed **failed**, not running: fresh/warm each 58 failures and 685 errors of 2,999 tests. Lite/Full installations pass; old-core W2, migrations, nonstandard and browser gates fail. Policy run `34320216952` passes. Detailed artifact access is now resolved and its hash/source verified.

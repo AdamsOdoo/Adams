@@ -208,7 +208,38 @@ class TestMutationRecovery(TransactionCase):
             type(Dispatch), '_get_v2_mutation_job_types',
             return_value=frozenset(('mutation_dispatch_selftest',)),
         ):
-            attempt = fixture_env['shopify.connector.mutation.attempt'].with_context(**{
+            Attempt = fixture_env['shopify.connector.mutation.attempt']
+            mismatch = Attempt._v2_scope_mismatch(job, lock=True)
+            self.assertIsNone(
+                mismatch,
+                'V2 recovery fixture is not admissible at C2: %s' % {
+                    'reason': mismatch,
+                    'environment_company_ids': tuple(
+                        sorted(Attempt.env.companies.ids)
+                    ),
+                    'company_ids': (
+                        store.company_id.id,
+                        job.company_id.id,
+                        run.company_id.id,
+                        settings.company_id.id,
+                    ),
+                    'states': (
+                        store.state, store.activation_state, run.state,
+                        settings.v2_runtime_mode,
+                    ),
+                    'connection_generations': (
+                        store.connection_generation,
+                        job.expected_connection_generation,
+                        run.expected_connection_generation,
+                    ),
+                    'configuration_generations': (
+                        settings.configuration_generation,
+                        job.expected_configuration_generation,
+                        run.expected_configuration_generation,
+                    ),
+                },
+            )
+            attempt = Attempt.with_context(**{
                 C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
             })._create_attempt_intent({
                 'job_id': job.id,

@@ -70,3 +70,16 @@ These 76 headers include downstream effects and structural drift, not 76 proven 
 | `TestUiVisibilityMatrix` | 1 |
 | `TestV2MutationRuntime` | 1 |
 | `TestV2RecoveryCommands` | 1 |
+
+## Focused experiment 1 — source 768eadbed92c1552b070d2b8302724208a1a8467
+
+[Run 34327810048](https://github.com/AdamsOdoo/Adams/actions/runs/34327810048) completed the prerequisite in **233 seconds**: **401 tests, zero assertion failures, nine errors, no selected skips or missing classes**. The full campaign was correctly not executed. [Structured summary](evidence/native-focus-768eadb-summary.json). Artifact `10094634993` checksum: `3779eb7d54e70e200688a18f2fc200f249f4d985387e8dcc6141be8923483b01`. Its source, pin, clean checkout and checksum were verified.
+
+Seven selected classes reported no failures/errors: BusinessAdmission, InventoryPushMechanics, ProductMatchDecision, V2RuntimeAdapter, P15StoreAdmin, JobEnqueue and JobDispatch. This qualifies only those executed class scenarios on this source; the full domain/release gate is still open.
+
+Residuals:
+
+- Seven ProductImportMatching errors still hit activation: direct job creation and two alternate helpers bypassed the earlier `_import_job` fix. The initial fixture attribution overstated coverage. Move operational activation to class setup while retaining domain-disabled/missing-settings negatives.
+- Two MutationRecovery errors hit the C2 scope fence only for the secondary copied store. Preserve the scope fence and diagnose the fixture/identity mismatch before considering any correction.
+
+Separate migration review found that the existing P15 post-migration runs after the ORM fills the new activation column with `draft`. The pinned [field initialization](https://github.com/odoo/odoo/blob/30bde9ff758834a4912c5ae55843d3a7dad849f1/odoo/orm/fields.py) calls [model `_init_column`](https://github.com/odoo/odoo/blob/30bde9ff758834a4912c5ae55843d3a7dad849f1/odoo/orm/models.py), so the post-hook's NULL-only backfill cannot identify legacy connected stores. A core-owned pre-migration and PostgreSQL regression are prepared for the next source. They preserve explicit paused/retired/draft values and do not claim to reconstruct intent on databases already upgraded by the faulty path. They were not part of experiment 1 and need native plus genuine-upgrade proof.

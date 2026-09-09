@@ -5,7 +5,9 @@ menus and browser affordances are deliberately not involved.
 """
 
 from datetime import datetime, timezone
+import importlib.util
 import json
+from pathlib import Path
 from uuid import uuid4
 
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -295,6 +297,55 @@ class TestP15StoreAdmin(TransactionCase):
         self.assertTrue(all(isinstance(action, dict) for action in actions))
         self.assertEqual(actions, projection["data"]["allowed_actions"])
         json.dumps(projection)
+
+    def test_activation_upgrade_preserves_legacy_and_explicit_states(self):
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "migrations" / "19.0.1.32.0" / "pre-migrate.py"
+        )
+        spec = importlib.util.spec_from_file_location("p15_activation_pre", path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        cr = self.env.cr
+        # Shadow only this transaction's SQL name; the real connector table
+        # and ORM records remain untouched. Remove the shadow before ORM
+        # teardown can run. This executes PostgreSQL DDL/backfill, not a mock.
+        cr.execute(
+            "CREATE TEMP TABLE shopify_connector_store "
+            "(id integer PRIMARY KEY, state varchar) ON COMMIT DROP"
+        )
+        try:
+            with cr.savepoint(flush=False):
+                cr.execute(
+                    "INSERT INTO shopify_connector_store (id, state) VALUES "
+                    "(1, 'connected'), (2, 'disconnected'), (3, 'setup_incomplete')"
+                )
+                migration.migrate(cr, "19.0.1.31.0")
+                # Mirror the pinned ORM's default initialization between pre
+                # and post migration; it must not erase the legacy distinction.
+                cr.execute(
+                    "UPDATE shopify_connector_store SET activation_state = 'draft' "
+                    "WHERE activation_state IS NULL"
+                )
+                cr.execute(
+                    "SELECT id, activation_state FROM shopify_connector_store ORDER BY id"
+                )
+                self.assertEqual(cr.fetchall(), [(1, "active"), (2, "draft"), (3, "draft")])
+                cr.execute(
+                    "INSERT INTO shopify_connector_store VALUES "
+                    "(4, 'connected', 'paused'), (5, 'disconnected', 'retired'), "
+                    "(6, 'connected', 'draft')"
+                )
+                migration.migrate(cr, "19.0.1.31.0")
+                cr.execute(
+                    "SELECT id, activation_state FROM shopify_connector_store ORDER BY id"
+                )
+                self.assertEqual(cr.fetchall(), [
+                    (1, "active"), (2, "draft"), (3, "draft"),
+                    (4, "paused"), (5, "retired"), (6, "draft"),
+                ])
+        finally:
+            cr.execute("DROP TABLE pg_temp.shopify_connector_store")
 
     def test_capacity_admission_rejects_the_eleventh_service_create(self):
         # Existing fixtures may have stores, so fill only the remaining slots
