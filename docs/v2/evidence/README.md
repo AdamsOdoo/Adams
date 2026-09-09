@@ -10,7 +10,7 @@ V2 implementation. Evidence is additive and truthful: an unavailable runtime mea
 | --- | --- |
 | V1 implementation source | PR #210 head `f77bfcc25e63615e6226dd9a9329f8f943593cb2` |
 | V2 approved blueprint source | PR #211 head `3914004e27630b09b211e3d2ee92a8e6d9a0e55e` |
-| Frozen repository inventory source | `30bde525c9d003a9b00eb4175eed012dc65e8c2c` |
+| Frozen repository inventory source | `51c20c11647d6eb4ff944b81a4704178a4039d34` |
 | Implementation branch | `codex/v2-continuous-implementation` |
 | Protected branches/PRs modified | none |
 | Shopify/Odoo external effects for this checkpoint | none |
@@ -41,7 +41,7 @@ reviewable and unmodified.
 ```bash
 python3 -m unittest tools.tests.test_v2_repository_baseline -v
 python3 tools/v2_repository_baseline.py \
-  --source-ref 30bde525c9d003a9b00eb4175eed012dc65e8c2c
+  --source-ref 51c20c11647d6eb4ff944b81a4704178a4039d34
 python3 tools/v2_repository_baseline.py --check
 python3 tools/validate_shopify_graphql.py
 ```
@@ -52,11 +52,10 @@ evidence update in the same reviewed change.
 
 ## Current reproduction boundary
 
-The inventories above describe published `30bde525`, not later local repairs. Run
-their check in an isolated checkout of that exact source. The active worktree's
-check correctly rejects addon changes against this frozen source; refresh the
-inventory twice against the next published source before calling its policy gate
-complete. Current execution and native results are in the canonical handoff.
+The inventories describe published `51c20c1`, whose tree exactly matches approved
+local checkpoint `0704166`. Two generations on that source were byte-identical.
+The evidence-only follow-up does not change addon source. Current execution and
+native results are in the canonical handoff.
 
 ## Historical P00 repository-check result (880e7008)
 
