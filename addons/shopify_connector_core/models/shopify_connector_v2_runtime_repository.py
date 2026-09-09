@@ -55,10 +55,13 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
 
     @contextmanager
     def _transaction(self):
+        # Validate caller companies before elevation can bypass membership checks.
+        company_ids = self._company_ids(self.env)
+        side_context = dict(self.env.context, allowed_company_ids=list(company_ids))
         cursor = self.env.registry.cursor()
-        # Public services authorize first; SQL still enforces scope/generation.
-        side_env = api.Environment(cursor, SUPERUSER_ID, dict(self.env.context))
         try:
+            # SQL enforces validated caller scope and generations in this transaction.
+            side_env = api.Environment(cursor, SUPERUSER_ID, side_context)
             yield side_env
             side_env.flush_all()
             cursor.commit()

@@ -51,7 +51,10 @@ class TestCommandResultSecurity(TransactionCase):
     ):
         company = company or self.company
         store = store or self.store
-        return (result_model or self.Result)._record_for_command(
+        # Empty model recordsets are falsey but still carry the selected
+        # company, user and sudo context needed by the scope check.
+        model = self.Result if result_model is None else result_model
+        return model._record_for_command(
             company_id=company.id,
             store_id=store.id,
             command_id=command_id or str(uuid.uuid4()),
@@ -128,9 +131,13 @@ class TestCommandResultSecurity(TransactionCase):
         with self.assertRaises(AccessError):
             forged.create(values)
 
-        row = self._row()
+        created = self._row()
+        # Service-created rows retain their private capability context. A
+        # fresh browse represents generic sudo without that service authority.
+        row = self.Result.sudo().browse(created.id)
+        original_result = dict(row.result_json)
         with self.assertRaises(AccessError):
-            row.sudo().write({"message": "forged"})
+            row.write({"result_json": {"status": "accepted", "message": "forged"}})
         with self.assertRaises(AccessError):
             row.sudo().with_context(
                 **{
@@ -138,6 +145,8 @@ class TestCommandResultSecurity(TransactionCase):
                     COMMAND_RESULT_SERVICE_CAPABILITY_CONTEXT: True,
                 }
             ).write({"result_json": {"status": "forged"}})
+        row.invalidate_recordset(["result_json"])
+        self.assertEqual(row.result_json, original_result)
 
     def test_capability_still_cannot_cross_the_active_company_or_store(self):
         with self.assertRaises(AccessError):

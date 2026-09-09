@@ -17,7 +17,8 @@ from types import SimpleNamespace
 import unittest
 import uuid
 
-from odoo.tests.common import TransactionCase, tagged
+from odoo.exceptions import AccessError
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 from ..models.shopify_connector_v2_runtime import (
     OdooReadOnlyRuntimeRepository,
@@ -94,6 +95,34 @@ def _claim(job_id=41, worker="worker:test"):
 
 @tagged('post_install', '-at_install')
 class TestV2RuntimeAdapter(TransactionCase):
+
+    def test_runtime_rejects_forged_company_context_before_elevation(self):
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Unauthorized runtime scope',
+        })
+        user = new_test_user(
+            self.env, login='runtime_company_guard_%s' % uuid.uuid4().hex,
+            groups='base.group_user,shopify_connector_core.group_shopify_connector_admin',
+            company_id=self.env.company.id,
+            company_ids=[(6, 0, self.env.company.ids)],
+        )
+        caller = self.env['shopify.connector.v2.runtime'].with_user(user).with_context(
+            allowed_company_ids=[other_company.id],
+        )
+        with self.assertRaises(AccessError):
+            with OdooReadOnlyRuntimeRepository(caller.env)._transaction():
+                self.fail('Unauthorized company reached an elevated transaction')
+
+    def test_runtime_side_transaction_retains_caller_company_scope(self):
+        user = new_test_user(
+            self.env, login='runtime_company_valid_%s' % uuid.uuid4().hex,
+            groups='base.group_user,shopify_connector_core.group_shopify_connector_admin',
+            company_id=self.env.company.id,
+            company_ids=[(6, 0, self.env.company.ids)],
+        )
+        caller = self.env['shopify.connector.v2.runtime'].with_user(user).with_context({})
+        with OdooReadOnlyRuntimeRepository(caller.env)._transaction() as side_env:
+            self.assertEqual(side_env.companies.ids, self.env.company.ids)
 
     def test_generation_snapshot_fields_exist_on_run_and_job(self):
         run_field = self.env['shopify.connector.run']._fields[

@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from odoo import SUPERUSER_ID, api, fields
 from odoo.sql_db import db_connect
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 from ..models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
@@ -134,17 +134,19 @@ class TestMutationRecovery(TransactionCase):
             })
         return job, attempt
 
-    def _v2_running(self, running_since):
-        if self.store.activation_state != 'active':
-            self.store._p15_set_activation('active')
-        settings = self.env[
+    def _v2_running(self, running_since, store=None):
+        store = self.store if store is None else store
+        fixture_env = store.with_company(store.company_id).env
+        if store.activation_state != 'active':
+            store._p15_set_activation('active')
+        settings = fixture_env[
             'shopify.connector.store.settings'
-        ].sudo().search([('store_id', '=', self.store.id)], limit=1)
+        ].sudo().search([('store_id', '=', store.id)], limit=1)
         if not settings:
-            settings = self.env[
+            settings = fixture_env[
                 'shopify.connector.store.settings'
             ].sudo()._settings_service_create(
-                '_canonical_settings', {'store_id': self.store.id},
+                '_canonical_settings', {'store_id': store.id},
             )
         if settings.v2_runtime_mode != 'all':
             settings._set_v2_modes_service(
@@ -154,8 +156,8 @@ class TestMutationRecovery(TransactionCase):
                     settings.configuration_generation
                 ),
             )
-        run = self.env['shopify.connector.run']._create_service({
-            'store_id': self.store.id,
+        run = fixture_env['shopify.connector.run']._create_service({
+            'store_id': store.id,
             'workflow': 'core',
             'operation': 'mutation_dispatch_selftest',
             'trigger': 'system',
@@ -164,12 +166,12 @@ class TestMutationRecovery(TransactionCase):
         })
         run._admit_service()
         token = uuid.uuid4().hex
-        job = self.Job.sudo().create({
-            'store_id': self.store.id,
+        job = fixture_env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'mutation_dispatch_selftest',
             'expected_connection_generation':
-                self.store.connection_generation,
+                store.connection_generation,
             'expected_configuration_generation':
                 settings.configuration_generation,
             'run_id': run.id,
@@ -183,23 +185,107 @@ class TestMutationRecovery(TransactionCase):
             'owner_worker_ref': 'stale-v2-regression',
             'running_since': running_since,
         })
-        Dispatch = self.env['shopify.connector.job.dispatch']
+        Dispatch = fixture_env['shopify.connector.job.dispatch']
         with patch.object(
             type(Dispatch), '_get_v2_mutation_job_types',
             return_value=frozenset(('mutation_dispatch_selftest',)),
         ):
-            attempt = self.Attempt.with_context(**{
+            attempt = fixture_env['shopify.connector.mutation.attempt'].with_context(**{
                 C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
             })._create_attempt_intent({
                 'job_id': job.id,
                 'attempt_token': token,
                 'mutation_domain': 'mutation_dispatch_selftest',
                 'expected_connection_generation':
-                    self.store.connection_generation,
-                'expected_store_identity': self.store.shop_domain,
+                    store.connection_generation,
+                'expected_store_identity': store.shop_domain,
                 'shopify_idempotency_key': uuid.uuid4().hex,
             })
         return job, attempt
+
+    def test_admin_stale_sweep_excludes_older_foreign_c1_and_c2_before_limit(self):
+        foreign_company = self.env['res.company'].sudo().create({
+            'name': 'Stale sweep foreign %s' % uuid.uuid4().hex,
+        })
+        foreign_store = self.store.sudo().copy({
+            'company_id': foreign_company.id,
+            'shop_domain': 'stale-foreign-%s.myshopify.com' % uuid.uuid4().hex,
+        })
+        now = fields.Datetime.now()
+        local, local_attempt = self._v2_running(now - timedelta(hours=1))
+        foreign, foreign_attempt = self._v2_running(
+            now - timedelta(hours=3), store=foreign_store,
+        )
+        foreign_c1 = foreign.copy({
+            'payload_hash': uuid.uuid4().hex,
+            'current_attempt_token': uuid.uuid4().hex,
+        })
+        admin = new_test_user(
+            self.env, login='stale_scope_%s' % uuid.uuid4().hex,
+            groups='base.group_user,shopify_connector_core.group_shopify_connector_admin',
+            company_id=self.store.company_id.id,
+            company_ids=[(6, 0, [self.store.company_id.id])],
+        )
+        scoped = self.Sweep.with_user(admin).with_context(
+            allowed_company_ids=[self.store.company_id.id],
+        )
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset(('mutation_dispatch_selftest',)),
+        ), patch.object(
+            type(scoped), '_positive_int_parameter',
+            side_effect=lambda name, default: 1 if name.endswith('batch_size') else 30,
+        ):
+            self.assertEqual(scoped.run_sweep(), 1)
+        foreign.invalidate_recordset()
+        foreign_c1.invalidate_recordset()
+        self.assertEqual(foreign.state, 'running')
+        self.assertEqual(foreign_c1.state, 'running')
+        self.assertFalse(self.Job.sudo().search([
+            ('mutation_attempt_id', '=', foreign_attempt.id),
+        ]))
+        self.assertTrue(self.Job.sudo().search([
+            ('mutation_attempt_id', '=', local_attempt.id),
+        ]))
+
+    def test_c2_same_company_run_drift_projects_authoritative_attempt_run(self):
+        now = fields.Datetime.now()
+        job, attempt = self._v2_running(now - timedelta(hours=1))
+        attempt_run = attempt.run_id
+        other_store = self.store.sudo().copy({
+            'shop_domain': 'stale-same-company-%s.myshopify.com' % uuid.uuid4().hex,
+        })
+        _other_job, other_attempt = self._v2_running(now, store=other_store)
+        other_run = other_attempt.run_id
+        self.env.cr.execute(
+            'UPDATE shopify_connector_job SET run_id = %s WHERE id = %s',
+            [other_run.id, job.id],
+        )
+        job.invalidate_recordset(['run_id'])
+        self.assertEqual(job.run_id, other_run)
+
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        projected_runs = []
+
+        def record_projection(_dispatch, run):
+            projected_runs.append(run)
+
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset(('mutation_dispatch_selftest',)),
+        ), patch.object(
+            type(Dispatch), '_v2_project_run', new=record_projection,
+            create=True,
+        ):
+            self.assertEqual(self.Sweep._sweep_v2_mutation_owners(), 1)
+
+        reconciliation = self.Job.search([
+            ('mutation_attempt_id', '=', attempt.id),
+        ])
+        self.assertEqual(len(reconciliation), 1)
+        self.assertEqual(reconciliation.run_id, attempt_run)
+        self.assertEqual(projected_runs, [attempt_run])
 
     def test_c1_without_c2_is_safely_requeued(self):
         job, _attempt = self._running(False)

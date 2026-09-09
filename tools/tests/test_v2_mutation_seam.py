@@ -165,11 +165,15 @@ class TestV2MutationSeam(unittest.TestCase):
 
         class FakeEnv(dict):
             cr = cursor
+            su = False
+            companies = type('Companies', (), {'ids': [7]})()
 
         service = type('FakeSweep', (), {
             'env': FakeEnv({
                 'shopify.connector.job': job_model,
                 'shopify.connector.mutation.attempt': attempt_model,
+                'shopify.connector.run': FakeModel(),
+                'shopify.connector.store': FakeModel(),
             }),
         })()
         result = namespace['_stale_v2_attempt_jobs'](
@@ -177,6 +181,7 @@ class TestV2MutationSeam(unittest.TestCase):
             job_types=frozenset(('z_type', 'a_type')),
             cutoff='2026-09-08 10:00:00',
             limit=2,
+            company_ids=(7,),
         )
         normalized = ' '.join(cursor.query.split())
         self.assertIn(
@@ -190,16 +195,31 @@ class TestV2MutationSeam(unittest.TestCase):
         self.assertIn('LIMIT %s', normalized)
         self.assertEqual(
             attempt_model.flushed,
-            [['run_id', 'mutation_domain', 'job_id']],
+            [['run_id', 'mutation_domain', 'job_id', 'company_id', 'store_id']],
         )
-        self.assertEqual(job_model.flushed, [['state', 'running_since']])
+        self.assertEqual(job_model.flushed, [['state', 'running_since', 'company_id', 'store_id']])
         self.assertEqual(
             cursor.params,
-            ('running', '2026-09-08 10:00:00', ['a_type', 'z_type'], 2),
+            ('running', '2026-09-08 10:00:00', False, [7], ['a_type', 'z_type'], 2),
         )
+        for fence in (
+            'j.company_id = ANY(%s)', 's.company_id = j.company_id',
+            'a.company_id = j.company_id', 'a.store_id = j.store_id',
+            'r.company_id = j.company_id', 'r.store_id = j.store_id',
+        ):
+            self.assertLess(normalized.index(fence), normalized.index('LIMIT %s'))
         self.assertEqual(result, (17, 23))
         self.assertEqual(job_model.browsed, [17, 23])
         self.assertNotIn('job_id.running_since', selector)
+        namespace['_stale_v2_attempt_jobs'](
+            service, job_types={'a_type'}, cutoff='cutoff', limit=1,
+        )
+        self.assertEqual(cursor.params[2:4], (False, [7]))
+        service.env.su = True
+        namespace['_stale_v2_attempt_jobs'](
+            service, job_types={'a_type'}, cutoff='cutoff', limit=1,
+        )
+        self.assertEqual(cursor.params[2:4], (True, []))
 
     def test_legacy_lock_contention_preserves_processed_v2_count(self):
         sweep = _source(CORE_MODELS / 'shopify_connector_stale_owner_sweep.py')
