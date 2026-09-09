@@ -12,6 +12,8 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
+- Frozen test-repair source `fdf96fb94211a2c8c4104829ed2614d8928a1602` matches local `a8c4bae`. Independent review found no blockers and executed the exact updated source assertion successfully. Six generated artifacts reproduce identically; baseline and five catalog tests pass after synchronization. Final branch publication and native verification pending.
+
 - Published head `8727b50cea694590fa4c70cec2e44aba4ee883bc`, source `19ce79419f8bfa3beaf9b360cdc30d4971b28e41`. Policy passed. Native 34379511455 failed: 901 tests, one failure, two errors, all 48 selected classes present, no skips. Full campaign skipped. Original summary/digest in document 18.
 - Production mutation success and preparation rollback regressions passed. Prepared test-only follow-up updates source ordering for the extracted helper and moves identity checks onto the existing committed fixture with real independent cursors. Missing-run rejection remains unchanged; no production correction in this packet.
 - All 471 local tests pass (26.576 seconds); changed Python syntax passes. Final exact-source evidence and native results remain pending.
