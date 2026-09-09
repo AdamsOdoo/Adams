@@ -5,8 +5,8 @@
 
 ## Provenance
 
-- Source ref: `acaa0e2048e6f25fa031fd772fa70371a2efcc03`
-- Source SHA: `acaa0e2048e6f25fa031fd772fa70371a2efcc03`
+- Source ref: `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`
+- Source SHA: `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`
 - Generator schema: `2`
 
 ## Inventory counts

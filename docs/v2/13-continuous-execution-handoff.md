@@ -37,6 +37,8 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Local follow-up after af771c91
 
+Prepared source `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`, tree `04f0c393e9f5bc73025d0d4d8a21f772452f5517`, is identical to local `7f04bf7`. Six source artifacts reproduced identically twice. Verify the eventual evidence head and 37-class run before claiming publication or native success.
+
 `test_mutation_dispatch.py` still asserted the old `self` receiver in both dispatch branches. Its prepared source guard now checks that claim precedes company-scope binding and both branches invoke the scoped `worker` with the claimed job. Static execution of this assertion passes; native execution is pending and this follow-up is not part of `af771c91`. The next candidate also selects the complete mutation-dispatch class and five independently traced activation-cascade classes, keeping all prior selections (37 total).
 
 ## Remaining completion gates
