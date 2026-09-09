@@ -124,6 +124,30 @@
     {
       "addon": "shopify_connector_core",
       "class": "TestP07DomainReadGateway"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationDispatch"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentModeSwitch"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentScans"
+    },
+    {
+      "addon": "shopify_connector_fulfillment_webhook",
+      "class": "TestShopifyConnectorFulfillmentWebhook"
+    },
+    {
+      "addon": "shopify_connector_sale_webhook",
+      "class": "TestShopifyConnectorSaleWebhook"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestTaxDecisionRoute"
     }
   ]
 }

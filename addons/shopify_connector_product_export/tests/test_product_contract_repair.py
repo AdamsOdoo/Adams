@@ -114,6 +114,14 @@ class TestProductContractRepair(ExportCase):
             'product_export_binding_namespace_ready': True,
         })
         extra = self.add_template_variant('WIDGET-1', '0002')
+        # Attribute generation may replace/archive the original singleton.
+        # Seed both current combinations explicitly, then prove the fixture
+        # actually presents duplicate SKUs to the create preflight.
+        self.variant = self.template.product_variant_ids - extra
+        self.variant.ensure_one()
+        self.variant.write({'default_code': 'WIDGET-1'})
+        self.assertNotEqual(self.variant.id, extra.id)
+        self.assertEqual(self.variant.default_code, extra.default_code)
         preview = self.make_preview(
             export_path='create', state='applying',
             steps=[{

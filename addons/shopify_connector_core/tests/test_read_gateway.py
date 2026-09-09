@@ -6,6 +6,8 @@ reach the API client at all.  Pure gateway behavior is covered by the cheap
 ``tools.tests.test_v2_read_gateways`` lane.
 """
 
+import uuid
+
 from odoo import SUPERUSER_ID
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
@@ -50,6 +52,7 @@ class TestReadGatewayScope(TransactionCase):
             "store_id": store.id,
             "job_source": "setup_readiness_check",
             "job_type": "core_dispatch_selftest",
+            "payload_hash": uuid.uuid4().hex,
             "state": state,
         })
 

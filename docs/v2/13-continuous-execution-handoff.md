@@ -10,7 +10,14 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Only the authorized development environment and `testin-lzhbzhtc.myshopify.com` may be used for live verification after exact build/database/company/store identity checks. Staging/production, other stores and public release require separate authorization.
 - GitHub API publication and native CI are available. Local scratch has no Odoo/PostgreSQL. Current Odoo.sh build/database identity is unverified. No live Shopify work has been performed in this correction campaign.
 
-## Current native checkpoint — 9 September 2026
+## Active published candidate — 9 September 2026
+
+- Head `af771c9121239c1ce358020527075dcc35f3f068`; source `acaa0e2048e6f25fa031fd772fa70371a2efcc03`. Local source/evidence `ceea5ef`/`960ef0d` were tree-verified and both histories merged without force.
+- [Native 34336740112](https://github.com/AdamsOdoo/Adams/actions/runs/34336740112), job `102417807016`, completed **707 tests, one failure, one error**, 247.758 seconds, no selected skips/missing classes. Packaging and policy `34336740133` pass. Full campaign did not execute. Artifact `10098186454` SHA-256 `c926b4fea737825bf65854a51be96e31b6a69d141783f49bf51a8f2f51363f5c` verified; summary preserved in evidence.
+- Worker P06/P07 positives and W2 cleanup pass. The new multi-job negative fixture accidentally reused the same durable idempotency identity; give each intended distinct job a payload hash. Export duplicate-SKU fixture now explicitly selects and seeds the current attribute combinations and asserts the duplicate before preflight; retain the rejection assertion. No production guard relaxation.
+- First next action: publish this test-only follow-up with refreshed source evidence and inspect its 37-class prerequisite, then full campaign. The existing W2-only compatibility decision remains pending.
+
+## Preceding native result — 9faaf3be
 
 - Published `9faaf3bea46bbe789277dd5f174cd108a100a1b6`, source `c195f82b3f181caf8371a5f4411af3bfe115436d`; tree-identical local merge `e13fd67` preserves both histories.
 - [Policy 34334141213](https://github.com/AdamsOdoo/Adams/actions/runs/34334141213) passes. [Native 34334141258](https://github.com/AdamsOdoo/Adams/actions/runs/34334141258), job `102409445616`: **696 tests, two failures, two errors**, 276.505 seconds, no selected skips or missing classes. Full campaign did not execute. Artifact `10097190577` SHA-256 `a9cd0867ce7bf488b32926bba6039da902d63bc77f306584e3038b915abb5c96` verified; original summary preserved in evidence.
@@ -27,6 +34,10 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Focus retains all prior classes and adds affected gateway/worker checks. Full fresh/warm, Lite/Full, old-core, migration, nonstandard and browser lanes remain downstream and unchanged.
 - Group duplicate push/PR CI by workflow/source repository/head branch, preserving triggers and exact-head checkout. Inspect all Actions runs, since the convenience commit wrapper filters to PR events.
 - Integrated source: 461 dependency-free tests pass in 20.071 seconds; static, core dependency, change-size, changed Python syntax and whitespace checks pass. The 31-class native run remains pending. Worker tests cover the installed server action on the shared test cursor, P06 admission and the registered real P07 observation handler; separate-cursor scheduler/lease/concurrency proof remains open. Inspect `git status` and the remote ref for actual publication state.
+
+## Local follow-up after af771c91
+
+`test_mutation_dispatch.py` still asserted the old `self` receiver in both dispatch branches. Its prepared source guard now checks that claim precedes company-scope binding and both branches invoke the scoped `worker` with the claimed job. Static execution of this assertion passes; native execution is pending and this follow-up is not part of `af771c91`. The next candidate also selects the complete mutation-dispatch class and five independently traced activation-cascade classes, keeping all prior selections (37 total).
 
 ## Remaining completion gates
 
