@@ -143,16 +143,16 @@ class ShopifyConnectorStoreSettingsV2(models.Model):
                     'Unsupported value for %s.' % field_name
                 )
             normalized[field_name] = value
-        if isinstance(expected_configuration_generation, bool):
+        if (
+            isinstance(expected_configuration_generation, bool)
+            or not isinstance(expected_configuration_generation, int)
+            or expected_configuration_generation < 0
+        ):
             raise ValidationError(
-                'The expected configuration generation must be an integer.'
+                'The expected configuration generation must be a '
+                'non-negative integer.'
             )
-        try:
-            expected = int(expected_configuration_generation)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError(
-                'The expected configuration generation must be an integer.'
-            ) from exc
+        expected = expected_configuration_generation
         if not isinstance(reason, str) or not reason.strip():
             raise ValidationError('A V2 mode-change reason is required.')
         safe_reason = redact(reason.strip())[:512]

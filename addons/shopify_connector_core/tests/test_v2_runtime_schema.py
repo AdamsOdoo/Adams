@@ -18,7 +18,7 @@ from psycopg2 import IntegrityError
 
 from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 from ..models.shopify_connector_job_attempt import (
     ATTEMPT_CREATE_SURFACE,
@@ -430,7 +430,9 @@ class TestV2RuntimeSchema(TransactionCase):
     def test_v2_mode_controls_are_locked_audited_compare_and_set(self):
         settings = self.env[
             'shopify.connector.store.settings'
-        ].sudo().create({'store_id': self.store_a.id})
+        ]._settings_service_create(
+            '_canonical_settings', {'store_id': self.store_a.id},
+        )
         self.assertEqual(settings.v2_ui_mode, 'legacy')
         self.assertEqual(settings.v2_gateway_mode, 'legacy')
         self.assertEqual(settings.v2_runtime_mode, 'legacy')
@@ -438,8 +440,30 @@ class TestV2RuntimeSchema(TransactionCase):
         with self.assertRaises(AccessError):
             settings.sudo().write({'v2_ui_mode': 'pilot'})
 
-        admin = self.env.ref('base.user_admin')
+        # The platform administrator is not necessarily a connector
+        # administrator. Exercise the service with its required explicit role.
+        admin = new_test_user(
+            self.env,
+            login='v2_schema_mode_admin_%s' % self.tag,
+            groups=(
+                'base.group_user,'
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+        )
         settings = settings.with_user(admin).with_company(self.company_a)
+        for invalid_generation in (
+            None, False, True, '0', 0.0, 0.9, -1, float('nan'),
+            float('inf'), float('-inf'),
+        ):
+            with self.subTest(invalid_generation=invalid_generation):
+                with self.assertRaises(ValidationError):
+                    settings._set_v2_modes_service(
+                        {'v2_runtime_mode': 'read_only'},
+                        reason='Reject malformed mode generation',
+                        expected_configuration_generation=invalid_generation,
+                    )
+                self.assertEqual(settings.configuration_generation, 0)
+                self.assertEqual(settings.v2_runtime_mode, 'legacy')
         settings._set_v2_modes_service(
             {
                 'v2_ui_mode': 'pilot',
