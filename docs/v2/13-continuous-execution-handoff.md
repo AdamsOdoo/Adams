@@ -10,7 +10,15 @@ This file owns current execution state. AGENTS.md owns authority and development
 - Only the authorized development environment and `testin-lzhbzhtc.myshopify.com` may be used for live verification after exact build/database/company/store identity checks. Staging/production, other stores and public release require separate authorization.
 - GitHub API publication and native CI are available. Local scratch has no Odoo/PostgreSQL. Current Odoo.sh build/database identity is unverified. No live Shopify work has been performed in this correction campaign.
 
-## Active published candidate — 9 September 2026
+## Active continuation — 9 September 2026
+
+- Verified remote head `1063cb0700d78258b3acbfc4808cd526d51fd88e`, source `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`. Preserved local checkpoint `4643f6f` and both prior publication histories; no work discarded.
+- [Native 34337913595](https://github.com/AdamsOdoo/Adams/actions/runs/34337913595), job `102423055779`: **834 tests, zero failures, one error**, 296.609 seconds; all 37 classes present, no selected skips. Policy `34337913613` and packaging passed. Full campaign skipped downstream.
+- Artifact `10098860989` downloaded and SHA-256 `e2018d4cd8440837f666d9f31b900d9a26529a32aced37ca0faa03694f304660` verified. Original summary preserved in `evidence/native-focus-1063cb0-summary.json`.
+- Sole error: fulfillment batch identity test invoked protected reader as root without connector membership. Prepared fixture scopes service/store/job to an ordinary same-company operator, preserving positive and reversed-identity rejection assertions. Read-only independent agent review agrees; production guards unchanged. Native requalification is pending.
+- First next action: publish the coherent test correction with exact-source evidence, inspect its unchanged 37-class prerequisite, then continue the downstream full campaign and residual corrections. Document 19 remains proposed; no compatibility waiver accepted.
+
+## Preceding worker candidate — af771c91
 
 - Head `af771c9121239c1ce358020527075dcc35f3f068`; source `acaa0e2048e6f25fa031fd772fa70371a2efcc03`. Local source/evidence `ceea5ef`/`960ef0d` were tree-verified and both histories merged without force.
 - [Native 34336740112](https://github.com/AdamsOdoo/Adams/actions/runs/34336740112), job `102417807016`, completed **707 tests, one failure, one error**, 247.758 seconds, no selected skips/missing classes. Packaging and policy `34336740133` pass. Full campaign did not execute. Artifact `10098186454` SHA-256 `c926b4fea737825bf65854a51be96e31b6a69d141783f49bf51a8f2f51363f5c` verified; summary preserved in evidence.
@@ -55,3 +63,5 @@ The old-core W2 contract decision in document 19 is proposed, not accepted. Cust
 4. Freeze generated evidence against the exact source; reproduce it and preserve failed/skipped/blocked results honestly. Source correction reopens affected proof. No secrets, customer payloads or raw PII belong in evidence.
 5. Source rollback uses a normal corrective commit from the verified prior tree; no destructive history operation. These prepared source changes have no live database/shop compensation. A future database upgrade requires a matching backup/restore plan.
 6. Resume from the first next action above. Do not restart research or rely on chat memory; automatic compaction is not a guarantee of automatic new-chat creation or unattended execution after a turn ends.
+
+Local evidence follow-up records the remaining original activation-cascade attributions in document 18 and the seven exact old/current owner versions in document 19. The recommendation is prepared for the user’s material compatibility decision; no contract or install gate has been changed.

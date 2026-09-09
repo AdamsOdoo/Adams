@@ -8,6 +8,20 @@ The existing W2-only gate remains required and failing. This proposal does not c
 
 Current owner modules now define additional activation, configuration, job/run/attempt and command-result schema. Replacing their Python code without upgrading their installed schema leaves an inconsistent registry. The W2 pre-init hook already bridges more than the original two W1 JSONB columns, including settings, order, inventory and export fields. Expanding it to recreate the current core runtime would duplicate owner migrations without their complete backfills, security/XML updates or version bookkeeping. Merely adding each next missing column is not an adequate repair.
 
+The exact seven-module fixture spans these owner versions (verified from both manifests at the durable origin and current source `96f3eda8`):
+
+| Owner addon suffix | Installed old version | Current source version |
+| --- | --- | --- |
+| core | 19.0.1.23.0 | 19.0.1.33.0 |
+| product | 19.0.2.11.0 | 19.0.2.14.0 |
+| sale | 19.0.2.11.0 | 19.0.2.17.0 |
+| inventory | 19.0.1.8.0 | 19.0.1.13.0 |
+| fulfillment | 19.0.1.6.0 | 19.0.1.11.0 |
+| product_export | 19.0.1.2.0 | 19.0.1.7.1 |
+| webhook | 19.0.1.0.0 | 19.0.1.4.0 |
+
+This is a source/fixture inventory, not proof that any upgrade chain has passed. The proposed lane must exercise these actual owner upgrades and assert their installed versions and preserved data.
+
 ## Recommended decision
 
 Require a normal, versioned upgrade of the installed connector owner modules before adding W2 to an old installation. Preserve existing identities, bindings, audit history and uncertain mutation records through those owner migrations. Keep the durable old origin as an upgrade fixture; do not replace it with a convenient recent baseline.
