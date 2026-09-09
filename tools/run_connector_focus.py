@@ -64,7 +64,10 @@ def selected_classes(config: dict) -> tuple[list[str], list[str]]:
                          for node in tree.body)
         if not found:
             raise RuntimeError(f"focused class is missing: {addon}:{class_name}")
-        selectors.append(f"/{addon}:{class_name}")
+        # Odoo's TagsSelector interprets a missing positive tag as 'standard'.
+        # Explicit '*' removes only that tag restriction; addon and class still
+        # match exactly, including the deliberately nonstandard race classes.
+        selectors.append(f"*/{addon}:{class_name}")
         names.append(class_name)
     if not selectors or len(selectors) != len(set(selectors)):
         raise RuntimeError("focused class inventory is empty or contains duplicates")

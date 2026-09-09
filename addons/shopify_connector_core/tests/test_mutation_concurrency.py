@@ -592,9 +592,89 @@ class TestMutationConcurrency(TransactionCase):
             )
             self.assertEqual(cr.fetchone()[0], 1)
 
+    def test_precondition_failure_rolls_back_owned_cursor_before_c2(self):
+        store_id, job_id = self._durable_fixture()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            Dispatch = env['shopify.connector.job.dispatch']
+            job = env['shopify.connector.job'].browse(job_id)
+            job.write({
+                'state': 'running',
+                'current_attempt_token': 'preparation-rollback-token',
+                'owner_worker_ref': 'preparation-rollback-test',
+                'running_since': fields.Datetime.now(),
+            })
+            local = Dispatch._prepare_local_mutation_selftest(job)
+            owner = {
+                'job_id': job_id,
+                'attempt_token': 'preparation-rollback-token',
+            }
+            cr.commit()
+            real_strategies = type(Dispatch)._get_reconciliation_strategies
+
+            def side_cursor(*_args, **_kwargs):
+                return db_connect(self.env.cr.dbname).cursor()
+
+            for failure in ('typed_error', 'malformed_request'):
+                with self.subTest(failure=failure):
+                    marker = UserError('Synthetic precondition refusal')
+
+                    def strategies(dispatch):
+                        result = dict(real_strategies(dispatch))
+                        strategy = dict(result['mutation_dispatch_selftest'])
+
+                        def prepare(_local, _owner):
+                            self.assertIsNot(dispatch.env.cr, cr)
+                            dispatch.env['shopify.connector.store'].browse(
+                                store_id,
+                            ).write({'name': 'Must roll back preparation'})
+                            # Flush proves database rollback, not merely
+                            # abandonment of an unflushed ORM cache.
+                            dispatch.env.flush_all()
+                            if failure == 'typed_error':
+                                raise marker
+                            return {}
+
+                        strategy['prepare_preconditions'] = prepare
+                        result['mutation_dispatch_selftest'] = strategy
+                        return result
+
+                    expected = (
+                        UserError if failure == 'typed_error' else ValidationError
+                    )
+                    with patch.object(self.registry, 'cursor', side_effect=side_cursor), \
+                            patch.object(
+                                type(Dispatch), '_get_reconciliation_strategies',
+                                new=strategies,
+                            ):
+                        with self.assertRaises(expected) as raised:
+                            Dispatch._prepare_mutation_request(
+                                local, owner, 'mutation_dispatch_selftest',
+                            )
+                    if failure == 'typed_error':
+                        self.assertIs(raised.exception, marker)
+                    self.assertEqual(
+                        cr._cnx.get_transaction_status(),
+                        psycopg2.extensions.TRANSACTION_STATUS_IDLE,
+                    )
+                    with db_connect(self.env.cr.dbname).cursor() as observer:
+                        observer.execute(
+                            'SELECT name FROM shopify_connector_store '
+                            'WHERE id = %s FOR UPDATE NOWAIT', (store_id,),
+                        )
+                        self.assertEqual(
+                            observer.fetchone()[0], 'Layer 2 concurrency',
+                        )
+                        observer.execute(
+                            'SELECT count(*) FROM shopify_connector_mutation_attempt '
+                            'WHERE job_id = %s', (job_id,),
+                        )
+                        self.assertEqual(observer.fetchone()[0], 0)
+
     def test_success_path_commits_c1_c2_then_runs_net_and_fresh_c3(self):
         _store_id, job_id = self._durable_fixture()
         trace = []
+        transport_errors = []
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             Dispatch = env['shopify.connector.job.dispatch']
@@ -632,14 +712,42 @@ class TestMutationConcurrency(TransactionCase):
                 trace.append('prepare_local')
                 return real['prepare_local'](job)
 
-            def prepare_preconditions(local, owner):
+            def prepare_preconditions(local, owner, side_dispatch):
                 trace.append('prepare_preconditions')
                 assert_durable(0)
-                return real['prepare_preconditions'](local, owner)
+                self.assertIsNot(side_dispatch.env.cr, cr)
+                # Real domain preparation reads ORM state and can persist
+                # observed metadata. Both must stay off the C3 cursor.
+                side_dispatch.env.cr.execute('SELECT 1')
+                side_dispatch.env['shopify.connector.store'].browse(
+                    _store_id,
+                ).write({'name': 'Prepared on independent cursor'})
+                return side_dispatch._prepare_preconditions_mutation_selftest(
+                    local, owner,
+                )
 
             def transport(request, context):
                 trace.append('transport')
-                assert_durable(1)
+                try:
+                    self.assertEqual(
+                        cr._cnx.get_transaction_status(),
+                        psycopg2.extensions.TRANSACTION_STATUS_IDLE,
+                        'Request validation reopened the main transaction '
+                        'before C2/transport.',
+                    )
+                    assert_durable(1)
+                    with db_connect(self.env.cr.dbname).cursor() as observer:
+                        observer.execute(
+                            'SELECT name FROM shopify_connector_store '
+                            'WHERE id = %s', (_store_id,),
+                        )
+                        self.assertEqual(
+                            observer.fetchone()[0],
+                            'Prepared on independent cursor',
+                        )
+                except Exception as exc:
+                    transport_errors.append(exc)
+                    raise
                 return real['transport'](request, context)
 
             def classify(result):
@@ -652,7 +760,6 @@ class TestMutationConcurrency(TransactionCase):
 
             strategy.update({
                 'prepare_local': prepare_local,
-                'prepare_preconditions': prepare_preconditions,
                 'transport': transport,
                 'classify_direct_result': classify,
                 'apply_consequence': apply,
@@ -663,14 +770,22 @@ class TestMutationConcurrency(TransactionCase):
             def side_cursor(*_args, **_kwargs):
                 return db_connect(self.env.cr.dbname).cursor()
 
+            def strategies(dispatch):
+                bound = dict(strategy)
+                bound['prepare_preconditions'] = lambda local, owner: (
+                    prepare_preconditions(local, owner, dispatch)
+                )
+                return {'mutation_dispatch_selftest': bound}
+
             with patch.object(self.registry, 'cursor', side_effect=side_cursor), \
                     patch.object(
                 type(Dispatch), '_get_reconciliation_strategies',
-                return_value={'mutation_dispatch_selftest': strategy},
+                new=strategies,
             ):
                 Dispatch._drain_mutation_one(
                     env['shopify.connector.job'].browse(job_id)
                 )
+        self.assertFalse(transport_errors, repr(transport_errors))
         self.assertEqual(trace, [
             'prepare_local', 'prepare_preconditions', 'transport',
             'classify_direct_result', 'apply_consequence',

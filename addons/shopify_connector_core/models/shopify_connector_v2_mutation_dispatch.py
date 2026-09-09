@@ -302,6 +302,9 @@ class ShopifyConnectorV2MutationDispatch(models.AbstractModel):
                 raise ValidationError('The mutation job scope is unavailable.')
             job, _attempt, run, store, settings = scope
             result = {
+                'requires_v2': side_env[
+                    'shopify.connector.job.dispatch'
+                ]._is_v2_mutation_job(job),
                 'is_v2': bool(
                     run
                     and job.job_type in side_env[
@@ -459,16 +462,46 @@ class ShopifyConnectorV2MutationDispatch(models.AbstractModel):
             side_cr.close()
 
     @api.model
+    def _prepare_mutation_request(self, local_snapshot, owner_context, job_type):
+        """Prepare on an owned cursor; leave the main C3 snapshot unopened.
+
+        Successful domain observations may persist. Preparation/shape failures
+        roll back before existing pre-C2 recovery. Close this cursor before
+        V2 identity locking so observation writes cannot conflict with it.
+        """
+        with self.env.registry.cursor() as side_cr:
+            side_env = api.Environment(
+                side_cr, self.env.uid, dict(self.env.context),
+            )
+            dispatch = side_env['shopify.connector.job.dispatch']
+            strategy = dispatch._validated_mutation_strategy(job_type)
+            request = dispatch._validate_prepared_request_shape(
+                strategy['prepare_preconditions'](
+                    dict(local_snapshot), dict(owner_context),
+                ),
+                owner_context['job_id'], owner_context['attempt_token'],
+                job_type,
+            )
+            side_cr.commit()
+        return self._validate_prepared_request(
+            request, owner_context['job_id'], owner_context['attempt_token'],
+            job_type,
+        )
+
+    @api.model
     def _validate_prepared_request(self, request, job_id, token, job_type):
         """Canonicalize V2 identity in the in-memory prepared request."""
         exact = super()._validate_prepared_request(
             request, job_id, token, job_type,
         )
-        job = self.env['shopify.connector.job'].browse(job_id).exists()
-        if not self._is_v2_mutation_job(job):
+        # C1 has closed the main transaction. Do not open a new snapshot
+        # before independent C2 commits: C3 must see that durable attempt.
+        if job_type not in self._get_v2_mutation_job_types():
             return exact
         identity = self._v2_locked_job_identity(job_id)
-        if not identity or not identity['is_v2']:
+        if not identity['requires_v2']:
+            return exact
+        if not identity['is_v2']:
             raise ValidationError(
                 'Prepared V2 request lost its durable run identity.'
             )

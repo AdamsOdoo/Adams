@@ -1,6 +1,7 @@
 """Odoo checks for the additive V2 mutation-attempt identity seam."""
 
 import uuid
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import ValidationError
@@ -103,3 +104,45 @@ class TestV2MutationRuntime(TransactionCase):
         self.assertTrue(callable(client._v2_admit_mutation_side))
         self.assertTrue(callable(client._admit_mutation))
         self.assertTrue(callable(client._validate_graphql_operation))
+
+    def test_prepared_request_keeps_unmarked_registered_legacy_job(self):
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        request = Dispatch._prepare_preconditions_mutation_selftest(
+            Dispatch._prepare_local_mutation_selftest(self.job),
+            {'job_id': self.job.id},
+        )
+        self.env.flush_all()
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset({'mutation_dispatch_selftest'}),
+        ):
+            identity = Dispatch._v2_locked_job_identity(self.job.id)
+            self.assertFalse(identity['requires_v2'])
+            self.assertFalse(identity['is_v2'])
+            self.assertEqual(Dispatch._validate_prepared_request(
+                request, self.job.id, self.job.current_attempt_token,
+                self.job.job_type,
+            ), request)
+
+    def test_prepared_request_rejects_lane_marker_with_missing_run(self):
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        self.job.write({'lane': 'interactive'})
+        request = Dispatch._prepare_preconditions_mutation_selftest(
+            Dispatch._prepare_local_mutation_selftest(self.job),
+            {'job_id': self.job.id},
+        )
+        self.env.flush_all()
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset({'mutation_dispatch_selftest'}),
+        ):
+            identity = Dispatch._v2_locked_job_identity(self.job.id)
+            self.assertTrue(identity['requires_v2'])
+            self.assertFalse(identity['is_v2'])
+            with self.assertRaisesRegex(
+                ValidationError, 'lost its durable run identity',
+            ):
+                Dispatch._validate_prepared_request(
+                    request, self.job.id, self.job.current_attempt_token,
+                    self.job.job_type,
+                )

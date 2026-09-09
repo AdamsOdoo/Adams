@@ -904,6 +904,10 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
     @api.model
     def _validate_prepared_request(self, request, job_id, token, job_type):
+        return self._validate_prepared_request_shape(request, job_id, token, job_type)
+
+    @api.model
+    def _validate_prepared_request_shape(self, request, job_id, token, job_type):
         if not isinstance(request, dict):
             raise ValidationError('Prepared mutation request must be a dict.')
         required = {
@@ -1317,13 +1321,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         self.env.cr.commit()
 
         try:
-            request = self._validate_prepared_request(
-                strategy['prepare_preconditions'](
-                    dict(local_snapshot), dict(owner_context),
-                ),
-                job_id,
-                token,
-                job_type,
+            request = self._prepare_mutation_request(
+                local_snapshot, owner_context, job_type,
             )
             attempt_id = self._commit_attempt_intent_c2(
                 job_id, token, request,

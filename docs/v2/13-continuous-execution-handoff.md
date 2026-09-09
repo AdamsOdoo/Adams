@@ -12,9 +12,11 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
-- Frozen source `0aef7df8e8d7e959cb50d405f361cd78988741d1`, tree `4b672d5adb73941ba1f5bebe29ee9f6cf9c845b1`, matches local source commit `8d3565a` exactly. Source objects uploaded; branch still at preceding candidate until final evidence publication.
-- Final evidence generation and catalog source metadata are synchronized to this source and verified. All 467 local tests pass after generation. Native verification remains pending; no qualification claim.
-- First next action: publish the evidence commit as one fast-forward branch update, preserve both histories, verify exact-head policy and expanded 48-class prerequisite, then inspect the full campaign. Keep W2 compatibility and all release gates open.
+- Published source remains head `57c8b6794b8ae26075c80505e4154f70000929d0`; exact-head policy passed, native 34374904144 FAILED: 880 tests, one failure, zero errors, eight selected classes missing. Full campaign skipped. Original artifact digest and summary preserved in document 18.
+- Prepared correction fixes explicit nonstandard class selection and mutation precondition transaction ownership. Successful observed metadata is committed on an owned preparation cursor; failures/invalid shape roll back. The cursor closes before independent V2 identity validation/C2. Main C3 cursor stays idle; no added main commit. V2 lane marker without run still fails closed.
+- Native success proof now includes actual preparation read/write, independent visibility, main idle state and durable C3 success. Rollback regression covers typed exception and malformed request; V2 identity tests retain legitimate legacy and reject missing-run lane markers. Independent review inspected actual boundaries and corrected nested lock risk.
+- All 471 local tests pass before final evidence freeze; syntax, static and change-size checks pass. Native qualification remains pending. No live Shopify or production action.
+- First next action: freeze/publish coherent source and synchronized evidence, verify all 48 classes actually execute and inspect full campaign. Keep W2 compatibility and release gates open. Preserve local and API histories.
 
 ## Preceding published candidate — 9 September 2026
 

@@ -187,3 +187,11 @@ Run [34342033182](https://github.com/AdamsOdoo/Adams/actions/runs/34342033182), 
 - Policy metadata omission: catalog provenance must match frozen inventory; validate final generated evidence before publication.
 
 The old-core compatibility proposal remains unaccepted. Repairs above are in progress, not qualified results.
+
+## Candidate 57c8b67 — expanded prerequisite failure
+
+[Native run 34374904144](https://github.com/AdamsOdoo/Adams/actions/runs/34374904144), job 102545707519, completed with 880 tests, one failure, zero errors. Eight selected nonstandard classes did not execute; downstream full suite skipped. Artifact 10113744459 SHA-256 `a8a52094a087d4d5c1568763a31db74dae563339841b099a7ab8ae84e7a2cd91` verified; original summary preserved. Exact-head policy passed.
+
+The omitted positive tag in `/addon:Class` implicitly selects Odoo's standard tag. Explicit `*/addon:Class` keeps addon/class restrictions and includes nonstandard classes. Verified against the pinned Odoo selector.
+
+Mutation success still missed its consequence callback. V2 request validation opened a main-cursor snapshot with `.exists()` before independent C2, and ORM cache reset did not end that PostgreSQL transaction. Domain preconditions also perform ORM reads and retain observed metadata, so eliminating only the synthetic-path read is insufficient. The correction resolves preparation callbacks on an owned cursor, validates shape and commits successful observations there, closes it, then validates V2 identity independently before C2. No new main-cursor commit is introduced. Lane-marked V2 jobs with missing run identity remain rejected. Preparation exceptions roll back and use existing recovery. Native regression now exercises a real preparation read/write, main-cursor idle status, independent committed observation, C2 visibility and durable C3 success. New candidate native qualification remains pending.
