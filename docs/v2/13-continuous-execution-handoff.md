@@ -12,6 +12,8 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
+- Frozen owner-upgrade source `255a69308a37e2fcc691d2f4b0f6340be7b4f9fa`, tree `f8e12657303c7f6487def2262ccccc06f032f9a0`, matches local `304bdab`. Six generated artifacts reproduce byte-identically; final frozen baseline and all5 catalog consistency checks pass. Evidence-head publication and native verification are next.
+
 - User approved document19 on 10 September 2026: older installations must complete normal versioned upgrades of installed connector owners before W2. This supersedes the mixed-version W2-only promise; historical failures remain failures.
 - Last published head `82ab96e115625eec05dafd764ee397e48e5dfdf9`, source `b66f829faba90d1251a5bd2cb565a92fb0f75412`. Policy34453371975 passed. Native34453371725 passed focus49 classes, fresh3014, warm3014, Lite/Full, both migration paths and repeats, nonstandard62, and all8 P10 cases. Sole failed lane: old W2-only18 tests/10 errors. Verified summaries are preserved in evidence and document18.
 - Prepared W2 version19.0.0.4.0 removes cross-owner DDL. Its read-only metadata preflight rejects old/newer/missing/pending installed owners with upgrade/recovery guidance. Fresh dependency installation remains supported.
