@@ -1,6 +1,6 @@
-# Installation compatibility decision — proposed, not accepted
+# Installation compatibility decision — approved 10 September 2026
 
-The existing W2-only gate remains required and failing. This proposal does not change its runner, origin, acceptance criteria or reported result.
+The user explicitly approved owner upgrades before W2 on 10 September 2026. The old mixed-version W2-only promise is superseded by the separately named owner-upgrade/W2-install qualification lane. Historical failures remain failures; approval does not establish that the replacement lane has passed.
 
 ## Finding
 
@@ -22,11 +22,11 @@ The exact seven-module fixture spans these owner versions (verified from both ma
 
 This is a source/fixture inventory, not proof that any upgrade chain has passed. The proposed lane must exercise these actual owner upgrades and assert their installed versions and preserved data.
 
-## Recommended decision
+## Approved decision
 
 Require a normal, versioned upgrade of the installed connector owner modules before adding W2 to an old installation. Preserve existing identities, bindings, audit history and uncertain mutation records through those owner migrations. Keep the durable old origin as an upgrade fixture; do not replace it with a convenient recent baseline.
 
-This changes the promise that W2 can install over unchanged old owner versions after all owner source has been replaced. It therefore requires the user's approval. Customer installation footprint remains unknown; lack of that information is not permission to discard compatibility or data.
+This changes the promise that W2 can install over unchanged old owner versions after all owner source has been replaced. The user's explicit approval authorizes this prerequisite and corresponding preflight/qualification changes. Customer installation footprint remains unknown; data and historical identity preservation remain mandatory.
 
 | Option | Consequence | Qualification |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ This changes the promise that W2 can install over unchanged old owner versions a
 | Maintain a legacy-compatible W2 bundle | Keep compatible old owner code with a separately supported W2 implementation; ongoing packaging and security maintenance. | Test that actual split bundle against its declared owner versions, plus current bundle qualification. The present all-current-source fixture does not prove this option. |
 | Rebuild current owner schema in W2 pre-init | An unversioned partial owner upgrade with duplicated migration responsibilities. | Rejected as an architectural workaround; column existence cannot establish complete owner migration correctness. |
 
-## Work after approval of the recommendation
+## Approved implementation and qualification
 
 1. Inventory installed owner versions and their migration chains from the durable old fixture; derive the necessary upgrade list from actual installed owners, including optional packages.
 2. Implement a safe installation preflight that identifies required owner upgrades without reading absent future schema or changing data. Give a precise operator recovery instruction.
@@ -43,3 +43,7 @@ This changes the promise that W2 can install over unchanged old owner versions a
 5. Document the supported package/upgrade combinations and rollback by restoration of the matching database and source, before merchant use.
 
 No changes in this document authorize a live customer upgrade or waive native, migration, concurrency, usability or release gates. Independent backend corrections continue while the decision is pending.
+
+## Implementation checkpoint
+
+W2 pre-init now reads only stable installed-module metadata and compares actual installed connector owners with their source manifests. It refuses outdated/newer/missing source or pending owner transitions with an explicit backup, owner-upgrade and retry instruction. Fresh uninstalled optional owners are excluded. The former cross-owner schema bridge is removed; owning migrations provide those fields and backfills. W2 version becomes 19.0.0.4.0. Native qualification of the new lane remains pending.

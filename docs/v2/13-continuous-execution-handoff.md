@@ -12,7 +12,17 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
-- Frozen correction source `b66f829faba90d1251a5bd2cb565a92fb0f75412` matches reviewed local commit `4627537`. Independent final review found no blocker. Six source artifacts reproduce identically; final baseline and catalog consistency pass. Lite/Full packages validate. Evidence commit publication/native qualification pending.
+- User approved document19 on 10 September 2026: older installations must complete normal versioned upgrades of installed connector owners before W2. This supersedes the mixed-version W2-only promise; historical failures remain failures.
+- Last published head `82ab96e115625eec05dafd764ee397e48e5dfdf9`, source `b66f829faba90d1251a5bd2cb565a92fb0f75412`. Policy34453371975 passed. Native34453371725 passed focus49 classes, fresh3014, warm3014, Lite/Full, both migration paths and repeats, nonstandard62, and all8 P10 cases. Sole failed lane: old W2-only18 tests/10 errors. Verified summaries are preserved in evidence and document18.
+- Prepared W2 version19.0.0.4.0 removes cross-owner DDL. Its read-only metadata preflight rejects old/newer/missing/pending installed owners with upgrade/recovery guidance. Fresh dependency installation remains supported.
+- New honestly named owner_upgrade_then_w2_install lane retains original7443250a, inventories installed owners, proves old-version rejection, exercises database backup/restore, runs each owner's actual migrations, installs W2, and repeats without migrations. Synthetic disconnected fixtures preserve IDs, audit/location history and unresolved mutation evidence. Optional product bindings are not populated by this fixture; do not claim that coverage.
+- Integrated review found no blocker; all490 local tests pass in15.273 seconds. Static/dependency/change-size policy, changed Python/bash syntax, whitespace, runner self-test and Lite/Full package validation pass. Source/evidence publication and native verification of this new lane remain pending. First next action: finish consolidated checks, freeze exact-source evidence and publish one candidate, then inspect native results. No release or live readiness claim.
+
+## Previous correction checkpoint (historical)
+
+- Published head `82ab96e115625eec05dafd764ee397e48e5dfdf9`, source `b66f829faba90d1251a5bd2cb565a92fb0f75412`; tree-identical local merge `b01ad00bb8873c720287984ff106afa48322f420` preserves histories. Native 34453371725 and policy 34453371975 are running. PR #212 updated. This status-only checkpoint remains local while CI is active. W2 approval request is the existing document19 compatibility decision, not routine repair permission.
+
+- Frozen correction source `b66f829faba90d1251a5bd2cb565a92fb0f75412` matches reviewed local commit `4627537`. Independent final review found no blocker. Six source artifacts reproduce identically; final baseline and catalog consistency pass. Lite/Full packages validate. Evidence commit published as above; native qualification pending.
 
 - Remote candidate `6fc17f5a97fe5b07bc7044ab2c53708bba9246f7`, source `fdf96fb94211a2c8c4104829ed2614d8928a1602`. Full native 34398695973 completed failure. Focus48, fresh3014, warm3014, Lite/Full, both migrations2879 and both repeats2879 passed. Artifact digest and raw summaries preserved in document18.
 - Remaining failures: export inline-preparation source assertion; P10 cancellation parent run stale state; old-core W2 10 errors/18 tests. Browser-evidence FAILED is the W2 error in shared evidence-error list, not an additional missing-tour defect.
@@ -84,7 +94,7 @@ Prepared source `96f3eda87b5ff5a1681dc53fe5d4c749d1b7fe91`, tree `04f0c393e9f5bc
 
 Complete F1–F3 and domain D1–D5 in blueprint 16 using native installation, migration, authorization, concurrency, recovery and business-readback evidence. P12–P14 source is not release qualification. U1–U14, native UI approval/implementation, accessibility/RTL/responsiveness, operator usability, security/privacy, performance/SLO, backup/restore, packaging and controlled live qualification remain open. Preserve sequential inventory/catalog/fulfillment canaries totaling at least thirteen observation days after readiness; a 21-day checkpoint is not uninterrupted agent execution or a release guarantee.
 
-The old-core W2 contract decision in document 19 is proposed, not accepted. Customer installation footprint, actual model allowance and availability of human usability participants remain unresolved; preserve data and compatibility commitments until a material decision is made.
+The owner-upgrade requirement in document 19 is approved; its native qualification remains pending. Customer installation footprint, actual model allowance and availability of human usability participants remain unresolved; preserve data and the approved compatibility requirements.
 
 ## Checkpoint and resume procedure
 

@@ -36,3 +36,9 @@ successful snapshot, preserving monotonic product evidence.
 The Product webhook topic payloads are documented by Shopify's current Admin
 GraphQL webhook reference:
 <https://shopify.dev/docs/api/webhooks/latest/products/update>.
+
+## Installing on an existing connector database
+
+Before adding W2, back up the database, filestore and matching source. Deploy the matching connector package and run the normal versioned upgrade of every installed connector owner module, including installed optional owners. Verify those upgrades complete before installing W2. W2 checks installed owner versions against the source manifests and refuses mixed versions; it never creates another owner's missing columns. Fresh installations create dependencies normally.
+
+If the installed version is newer than the available source, restore matching source instead of attempting a database downgrade. Restore a failed upgrade from the matching database/filestore/source backup. Installation qualification and data-preservation evidence are tracked in decision 19; no production readiness is implied.

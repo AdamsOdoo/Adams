@@ -213,3 +213,9 @@ Mutation durable success and preparation rollback regressions passed. Remaining 
 - Old-core W2 remains 18 tests/10 errors. The summary's browser-evidence FAILED label is caused by that same W2 evidence error in the shared error list; no additional missing-tour error was reported. Document19's compatibility decision remains unaccepted.
 
 No full qualification or release claim. P10 and export corrections require native verification.
+
+## Candidate 82ab96e — all executed lanes pass except superseded W2-only promise
+
+[Run 34453371725](https://github.com/AdamsOdoo/Adams/actions/runs/34453371725) completed failure. Fresh/warm each3014 pass, Lite/Full pass, both migrations/repeats pass, nonstandard62 pass, dedicated P10all8 pass. Focus49 passed. Old-core W2-only18/10errors was the sole failing lane. Artifact10144897097 SHA256 `7e30399ce230f520e46c4bc2822ce86196ac77a20dc0812f0ae408484634f17a` verified; raw summaries preserved.
+
+User approved document19 owner-upgrade prerequisite on10September2026. Replacement lane retains the original old origin and must prove actual versioned upgrades, preserved fixture histories/identities and repeat-update behavior. Historical W2-only failure is not relabeled as a pass.

@@ -156,7 +156,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         ).read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
         self.assertIn("'version': '19.0.1.4.0'", w1_manifest)
-        self.assertIn("'version': '19.0.0.3.0'", w2_manifest)
+        self.assertIn("'version': '19.0.0.4.0'", w2_manifest)
         self.assertIn('information_schema.columns', migration)
         self.assertIn('expected_include_fields', migration)
         self.assertIn('actual_include_fields', migration)
@@ -177,16 +177,16 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             {'expected_include_fields', 'actual_include_fields'},
         )
 
-    def test_w2_only_install_bridge_is_idempotent_and_jsonb(self):
-        """Installing W2 alone over old W1 adds only the canonical columns."""
+    def test_w2_preflight_is_read_only_and_owner_schema_is_current(self):
+        """W2 checks owner versions; owner migrations supply canonical fields."""
         root = Path(__file__).resolve().parents[1]
         manifest = (root / '__manifest__.py').read_text()
         bridge = (root / 'pre_init.py').read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
         self.assertIn("'pre_init_hook': 'pre_init_hook'", manifest)
-        self.assertIn('ALTER TABLE IF EXISTS', bridge)
-        self.assertIn('ADD COLUMN IF NOT EXISTS expected_include_fields jsonb', bridge)
-        self.assertIn('ADD COLUMN IF NOT EXISTS actual_include_fields jsonb', bridge)
+        self.assertIn('check_owner_versions', bridge)
+        self.assertNotIn('ALTER TABLE', bridge)
+        self.assertNotIn('UPDATE ', bridge)
         self.assertIn('7443250ae42a0c3fadba9bf0ef9991e1826b77b5', runner)
         pre_init_hook(self.env)
         pre_init_hook(self.env)
