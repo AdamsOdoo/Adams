@@ -45,6 +45,7 @@
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
 #                                [--skip-w2-owner-upgrade]
+#                                [--w2-owner-upgrade-only] (diagnostic, not full qualification)
 #                                [--skip-meta-install]
 #                                [--tags <extra-test-tags>]
 #   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
@@ -237,6 +238,7 @@ RUN_WARM=1
 RUN_NONSTANDARD=1
 RUN_W2_OWNER_UPGRADE=1
 RUN_SELF_TEST=0
+CAMPAIGN_SCOPE="full"
 TEST_TAGS=""
 # --- The migration passes (2026-07-30) ---------------------------------------
 #
@@ -279,8 +281,10 @@ MIGRATION_FROM_REFS=(
 MIGRATION_MODULES="$MODULES"
 RUN_MIGRATION=1
 RUN_META_INSTALL=1
+ARGUMENT_COUNT=$#
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --w2-owner-upgrade-only) CAMPAIGN_SCOPE="w2-owner-upgrade-diagnostic"; RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_META_INSTALL=0; shift ;;
         --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_OWNER_UPGRADE=0; RUN_META_INSTALL=0; shift ;;
         --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_OWNER_UPGRADE=0; RUN_META_INSTALL=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
@@ -304,6 +308,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 log() { printf '[connector-suite] %s\n' "$*"; }
+
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" && "$ARGUMENT_COUNT" -ne 1 ]]; then
+    echo '--w2-owner-upgrade-only must be used alone; diagnostic scope cannot mix selectors' >&2
+    exit 2
+fi
 
 # --- Browser resolution and preflight (TD-010) -------------------------------
 #
@@ -1129,7 +1138,12 @@ if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then
 fi
 EVIDENCE_ERRORS=()
 
-preflight_browser
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" ]]; then
+    ODOO_BROWSER_BIN="not-executed"
+    BROWSER_VERSION="not-executed"
+else
+    preflight_browser
+fi
 
 
 # --- Odoo config -------------------------------------------------------------
@@ -1201,6 +1215,7 @@ WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
 P10_STATUS="skipped"; P10_RESULT=""; P10_EXECUTED=0; P10_EXPECTED=0
 W2_OWNER_UPGRADE_STATUS="skipped"; W2_OWNER_UPGRADE_RESULT=""
+W2_OWNER_UPGRADE_STAGE="not-started"; W2_OWNER_UPGRADE_STAGE_LOG=""
 META_INSTALL_STATUS="skipped"; META_INSTALL_RESULT=""
 META_LITE_STATUS="skipped"; META_LITE_RESULT=""
 META_FULL_STATUS="skipped"; META_FULL_RESULT=""
@@ -1321,6 +1336,17 @@ fi
 # --- Approved owner upgrades, then W2 installation --------------------------
 # Document 19 approval supersedes the old mixed-version W2-only promise. Keep
 # the exact historical origin; execute each installed owner's real migrations.
+# Fixed stage names and relative log basenames only; never serialize commands,
+# connection settings, database dumps, or fixture payloads into stage evidence.
+w2_stage() {
+    W2_OWNER_UPGRADE_STAGE="$1"
+    W2_OWNER_UPGRADE_STAGE_LOG="${2:-}"
+    local status="${3:-running}"
+    printf '{"stage":"%s","status":"%s","log":"%s"}\n' \
+        "$W2_OWNER_UPGRADE_STAGE" "$status" "$W2_OWNER_UPGRADE_STAGE_LOG" \
+        > "${ARTIFACT_DIR}/w2-owner-upgrade-stage.json" || return 1
+    log "W2 owner upgrade: ${W2_OWNER_UPGRADE_STAGE} (${status}); log=${W2_OWNER_UPGRADE_STAGE_LOG}"
+}
 if [[ $RUN_W2_OWNER_UPGRADE -eq 1 ]]; then
     w2_preservation_fixture() {
         local mode="$1" conf="$2" logfile="$3"
@@ -1343,53 +1369,77 @@ if [[ $RUN_W2_OWNER_UPGRADE -eq 1 ]]; then
         local owners old_w1 old_w2
         local initial_evidence_errors="${#EVIDENCE_ERRORS[@]}"
         W2_OWNER_UPGRADE_DB="connector_w2_owner_upgrade_$$"
+        w2_stage "prepare-old-source" "" || return 1
         if ! git -C "$REPO_ROOT" cat-file -e "${W2_OWNER_UPGRADE_ORIGIN}^{commit}" 2>/dev/null; then
             git -C "$REPO_ROOT" fetch --no-tags origin "$W2_OWNER_UPGRADE_ORIGIN" || return 1
         fi
         mkdir -p "$bridge_tree" || return 1
         git -C "$REPO_ROOT" archive "$W2_OWNER_UPGRADE_ORIGIN" addons | tar -x -C "$bridge_tree" || return 1
         sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${bridge_tree}/addons|" "$CONF" > "$bridge_old_conf" || return 1
+        w2_stage "create-old-database" "" || return 1
         createdb "$W2_OWNER_UPGRADE_DB" || return 1
+        w2_stage "install-old-owners" "w2-owner-old-install.log" || return 1
         run_odoo_with_conf "$bridge_old_conf" "$W2_OWNER_UPGRADE_DB" "$bridge_old_log" -i "${W1_ONLY_MODULES},${EXTRA_MODULES}" || return 1
+        w2_stage "verify-old-versions" "" || return 1
         old_w1="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
         old_w2="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM ir_module_module WHERE name='shopify_connector_product_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
         [[ "$old_w1" == "19.0.1.0.0" && "$old_w2" == "0" ]] || return 1
         # Legacy semantic fixture is seeded with the matching old registry.
+        w2_stage "seed-preservation-fixture" "w2-preservation-seed.log" || return 1
         w2_preservation_fixture seed "$bridge_old_conf" "${ARTIFACT_DIR}/w2-preservation-seed.log" || return 1
+        w2_stage "inventory-installed-owners" "w2-owner-upgrade-evidence.json" || return 1
         owners="$(python3 "$helper" before --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence")" || return 1
         [[ -n "$owners" ]] || return 1
+        w2_stage "reject-mixed-owner-versions" "w2-owner-preflight-rejection.log" || return 1
         "$VENV/bin/python" "$helper" reject-old --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" > "${ARTIFACT_DIR}/w2-owner-preflight-rejection.log" 2>&1 || return 1
         # Exercise restoration of the actual pre-upgrade fixture before switching
         # source. The old install's filestore stays with the restored database.
+        w2_stage "backup-old-database" "" || return 1
         pg_dump -Fc "$W2_OWNER_UPGRADE_DB" > "${ARTIFACT_DIR}/w2-owner-before.dump" || return 1
+        w2_stage "restore-old-database" "" || return 1
         dropdb "$W2_OWNER_UPGRADE_DB" || return 1
         createdb "$W2_OWNER_UPGRADE_DB" || return 1
         pg_restore --exit-on-error --dbname "$W2_OWNER_UPGRADE_DB" "${ARTIFACT_DIR}/w2-owner-before.dump" || return 1
+        w2_stage "verify-restored-preservation" "w2-preservation-restored.log" || return 1
         w2_preservation_fixture verify "$bridge_old_conf" "${ARTIFACT_DIR}/w2-preservation-restored.log" || return 1
+        w2_stage "upgrade-installed-owners" "w2-owner-upgrade.log" || return 1
         run_odoo "$W2_OWNER_UPGRADE_DB" "$upgrade_log" -u "$owners" || return 1
+        w2_stage "verify-owner-migrations" "w2-owner-upgrade-evidence.json" || return 1
         python3 "$helper" after --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" --log "$upgrade_log" || return 1
+        w2_stage "install-w2" "w2-after-owner-upgrade-install.log" || return 1
         run_odoo "$W2_OWNER_UPGRADE_DB" "$bridge_log" -i shopify_connector_product_webhook --test-enable --test-tags "$W2_OWNER_UPGRADE_TEST_TAGS" || return 1
+        w2_stage "verify-w2-tests" "w2-after-owner-upgrade-install.log" || return 1
         grep -Eq '0 failed, 0 error\(s\) of [1-9][0-9]* tests' "$bridge_log" || return 1
         verify_no_unexpected_skips "$bridge_log" "w2-after-owner-upgrade"
+        [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
         [[ -z "$(migration_lines "$bridge_log")" ]] || return 1
+        w2_stage "verify-installed-versions" "" || return 1
         W2_OWNER_UPGRADE_W1_VERSION="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
         W2_OWNER_UPGRADE_W2_VERSION="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_product_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
         [[ "$W2_OWNER_UPGRADE_W1_VERSION" == "$W1_WEBHOOK_VERSION" && "$W2_OWNER_UPGRADE_W2_VERSION" == "$W2_PRODUCT_WEBHOOK_VERSION" ]] || return 1
+        w2_stage "verify-preservation-after-install" "w2-preservation-check.log" || return 1
         w2_preservation_fixture verify "$CONF" "${ARTIFACT_DIR}/w2-preservation-check.log" || return 1
+        w2_stage "repeat-owner-and-w2-upgrade" "w2-owner-upgrade-repeat.log" || return 1
         run_odoo "$W2_OWNER_UPGRADE_DB" "$repeat_log" -u "${owners},shopify_connector_product_webhook" --test-enable --test-tags "$W2_OWNER_UPGRADE_TEST_TAGS" || return 1
+        w2_stage "verify-repeat-tests" "w2-owner-upgrade-repeat.log" || return 1
         grep -Eq '0 failed, 0 error\(s\) of [1-9][0-9]* tests' "$repeat_log" || return 1
         verify_no_unexpected_skips "$repeat_log" "w2-owner-upgrade-repeat"
+        [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
         [[ -z "$(migration_lines "$repeat_log")" ]] || return 1
+        w2_stage "verify-repeat-owner-versions" "w2-owner-upgrade-evidence.json" || return 1
         python3 "$helper" after --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" --log "$upgrade_log" || return 1
+        w2_stage "verify-preservation-after-repeat" "w2-preservation-repeat.log" || return 1
         w2_preservation_fixture verify "$CONF" "${ARTIFACT_DIR}/w2-preservation-repeat.log" || return 1
         [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
         W2_OWNER_UPGRADE_RESULT="$(result_line "$bridge_log")"
     }
     if run_w2_owner_upgrade; then
+        w2_stage "complete" "" "pass"
         W2_OWNER_UPGRADE_STATUS="pass"
     else
         W2_OWNER_UPGRADE_STATUS="fail"
-        W2_OWNER_UPGRADE_RESULT="owner upgrade, W2 installation, preservation or repeat verification failed"
+        w2_stage "$W2_OWNER_UPGRADE_STAGE" "$W2_OWNER_UPGRADE_STAGE_LOG" "fail"
+        W2_OWNER_UPGRADE_RESULT="failed at ${W2_OWNER_UPGRADE_STAGE}; see ${W2_OWNER_UPGRADE_STAGE_LOG:-workflow job log}"
         evidence_fail "w2-owner-upgrade: ${W2_OWNER_UPGRADE_RESULT}"
         OVERALL=1
     fi
@@ -1607,11 +1657,16 @@ fi
 if (( ! RUN_FRESH || ! RUN_WARM )); then
     BROWSER_EVIDENCE_STATUS="${BROWSER_EVIDENCE_STATUS}; single-pass mode"
 fi
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" ]]; then
+    BROWSER_EVIDENCE_STATUS="not-executed: W2 diagnostic scope"
+fi
 if (( ${#EVIDENCE_ERRORS[@]} )); then
-    BROWSER_EVIDENCE_STATUS="FAILED"
+    if [[ "$CAMPAIGN_SCOPE" != "w2-owner-upgrade-diagnostic" ]]; then
+        BROWSER_EVIDENCE_STATUS="FAILED: campaign evidence errors; inspect failed lane"
+    fi
     OVERALL=1
     log "-------------------------------------------------------------------"
-    log "BROWSER EVIDENCE VERIFICATION FAILED (${#EVIDENCE_ERRORS[@]} problems)."
+    log "CAMPAIGN EVIDENCE VERIFICATION FAILED (${#EVIDENCE_ERRORS[@]} problems)."
     log "The suite's own pass/fail counts may be green; they do not describe"
     log "tests that never executed. This run is NOT browser evidence."
     for problem in "${EVIDENCE_ERRORS[@]}"; do log "  * ${problem}"; done
@@ -1624,6 +1679,7 @@ fi
 # can never be quoted as Odoo.sh acceptance.
 cat > "$SUMMARY" <<EOF
 {
+  "campaign_scope": "${CAMPAIGN_SCOPE}",
   "tested_checkout_sha": "${SHA}",
   "connector_sha": "${SHA}",
   "source_head_sha": "${SOURCE_HEAD_SHA}",
@@ -1660,7 +1716,7 @@ cat > "$SUMMARY" <<EOF
                                "kind": "SAME-VERSION module update",
                                "runs_migration_scripts": false,
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
-    "owner_upgrade_then_w2_install": {"status": "${W2_OWNER_UPGRADE_STATUS}", "result": "${W2_OWNER_UPGRADE_RESULT}", "db": "${W2_OWNER_UPGRADE_DB}", "origin": "${W2_OWNER_UPGRADE_ORIGIN}", "w1_version_after": "${W2_OWNER_UPGRADE_W1_VERSION}", "w2_version_after": "${W2_OWNER_UPGRADE_W2_VERSION}", "log": "w2-after-owner-upgrade-install.log", "upgrade_log": "w2-owner-upgrade.log", "repeat_log": "w2-owner-upgrade-repeat.log", "evidence": "w2-owner-upgrade-evidence.json", "kind": "approved installed owner versioned upgrades, then W2 install and same-version repeat"},
+    "owner_upgrade_then_w2_install": {"status": "${W2_OWNER_UPGRADE_STATUS}", "result": "${W2_OWNER_UPGRADE_RESULT}", "stage": "${W2_OWNER_UPGRADE_STAGE}", "stage_evidence": "w2-owner-upgrade-stage.json", "db": "${W2_OWNER_UPGRADE_DB}", "origin": "${W2_OWNER_UPGRADE_ORIGIN}", "w1_version_after": "${W2_OWNER_UPGRADE_W1_VERSION}", "w2_version_after": "${W2_OWNER_UPGRADE_W2_VERSION}", "log": "w2-after-owner-upgrade-install.log", "upgrade_log": "w2-owner-upgrade.log", "repeat_log": "w2-owner-upgrade-repeat.log", "evidence": "w2-owner-upgrade-evidence.json", "kind": "approved installed owner versioned upgrades, then W2 install and same-version repeat"},
     "dec029_meta_install": {"status": "${META_INSTALL_STATUS}", "result": "${META_INSTALL_RESULT}", "lite": {"status": "${META_LITE_STATUS}", "result": "${META_LITE_RESULT}", "log": "meta-lite-install.log"}, "full": {"status": "${META_FULL_STATUS}", "result": "${META_FULL_RESULT}", "log": "meta-full-install.log"}, "kind": "candidate-only meta-addon install; excluded from migration module set"},
     "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"},
     "p10_runtime": {"status": "${P10_STATUS}", "result": "${P10_RESULT}", "executed": ${P10_EXECUTED}, "expected": ${P10_EXPECTED}, "missing": $((P10_EXPECTED - P10_EXECUTED)), "log": "p10-runtime.log", "isolation": "dedicated disposable database"}

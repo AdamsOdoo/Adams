@@ -219,3 +219,11 @@ No full qualification or release claim. P10 and export corrections require nativ
 [Run 34453371725](https://github.com/AdamsOdoo/Adams/actions/runs/34453371725) completed failure. Fresh/warm each3014 pass, Lite/Full pass, both migrations/repeats pass, nonstandard62 pass, dedicated P10all8 pass. Focus49 passed. Old-core W2-only18/10errors was the sole failing lane. Artifact10144897097 SHA256 `7e30399ce230f520e46c4bc2822ce86196ac77a20dc0812f0ae408484634f17a` verified; raw summaries preserved.
 
 User approved document19 owner-upgrade prerequisite on10September2026. Replacement lane retains the original old origin and must prove actual versioned upgrades, preserved fixture histories/identities and repeat-update behavior. Historical W2-only failure is not relabeled as a pass.
+
+## Candidate 9909a4e — populated owner-upgrade root identified
+
+[Attempt2](https://github.com/AdamsOdoo/Adams/actions/runs/34464295127/attempts/2) passed Chrome readiness, focused903/0/0 across49 classes, fresh/warm3014 each, Lite/Full, both migrations/repeats2879 each, nonstandard62 and P10all8. Policy34464295059 passed. The sole failed lane was the new owner upgrade; the generic browser-evidence failure heading was misleading. Attempt1 had independently stopped at Chrome readiness timeout.
+
+Verified artifact10150014587 SHA256 `e89d8dd33b36fe4d20a748eeeede936cbc07034260a41a4eaed2c49b5e3aa96f`. The old fixture was populated successfully, old-version preflight rejected read-only, and restored evidence matched. During core upgrade, mutation_attempt.init called the historic scope sweep, which ORM-prefetched parent job columns before job.run_id existed. Thus ordinary empty-fixture migration passes did not qualify populated-history migration. W2 installation and repeat never ran. Fix init ordering/access without skipping quarantine or discarding uncertainty; preserve the real populated fixture as regression evidence.
+
+Workflow omitted new W2 JSON evidence from uploaded paths and runner reported a generic multi-stage failure. The correction packet adds isolated diagnosis, exact stage reporting and safe evidence upload; unchanged full acceptance gates remain required downstream.

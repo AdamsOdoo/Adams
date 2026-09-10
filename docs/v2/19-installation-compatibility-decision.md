@@ -20,7 +20,7 @@ The exact seven-module fixture spans these owner versions (verified from both ma
 | product_export | 19.0.1.2.0 | 19.0.1.7.1 |
 | webhook | 19.0.1.0.0 | 19.0.1.4.0 |
 
-This is a source/fixture inventory, not proof that any upgrade chain has passed. The proposed lane must exercise these actual owner upgrades and assert their installed versions and preserved data.
+This is a source/fixture inventory, not proof that any upgrade chain has passed. The approved lane must exercise these actual owner upgrades and assert their installed versions and preserved data.
 
 ## Approved decision
 
@@ -42,7 +42,7 @@ This changes the promise that W2 can install over unchanged old owner versions a
 4. Replace only the superseded mixed-version promise through an explicit contract/runner change, retain historical failure evidence and name the new lane honestly. Review the existing additive bridge for removal or a smaller declared compatibility range using migration evidence.
 5. Document the supported package/upgrade combinations and rollback by restoration of the matching database and source, before merchant use.
 
-No changes in this document authorize a live customer upgrade or waive native, migration, concurrency, usability or release gates. Independent backend corrections continue while the decision is pending.
+No changes in this document authorize a live customer upgrade or waive native, migration, concurrency, usability or release gates. Independent backend corrections continue under the approved prerequisite.
 
 ## Implementation checkpoint
 

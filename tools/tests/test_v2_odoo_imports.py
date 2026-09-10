@@ -72,7 +72,7 @@ class OdooRuntimeCompatibilityTests(unittest.TestCase):
         )
         segment = ast.get_source_segment(source, method) or ""
         guard = segment.index("if not table_exists(self.env.cr, self._table)")
-        search = segment.index("self.sudo().search")
+        search = segment.index("self.sudo().with_context(prefetch_fields=False).search")
         self.assertLess(guard, search)
 
 

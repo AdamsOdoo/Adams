@@ -40,6 +40,14 @@ on:
       - Shopify-connector
   pull_request:
   workflow_dispatch:
+    inputs:
+      campaign:
+        description: Qualification scope (diagnostic does not replace full campaign)
+        type: choice
+        options:
+          - full
+          - w2-owner-upgrade
+        default: full
 
 permissions:
   contents: read
@@ -47,12 +55,12 @@ permissions:
 concurrency:
   # Push and PR events test the same source head; avoid duplicate campaigns.
   # Keep fork repositories and the two workflows in separate groups.
-  group: connector-tests-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+  group: connector-tests-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}-${{ inputs.campaign || 'full' }}
   cancel-in-progress: true
 
 jobs:
   suite:
-    name: Odoo 19 install + full connector suite
+    name: Odoo 19 / ${{ inputs.campaign || 'full' }} campaign
     runs-on: ubuntu-24.04
     # Raised from 90. The third pass includes the customer-matching benchmark,
     # which builds a 100 000-partner dataset; on CI hardware that alone can take
@@ -134,13 +142,22 @@ jobs:
           # anyway before running anything.
           key: odoo-src-${{ hashFiles('tools/odoo-pin.txt') }}
 
+      # Run the historically failing lifecycle path before expensive unrelated
+      # campaigns. Full qualification still repeats it on the same source.
+      - name: Diagnose owner upgrade and W2 installation
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/ci-artifacts/w2-diagnostic
+        run: bash tools/run_connector_suite.sh --w2-owner-upgrade-only
+
       - name: Run focused native prerequisite
+        if: inputs.campaign != 'w2-owner-upgrade'
         # Fast native diagnosis for activation/API/DTO foundations and the
         # current core job roots. Its summary is scoped and cannot claim the
         # full connector gate. The no-argument campaign below remains required.
         run: python tools/run_connector_focus.py
 
       - name: Run the connector suite
+        if: inputs.campaign != 'w2-owner-upgrade'
         # No arguments on purpose. The script runs the fresh-install pass, the
         # warm-update pass AND the complete non-standard tag suite by default,
         # so no concurrency proof can be skipped by forgetting a flag here.
@@ -161,6 +178,14 @@ jobs:
             ci-artifacts/*.log
             ci-artifacts/summary.json
             ci-artifacts/focus-summary.json
+            ci-artifacts/w2-owner-upgrade-stage.json
+            ci-artifacts/w2-owner-upgrade-evidence.json
+            ci-artifacts/w2-preservation.json
+            ci-artifacts/w2-diagnostic/*.log
+            ci-artifacts/w2-diagnostic/summary.json
+            ci-artifacts/w2-diagnostic/w2-owner-upgrade-stage.json
+            ci-artifacts/w2-diagnostic/w2-owner-upgrade-evidence.json
+            ci-artifacts/w2-diagnostic/w2-preservation.json
           retention-days: 30
           if-no-files-found: warn
 
@@ -174,6 +199,17 @@ jobs:
             echo "GitHub event: \`${SOURCE_EVENT_NAME}\`"
             echo "\`github.sha\` (merge ref on pull_request; NOT what ran): \`${{ github.sha }}\`"
             echo
+            echo '### W2 owner-upgrade diagnostic (not full qualification)'
+            if [ -f ci-artifacts/w2-diagnostic/summary.json ]; then
+              echo '```json'
+              cat ci-artifacts/w2-diagnostic/summary.json
+              echo '```'
+            elif [ -f ci-artifacts/w2-diagnostic/w2-owner-upgrade-stage.json ]; then
+              cat ci-artifacts/w2-diagnostic/w2-owner-upgrade-stage.json
+            else
+              echo '_No W2 diagnostic summary produced._'
+            fi
+            echo
             echo '### Focused native prerequisite'
             if [ -f ci-artifacts/focus-summary.json ]; then
               echo '```json'
@@ -183,7 +219,7 @@ jobs:
               echo '_No focused summary produced._'
             fi
             echo
-            echo '### Full release campaign'
+            echo '### Executed campaign (see campaign_scope; diagnostic is not full qualification)'
             if [ -f ci-artifacts/summary.json ]; then
               echo '```json'
               cat ci-artifacts/summary.json

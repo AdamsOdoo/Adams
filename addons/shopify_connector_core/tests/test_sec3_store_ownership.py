@@ -1523,6 +1523,51 @@ class TestSec3HistoricRows(Sec3Base):
             'the sweep must not re-home the job or its run')
 
     @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
+    def test_historic_sweep_before_parent_additive_columns_exist(self):
+        """Populated old parents must be scoped without future-column prefetch."""
+        matching = self._row_mutation_attempt(self.store_a)
+        mismatched = self._row_mutation_attempt(self.store_a)
+        foreign_job = self._job(self.store_a2)
+        matching_job_id = matching.job_id.id
+        Model = self.env['shopify.connector.mutation.attempt']
+        self.env.flush_all()
+
+        class RestoreParentSchema(Exception):
+            pass
+
+        # Roll back the DDL even if the sweep/assertions fail. No ORM flush
+        # may run while the physical parent schema intentionally trails it.
+        with self.assertRaises(RestoreParentSchema):
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute(
+                    'UPDATE shopify_connector_mutation_attempt '
+                    'SET job_id = %s WHERE id = %s',
+                    (foreign_job.id, mismatched.id),
+                )
+                self.env.invalidate_all(flush=False)
+                self.env.cr.execute(
+                    'ALTER TABLE shopify_connector_job RENAME COLUMN '
+                    'run_id TO sec3_test_future_run_id')
+                self.assertGreaterEqual(
+                    Model._sec3_quarantine_scope_mismatches(), 1)
+                self.env.cr.execute(
+                    'SELECT id, store_id, job_id, sec3_scope_quarantined '
+                    'FROM shopify_connector_mutation_attempt '
+                    'WHERE id IN %s ORDER BY id',
+                    ((matching.id, mismatched.id),),
+                )
+                rows = {row[0]: row[1:] for row in self.env.cr.fetchall()}
+                self.assertEqual(
+                    rows[matching.id],
+                    (self.store_a.id, matching_job_id, False))
+                self.assertEqual(
+                    rows[mismatched.id],
+                    (self.store_a.id, foreign_job.id, True))
+                self.assertEqual(Model._sec3_quarantine_scope_mismatches(), 0)
+                raise RestoreParentSchema()
+        self.env.invalidate_all(flush=False)
+
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_releasing_a_quarantine_requires_the_disagreement_to_be_resolved(self):
         binding_a2 = self._row_template_binding(self.store_a2)
         variant_a = self._row_variant_binding(self.store_a)

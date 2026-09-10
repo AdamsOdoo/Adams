@@ -191,7 +191,11 @@ class ShopifyConnectorScopeMixin(models.AbstractModel):
             field = self._fields.get(field_name)
             if field is None or not field.relational:
                 continue
-            candidates = self.sudo().search([
+            # init() runs model by model: a related parent's new columns may
+            # not exist yet. Match pinned Odoo's _auto_init precaution and
+            # fetch only the scope fields actually read, including on parents.
+            # This changes prefetch breadth, not the quarantine predicate.
+            candidates = self.sudo().with_context(prefetch_fields=False).search([
                 (field_name, '!=', False),
                 ('sec3_scope_quarantined', '=', False),
             ])

@@ -32,6 +32,7 @@ W2_PRODUCT_WEBHOOK_VERSION=19.0.0.4.0
 W2_OWNER_UPGRADE_TEST_TAGS=fixture
 EVIDENCE_ERRORS=()
 FAIL={fail!r}
+w2_stage() {{ W2_OWNER_UPGRADE_STAGE="$1"; echo "stage:$1"; }}
 git() {{ return 0; }}
 tar() {{ cat >/dev/null; }}
 createdb() {{ return 0; }}
@@ -77,10 +78,19 @@ if run_w2_owner_upgrade; then exit 0; else exit 1; fi
         self.assertEqual(result.stdout.count('fixture:verify'), 3)
 
     def test_every_qualification_failure_propagates(self):
-        for failure in ('backup', 'restore', 'upgrade', 'install', 'repeat', 'preservation', 'evidence', 'skip', 'rerun_migration'):
+        stages = {
+            'backup': 'backup-old-database', 'restore': 'restore-old-database',
+            'upgrade': 'upgrade-installed-owners', 'install': 'install-w2',
+            'repeat': 'repeat-owner-and-w2-upgrade', 'preservation': 'seed-preservation-fixture',
+            'evidence': 'verify-owner-migrations', 'skip': 'verify-w2-tests',
+            'rerun_migration': 'verify-w2-tests',
+        }
+        for failure, stage in stages.items():
             with self.subTest(failure=failure):
                 result = self.run_lane(failure)
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                reported = [line for line in result.stdout.splitlines() if line.startswith('stage:')]
+                self.assertEqual(reported[-1], 'stage:' + stage)
 
 
 if __name__ == '__main__':
