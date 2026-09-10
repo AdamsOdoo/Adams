@@ -67,3 +67,21 @@ from . import test_canonical_store_settings
 from . import test_batch2_journeys_core
 from . import test_ui_b2_settings_tours
 from . import test_graphql_schema_conformance
+# P02 named read facade over existing records.
+from . import test_ui_facade
+# P09 additive run/execution-attempt schema and migration-mode contracts.
+from . import test_v2_runtime_schema
+# P15 typed admin commands, generation fences and exact multistore scope.
+from . import test_p15_store_admin
+from . import test_command_result_security
+from . import test_v2_runtime_adapter
+# Shared V2 mutation identity/admission seam.
+from . import test_v2_mutation_runtime
+# P10 genuine PostgreSQL claim/finalization/stale-owner concurrency proof.
+from . import test_v2_runtime_concurrency
+# P06 store-scoped read adapter authorization boundary.
+from . import test_read_gateway
+# P07 domain read adapter: one authorized core model with reversible
+# inventory/fulfillment/webhook delegates.
+from . import test_v2_recovery_commands
+from . import test_p07_domain_read_gateway

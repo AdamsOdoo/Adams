@@ -172,6 +172,78 @@ class TestJobRetryScheduling(TransactionCase):
         self.assertEqual(job.state, 'failed_final')
         self.assertEqual(job.retry_count, 2)
 
+    def test_retry_may_land_exactly_on_window_deadline(self):
+        fixed_now = fields.Datetime.now()
+        delay = 30
+        started_at = fixed_now - timedelta(
+            hours=RETRY_WINDOW_HOURS,
+        ) + timedelta(seconds=delay)
+        job = self._create_selftest_job(
+            state='queued', retry_count=0, started_at=started_at,
+        )
+        with patch.object(
+            dispatch_module.fields.Datetime, 'now', return_value=fixed_now,
+        ), patch.object(
+            type(self.Dispatch), '_retry_delay_seconds', return_value=delay,
+        ):
+            self.Dispatch._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'deadline boundary',
+                False,
+                RETRY_MAX_ATTEMPTS,
+            )
+        self.assertEqual(job.state, 'retry_waiting')
+        self.assertEqual(
+            job.next_retry_at,
+            started_at + timedelta(hours=RETRY_WINDOW_HOURS),
+        )
+
+    def test_retry_past_window_deadline_fails_without_scheduling(self):
+        fixed_now = fields.Datetime.now()
+        delay = 30
+        started_at = fixed_now - timedelta(
+            hours=RETRY_WINDOW_HOURS,
+        ) + timedelta(seconds=delay - 1)
+        job = self._create_selftest_job(
+            state='queued', retry_count=0, started_at=started_at,
+        )
+        with patch.object(
+            dispatch_module.fields.Datetime, 'now', return_value=fixed_now,
+        ), patch.object(
+            type(self.Dispatch), '_retry_delay_seconds', return_value=delay,
+        ):
+            self.Dispatch._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'deadline exceeded',
+                False,
+                RETRY_MAX_ATTEMPTS,
+            )
+        self.assertEqual(job.state, 'failed_final')
+        self.assertFalse(job.next_retry_at)
+
+    def test_retry_at_window_deadline_with_positive_delay_fails(self):
+        fixed_now = fields.Datetime.now()
+        started_at = fixed_now - timedelta(hours=RETRY_WINDOW_HOURS)
+        job = self._create_selftest_job(
+            state='queued', retry_count=0, started_at=started_at,
+        )
+        with patch.object(
+            dispatch_module.fields.Datetime, 'now', return_value=fixed_now,
+        ), patch.object(
+            type(self.Dispatch), '_retry_delay_seconds', return_value=30,
+        ):
+            self.Dispatch._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'deadline reached',
+                False,
+                RETRY_MAX_ATTEMPTS,
+            )
+        self.assertEqual(job.state, 'failed_final')
+        self.assertFalse(job.next_retry_at)
+
     def test_unknown_system_error_retries_once_then_fails_final(self):
         self.store.write({'state': 'connected'})
         job = self._create_selftest_job(state='queued')

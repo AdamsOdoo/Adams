@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "source_v1_sha": "f77bfcc25e63615e6226dd9a9329f8f943593cb2",
+  "canonical_addressing_rule": "step_key is authoritative for persistence, validation, navigation, deep links and resume; ordinal is display-only",
+  "durable_steps": [
+    {"ordinal": 1, "step_key": "welcome", "label": "Welcome"},
+    {"ordinal": 2, "step_key": "identity", "label": "Store identity"},
+    {"ordinal": 3, "step_key": "credential", "label": "Credentials"},
+    {"ordinal": 4, "step_key": "scopes", "label": "Permissions"},
+    {"ordinal": 5, "step_key": "test_connection", "label": "Test connection"},
+    {"ordinal": 6, "step_key": "directions", "label": "What to sync"},
+    {"ordinal": 7, "step_key": "location_mapping", "label": "Location mapping"},
+    {"ordinal": 8, "step_key": "source_of_truth", "label": "Source of truth"},
+    {"ordinal": 9, "step_key": "notification", "label": "Customer notifications"},
+    {"ordinal": 10, "step_key": "first_push", "label": "First stock push"},
+    {"ordinal": 11, "step_key": "final_readiness", "label": "Final readiness"},
+    {"ordinal": 12, "step_key": "review", "label": "Review and activate"}
+  ],
+  "v1_presentation_phases": [
+    {"phase_key": "connect", "label": "Connect", "step_keys": ["welcome", "identity", "credential", "scopes", "test_connection"]},
+    {"phase_key": "choose", "label": "Choose", "step_keys": ["directions"]},
+    {"phase_key": "map", "label": "Map", "step_keys": ["location_mapping"]},
+    {"phase_key": "protect", "label": "Protect", "step_keys": ["source_of_truth", "notification", "first_push"]},
+    {"phase_key": "verify", "label": "Verify", "step_keys": ["final_readiness", "review"]}
+  ],
+  "v2_presentation_phases": [
+    {"phase_key": "store_credential", "label": "Store and credential", "step_keys": ["welcome", "identity", "credential"]},
+    {"phase_key": "connection_scopes", "label": "Connection and scopes", "step_keys": ["scopes", "test_connection"]},
+    {"phase_key": "workflows", "label": "Workflows", "step_keys": ["directions"]},
+    {"phase_key": "locations", "label": "Locations", "step_keys": ["location_mapping"]},
+    {"phase_key": "authority_protections", "label": "Authority and protections", "step_keys": ["source_of_truth", "notification", "first_push"]},
+    {"phase_key": "readiness_activation", "label": "Readiness and activation", "step_keys": ["final_readiness", "review"]}
+  ],
+  "legacy_numeric_resume_map": {
+    "1": "welcome",
+    "2": "identity",
+    "3": "credential",
+    "4": "scopes",
+    "5": "test_connection",
+    "6": "directions",
+    "7": "directions",
+    "8": "source_of_truth",
+    "9": "notification",
+    "10": "first_push",
+    "11": "review"
+  },
+  "compatibility_acceptance": [
+    "every V1 durable step_key resumes at the same semantic step",
+    "every legacy numeric value translates through the frozen one-way map",
+    "phase regrouping never rewrites durable progress",
+    "inserting or reordering a presentation phase never changes command addressing",
+    "stale activation snapshots are rejected after any setup or settings change"
+  ],
+  "status": "contract_frozen_execution_pending"
+}

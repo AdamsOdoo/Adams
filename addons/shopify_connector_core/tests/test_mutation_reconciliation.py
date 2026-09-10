@@ -32,6 +32,7 @@ class TestMutationReconciliation(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
         cls.admin = cls.env['res.users'].create({

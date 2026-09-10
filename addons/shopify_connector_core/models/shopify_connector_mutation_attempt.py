@@ -731,12 +731,13 @@ class ShopifyConnectorMutationAttempt(models.Model):
 
     def action_resolve_mutation_attempt(self, disposition, reason):
         self.ensure_one()
-        attempt = self.try_lock_for_update()
-        if not attempt:
+        # Manual resolution shares the canonical job -> attempt lock order.
+        locked_lineage = self._lock_with_original_job(self.job_id)
+        if not locked_lineage:
             raise UserError(
                 'The mutation attempt is being reconciled by another worker.'
             )
-        attempt.invalidate_recordset()
+        job, attempt = locked_lineage
         if not self.env.user.has_group(
             'shopify_connector_core.group_shopify_connector_admin'
         ):
@@ -787,29 +788,19 @@ class ShopifyConnectorMutationAttempt(models.Model):
             'domain_payload': {'disposition': disposition},
         }
         self.env['shopify.connector.job.dispatch']._apply_validated_consequence(
-            attempt.job_id,
+            job,
             attempt,
             'manual_resolution',
             consequence,
             strategy,
         )
-        reconciliation_jobs = self.env['shopify.connector.job'].search([
-            ('mutation_attempt_id', '=', attempt.id),
-            ('state', 'in', ('queued', 'running', 'retry_waiting')),
-        ]).try_lock_for_update()
-        for job in reconciliation_jobs:
-            from_state = job.state
-            job.sudo().write({
-                'state': 'cancelled',
-                'cancel_reason': 'Attempt resolved manually by Administrator.',
-                'finished_at': now,
-            })
-            job._log_transition(
-                'manual_action',
-                'Reconciliation job closed after Administrator resolution.',
-                from_state=from_state,
-                to_state='cancelled',
-            )
+        # Do not synchronously lock or write reconciliation children here.
+        # A worker claims a child before it reads/locks the attempt, whereas
+        # this action owns the original job then the attempt.  The resolved
+        # attempt is the durable cancellation authority: a queued/running
+        # reconciliation worker observes its terminal disposition and closes
+        # its own child through _complete_reconciliation_job, avoiding the
+        # child -> attempt -> original / original -> attempt -> child cycle.
         return True
 
     def _mask_terminal_evidence(self):

@@ -214,7 +214,10 @@ class TestMutationDispatch(TransactionCase):
         positions = [
             call_line(strategy_call('prepare_local')),
             fn.body[direct_commit[0]].lineno,
-            call_line(strategy_call('prepare_preconditions')),
+            call_line(
+                lambda call: isinstance(call.func, ast.Attribute)
+                and call.func.attr == '_prepare_mutation_request'
+            ),
             call_line(
                 lambda call: isinstance(call.func, ast.Attribute)
                 and call.func.attr == '_commit_attempt_intent_c2'
@@ -316,5 +319,19 @@ class TestMutationDispatch(TransactionCase):
         source = inspect.getsource(
             dispatch_module.ShopifyConnectorJobDispatch._drain_one
         )
-        self.assertIn('self._dispatch_one(claimed)', source)
-        self.assertIn('self._drain_mutation_one(claimed)', source)
+        tree = ast.parse(textwrap.dedent(source))
+        calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+        claim = next(node for node in calls if isinstance(node.func, ast.Attribute)
+                     and node.func.attr == '_claim_for_dispatch')
+        scope = next(node for node in calls if isinstance(node.func, ast.Attribute)
+                     and node.func.attr == '_claimed_dispatch_scope')
+        self.assertLess(claim.lineno, scope.lineno)
+        for method in ('_dispatch_one', '_drain_mutation_one'):
+            dispatches = [node for node in calls
+                          if isinstance(node.func, ast.Attribute)
+                          and node.func.attr == method]
+            self.assertTrue(dispatches, method)
+            for node in dispatches:
+                self.assertEqual(ast.unparse(node.func.value), 'worker')
+                self.assertEqual([ast.unparse(arg) for arg in node.args], ['claimed'])
+                self.assertLess(scope.lineno, node.lineno)

@@ -1,0 +1,85 @@
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Shopify Connector Full for Odoo 19</h2>
+    <h3 class="oe_slogan">Operate the store with guarded write-back domains</h3>
+    <p class="oe_mt32">
+      The DEC-029 Full edition installs the complete Lite visibility layer and
+      adds controlled inventory, fulfillment/tracking, and product-export
+      modules. Each write-capable domain keeps its own preview, confirmation,
+      readback, and operator-review controls.
+    </p>
+    <p>
+      Full is a thin <strong>meta-application</strong>. It adds no models,
+      views, data records, scheduled actions, controllers, credentials, or
+      Shopify requests of its own. The direct domain modules and webhook
+      satellites remain independently identifiable and own their security and
+      lifecycle rules.
+    </p>
+    <p>
+      The installation closure also includes the generic webhook foundation
+      and separate product, order, inventory, and fulfillment webhook
+      accelerators. Supported events enter existing asynchronous read jobs;
+      scheduled reconciliation remains the loss-recovery backstop. No timing
+      or exactly-once promise is made.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <h3>Included edition scope</h3>
+    <div class="row">
+      <div class="col-md-6">
+        <ul>
+          <li>Everything in the DEC-029 Lite edition</li>
+          <li>Guarded inventory location mapping and quantity operations</li>
+          <li>Fulfillment and carrier-tracking workflows</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <ul>
+          <li>Controlled product export and update review</li>
+          <li>First-push, destructive-write, and notification safeguards</li>
+          <li>Readback, reconciliation, and manual-review evidence</li>
+          <li>Supported product, order, inventory, and fulfillment event acceleration</li>
+        </ul>
+      </div>
+    </div>
+    <p class="oe_mt16">
+      Full does not imply payouts, refunds, returns, billing, entitlement
+      enforcement, or unlimited scale. Full supports up to ten configured
+      Shopify stores per Odoo database, subject to readiness and capacity
+      checks; this is a bounded support limit, not a throughput guarantee.
+      Other future domains require their own accepted architecture and release
+      gates.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h3>Operationally explicit</h3>
+    <p>
+      Installation does not create a Shopify connection or transmit data.
+      Configure a store and credentials in Odoo after installation, following
+      the connector's setup guidance. Sensitive operations remain bounded and
+      unsupported or ambiguous remote states are surfaced for review.
+    </p>
+    <p class="text-muted">
+      Screenshots show rendered Odoo browser evidence with synthetic fixtures.
+      They are illustrative, do not represent a live Shopify store, and are
+      not Odoo.sh/UAT acceptance evidence.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_separator">
+  <div class="oe_row oe_spaced">
+    <p class="text-muted">
+      License: LGPL-3. Compatible target: Odoo 19. Future domains such as
+      payouts, refunds, returns, and accounting are not included or implied by
+      Full. The supported multi-store boundary is up to ten configured stores
+      per Odoo database, subject to readiness and capacity checks.
+    </p>
+  </div>
+</section>

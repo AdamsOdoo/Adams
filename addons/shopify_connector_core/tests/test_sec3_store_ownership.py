@@ -74,6 +74,11 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
+from odoo.addons.shopify_connector_core.models.\
+    shopify_connector_command_result import (
+        _COMMAND_RESULT_SERVICE_CAPABILITY,
+    )
+
 CORE = 'shopify_connector_core'
 
 # ---------------------------------------------------------------------------
@@ -94,9 +99,12 @@ SEC3_MODELS = (
     # durable and store-scoped, so it is in the matrix rather than trusted to
     # be safe because no group can read it today.
     ('shopify.connector.store.access.token', '_row_access_token'),
+    ('shopify.connector.command.result', '_row_command_result'),
     ('shopify.connector.store.settings', '_row_settings'),
     ('shopify.connector.location', '_row_location'),
+    ('shopify.connector.run', '_row_run'),
     ('shopify.connector.job', '_row_job'),
+    ('shopify.connector.job.attempt', '_row_job_attempt'),
     ('shopify.connector.job.log', '_row_job_log'),
     ('shopify.connector.mutation.attempt', '_row_mutation_attempt'),
     ('shopify.connector.call.lease', '_row_call_lease'),
@@ -138,16 +146,25 @@ SEC3_MODELS = (
 SEC3_NO_ACL_MODELS = frozenset((
     # The cached 24-hour access token of the client-credentials mode (Wave 5).
     'shopify.connector.store.access.token',
+    # Immutable named-command replay evidence is service-only and has no ACL.
+    'shopify.connector.command.result',
 ))
 
 # Connector-to-connector relations that must agree on the STORE, and the models
 # that own them. Company equality is insufficient for every entry here.
 SEC3_STORE_RELATIONS = (
     ('shopify.connector.store.access.token', 'credential_id'),
+    ('shopify.connector.job', 'run_id'),
+    ('shopify.connector.job', 'parent_job_id'),
+    ('shopify.connector.job', 'blocked_by_job_id'),
     ('shopify.connector.job', 'mutation_attempt_id'),
     ('shopify.connector.job', 'superseded_by_job_id'),
+    ('shopify.connector.job.attempt', 'job_id'),
+    ('shopify.connector.job.attempt', 'run_id'),
+    ('shopify.connector.job.attempt', 'mutation_attempt_id'),
     ('shopify.connector.job.log', 'job_id'),
     ('shopify.connector.mutation.attempt', 'job_id'),
+    ('shopify.connector.mutation.attempt', 'run_id'),
     ('shopify.connector.product.variant.binding', 'product_template_binding_id'),
     ('shopify.connector.inventory.level.binding', 'product_variant_binding_id'),
     ('shopify.connector.inventory.level.binding', 'location_mapping_id'),
@@ -252,14 +269,17 @@ class Sec3Base(TransactionCase):
         })
 
     @classmethod
-    def _job(cls, store, job_type='core_dispatch_selftest'):
-        return cls.env['shopify.connector.job'].sudo().create({
+    def _job(cls, store, job_type='core_dispatch_selftest', run=False):
+        values = {
             'store_id': store.id,
             'job_source': 'setup_readiness_check',
             'job_type': job_type,
             'state': 'queued',
             'payload_hash': uuid.uuid4().hex,
-        })
+        }
+        if run:
+            values['run_id'] = run.id
+        return cls.env['shopify.connector.job'].sudo().create(values)
 
     def _gid(self, kind, store):
         """A unique Shopify-shaped GID.
@@ -452,6 +472,21 @@ class Sec3Base(TransactionCase):
             'expires_at': fields.Datetime.add(fields.Datetime.now(), hours=24),
         })
 
+    def _row_command_result(self, store):
+        """Persist immutable replay evidence through its service capability."""
+        return self.env['shopify.connector.command.result'].with_company(
+            store.company_id
+        )._record_for_command(
+            company_id=store.company_id.id,
+            store_id=store.id,
+            command_id=str(uuid.uuid4()),
+            command_name='test_connection_v1',
+            request_hash='a' * 64,
+            result={'status': 'accepted', 'message': 'SEC-3 matrix'},
+            generation=0,
+            service_capability=_COMMAND_RESULT_SERVICE_CAPABILITY,
+        )
+
     def _row_settings(self, store):
         Settings = self.env['shopify.connector.store.settings'].sudo()
         existing = Settings.search([('store_id', '=', store.id)], limit=1)
@@ -465,8 +500,34 @@ class Sec3Base(TransactionCase):
                 self._gid('Location', store),
         })
 
+    def _row_run(self, store):
+        """Create run evidence through the closed runtime service surface."""
+        self._build(
+            'shopify.connector.store.settings', '_row_settings', store,
+        )
+        return self.env['shopify.connector.run'].with_company(
+            store.company_id
+        )._create_service({
+            'store_id': store.id,
+            'workflow': 'core',
+            'operation': 'sec3.matrix',
+            'trigger': 'system',
+            'scope_summary': 'SEC-3 matrix',
+        })
+
     def _row_job(self, store):
         return self._job(store)
+
+    def _row_job_attempt(self, store):
+        """Create execution evidence with exact run/job/store lineage."""
+        run = self._build('shopify.connector.run', '_row_run', store)
+        job = self._job(store, run=run)
+        return self.env['shopify.connector.job.attempt'].with_company(
+            store.company_id
+        )._create_service({
+            'job_id': job.id,
+            'run_id': run.id,
+        })
 
     def _row_job_log(self, store):
         job = self._job(store)
@@ -770,13 +831,10 @@ class TestSec3ModelMatrix(Sec3Base):
         "owner can" half is deliberate -- it stops the "foreigner cannot" half
         from passing vacuously because a rule hid the model from everybody.
 
-        `shopify.connector.store.access.token` is the one model where hiding it
-        from everybody is the POINT rather than a regression. It holds the
-        cached 24-hour Shopify access token, and its `ir.model.access.csv`
-        marker grants no permission, so no connector group -- including
-        Administrator -- can reach it through RPC. The token is reachable only
-        through the sanctioned, store-scoped `sudo()` accessor on
-        `shopify.connector.store.credential`.
+        The models in `SEC3_NO_ACL_MODELS` are intentionally hidden from every
+        interactive group. They hold either cached authentication material or
+        immutable service replay evidence, and no connector group -- including
+        Administrator -- can reach them through RPC.
 
         So this asserts the stronger property directly instead of skipping:
         EVERY interactive user is refused, on the model and on both rows. If a
@@ -885,14 +943,23 @@ class TestSec3ModelMatrix(Sec3Base):
         Contained in a savepoint for the same reason as the create test: these
         models refuse at different layers, and an uncontained SQL-level refusal
         would abort the transaction and take the remaining models with it. The
-        proof is that the row is byte-for-byte unchanged afterwards.
+        proof is that the row is byte-for-byte unchanged afterwards. Credential
+        snapshots omit write-only secrets while retaining ownership, mode,
+        epoch, and audit fields, so the no-side-effect proof cannot cross the
+        production credential read boundary.
         """
         for model, builder in SEC3_MODELS:
             with self.subTest(model=model):
                 own, foreign = self._pair(model, builder)
                 if own is None or foreign is None:
                     continue
-                before = foreign.read()[0]
+                snapshot_fields = None
+                if model == 'shopify.connector.store.credential':
+                    snapshot_fields = [
+                        'store_id', 'company_id', 'auth_mode',
+                        'credential_epoch', 'write_uid', 'write_date',
+                    ]
+                before = foreign.read(snapshot_fields)[0]
                 wrote = False
                 try:
                     with self.env.cr.savepoint():
@@ -906,7 +973,9 @@ class TestSec3ModelMatrix(Sec3Base):
                     wrote, "%s: an interactive user wrote another company's "
                     'row' % model)
                 self.assertEqual(
-                    self.env[model].sudo().browse(foreign.id).read()[0], before,
+                    self.env[model].sudo().browse(foreign.id).read(
+                        snapshot_fields
+                    )[0], before,
                     '%s: a denied write must leave the target completely '
                     'untouched' % model)
 
@@ -1313,10 +1382,11 @@ class TestSec3HistoricRows(Sec3Base):
         self.env.cr.execute(
             "INSERT INTO shopify_connector_store "
             "(name, shop_domain, api_version, state, company_id, "
-            " connection_generation, disconnect_status, create_uid, "
+            " activation_state, connection_generation, disconnect_status, "
+            " create_uid, "
             " create_date, write_uid, write_date) "
-            "VALUES (%s, %s, '2026-07', 'setup_incomplete', NULL, 0, 'none', "
-            "1, now(), 1, now()) RETURNING id",
+            "VALUES (%s, %s, '2026-07', 'setup_incomplete', NULL, 'draft', "
+            "0, 'none', 1, now(), 1, now()) RETURNING id",
             ('SEC-3 historic %s' % label,
              'sec3-hist-%s-%s.myshopify.com' % (self.tag, label)),
         )
@@ -1413,6 +1483,89 @@ class TestSec3HistoricRows(Sec3Base):
         self.assertEqual(
             variant_a.product_template_binding_id.store_id, self.store_a2,
             'the sweep must not have re-homed either half')
+
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
+    def test_a_historic_job_run_mismatch_is_quarantined_not_re_homed(self):
+        """The runtime relation declaration must cover historic job rows."""
+        run_a2 = self._row_run(self.store_a2)
+        job_a = self._job(self.store_a)
+        self.env.cr.execute(
+            'UPDATE shopify_connector_job SET run_id = %s WHERE id = %s',
+            (run_a2.id, job_a.id),
+        )
+        Model = self.env['shopify.connector.job']
+        Model.invalidate_model()
+
+        job_a = Model.sudo().browse(job_a.id)
+        self.assertEqual(
+            job_a.company_id, job_a.run_id.company_id,
+            'the planted job must be company-consistent')
+        self.assertNotEqual(
+            job_a.store_id, job_a.run_id.store_id,
+            'the planted job must genuinely cross store scope')
+        self.assertIn(
+            job_a.id, self._as(self.user_a, Model._name).search([]).ids)
+
+        quarantined = Model._sec3_quarantine_scope_mismatches()
+        self.assertGreaterEqual(quarantined, 1)
+        Model.invalidate_model()
+
+        self.assertNotIn(
+            job_a.id, self._as(self.user_a, Model._name).search([]).ids,
+            'a quarantined historic job must be invisible')
+        with self.assertRaises(AccessError):
+            self._as(self.user_a, Model._name).browse(job_a.id).read(['id'])
+        job_a = Model.sudo().browse(job_a.id)
+        self.assertTrue(job_a.sec3_scope_quarantined)
+        self.assertEqual(job_a.store_id, self.store_a)
+        self.assertEqual(
+            job_a.run_id, run_a2,
+            'the sweep must not re-home the job or its run')
+
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
+    def test_historic_sweep_before_parent_additive_columns_exist(self):
+        """Populated old parents must be scoped without future-column prefetch."""
+        matching = self._row_mutation_attempt(self.store_a)
+        mismatched = self._row_mutation_attempt(self.store_a)
+        foreign_job = self._job(self.store_a2)
+        matching_job_id = matching.job_id.id
+        Model = self.env['shopify.connector.mutation.attempt']
+        self.env.flush_all()
+
+        class RestoreParentSchema(Exception):
+            pass
+
+        # Roll back the DDL even if the sweep/assertions fail. No ORM flush
+        # may run while the physical parent schema intentionally trails it.
+        with self.assertRaises(RestoreParentSchema):
+            with self.env.cr.savepoint(flush=False):
+                self.env.cr.execute(
+                    'UPDATE shopify_connector_mutation_attempt '
+                    'SET job_id = %s WHERE id = %s',
+                    (foreign_job.id, mismatched.id),
+                )
+                self.env.invalidate_all(flush=False)
+                self.env.cr.execute(
+                    'ALTER TABLE shopify_connector_job RENAME COLUMN '
+                    'run_id TO sec3_test_future_run_id')
+                self.assertGreaterEqual(
+                    Model._sec3_quarantine_scope_mismatches(), 1)
+                self.env.cr.execute(
+                    'SELECT id, store_id, job_id, sec3_scope_quarantined '
+                    'FROM shopify_connector_mutation_attempt '
+                    'WHERE id IN %s ORDER BY id',
+                    ((matching.id, mismatched.id),),
+                )
+                rows = {row[0]: row[1:] for row in self.env.cr.fetchall()}
+                self.assertEqual(
+                    rows[matching.id],
+                    (self.store_a.id, matching_job_id, False))
+                self.assertEqual(
+                    rows[mismatched.id],
+                    (self.store_a.id, foreign_job.id, True))
+                self.assertEqual(Model._sec3_quarantine_scope_mismatches(), 0)
+                raise RestoreParentSchema()
+        self.env.invalidate_all(flush=False)
 
     @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_releasing_a_quarantine_requires_the_disagreement_to_be_resolved(self):

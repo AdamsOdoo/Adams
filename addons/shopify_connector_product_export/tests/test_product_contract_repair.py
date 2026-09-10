@@ -113,11 +113,15 @@ class TestProductContractRepair(ExportCase):
         self.settings.sudo().write({
             'product_export_binding_namespace_ready': True,
         })
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-1',
-            'barcode': '0002',
-        })
+        extra = self.add_template_variant('WIDGET-1', '0002')
+        # Attribute generation may replace/archive the original singleton.
+        # Seed both current combinations explicitly, then prove the fixture
+        # actually presents duplicate SKUs to the create preflight.
+        self.variant = self.template.product_variant_ids - extra
+        self.variant.ensure_one()
+        self.variant.write({'default_code': 'WIDGET-1'})
+        self.assertNotEqual(self.variant.id, extra.id)
+        self.assertEqual(self.variant.default_code, extra.default_code)
         preview = self.make_preview(
             export_path='create', state='applying',
             steps=[{
@@ -180,7 +184,7 @@ class TestProductContractRepair(ExportCase):
             'shopify_export_tags_managed',
         ):
             self.assertIn(field_name, product_arch)
-        self.assertIn('explicit Shopify clear', product_arch)
+        self.assertIn('explicit Shopify clear', ' '.join(product_arch.split()))
 
     def test_default_title_singleton_is_a_safe_update_noop(self):
         binding = self.bind_template()
@@ -287,11 +291,8 @@ class TestProductContractRepair(ExportCase):
         ]), 1)
 
     def test_create_finalization_rejects_duplicate_remote_sku_atomically(self):
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-1',
-            'barcode': '0002',
-        })
+        extra = self.add_template_variant('WIDGET-2', '0002')
+        self.assertEqual(len(self.template.product_variant_ids), 2)
         preview = self.make_preview(export_path='create')
         remote_variants = [{
             'id': VARIANT_GID,
@@ -304,7 +305,7 @@ class TestProductContractRepair(ExportCase):
             'barcode': '0002',
             'inventoryItem': {'id': 'gid://shopify/InventoryItem/2'},
         }]
-        with self.assertRaises(JobHandlerError):
+        with self.assertRaisesRegex(JobHandlerError, 'duplicate direct SKUs'):
             self.Service._bind_created_product(
                 self.store, preview, {
                     'id': PRODUCT_GID,

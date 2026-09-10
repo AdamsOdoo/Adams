@@ -4,6 +4,14 @@ import uuid
 
 from odoo import api, fields, models
 
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_gateway import (
+    FULFILLMENT_TRACKING_UPDATE_DOCUMENT,
+)
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_read_gateway import (
+    FULFILLMENT_NODE_QUERY,
+    FULFILLMENT_NODES_QUERY,
+)
+
 from .shopify_connector_fulfillment_create_strategy import (
     FulfillmentPreC2FailClosedError,
 )
@@ -11,47 +19,9 @@ from .shopify_connector_fulfillment_reader import FulfillmentReadError
 
 _logger = logging.getLogger(__name__)
 
-# Anonymous fulfillmentTrackingInfoUpdate document (module constant, guarded by
+# Named fulfillmentTrackingInfoUpdate document (module constant, guarded by
 # this addon's source-guard test). RA-022: never the legacy V2 path. No
 # @idempotent directive. Updates tracking IN PLACE — never a second fulfillment.
-FULFILLMENT_TRACKING_UPDATE_DOCUMENT = (
-    'mutation ($fulfillmentId: ID!, $trackingInfoInput: FulfillmentTrackingInput!, '
-    '$notifyCustomer: Boolean) {\n'
-    '  fulfillmentTrackingInfoUpdate(fulfillmentId: $fulfillmentId, '
-    'trackingInfoInput: $trackingInfoInput, notifyCustomer: $notifyCustomer) {\n'
-    '    fulfillment {\n'
-    '      id\n'
-    '      status\n'
-    '      trackingInfo { number url company }\n'
-    '    }\n'
-    '    userErrors { field message }\n'
-    '  }\n'
-    '}'
-)
-
-FULFILLMENT_NODE_QUERY = (
-    'query($id: ID!) {\n'
-    '  fulfillment(id: $id) {\n'
-    '    id\n'
-    '    status\n'
-    '    displayStatus\n'
-    '    trackingInfo { number url company }\n'
-    '  }\n'
-    '}'
-)
-
-FULFILLMENT_NODES_QUERY = (
-    'query ConnectorFulfillmentNodes($ids: [ID!]!) {\n'
-    '  nodes(ids: $ids) {\n'
-    '    ... on Fulfillment {\n'
-    '      id\n'
-    '      status\n'
-    '      displayStatus\n'
-    '      trackingInfo { number url company }\n'
-    '    }\n'
-    '  }\n'
-    '}'
-)
 FULFILLMENT_NODES_BATCH = 50
 
 

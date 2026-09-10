@@ -1,50 +1,52 @@
-# AGENTS.md — Proposed Future Agents (not yet active)
+# Adams Shopify connector — execution instructions
 
-> This file lists **proposed** automation agents for the Odoo 19 Shopify
-> Connector project. **None of these agents are active.** They are documented
-> here so ChatGPT (the strategy/control room) can review and shape the
-> automation plan *before* any agent is built.
->
-> **Do not create functioning agents now.** Premature automation can encode
-> weak or unverified assumptions into the workflow. Agents will be created later,
-> only after the research workflow has stabilised and ChatGPT approves.
->
-> Governance authority for the project is `CLAUDE.md`. If this file and
-> `CLAUDE.md` ever disagree, `CLAUDE.md` wins.
+## Authority and active work
 
-## Status legend
+Follow the user's latest instruction first, this file second, then accepted V2 contracts and ADRs. CLAUDE.md, CHATGPT.md and GPT_SOL.md are compatibility entrypoints/history, not separate authorities. Do not restart from historical prompts.
 
-- **Proposed** — described here; not built; not callable.
-- (Future) **Approved** — ChatGPT has approved building it.
-- (Future) **Active** — implemented under `/.claude/agents/` and in use.
+Read docs/v2/13-continuous-execution-handoff.md and docs/v2/16-delivery-blueprint.md, verify branch/head and worktree, then load only the owning contract and relevant skill. The user authorized continuous V2 development, testing and Astra/Sol orchestration. **UI redesign is parked until the user resumes it; proposals 01/02 are unapproved.** Backend and delivery work continue without routine approval stops.
 
-All agents below are **Proposed**.
+Work on codex/v2-continuous-implementation. Preserve PR #210/#211 and unrelated changes. Never reset, rebase, stash, force-push or discard preserved work. Commit coherent changes; publish using an authorized write connection. If blocked, preserve local commits and record that they are unpublished. Do not claim GitHub contains them.
 
-## Proposed agents
+Only the authorized development environment and Shopify store testin-lzhbzhtc.myshopify.com may be used. Verify exact build, database/company and shop identity before live work. No staging/production, other stores or public release without separate authority. Use the approved secure credential mechanism; never put secrets, customer payloads or PII in prompts, fixtures, commits or evidence.
 
-| Agent | Status | Intended purpose | Intended scope / guardrails (when built) |
-| --- | --- | --- | --- |
-| **competitor-research-agent** | Proposed | Deep-dive one competitor connector (Webkul, Teqstars, Emipro, VentorTech, Softhealer, official ecommerce_shopify) into a cited, comparable profile. | Read-only research (web read + repo read); no write/code; must cite and classify every claim; never bypass auth. |
-| **shopify-api-research-agent** | Proposed | Establish official Shopify platform facts: Admin REST/GraphQL, webhooks, scopes, versioning, rate limits, bulk ops, idempotency, app-review requirements. | Read-only; prefer official Shopify docs; always state the API version a fact applies to. |
-| **odoo-architecture-research-agent** | Proposed | Identify correct Odoo 19 extension points and modularity boundaries (sale/stock/product/account/delivery, ir.cron/queue, external IDs/mapping, security). | Read-only; prefer official Odoo 19 docs; may read repo but never modify it. |
-| **ux-benchmark-agent** | Proposed | Benchmark setup/onboarding and operational UX across connectors (connect flows, mapping wizards, error surfaces, screenshots). | Read-only; cite screenshot sources; separate observation from UX opinion. |
-| **qa-review-agent** | Proposed | Apply the PR/review checklist and the issue taxonomy to a deliverable; surface defects, missing citations, and unsupported assumptions. | Read-only review; classifies findings; routes them to the correct `/docs/05-qa` log; does not fix code. |
-| **prompt-control-agent** | Proposed | Maintain and improve the reusable prompts/templates and enforce the learning rules between sessions. | Docs-only; edits `/docs/06-prompts/**`; no code; changes reviewed by ChatGPT. |
+## Architecture that must survive repairs
 
-## Why defer
+- Odoo 19 modular monolith; preserve addon/model/table/XML IDs, bindings, audit and mutation history. Expand/migrate before switching. Optional modules cannot access another optional owner's schema merely because a shared table exists.
+- Typed Shopify gateways own remote I/O, pinned operations and normalized transport/GraphQL/business errors. Webhooks are authenticated, deduplicated hints; scheduled reconciliation repairs missed/out-of-order events.
+- Commands enforce actor capabilities, company, exact store, activation and configuration/connection generation at admission and before effects. UI hiding, context booleans and broad sudo are not authorization.
+- Durable intent, operation scope, claim fencing and readback prevent duplicate effects. After-send uncertainty remains query-only until resolved; never blindly retry it.
+- Preserve global deterministic lock ordering, run/job/handler binding and monotonic scan checkpoints. SQL is justified for migrations, constraints and concurrency correctness as well as measured performance; explain ownership and transaction boundaries.
+- Framework transactions own normal RPC commits. Independent cursors need explicit lifecycle. Cron progress APIs are not manual-commit workarounds for ordinary business RPCs.
+- Deterministic bindings, explicit inventory first-push approval, protected catalog fields/media, whole-order validation and explicit fulfillment notification remain invariant.
+- No speculative broker, external worker, generic repository layer, event bus or framework. Add an abstraction to enforce an actual boundary, isolate a side effect, or remove demonstrated duplication.
 
-- The research methodology and feature taxonomy are not yet stable; an agent
-  built now would bake in assumptions we may reject.
-- ChatGPT should review the proposed roles, scopes, and guardrails first.
-- Each agent, when built, must be **narrow, safe, read-only (or docs-only)**,
-  and must embed the citation, claim-classification, and handoff requirements
-  from `CLAUDE.md`.
+## Skills and sources
 
-## Activation criteria (future)
+Repository skills live in .agents/skills/. Read directly if discovery is unavailable; do not install global/personal skills for this project.
 
-An agent moves Proposed → Approved → Active only when:
+| Work | Skill |
+| --- | --- |
+| Models, APIs/webhooks, schema, runtime, security and domain behavior | connector-backend/SKILL.md |
+| Business journeys, native UI, management reporting and usability | connector-journey/SKILL.md |
+| Failure triage, native/lifecycle/live qualification and evidence | connector-qualification/SKILL.md |
 
-1. The research workflow it supports is stable and documented.
-2. ChatGPT approves its purpose, scope, and guardrails.
-3. Its definition is added under `/.claude/agents/` with least-privilege tools
-   and the project's citation/handoff rules baked in.
+Official platform/model references are routed from blueprint 16. Refresh version-sensitive facts for the touched operation, not the whole research corpus on every packet. Vendor documentation describes competitor behavior, not platform guarantees. Historical failures/rejected approaches remain regression inputs.
+
+## Astra/Sol coordination and efficiency
+
+One lead owns integration and handoff. Astra handles architecture, cross-domain decisions, mutation/security review and user-facing design when resumed. Sol handles bounded implementation, test repair and evidence extraction. Start Sol medium for straightforward tasks, high for ORM/state/concurrency; use Astra high for difficult integration, raising effort only for unresolved risk. These are initial routing choices, not quota guarantees.
+
+Delegate concrete non-overlapping work beside useful lead work. Usually one implementation agent and one lead suffice. Give objective, exact source, owned paths, constraints, acceptance, tests and return format. Reviewers receive raw evidence and criteria, not instructions to agree. The lead inspects the diff; summaries are not proof. Separate-model review is not human/organizational release independence.
+
+Use incremental searches and batched independent reads. Do not re-audit unchanged code, request maximal effort universally, or run duplicate full campaigns. Measure actual cost/latency when available; do not manufacture usage promises.
+
+## Evidence and continuation
+
+Run focused checks per coherent change, then affected native gates. Full install/upgrade/concurrency/browser/load/live campaigns belong at integration gates and candidate freeze. Skipped, blocked, simulated or failed checks are never passes. Fix causes before cascades; update stale fixtures through sanctioned surfaces, never weaken production safety.
+
+Every advertised feature needs actor → authorization → input → local/remote effect → verified business result → user evidence → recovery. Native backend proof precedes production UI wiring. Prototype approval does not qualify a workflow.
+
+Update the canonical handoff after material checkpoints: source/head, unpublished changes, behavior, exact checks/results, external state, defects, rollback and first next action. Checkpoint atomic work before context pressure. Never claim an exact chat-limit detector, automatic new-chat creation or background execution after the turn ends.
+
+Routine defects, reversible fixes and already-authorized dev tests are work to complete. Escalate significant new scope/architecture, irrecoverable data risk, access outside authority, or final promotion. Preserve the safe checkpoint and continue independent useful work where possible.

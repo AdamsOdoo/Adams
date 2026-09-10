@@ -74,6 +74,16 @@ class TestConnectionLifecycle(TransactionCase):
     def _store(self):
         return self.store.with_user(self.user_admin)
 
+    def _seed_operational_store(self):
+        """Seed legacy operational scenarios without bypassing job admission.
+
+        Connection and activation are separate persisted states. Tests of
+        activation itself still begin with the original draft store.
+        """
+        self.store._store_service_write('_lifecycle', {
+            'state': 'connected', 'activation_state': 'active',
+        })
+
     def _set_token(self):
         self.Credential.with_user(self.user_admin).action_set_token(
             self.store, DUMMY_TOKEN
@@ -131,7 +141,7 @@ class TestConnectionLifecycle(TransactionCase):
 
         def fake_run_for_store(rc_self, store):
             call_log.append(store.id)
-            store.write({
+            store._store_service_write('_readiness', {
                 'last_readiness_result': readiness_result,
                 'last_readiness_at': fields.Datetime.now(),
             })
@@ -172,10 +182,18 @@ class TestConnectionLifecycle(TransactionCase):
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'connected')
         audit_jobs = self._audit_jobs()
-        self.assertEqual(len(audit_jobs), 1)
-        self.assertEqual(audit_jobs.state, 'succeeded')
-        logs = self._logs_for(audit_jobs)
-        self.assertTrue(any(log.event_type == 'manual_action' for log in logs))
+        self.assertEqual(self.store.activation_state, 'active')
+        self.assertEqual(len(audit_jobs), 2)
+        self.assertTrue(all(job.state == 'succeeded' for job in audit_jobs))
+        logs = self.JobLog.search([('job_id', 'in', audit_jobs.ids)])
+        messages = logs.filtered(
+            lambda log: log.event_type == 'manual_action'
+        ).mapped('message')
+        self.assertTrue(any('Store activated (' in msg for msg in messages))
+        self.assertTrue(any(
+            'Store activation changed from draft to active' in msg
+            for msg in messages
+        ))
 
     def test_activate_succeeds_with_pass_and_warning(self):
         self._set_token()
@@ -432,7 +450,7 @@ class TestConnectionLifecycle(TransactionCase):
         # (state -> disconnecting); the quiescence controller clears it at the
         # `completed` finalize once the store has zero committed call leases.
         self._set_token()
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         self._store().action_disconnect()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnecting')
@@ -462,7 +480,7 @@ class TestConnectionLifecycle(TransactionCase):
     def test_disconnect_sets_state_disconnected(self):
         # CORE-R2 (AR-047): Phase 1 moves the store to `disconnecting`; the
         # quiescence controller finalizes it to `disconnected`.
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         self._store().action_disconnect()
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'disconnecting')
@@ -478,7 +496,7 @@ class TestConnectionLifecycle(TransactionCase):
         # cancellable rows) with reason 'Store disconnecting.', and never writes
         # a running/claimed row (that row is represented by its admission lease
         # and handled by the controller/timeout).
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         queued = self._create_job('webhook', state='queued')
         retry = self._create_job(
             'manual_sync', state='retry_waiting',
@@ -515,7 +533,7 @@ class TestConnectionLifecycle(TransactionCase):
             'export_preview_dry_run', job_type='core_manual_maintenance',
             state='draft',
         )
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         self._store().action_disconnect()
         for job in (readiness_job, test_conn_job, preview_job):
             job.invalidate_recordset()
@@ -523,7 +541,7 @@ class TestConnectionLifecycle(TransactionCase):
             self.assertFalse(job.cancel_reason)
 
     def test_disconnect_does_not_alter_terminal_jobs(self):
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         succeeded_job = self._create_job('manual_sync', state='succeeded')
         failed_job = self._create_job('reconciliation', state='failed_final')
         skipped_job = self._create_job('odoo_event', state='skipped', trigger_origin='inventory_stock_change')
@@ -537,7 +555,7 @@ class TestConnectionLifecycle(TransactionCase):
         # CORE-R2 (AR-047): a repeated disconnect while already `disconnecting`
         # is an audited idempotent no-op -- no re-sweep of the already-cancelled
         # job, no second generation bump, exactly one more audit job.
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         job = self._create_job('manual_sync', state='queued')
         self._store().action_disconnect()
         job.invalidate_recordset()
@@ -566,6 +584,7 @@ class TestConnectionLifecycle(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_business_job_create_blocked_when_not_connected(self):
+        self._seed_operational_store()
         for state in NON_CONNECTED_STATES:
             self.store.write({'state': state})
             for job_source in BUSINESS_JOB_SOURCES:
@@ -575,8 +594,27 @@ class TestConnectionLifecycle(TransactionCase):
                 with self.assertRaises(ValidationError):
                     self._create_job(job_source, state='draft', **extra)
 
+    def test_connected_store_requires_active_activation_for_business_work(self):
+        self._seed_operational_store()
+        job = self._create_job('manual_sync', state='queued')
+        for activation in ('draft', 'paused', 'retired'):
+            with self.subTest(activation=activation):
+                self.store._store_service_write('_lifecycle', {
+                    'activation_state': activation,
+                })
+                with self.assertRaises(ValidationError):
+                    self._create_job('manual_sync', state='queued')
+                with self.assertRaises(ValidationError):
+                    job.write({'state': 'running'})
+                self.assertEqual(job.state, 'queued')
+        self.store._store_service_write('_lifecycle', {
+            'activation_state': 'active',
+        })
+        job.write({'state': 'running'})
+        self.assertEqual(job.state, 'running')
+
     def test_business_job_create_succeeds_when_connected(self):
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         for job_source in BUSINESS_JOB_SOURCES:
             extra = {}
             if job_source == 'odoo_event':
@@ -599,7 +637,7 @@ class TestConnectionLifecycle(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_business_job_running_blocked_when_not_connected(self):
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         job = self._create_job('manual_sync', state='queued')
         # Race: the store disconnects after enqueue but before start.
         self.store.write({'state': 'disconnected'})
@@ -609,7 +647,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(job.state, 'queued')
 
     def test_business_job_running_succeeds_when_connected(self):
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         job = self._create_job('manual_sync', state='queued')
         job.write({'state': 'running'})
         self.assertEqual(job.state, 'running')
@@ -635,8 +673,9 @@ class TestConnectionLifecycle(TransactionCase):
             'shop_domain': 'other-disconnected-store.myshopify.com',
             'api_version': '2026-07',
             'state': 'disconnected',
+            'activation_state': 'active',
         })
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         job = self._create_job('manual_sync', state='queued')
         with self.assertRaises(ValidationError):
             job.write({'store_id': other_store.id, 'state': 'running'})
@@ -644,7 +683,7 @@ class TestConnectionLifecycle(TransactionCase):
         self.assertEqual(job.state, 'queued')
 
     def test_business_job_can_be_cancelled_when_not_connected(self):
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         job = self._create_job('manual_sync', state='draft')
         self.store.write({'state': 'disconnected'})
         job.write({
@@ -669,7 +708,7 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_mark_reconnect_needed_sets_state_keeps_credential(self):
         self._set_token()
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         self._store().action_mark_reconnect_needed(reason='test signal')
         self.store.invalidate_recordset()
         self.assertEqual(self.store.state, 'reconnect_needed')
@@ -689,7 +728,7 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_test_connection_auth_failure_sets_reconnect_needed(self):
         self._set_token()
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         response = FakeResponse(200, json_body={
             'errors': [{
                 'message': 'Access denied',
@@ -703,7 +742,7 @@ class TestConnectionLifecycle(TransactionCase):
 
     def test_test_connection_shop_state_failure_also_sets_reconnect_needed(self):
         self._set_token()
-        self.store.write({'state': 'connected'})
+        self._seed_operational_store()
         response = FakeResponse(423, text='Locked')
         self._run_test_connection(response)
         self.store.invalidate_recordset()

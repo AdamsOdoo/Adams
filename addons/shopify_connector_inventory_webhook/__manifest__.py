@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Inventory Webhooks',
-    'version': '19.0.0.4.0',
+    'version': '19.0.0.5.0',
     'summary': 'Read-first Shopify inventory-level drift observations',
     'description': """
 Shopify Connector Inventory Webhooks

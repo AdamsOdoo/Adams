@@ -26,6 +26,7 @@ and RPC, which are exactly the three paths the readonly attribute does not
 cover.
 """
 
+import ast
 import uuid
 
 from odoo.exceptions import ValidationError
@@ -35,6 +36,47 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
     admin_graphql_endpoint,
 )
+
+
+def _preflight_snapshot_lines(source):
+    """Identify the two returned identity snapshots, never ORM write values.
+
+    A snapshot must be assigned once and referenced only by its return. Any
+    additional use (including passing it to write/create) closes the exception.
+    """
+    lines = set()
+    for method in ast.walk(ast.parse(source)):
+        if not isinstance(method, ast.FunctionDef) or method.name not in {
+            '_v2_preflight_mutation_lineage',
+            '_v2_preflight_reconciliation_lineage',
+        }:
+            continue
+        references = [node for node in ast.walk(method)
+                      if isinstance(node, ast.Name) and node.id == 'snapshot']
+        returns = [node for node in ast.walk(method)
+                   if isinstance(node, ast.Return)
+                   and isinstance(node.value, ast.Name)
+                   and node.value.id == 'snapshot']
+        if len(references) != 2 or len(returns) != 1:
+            continue
+        for node in ast.walk(method):
+            if not (
+                isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == 'snapshot'
+                and isinstance(node.value, ast.Dict)
+            ):
+                continue
+            for key, value in zip(node.value.keys, node.value.values):
+                if (
+                    isinstance(key, ast.Constant) and key.value == 'api_version'
+                    and isinstance(value, ast.Attribute)
+                    and value.attr == 'api_version'
+                    and isinstance(value.value, ast.Name)
+                    and value.value.id == 'store'
+                ):
+                    lines.add(key.lineno)
+    return lines
 
 
 @tagged('post_install', '-at_install')
@@ -176,7 +218,7 @@ class TestApiVersionBinding(TransactionCase):
         self.assertIn('name="api_version" readonly="1"', arch.replace('\n', ' '))
 
     def test_no_module_writes_a_version_that_is_not_the_constant(self):
-        """Structural: nothing may hard-code a version anywhere.
+        """Structural: persisted version values must use the constant.
 
         The existing per-module guard covers each addon's own sources; this
         one asserts the property that matters at the boundary -- that the
@@ -190,9 +232,13 @@ class TestApiVersionBinding(TransactionCase):
         for path in sorted(addons.glob('shopify_connector_*/**/*.py')):
             if 'tests' in path.parts:
                 continue
+            source = path.read_text()
+            snapshot_lines = _preflight_snapshot_lines(source)
             for match in re.finditer(
-                r"'api_version'\s*:\s*(.+)", path.read_text(),
+                r"'api_version'\s*:\s*(.+)", source,
             ):
+                if source.count('\n', 0, match.start()) + 1 in snapshot_lines:
+                    continue
                 value = match.group(1).strip().rstrip(',')
                 if 'SHOPIFY_API_VERSION' not in value:
                     offenders.append('%s: %s' % (path.name, value[:60]))
@@ -200,3 +246,22 @@ class TestApiVersionBinding(TransactionCase):
             'these write an API version that is not the centralized '
             'constant: %s' % offenders
         ))
+
+    def test_snapshot_exception_cannot_hide_a_persisted_version(self):
+        source = (
+            'def _v2_preflight_mutation_lineage(self, store):\n'
+            "    snapshot = {'api_version': store.api_version}\n"
+            '    return snapshot\n'
+        )
+        self.assertEqual(_preflight_snapshot_lines(source), {2})
+        for changed in (
+            source.replace('store.api_version', "'2025-01'"),
+            source.replace('return snapshot', 'store.write(snapshot)\n    return snapshot'),
+            source.replace('return snapshot', 'store.create(snapshot)\n    return snapshot'),
+            source.replace('_v2_preflight_mutation_lineage', 'write_store'),
+            source.replace('snapshot = ', 'store.write(').replace(
+                'store.api_version}', 'store.api_version})',
+            ),
+        ):
+            with self.subTest(source=changed):
+                self.assertEqual(_preflight_snapshot_lines(changed), set())

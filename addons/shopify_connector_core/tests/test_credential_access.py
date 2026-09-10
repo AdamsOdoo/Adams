@@ -156,16 +156,82 @@ class TestCredentialAccess(TransactionCase):
     def test_admin_reads_directly_and_mutates_only_through_the_service(self):
         """The Administrator's real capability, stated exactly.
 
-        READ is direct and unchanged -- the ACL grants it and surfaces depend on
-        it. MUTATION is service-only (§9.1), and `unlink` is refused to everyone
-        including the service, because credential history is retained (MBQ-08).
+        Safe metadata remains directly readable, but raw credential values are
+        write-only even for an Administrator. MUTATION is service-only (§9.1),
+        and `unlink` is refused to everyone including the service, because
+        credential history is retained (MBQ-08).
         """
         Credential = self.env['shopify.connector.store.credential']
         credential = self._admin_credential()
         as_admin = Credential.with_user(self.user_admin)
-        # Read: allowed, directly.
-        as_admin.browse(credential.id).read(['credential_state'])
+        # Safe metadata: allowed directly.
+        metadata = as_admin.browse(credential.id).read(
+            ['credential_state', 'auth_mode'],
+        )[0]
+        self.assertNotIn('access_token', metadata)
+        self.assertNotIn('client_secret', metadata)
         self.assertTrue(as_admin.search([('store_id', '=', self.store.id)]))
+        search_metadata = as_admin.search_read(
+            [('id', '=', credential.id)], ['credential_state', 'auth_mode'],
+        )[0]
+        self.assertNotIn('access_token', search_metadata)
+        self.assertNotIn('client_secret', search_metadata)
+        # Raw values: never returned by read, search_read, export, or an
+        # unqualified read that would otherwise select every readable field.
+        for field in ('access_token', 'client_secret'):
+            with self.subTest(field=field):
+                with self.assertRaises(AccessError):
+                    as_admin.browse(credential.id).read([field])
+                with self.assertRaises(AccessError):
+                    as_admin.search_read(
+                        [('id', '=', credential.id)], [field],
+                    )
+                with self.assertRaises(AccessError):
+                    as_admin.browse(credential.id).export_data([field])
+        with self.assertRaises(AccessError):
+            as_admin.browse(credential.id).read()
+        # A secret must not become a boolean oracle through a domain or a
+        # grouped query, either.  These are separate ORM paths from read() and
+        # are also used by the web client.
+        for domain in (
+            [('access_token', '=', 'shpat_ACCESSFIXTURE0000000000000000')],
+            ['|', ('store_id', '=', self.store.id),
+             ('client_secret', '!=', False)],
+        ):
+            with self.subTest(domain=domain):
+                with self.assertRaises(AccessError):
+                    as_admin.search(domain)
+                with self.assertRaises(AccessError):
+                    as_admin.search_count(domain)
+        with self.assertRaises(AccessError):
+            as_admin.read_group([], ['access_token:count'], [])
+        with self.assertRaises(AccessError):
+            as_admin.read_group([], ['credential_state'], ['client_secret'])
+        with self.assertRaises(AccessError):
+            as_admin.web_read({'access_token': {}})
+        with self.assertRaises(AccessError):
+            as_admin.web_search_read([], {'client_secret': {}})
+        # The existing internal accessor remains the only in-process route to
+        # the stored offline token; it is not an ORM projection.
+        self.assertEqual(
+            Credential._get_access_token(self.store),
+            'shpat_ACCESSFIXTURE0000000000000000',
+        )
+        # The client-secret mode has the same narrow internal accessor.  Set it
+        # through the service, then prove the safe projection still contains no
+        # raw value while HMAC callers can obtain it in-process.
+        as_admin.action_set_client_credentials(
+            self.store, 'client-id-for-access-test', 'client-secret-for-test',
+        )
+        self.assertEqual(
+            Credential._get_client_secret(self.store),
+            'client-secret-for-test',
+        )
+        safe_projection = as_admin.browse(credential.id).read(
+            ['credential_state', 'auth_mode'],
+        )[0]
+        self.assertNotIn('access_token', safe_projection)
+        self.assertNotIn('client_secret', safe_projection)
         # Mutate: only through the service.
         with self.assertRaises(AccessError):
             as_admin.browse(credential.id).write({'credential_state': 'absent'})
@@ -208,6 +274,7 @@ class TestCredentialAccess(TransactionCase):
         # supplementary check of that specific, independent mechanism.
         exposed_fields = credential_as_operator.fields_get()
         self.assertNotIn('access_token', exposed_fields)
+        self.assertNotIn('client_secret', exposed_fields)
         with self.assertRaises(AccessError):
             credential_as_operator.browse(admin_credential.id).read(
                 ['access_token']

@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.30.0',
+    'version': '19.0.1.33.0',
     'summary': (
         'Shared Odoo <-> Shopify connector runtime and operator app: '
         'stores, guarded credentials, job dispatch and recovery, guided '
@@ -45,9 +45,6 @@ pipeline and no OAuth flow.
     # 'web' is required by the U0 operator UI (menus, views, the Owl dashboard
     # client action, SCSS/JS assets, and browser tours).
     'depends': ['base', 'web'],
-    'external_dependencies': {
-        'python': ['graphql'],
-    },
     'data': [
         'security/shopify_connector_security.xml',
         'security/ir.model.access.csv',
@@ -55,6 +52,7 @@ pipeline and no OAuth flow.
         # Loaded after the ACLs, because a record rule refines an access
         # right that must already exist.
         'security/shopify_connector_company_rules.xml',
+        'security/shopify_connector_v2_runtime_security.xml',
         # PERF-1: the drain's per-pass cap parameter is seeded before the
         # drain cron that consumes it.
         'data/shopify_connector_config_params.xml',
@@ -95,6 +93,9 @@ pipeline and no OAuth flow.
         # this would be invisible on a warm `-u` of a database that already
         # had that menu and a hard `ParseError` on a fresh install.
         'views/shopify_connector_store_settings_views.xml',
+        # P09 additive run/attempt evidence and readonly migration controls.
+        # This inherits the canonical settings view, so it must remain last.
+        'views/shopify_connector_runtime_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

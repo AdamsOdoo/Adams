@@ -34,7 +34,9 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             'shop_domain': 'w2-product-%s.myshopify.com' % suffix,
             'api_version': SHOPIFY_API_VERSION,
         })
-        store.write({'state': 'connected'})
+        store._store_service_write('_lifecycle', {
+            'state': 'connected', 'activation_state': 'active',
+        })
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id,
             'product_domain_enabled': True,
@@ -76,6 +78,21 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         active = set(registry.allowed_topics())
         self.assertTrue(set(PRODUCT_WEBHOOK_TOPICS).issubset(active))
         self.assertIn('products/delete', active)
+
+    def test_paused_store_does_not_admit_product_import_child(self):
+        store = self._store('paused')
+        store._store_service_write('_lifecycle', {
+            'activation_state': 'paused',
+        })
+        delivery = self._delivery(
+            store, 'paused', 'gid://shopify/Product/788032119674292998',
+        )
+        delivery._process_queued()
+        self.assertEqual(delivery.state, 'manual_review')
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', PRODUCT_IMPORT_JOB_TYPE),
+        ]))
 
     def test_delete_delivery_admits_read_first_stale_binding_path(self):
         registry = self.env['shopify.connector.webhook.registry']
@@ -138,8 +155,8 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             w1_root / 'migrations' / '19.0.1.1.0' / 'post-migrate.py'
         ).read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
-        self.assertIn("'version': '19.0.1.3.0'", w1_manifest)
-        self.assertIn("'version': '19.0.0.3.0'", w2_manifest)
+        self.assertIn("'version': '19.0.1.4.0'", w1_manifest)
+        self.assertIn("'version': '19.0.0.4.0'", w2_manifest)
         self.assertIn('information_schema.columns', migration)
         self.assertIn('expected_include_fields', migration)
         self.assertIn('actual_include_fields', migration)
@@ -160,17 +177,18 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             {'expected_include_fields', 'actual_include_fields'},
         )
 
-    def test_w2_only_install_bridge_is_idempotent_and_jsonb(self):
-        """Installing W2 alone over old W1 adds only the canonical columns."""
+    def test_w2_preflight_is_read_only_and_owner_schema_is_current(self):
+        """W2 checks owner versions; owner migrations supply canonical fields."""
         root = Path(__file__).resolve().parents[1]
         manifest = (root / '__manifest__.py').read_text()
         bridge = (root / 'pre_init.py').read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
         self.assertIn("'pre_init_hook': 'pre_init_hook'", manifest)
-        self.assertIn('ALTER TABLE IF EXISTS', bridge)
-        self.assertIn('ADD COLUMN IF NOT EXISTS expected_include_fields jsonb', bridge)
-        self.assertIn('ADD COLUMN IF NOT EXISTS actual_include_fields jsonb', bridge)
+        self.assertIn('check_owner_versions', bridge)
+        self.assertNotIn('ALTER TABLE', bridge)
+        self.assertNotIn('UPDATE ', bridge)
         self.assertIn('7443250ae42a0c3fadba9bf0ef9991e1826b77b5', runner)
+        pre_init_hook(self.env)
         pre_init_hook(self.env)
         self.env.cr.execute(
             "SELECT column_name, udt_name FROM information_schema.columns "
@@ -209,12 +227,22 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 'sale_order_scan_cursor',
             },
         )
-        self.env.cr.execute(
-            "SELECT shopify_export_status_managed FROM product_template "
-            "WHERE id = %s",
-            (self.env['product.template'].create({'name': 'Bridge seed'}).id,),
-        )
-        self.assertTrue(self.env.cr.fetchone()[0])
+        if 'shopify_export_status' in self.env['product.template']._fields:
+            self.env.cr.execute(
+                "SELECT shopify_export_status_managed FROM product_template "
+                "WHERE id = %s",
+                (self.env['product.template'].create({'name': 'Bridge seed'}).id,),
+            )
+            self.assertTrue(self.env.cr.fetchone()[0])
+        else:
+            self.env.cr.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'product_template' "
+                "AND column_name IN ("
+                "'shopify_export_status', 'shopify_export_status_managed')"
+            )
+            self.assertFalse(self.env.cr.fetchall())
 
     def test_registry_removed_product_topic_queues_exact_gid_cleanup(self):
         """W2 removal leaves no active evidence and queues read-first delete."""
@@ -233,6 +261,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             'expected_include_fields': ['admin_graphql_api_id'],
             'state': 'active',
             'shopify_subscription_gid': gid,
+            'expected_callback_url_digest': 'callback-digest',
         })
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': store.id,
@@ -538,7 +567,8 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         JobEnqueue = self.env['shopify.connector.job.enqueue'].sudo()
         Job = self.env['shopify.connector.job'].sudo()
         for state in ('skipped', 'cancelled', 'failed_final'):
-            store = self._store('generation-%s' % state)
+            suffix = 'generation-%s' % state.replace('_', '-')
+            store = self._store(suffix)
             store.sudo().write({'connection_generation': 1})
             old = JobEnqueue.enqueue(
                 store,
@@ -577,7 +607,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 'state': 'connected',
             })
             delivery = self._delivery(
-                store, 'generation-%s' % state, gid,
+                store, suffix, gid,
                 fields.Datetime.to_datetime(
                     stamp.replace('T', ' ').replace('Z', ''),
                 ),
@@ -679,6 +709,11 @@ class TestShopifyConnectorProductWebhookGenerationRace(TransactionCase):
                 'shop_domain': 'w2-product-race-%s.myshopify.com' % store_id_seed(),
                 'api_version': SHOPIFY_API_VERSION,
                 'state': 'connected',
+            })
+            # The race must reach parent/child admission, not fail early on
+            # the independent activation gate. Keep the two-cursor proof intact.
+            store._store_service_write('_lifecycle', {
+                'activation_state': 'active',
             })
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id,

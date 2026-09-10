@@ -183,6 +183,7 @@ class TestOrderScanTriggers(OrderImportCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        other_store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': other_store.id,
             'sale_domain_enabled': True,

@@ -362,6 +362,42 @@ class TestMediaExportPipeline(ExportCase):
         verdict = self.Media._reconcile_media_stage_result(_Attempt(), body)
         self.assertEqual(verdict['error_class'], 'store_identity_mismatch')
 
+    def test_media_associate_reconciliation_adopts_the_expected_file(self):
+        class _Attempt:
+            expected_store_identity = self.store.shop_domain
+            preconditions_snapshot = {'file_gid': FILE_GID}
+
+        body = {'data': {
+            'product': {
+                'id': 'gid://shopify/Product/1',
+                'media': {'nodes': [{'id': FILE_GID}]},
+            },
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+        verdict = self.Media._reconcile_media_associate_result(
+            _Attempt(), body,
+        )
+        self.assertEqual(verdict['verdict'], 'applied')
+        self.assertEqual(verdict['evidence']['product_media_gid'], FILE_GID)
+
+    def test_media_associate_reconciliation_does_not_adopt_another_file(self):
+        class _Attempt:
+            expected_store_identity = self.store.shop_domain
+            preconditions_snapshot = {'file_gid': FILE_GID}
+
+        body = {'data': {
+            'product': {
+                'id': 'gid://shopify/Product/1',
+                'media': {'nodes': [{'id': FILE_GID + '-other'}]},
+            },
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+        verdict = self.Media._reconcile_media_associate_result(
+            _Attempt(), body,
+        )
+        self.assertEqual(verdict['verdict'], 'not_applied')
+        self.assertEqual(verdict['action'], 'block_manual_review')
+
     def test_a_failed_media_link_blocks_the_plan_entry_it_belongs_to(self):
         """The plan holds one entry per image; every link resolves that one.
 

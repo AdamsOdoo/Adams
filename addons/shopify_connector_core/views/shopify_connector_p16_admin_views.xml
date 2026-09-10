@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    P16 Administrator/multistore native fallback.
+
+    This file is intentionally not referenced by the manifest yet.  It defines
+    the Odoo-native density surface that the W2 gate may later wire beside the
+    composed P16 setup/settings action.  No menu is declared here: navigation
+    and asset activation remain a separate reviewed change.
+-->
+<odoo>
+    <record id="view_shopify_connector_p16_store_search" model="ir.ui.view">
+        <field name="name">shopify.connector.p16.store.search</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <search string="Manage Stores">
+                <field name="name"/>
+                <field name="shop_domain"/>
+                <filter name="p16_connected" string="Connected"
+                        domain="[('state', '=', 'connected')]"/>
+                <filter name="p16_reconnect" string="Reconnect required"
+                        domain="[('state', '=', 'reconnect_needed')]"/>
+                <filter name="p16_setup" string="Setup incomplete"
+                        domain="[('state', '=', 'setup_incomplete')]"/>
+                <filter name="p16_disconnecting" string="Disconnecting"
+                        domain="[('state', '=', 'disconnecting')]"/>
+                <filter name="p16_disconnected" string="Disconnected"
+                        domain="[('state', '=', 'disconnected')]"/>
+                <separator/>
+                <filter name="p16_health_warning" string="API health warning"
+                        domain="[('api_health_state', 'in', ('throttled', 'degraded'))]"/>
+                <group>
+                    <filter name="p16_group_state" string="Lifecycle"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="p16_group_health" string="API health"
+                            context="{'group_by': 'api_health_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_p16_store_list" model="ir.ui.view">
+        <field name="name">shopify.connector.p16.store.list</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <list string="Manage Stores" create="false" delete="false" edit="false"
+                  decoration-success="state == 'connected'"
+                  decoration-warning="state == 'reconnect_needed'"
+                  decoration-muted="state in ('disconnecting', 'disconnected')">
+                <field name="name"/>
+                <field name="shop_domain"/>
+                <field name="company_id" optional="show"/>
+                <field name="state" string="Lifecycle"/>
+                <field name="api_health_state" string="API health" optional="show"/>
+                <field name="credential_present" string="Credential on file" optional="show"/>
+                <field name="last_test_connection_result" string="Last test" optional="show"/>
+                <field name="last_readiness_result" string="Readiness" optional="show"/>
+                <field name="last_readiness_at" string="Readiness checked" optional="hide"/>
+                <field name="connection_generation" string="Connection generation" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_p16_store_form" model="ir.ui.view">
+        <field name="name">shopify.connector.p16.store.form</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <form string="Store administration" create="false" delete="false" edit="false">
+                <header>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="setup_incomplete,connected,reconnect_needed,disconnecting,disconnected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h3><field name="shop_domain" readonly="1"/></h3>
+                    </div>
+                    <group string="Store identity">
+                        <field name="company_id" readonly="1"/>
+                        <field name="api_version" readonly="1"/>
+                        <field name="connection_generation" readonly="1"/>
+                    </group>
+                    <group string="Connection evidence">
+                        <field name="credential_present" string="Credential on file" readonly="1"/>
+                        <field name="credential_last_verified_at" readonly="1"/>
+                        <field name="last_test_connection_result" readonly="1"/>
+                        <field name="last_test_connection_at" readonly="1"/>
+                        <field name="last_test_connection_reason" readonly="1"
+                               invisible="not last_test_connection_reason"/>
+                        <field name="last_readiness_result" readonly="1"/>
+                        <field name="last_readiness_at" readonly="1"/>
+                    </group>
+                    <group string="API and webhook health">
+                        <field name="api_health_state" readonly="1"/>
+                        <field name="api_health_reason" readonly="1"
+                               invisible="not api_health_reason"/>
+                        <field name="webhook_ready" readonly="1"/>
+                    </group>
+                    <group string="Disconnect / quiescence"
+                           invisible="disconnect_status == 'none'">
+                        <field name="disconnect_status" readonly="1"/>
+                        <field name="disconnect_status_reason" readonly="1"
+                               invisible="not disconnect_status_reason"/>
+                        <field name="disconnect_open_lease_count" readonly="1"/>
+                        <field name="disconnect_requested_at" readonly="1"
+                               invisible="not disconnect_requested_at"/>
+                        <field name="disconnect_completed_at" readonly="1"
+                               invisible="not disconnect_completed_at"/>
+                    </group>
+                    <div class="alert alert-info" role="note">
+                        Credential values are write-only and never shown here. Use the guarded P16 setup or administration command to replace one.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_p16_settings_list" model="ir.ui.view">
+        <field name="name">shopify.connector.p16.settings.list</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <list string="Store settings" create="false" delete="false" edit="false">
+                <field name="store_id"/>
+                <field name="company_id"/>
+                <field name="product_domain_enabled"/>
+                <field name="sale_domain_enabled"/>
+                <field name="inventory_domain_enabled"/>
+                <field name="fulfillment_domain_enabled"/>
+                <field name="log_redaction_retention_days"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_p16_settings_form" model="ir.ui.view">
+        <field name="name">shopify.connector.p16.settings.form</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <form string="Store settings" create="false" delete="false" edit="false">
+                <sheet>
+                    <group string="Store scope">
+                        <field name="store_id" readonly="1" options="{'no_open': True}"/>
+                        <field name="company_id" readonly="1" options="{'no_open': True}"/>
+                    </group>
+                    <group string="Workflow posture">
+                        <field name="product_domain_enabled" readonly="1"/>
+                        <field name="sale_domain_enabled" readonly="1"/>
+                        <field name="inventory_domain_enabled" readonly="1"/>
+                        <field name="fulfillment_domain_enabled" readonly="1"/>
+                        <field name="log_redaction_retention_days" readonly="1"/>
+                    </group>
+                    <div class="alert alert-info" role="note">
+                        Grouped settings are edited through the named P15 service so generation and readiness fingerprints remain current. Safety-critical mode, notification and connector-owned evidence fields are not direct controls.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Native density fallback.  No menu is wired here. -->
+    <record id="action_shopify_connector_p16_manage_stores_native" model="ir.actions.act_window">
+        <field name="name">Manage Stores</field>
+        <field name="res_model">shopify.connector.store</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shopify_connector_p16_store_search"/>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_p16_store_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_p16_store_form')})]"/>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No store is configured yet.</p>
+            <p>Use the guarded P16 Add Store action to create an isolated draft and begin setup.</p>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_p16_admin" model="ir.actions.client">
+        <field name="name">Manage Stores and Setup</field>
+        <field name="tag">shopify_connector_p16_admin</field>
+        <field name="context">{'p16_surface': 'list'}</field>
+    </record>
+
+    <record id="action_shopify_connector_p16_setup" model="ir.actions.client">
+        <field name="name">Store Setup</field>
+        <field name="tag">shopify_connector_p16_admin</field>
+        <field name="context">{'p16_surface': 'setup'}</field>
+    </record>
+
+    <record id="action_shopify_connector_p16_settings" model="ir.actions.client">
+        <field name="name">Grouped Settings</field>
+        <field name="tag">shopify_connector_p16_admin</field>
+        <field name="context">{'p16_surface': 'settings'}</field>
+    </record>
+
+    <record id="action_shopify_connector_p16_readiness" model="ir.actions.client">
+        <field name="name">Store Readiness</field>
+        <field name="tag">shopify_connector_p16_admin</field>
+        <field name="context">{'p16_surface': 'readiness'}</field>
+    </record>
+</odoo>

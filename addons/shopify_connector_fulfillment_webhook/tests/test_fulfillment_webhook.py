@@ -47,6 +47,7 @@ class TestShopifyConnectorFulfillmentWebhook(TransactionCase):
             'store_id': store.id,
             'fulfillment_domain_enabled': True,
         })
+        store._p15_set_activation('active')
         return store
 
     def _subscription(self, store, topic, state='expected', gid=False):

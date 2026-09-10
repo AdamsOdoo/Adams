@@ -103,8 +103,6 @@ CORE_SUDO_SITES = [
     ('shopify_connector_job_enqueue.py', 'enqueue', 'cron', 1),
     ('shopify_connector_job_log.py', '_system_append', 'self', 1),
     ('shopify_connector_mutation_attempt.py', '_surface', 'self', 1),
-    ('shopify_connector_mutation_attempt.py',
-     'action_resolve_mutation_attempt', 'job', 1),
     # PERF-1: the drain's per-pass cap. System-parameter reads are
     # admin-only in Odoo 19, so this read needs elevation. Read-only, and
     # the value is clamped to [1,500] before it reaches the loop.
@@ -284,6 +282,123 @@ CORE_SUDO_SITES = [
      'self', 1),
     ('shopify_connector_store_credential.py', '_write_token_cache',
      "self.env['shopify.connector.store.access.token']", 1),
+    # V2 service inventory additions. These are explicit call-site identities,
+    # not a generated acceptance of the current tree. Public commands validate
+    # actor/company/store before elevation; private runtime surfaces require
+    # unforgeable in-process sentinels or already-claimed owner lineage.
+    # Each owner below carries the specific boundary in its purpose entry.
+    ('shopify_connector_command_result.py',
+     '_find_for_command', 'self', 1),
+    ('shopify_connector_command_result.py',
+     '_record_for_command',
+     'self.with_context(**{COMMAND_RESULT_SERVICE_CONTEXT: '
+     'COMMAND_RESULT_SERVICE_SENTINEL, COMMAND_RESULT_SERVICE_CAPABILITY_CONTEXT: '
+     '_COMMAND_RESULT_SERVICE_CAPABILITY})', 1),
+    ('shopify_connector_command_result.py',
+     '_retention_days', "self.env['ir.config_parameter']", 1),
+    ('shopify_connector_command_result.py',
+     'run_retention', 'self', 1),
+    ('shopify_connector_job_attempt.py',
+     '_prepare_service_values', 'self', 1),
+    ('shopify_connector_job_attempt.py',
+     '_prepare_service_values', "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_job_attempt.py',
+     '_prepare_service_values', "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_job_attempt.py',
+     '_prepare_service_values', "self.env['shopify.connector.run']", 1),
+    ('shopify_connector_job_attempt.py',
+     '_surface', 'self', 1),
+    ('shopify_connector_job_attempt.py',
+     'write', "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_lock_with_original_job', 'Job.browse(original_job.id)', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_lock_with_original_job', 'self', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope', 'job', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope', 'locked_attempt', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope', 'run', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope', "self.env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope', 'store', 1),
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_scope_mismatch', "self.env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_p15_commands.py',
+     'create_store_v1', "self.env['shopify.connector.store']", 1),
+    ('shopify_connector_p15_lifecycle.py',
+     '_p15_activation_command', "self.env['shopify.connector.call.lease']", 1),
+    ('shopify_connector_p15_operations.py',
+     'start_operation_v1', "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_p15_settings.py',
+     '_p15_get_or_create', "self.env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_run.py',
+     '_prepare_service_values', "self.env['res.users']", 1),
+    ('shopify_connector_run.py',
+     '_prepare_service_values', "self.env['shopify.connector.store']", 1),
+    ('shopify_connector_run.py',
+     '_surface', 'self', 1),
+    ('shopify_connector_run_metadata.py',
+     '_configuration_generation_for_store', "env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_store_settings_v2.py',
+     '_v2_mode_surface', 'self', 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_dispatch_one', "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_ensure_reconciliation_job', 'result', 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_ensure_reconciliation_job', "self.env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_queued_c2_attempt', "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_queued_c2_attempt', "self.env['shopify.connector.store.settings']", 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_recover_queued_c2_attempt', 'job', 1),
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_recover_queued_c2_attempt', "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_v2_runtime.py',
+     'enqueue_read_only_job', 'cron', 1),
+    ('shopify_connector_v2_runtime.py',
+     'enqueue_read_only_job', "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_v2_runtime.py',
+     'enqueue_read_only_job', "self.env['shopify.connector.job']", 2),
+    ('shopify_connector_v2_runtime.py',
+     'enqueue_read_only_job', "self.env['shopify.connector.store.settings']", 1),
+    # These side-cursor writes inherit company IDs validated on the original
+    # actor before SUPERUSER_ID elevation, then lock/recheck owner lineage.
+    ('shopify_connector_v2_runtime_repository.py',
+     '_finish_cancelled', 'job', 1),
+    ('shopify_connector_v2_runtime_repository.py',
+     '_finish_result', 'job', 1),
+    ('shopify_connector_v2_runtime_repository.py',
+     '_finish_scope_mismatch', 'job', 1),
+    ('shopify_connector_v2_runtime_repository.py',
+     'claim_due', 'job', 1),
+    ('shopify_connector_v2_runtime_stale.py',
+     '_finish_cancelled_stale', 'job', 1),
+    ('shopify_connector_v2_runtime_stale.py',
+     'sweep_stale_read_only', 'job', 1),
+    ('shopify_connector_v2_runtime_stale.py',
+     'sweep_stale_read_only', 'job', 2),
+    # V2 mutation sweep captures the ordinary caller's allowed companies
+    # before sudo, filters both candidate streams before LIMIT, and rechecks
+    # locked lineage. Only an explicit superuser cron keeps global scope.
+    ('shopify_connector_stale_owner_sweep.py', '_stale_v2_attempt_jobs',
+     "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_stale_owner_sweep.py', '_stale_v2_attempt_jobs',
+     "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_stale_owner_sweep.py', '_stale_v2_attempt_jobs',
+     "self.env['shopify.connector.run']", 1),
+    ('shopify_connector_stale_owner_sweep.py', '_stale_v2_attempt_jobs',
+     "self.env['shopify.connector.store']", 1),
+    ('shopify_connector_stale_owner_sweep.py', '_sweep_v2_mutation_owners',
+     'job', 1),
+    ('shopify_connector_stale_owner_sweep.py', '_sweep_v2_mutation_owners',
+     "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_stale_owner_sweep.py', '_sweep_v2_mutation_owners',
+     "self.env['shopify.connector.mutation.attempt']", 1),
 ]
 CORE_SUDO_PURPOSE_BY_OWNER = {
     ('shopify_connector_binding_mixin.py',
@@ -339,8 +454,6 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_system_append'): 'System audit-log append.',
     ('shopify_connector_mutation_attempt.py',
      '_surface'): 'Closed attempt write surface.',
-    ('shopify_connector_mutation_attempt.py',
-     'action_resolve_mutation_attempt'): 'Resolved job consequence.',
     ('shopify_connector_job_dispatch.py',
      '_resolve_drain_batch_size'): 'Drain cap configuration.',
     ('shopify_connector_pii_retention.py',
@@ -459,6 +572,96 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_credential_for'): 'Single-store credential row read.',
     ('shopify_connector_store_credential.py',
      '_write_token_cache'): 'Single-store token-cache write.',
+    # Declared V2 service boundaries; inventory equality does not prove them.
+    ('shopify_connector_command_result.py',
+     '_find_for_command'):
+        'Private capability plus active-company/store authorization precedes exact command replay lookup.',
+    ('shopify_connector_command_result.py',
+     '_record_for_command'):
+        'Capability-authorized, scope-checked immutable sanitized replay envelope creation.',
+    ('shopify_connector_command_result.py',
+     '_retention_days'):
+        'Read only the connector-owned retention parameter; return a positive bounded-policy fallback.',
+    ('shopify_connector_command_result.py',
+     'run_retention'):
+        'Administrator/root retention; bounded old envelopes, active company for non-root callers.',
+    ('shopify_connector_job_attempt.py',
+     '_prepare_service_values'):
+        'Closed attempt-create capability: validate exact job/run/mutation store lineage and allocate per-job sequence.',
+    ('shopify_connector_job_attempt.py',
+     '_surface'):
+        'Private object-identity sentinel opens only named runtime evidence write surfaces; no RPC context bypass.',
+    ('shopify_connector_job_attempt.py',
+     'write'):
+        'Closed finish surface checks one immutable mutation-evidence link against the execution attempt store.',
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_lock_with_original_job'):
+        'Private recovery lock pair; exact job then attempt, with parent identity recheck.',
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_locked_scope'):
+        'Private ordered owner locks for admission; caller validates company/store/run/generations before effects.',
+    ('shopify_connector_mutation_attempt_v2_runtime.py',
+     '_v2_scope_mismatch'):
+        'Exact-store settings read for explicit company/run/store/generation admission rejection.',
+    ('shopify_connector_p15_commands.py',
+     'create_store_v1'):
+        'Administrator command binds actor and active company before structural store creation.',
+    ('shopify_connector_p15_lifecycle.py',
+     '_p15_activation_command'):
+        'Private administrator lifecycle path counts only this store leases before accepting retirement.',
+    ('shopify_connector_p15_operations.py',
+     'start_operation_v1'):
+        'Administrator actor/store/generation checks precede latest exact-store connection-audit lookup.',
+    ('shopify_connector_p15_settings.py',
+     '_p15_get_or_create'):
+        'Private command helper initializes only the authorized store structural settings row under parent lock.',
+    ('shopify_connector_run.py',
+     '_prepare_service_values'):
+        'Closed run-create capability validates exact store and actor existence; derives immutable company from store.',
+    ('shopify_connector_run.py',
+     '_surface'):
+        'Private object-identity sentinel permits only named run lifecycle fields; public CRUD remains closed.',
+    ('shopify_connector_run_metadata.py',
+     '_configuration_generation_for_store'):
+        'Private run snapshot reads one store configuration epoch; never creates settings or admits work.',
+    ('shopify_connector_store_settings_v2.py',
+     '_v2_mode_surface'):
+        'Private object-identity mode capability used by administrator/company-checked services.',
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_dispatch_one'):
+        'Private claimed-job dispatch reads exact-job C2 evidence to prevent mutation redispatch.',
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_ensure_reconciliation_job'):
+        'Private recovery validates store/run/settings lineage before attaching the unique readback child.',
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_queued_c2_attempt'):
+        'Private exact-job durable-evidence lookup; validates attempt/run/store/company before recovery-only routing.',
+    ('shopify_connector_v2_mutation_dispatch.py',
+     '_v2_recover_queued_c2_attempt'):
+        'Private claimed-owner recovery finds one attempt child and clears original ownership without replaying transport.',
+    ('shopify_connector_v2_runtime.py',
+     'enqueue_read_only_job'):
+        'Administrator and active-company admission; allowlisted handler/fields, matching parent/run/store/generations, module-owned cron trigger.',
+    ('shopify_connector_v2_runtime_repository.py', '_finish_cancelled'):
+        'Exact locked owner cancellation in the validated caller-company scope.',
+    ('shopify_connector_v2_runtime_repository.py', '_finish_result'):
+        'Typed outcome applied only after locked owner and live scope checks.',
+    ('shopify_connector_v2_runtime_repository.py', '_finish_scope_mismatch'):
+        'Locked claim quarantined locally on scope drift; no remote replay.',
+    ('shopify_connector_v2_runtime_repository.py', 'claim_due'):
+        'Bounded registered-handler claims under caller-company SQL selection '
+        'and locked store/run/settings generation rechecks.',
+    ('shopify_connector_v2_runtime_stale.py', '_finish_cancelled_stale'):
+        'Only the locked stale owner of a cancel-requested run is terminalized.',
+    ('shopify_connector_v2_runtime_stale.py', 'sweep_stale_read_only'):
+        'Caller-company bounded locked stale owners; recover only clean reads '
+        'with valid scope, otherwise retain manual-review evidence.',
+    ('shopify_connector_stale_owner_sweep.py', '_stale_v2_attempt_jobs'):
+        'Flush core-owned lineage fields for company-scoped durable-C2 SQL; '
+        'same-store/company joins precede oldest-job ordering and batch limit.',
+    ('shopify_connector_stale_owner_sweep.py', '_sweep_v2_mutation_owners'):
+        'Administrator/root bounded recovery with pre-sudo company capture '
+        'and locked lineage recheck; durable C2 is reconciled without resend.',
 }
 
 SUDO_INVENTORY_FIELDS = (

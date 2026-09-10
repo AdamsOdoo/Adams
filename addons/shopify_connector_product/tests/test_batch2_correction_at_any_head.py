@@ -97,6 +97,7 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
             'product_first_sync_source': 'shopify_source',
         })
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         cls.reviewer = cls._role_user(
             'reviewer', 'group_shopify_connector_reviewer', cls.company,
         )

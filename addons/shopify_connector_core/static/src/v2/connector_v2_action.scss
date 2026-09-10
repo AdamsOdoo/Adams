@@ -1,0 +1,147 @@
+// Odoo client-action shell chrome.  Child screens own the .o_sc_v2 surface;
+// this file only scopes the shared navigation/notice wrapper.
+.o_sc_v2-shell {
+    min-inline-size: 0;
+    min-block-size: 100%;
+    background: var(--sc-canvas, #f3f5f2);
+    color: var(--sc-ink, #19231f);
+
+    &__nav {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--sc-space-4, 16px);
+        min-inline-size: 0;
+        max-inline-size: 1440px;
+        margin-inline: auto;
+        padding: var(--sc-space-3, 12px) clamp(var(--sc-space-3, 12px), 3vw, var(--sc-space-7, 40px));
+        background: var(--sc-nav, #17251f);
+        color: #ffffff;
+    }
+
+    &__identity {
+        display: flex;
+        flex: 1 1 220px;
+        flex-direction: column;
+        min-inline-size: 0;
+
+        strong,
+        span:last-child {
+            overflow-wrap: anywhere;
+        }
+    }
+
+    &__eyebrow {
+        color: #dce9e1;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    &__links {
+        display: flex;
+        flex: 0 1 auto;
+        flex-wrap: wrap;
+        gap: var(--sc-space-1, 4px);
+        min-inline-size: 0;
+        max-inline-size: 100%;
+    }
+
+    &__link {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: 40px;
+        padding-block: var(--sc-space-2, 8px);
+        padding-inline: var(--sc-space-3, 12px);
+        border: 1px solid transparent;
+        border-radius: var(--sc-radius-control, 9px);
+        background: transparent;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible,
+        &[aria-current="page"] {
+            border-color: #dce9e1;
+            background: rgb(255 255 255 / 12%);
+        }
+    }
+
+    &__role {
+        flex: 0 0 auto;
+        padding-block: var(--sc-space-1, 4px);
+        padding-inline: var(--sc-space-2, 8px);
+        border: 1px solid #8da99a;
+        border-radius: var(--sc-radius-pill, 999px);
+        color: #f4fbf6;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    &__notice {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--sc-space-3, 12px);
+        min-inline-size: 0;
+        padding-block: var(--sc-space-2, 8px);
+        padding-inline: clamp(var(--sc-space-3, 12px), 3vw, var(--sc-space-7, 40px));
+        border-block-end: 1px solid var(--sc-line-strong, #b7c2bc);
+        background: var(--sc-warning-soft, #fcf2dc);
+        color: var(--sc-ink, #19231f);
+
+        > span {
+            flex: 1 1 260px;
+            min-inline-size: 0;
+            overflow-wrap: anywhere;
+        }
+    }
+
+    &__surface {
+        min-inline-size: 0;
+    }
+
+    @media (max-width: 767px) {
+        &__nav {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        &__links {
+            inline-size: 100%;
+        }
+
+        &__link {
+            flex: 1 1 130px;
+            overflow-wrap: anywhere;
+        }
+
+        &__role {
+            align-self: flex-start;
+        }
+    }
+
+    @media (max-width: 374px) {
+        &__links {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        &__link {
+            inline-size: 100%;
+            justify-content: flex-start;
+            text-align: start;
+        }
+    }
+
+    @media (forced-colors: active) {
+        &__link,
+        &__role,
+        &__notice {
+            border-color: CanvasText;
+        }
+    }
+}

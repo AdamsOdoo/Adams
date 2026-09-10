@@ -131,7 +131,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         else:
             cursor_id = 0
             observed_through = fields.Datetime.now()
-            settings.sudo().write({
+            settings._settings_service_write('_fulfillment_scan', {
                 'fulfillment_reconciliation_cursor_id': 0,
                 'fulfillment_reconciliation_generation': generation,
                 'fulfillment_reconciliation_observed_through_at':
@@ -197,7 +197,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             ('id', '>', max(bindings.ids)),
         ], limit=1)
         if has_more:
-            settings.sudo().write({
+            settings._settings_service_write('_fulfillment_scan', {
                 'fulfillment_reconciliation_cursor_id': max(bindings.ids),
             })
             job.sudo().write({
@@ -224,7 +224,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                     'continuation job could be admitted.',
                 )
             return
-        settings.sudo().write({
+        settings._settings_service_write('_fulfillment_scan', {
             'fulfillment_last_reconciliation_at': fields.Datetime.now(),
             # Store 360 / R-4 pending catch-up lineage: a genuinely complete
             # pass over the known fulfillment population, admitted at this
@@ -337,7 +337,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         # job-terminal hook promotes it once the store's fulfillment work is
         # quiescent at the current generation. A partial traversal raised
         # above and records nothing (fail-closed, R-4 §6).
-        self._settings(store).sudo().write({
+        self._settings(store)._settings_service_write('_fulfillment_scan', {
             'fulfillment_catchup_pending_generation':
                 job.expected_connection_generation,
             'fulfillment_catchup_pending_observed_through_at':
@@ -370,7 +370,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             # Direct handler callers and the dispatcher must both see a stable,
             # recoverable Mode 1 immediately; the dispatcher will make the same
             # outcome auditable on the exact job after this error is re-raised.
-            settings.sudo().write({
+            settings._settings_service_write('_fulfillment_scan', {
                 'fulfillment_operating_mode': 'mode1',
                 'fulfillment_requested_mode': False,
                 'fulfillment_switch_in_progress': False,
@@ -423,7 +423,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         now = fields.Datetime.now()
         if blockers:
             # Abort back to Mode 1; the switch does not complete.
-            settings.sudo().write({
+            settings._settings_service_write('_fulfillment_scan', {
                 'fulfillment_switch_in_progress': False,
                 'fulfillment_operating_mode': 'mode1',
                 'fulfillment_requested_mode': False,
@@ -441,7 +441,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             )
             return
         # Scan clean: complete the switch to Mode 2.
-        settings.sudo().write({
+        settings._settings_service_write('_fulfillment_scan', {
             'fulfillment_switch_in_progress': False,
             'fulfillment_operating_mode': 'mode2',
             'fulfillment_requested_mode': False,
@@ -538,7 +538,7 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
         except UserError:
             job = self.env['shopify.connector.job']
         if not job:
-            self.sudo().write({
+            self._settings_service_write('_fulfillment_mode_switch', {
                 'fulfillment_operating_mode': 'mode1',
                 'fulfillment_requested_mode': False,
                 'fulfillment_switch_in_progress': False,
@@ -553,7 +553,7 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
             })
             return True
         actual_nonce = (job.payload_hash or '').rsplit(':', 1)[-1]
-        self.sudo().write({
+        self._settings_service_write('_fulfillment_mode_switch', {
             'fulfillment_operating_mode': 'mode1',
             'fulfillment_requested_mode': 'mode2',
             'fulfillment_switch_in_progress': True,
@@ -574,7 +574,7 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
         if not job or job.job_type != JOB_TYPE_MODE_SWITCH_SCAN:
             raise UserError('There is no mode verification run to retry.')
         job.with_user(self.env.user).action_manual_retry()
-        self.sudo().write({
+        self._settings_service_write('_fulfillment_mode_switch', {
             'fulfillment_operating_mode': 'mode1',
             'fulfillment_requested_mode': 'mode2',
             'fulfillment_switch_in_progress': True,
@@ -592,7 +592,7 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
         Layer 2 mutation/reconcile jobs are NOT cancelled by the switch."""
         self.ensure_one()
         self._assert_mode_switch_admin()
-        self.sudo().write({
+        self._settings_service_write('_fulfillment_mode_switch', {
             'fulfillment_operating_mode': 'mode1',
             'fulfillment_requested_mode': False,
             'fulfillment_switch_in_progress': False,

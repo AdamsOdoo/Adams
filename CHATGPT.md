@@ -1,3 +1,5 @@
+> Historical entrypoint: current execution follows AGENTS.md and docs/v2/16-delivery-blueprint.md. UI design is parked by the user. Preserve lessons below; stale branch, model and stop instructions do not override current authority.
+
 # ChatGPT Control-Room Operating Guide
 
 > **Role-model supersession — 2026-07-25.** For MVP-program work, [the dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) are authoritative: ChatGPT is strategic control room; Sol/Codex is implementation worker; Runtime Claude is runtime verifier; separate Claude is independent reviewer; the product owner is final authority. Earlier role text below is preserved as history where it conflicts.

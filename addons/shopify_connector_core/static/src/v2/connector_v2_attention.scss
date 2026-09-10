@@ -1,0 +1,177 @@
+// Needs Attention list/detail workspace.
+.o_sc_v2 {
+    .sc-v2-attention__toolbar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--sc-space-3);
+        min-inline-size: 0;
+        margin-block-end: var(--sc-space-3);
+        color: var(--sc-muted);
+        font-size: 12px;
+
+        > span {
+            @include connector-v2-wrap-anywhere;
+        }
+    }
+
+    .sc-v2-attention__layout {
+        display: grid;
+        grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+        align-items: start;
+        gap: var(--sc-space-5);
+        min-inline-size: 0;
+    }
+
+    .sc-v2-attention__list,
+    .sc-v2-attention__detail {
+        min-inline-size: 0;
+    }
+
+    .sc-v2-attention__detail {
+        position: sticky;
+        inset-block-start: var(--sc-space-4);
+        border: 1px solid var(--sc-line);
+        border-radius: var(--sc-radius-panel);
+        padding: var(--sc-space-5);
+        background: var(--sc-surface);
+        box-shadow: var(--sc-shadow-quiet);
+
+        &:focus-visible {
+            outline: 3px solid var(--sc-focus);
+            outline-offset: 3px;
+        }
+
+        &--empty {
+            min-block-size: 260px;
+            color: var(--sc-muted);
+            text-align: center;
+
+            .fa {
+                font-size: 22px;
+            }
+        }
+    }
+
+    .sc-v2-attention__back {
+        margin-block-end: var(--sc-space-4);
+    }
+
+    .sc-v2-detail-header {
+        min-inline-size: 0;
+        border-block-end: 1px solid var(--sc-line);
+        padding-block-end: var(--sc-space-4);
+
+        h2 {
+            @include connector-v2-wrap-anywhere;
+            margin: var(--sc-space-2) 0 var(--sc-space-1);
+            font-size: 20px;
+            line-height: 1.25;
+        }
+
+        p {
+            @include connector-v2-wrap-anywhere;
+            margin: 0;
+            color: var(--sc-ink-soft);
+        }
+    }
+
+    .sc-v2-detail-impact {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+        min-inline-size: 0;
+        margin-block: var(--sc-space-4);
+        border-inline-start: 3px solid var(--sc-warning);
+        padding-inline-start: var(--sc-space-3);
+
+        span {
+            @include connector-v2-wrap-anywhere;
+            color: var(--sc-ink-soft);
+        }
+    }
+
+    .sc-v2-evidence-groups {
+        display: grid;
+        gap: var(--sc-space-3);
+    }
+
+    .sc-v2-evidence-group,
+    .sc-v2-detail-history,
+    .sc-v2-resolution {
+        min-inline-size: 0;
+        border-block-start: 1px solid var(--sc-line);
+        padding-block-start: var(--sc-space-4);
+
+        h3 {
+            margin: 0 0 var(--sc-space-2);
+            font-size: 14px;
+        }
+    }
+
+    .sc-v2-evidence-group dl,
+    .sc-v2-key-value-list {
+        display: grid;
+        gap: var(--sc-space-2);
+        margin: 0;
+    }
+
+    .sc-v2-evidence-row,
+    .sc-v2-key-value-list > div {
+        display: grid;
+        grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+        gap: var(--sc-space-3);
+        min-inline-size: 0;
+        border-block-end: 1px solid var(--sc-line);
+        padding-block-end: var(--sc-space-2);
+
+        dt {
+            color: var(--sc-muted);
+            font-size: 12px;
+        }
+
+        dd {
+            @include connector-v2-wrap-anywhere;
+            margin: 0;
+            color: var(--sc-ink-soft);
+        }
+    }
+
+    .sc-v2-detail-history ol,
+    .sc-v2-compact-list {
+        display: grid;
+        gap: var(--sc-space-2);
+        margin: 0;
+        padding-inline-start: var(--sc-space-4);
+    }
+
+    .sc-v2-detail-history li {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        span {
+            @include connector-v2-wrap-anywhere;
+            color: var(--sc-muted);
+            font-size: 12px;
+        }
+    }
+
+    .sc-v2-resolution {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--sc-space-2);
+
+        p {
+            @include connector-v2-wrap-anywhere;
+            margin: 0;
+            color: var(--sc-ink-soft);
+        }
+    }
+
+    .sc-v2-attention__next {
+        inline-size: 100%;
+        margin-block-start: var(--sc-space-4);
+    }
+}

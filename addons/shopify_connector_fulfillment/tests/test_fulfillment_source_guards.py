@@ -57,6 +57,12 @@ ALLOWED_MODEL_FILES = frozenset((
     # relaxation.
     'shopify_connector_fulfillment_reconnect.py',
     'shopify_connector_ui_store360_fulfillment.py',
+    # P06/P07 typed-read registration and reversible fulfillment call-site
+    # adapters. The owning addon supplies these exact extensions; the shared
+    # core gateway retains authorization, transport and rollback control.
+    'shopify_connector_read_gateway.py',
+    'shopify_connector_fulfillment_p07_read_adapter.py',
+    'shopify_connector_fulfillment_p07_gateway.py',
 ))
 ALLOWED_TEST_FILES = frozenset((
     '__init__.py', 'test_fulfillment_binding.py',

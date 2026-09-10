@@ -12,6 +12,11 @@ from ..models import shopify_connector_api_client as client_module
 from ..models.shopify_connector_api_client import (
     ERROR_API_VERSION,
     ERROR_AUTH,
+    ERROR_CODE_INVALID_CONTENT_LENGTH,
+    ERROR_CODE_MALFORMED_JSON,
+    ERROR_CODE_MAX_COST_EXCEEDED,
+    ERROR_CODE_UNKNOWN_GRAPHQL,
+    ERROR_CODE_RESPONSE_TOO_LARGE,
     ERROR_DATA_SHAPE,
     ERROR_TEMPORARY,
     ERROR_THROTTLE,
@@ -70,7 +75,7 @@ class FakeResponse:
 
     def __init__(
         self, status_code, json_body=None, headers=None, text=None,
-        json_error=False,
+        json_error=False, stream_chunks=None,
     ):
         self.status_code = status_code
         # The API-version ruling (2026-07-26) makes `_normalize_response` fail
@@ -89,11 +94,26 @@ class FakeResponse:
             self.text = json.dumps(json_body)
         else:
             self.text = ''
+        self._stream_chunks = (
+            tuple(stream_chunks) if stream_chunks is not None else None
+        )
+        self._content_consumed = stream_chunks is None
+        self.closed = False
+        self.close_calls = 0
 
     def json(self):
         if self._json_error:
             raise ValueError('malformed JSON body')
         return self._json_body
+
+    def iter_content(self, chunk_size):
+        del chunk_size
+        if self._stream_chunks is not None:
+            yield from self._stream_chunks
+
+    def close(self):
+        self.close_calls += 1
+        self.closed = True
 
 
 def _success_body(domain='api-client-test.myshopify.com'):
@@ -177,6 +197,31 @@ class TestApiClient(TransactionCase):
             [{'handle': 'read_products'}],
         )
 
+    def test_success_with_cost_preserves_the_legacy_result_shape(self):
+        body = _success_body()
+        body['extensions'] = {
+            'cost': {
+                'requestedQueryCost': 7,
+                'actualQueryCost': 5,
+                'throttleStatus': {
+                    'maximumAvailable': 1000,
+                    'currentlyAvailable': 995,
+                    'restoreRate': 50,
+                },
+            },
+        }
+        result = self._execute_with(
+            lambda self, store, request_body: FakeResponse(
+                200, json_body=body,
+            )
+        )
+        self.assertEqual(
+            set(result), {'data', 'throttle_status', 'served_version'},
+        )
+        self.assertEqual(
+            result['throttle_status']['currentlyAvailable'], 995,
+        )
+
     # 2. ACCESS_DENIED (200-OK GraphQL error).
     def test_access_denied_graphql_error(self):
         exc = self._raises_with(FakeResponse(200, json_body={
@@ -201,7 +246,8 @@ class TestApiClient(TransactionCase):
         self.assertEqual(exc.error_class, ERROR_THROTTLE)
         self.assertFalse(exc.credential_invalid)
 
-    # 4. MAX_COST_EXCEEDED (official sample shape) -> unknown_system_error.
+    # 4. MAX_COST_EXCEEDED (official sample shape) keeps the fixed legacy
+    # class while exposing the exact Shopify code to the typed facade.
     def test_max_cost_exceeded_maps_to_unknown(self):
         exc = self._raises_with(FakeResponse(200, json_body={
             'errors': [{
@@ -212,6 +258,7 @@ class TestApiClient(TransactionCase):
             }],
         }))
         self.assertEqual(exc.error_class, ERROR_UNKNOWN)
+        self.assertEqual(exc.error_code, ERROR_CODE_MAX_COST_EXCEEDED)
 
     def test_graphql_selection_mismatch_maps_to_existing_data_shape_class(self):
         exc = self._raises_with(FakeResponse(200, json_body={
@@ -230,6 +277,44 @@ class TestApiClient(TransactionCase):
         self.assertFalse(exc.credential_invalid)
         self.assertNotIn('shpat_', exc.reason)
         self.assertIn('HTTP 200', exc.technical_detail)
+
+    def test_unknown_or_unhashable_graphql_code_is_bounded(self):
+        remote_secret = 'REMOTE-CODE-customer@example.invalid'
+        for code in ({'raw': remote_secret}, [remote_secret]):
+            with self.subTest(code=code):
+                exc = self._raises_with(FakeResponse(200, json_body={
+                    'errors': [{
+                        'message': 'remote details %s' % remote_secret,
+                        'extensions': {'code': code},
+                    }],
+                }))
+                self.assertEqual(exc.error_code, ERROR_CODE_UNKNOWN_GRAPHQL)
+                self.assertEqual(exc.code, ERROR_CODE_UNKNOWN_GRAPHQL)
+                self.assertEqual(
+                    exc.shopify_error_code, ERROR_CODE_UNKNOWN_GRAPHQL,
+                )
+                self.assertEqual(
+                    exc.classification_code, ERROR_CODE_UNKNOWN_GRAPHQL,
+                )
+                self.assertNotIn(remote_secret, str(exc))
+
+    def test_direct_exception_metadata_is_bounded(self):
+        remote_secret = 'REMOTE-CODE-customer@example.invalid'
+        exc = ShopifyClientError(
+            ERROR_UNKNOWN,
+            'safe reason',
+            error_code=remote_secret,
+            cost={
+                'requestedQueryCost': '42',
+                'actualQueryCost': float('inf'),
+                'throttleStatus': {'currentlyAvailable': True},
+            },
+        )
+        self.assertEqual(exc.error_code, ERROR_CODE_UNKNOWN_GRAPHQL)
+        self.assertEqual(exc.code, ERROR_CODE_UNKNOWN_GRAPHQL)
+        self.assertEqual(exc.shopify_error_code, ERROR_CODE_UNKNOWN_GRAPHQL)
+        self.assertEqual(exc.classification_code, ERROR_CODE_UNKNOWN_GRAPHQL)
+        self.assertIsNone(exc.cost)
 
     # 5. INTERNAL_SERVER_ERROR + requestId -> requestId in technical_detail.
     def test_internal_server_error_includes_request_id(self):
@@ -301,6 +386,7 @@ class TestApiClient(TransactionCase):
         with self.assertRaises(ShopifyClientError) as catcher:
             self._execute_with(raise_timeout)
         self.assertEqual(catcher.exception.error_class, ERROR_TEMPORARY)
+        self.assertEqual(catcher.exception.technical_detail, 'transport_error')
 
     # 14. Malformed JSON body -> unknown_system_error.
     def test_malformed_json_body(self):
@@ -308,6 +394,32 @@ class TestApiClient(TransactionCase):
             FakeResponse(200, text='not json', json_error=True)
         )
         self.assertEqual(exc.error_class, ERROR_UNKNOWN)
+        self.assertEqual(exc.error_code, ERROR_CODE_MALFORMED_JSON)
+
+    def test_json_typeerror_and_attributeerror_are_normalized(self):
+        class TypeErrorResponse(FakeResponse):
+            def json(self):
+                raise TypeError('body parser received a bad value')
+
+        class AttributeErrorResponse(FakeResponse):
+            def json(self):
+                raise AttributeError('body parser is unavailable')
+
+        for response in (
+            TypeErrorResponse(200, json_body=_success_body()),
+            AttributeErrorResponse(200, json_body=_success_body()),
+        ):
+            with self.subTest(response=type(response).__name__):
+                exc = self._raises_with(response)
+                self.assertEqual(exc.error_code, ERROR_CODE_MALFORMED_JSON)
+
+    def test_malformed_status_is_normalized_without_membership_errors(self):
+        for status_code in ({'status': 401}, [401], object()):
+            with self.subTest(status_code=repr(status_code)):
+                exc = self._raises_with(FakeResponse(
+                    status_code, json_body=_success_body(),
+                ))
+                self.assertEqual(exc.error_class, ERROR_UNKNOWN)
 
     # 15. X-Shopify-API-Version mismatch -> FAILS CLOSED (2026-07-26 ruling).
     #
@@ -353,9 +465,11 @@ class TestApiClient(TransactionCase):
         )
         captured = {}
 
-        def fake_post(url, json=None, headers=None, timeout=None):
+        def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
             captured['url'] = url
             captured['headers'] = headers
+            captured['allow_redirects'] = kwargs.get('allow_redirects')
+            captured['stream'] = kwargs.get('stream')
             return FakeResponse(200, json_body=_success_body())
 
         with patch.object(client_module.requests, 'post', fake_post):
@@ -366,6 +480,8 @@ class TestApiClient(TransactionCase):
                 self.store.shop_domain, SHOPIFY_API_VERSION,
             ),
         )
+        self.assertFalse(captured['allow_redirects'])
+        self.assertTrue(captured['stream'])
 
     # 15d. A store whose recorded version disagrees with the connector
     # constant is refused BEFORE any request is sent.
@@ -393,7 +509,7 @@ class TestApiClient(TransactionCase):
         self.assertEqual(self.store.api_version, '2025-01')
         sent = []
 
-        def fake_post(url, json=None, headers=None, timeout=None):
+        def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
             sent.append(url)
             return FakeResponse(200, json_body=_success_body())
 
@@ -433,6 +549,118 @@ class TestApiClient(TransactionCase):
         self.assertNotIn(leaking_token, str(exc))
         self.assertNotIn(leaking_token, exc.reason)
         self.assertNotIn(leaking_token, exc.technical_detail or '')
+
+    def test_technical_detail_never_persists_response_pii(self):
+        customer_email = 'customer@example.invalid'
+        customer_phone = '+1-555-0100'
+        response = FakeResponse(
+            500,
+            text=(
+                'customer=%s phone=%s address=42 Example Street '
+                'order=#1001'
+            ) % (customer_email, customer_phone),
+        )
+        exc = self._raises_with(response)
+        self.assertEqual(exc.technical_detail, 'HTTP 500')
+        self.assertNotIn(customer_email, exc.technical_detail)
+        self.assertNotIn(customer_phone, exc.technical_detail)
+
+    def test_oversized_stream_is_rejected_and_closed_before_json(self):
+        response = FakeResponse(
+            200,
+            json_body=_success_body(),
+            stream_chunks=(b'12345', b'67890'),
+        )
+        with patch.object(client_module, 'MAX_RESPONSE_BODY_BYTES', 8):
+            exc = self._raises_with(response)
+        self.assertEqual(exc.error_code, ERROR_CODE_RESPONSE_TOO_LARGE)
+        self.assertTrue(response.closed)
+        self.assertEqual(response.close_calls, 1)
+
+    def test_invalid_content_length_is_distinct_from_too_large(self):
+        invalid_values = ('not-an-integer', '-1', True, 1.5)
+        with patch.object(client_module, 'MAX_RESPONSE_BODY_BYTES', 8):
+            for value in invalid_values:
+                with self.subTest(value=value):
+                    response = FakeResponse(
+                        200,
+                        json_body=_success_body(),
+                        headers={
+                            API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+                            'Content-Length': value,
+                        },
+                    )
+                    exc = self._raises_with(response)
+                    self.assertEqual(
+                        exc.error_code, ERROR_CODE_INVALID_CONTENT_LENGTH,
+                    )
+                    self.assertTrue(response.closed)
+            response = FakeResponse(
+                200,
+                json_body=_success_body(),
+                headers={
+                    API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+                    'Content-Length': 9,
+                },
+            )
+            exc = self._raises_with(response)
+            self.assertEqual(exc.error_code, ERROR_CODE_RESPONSE_TOO_LARGE)
+            self.assertTrue(response.closed)
+
+    def test_stream_connection_close_is_rejected_and_closed(self):
+        class FailingResponse(FakeResponse):
+            def iter_content(self, chunk_size):
+                del chunk_size
+                yield b'partial'
+                raise requests.exceptions.ChunkedEncodingError(
+                    'customer@example.invalid order=1001'
+                )
+
+        response = FailingResponse(
+            200,
+            json_body=_success_body(),
+            stream_chunks=(b'ignored',),
+        )
+        exc = self._raises_with(response)
+        self.assertEqual(exc.error_class, ERROR_TEMPORARY)
+        self.assertEqual(exc.technical_detail, 'response_stream_error')
+        self.assertNotIn('customer@example.invalid', exc.technical_detail)
+        self.assertTrue(response.closed)
+        self.assertEqual(response.close_calls, 1)
+
+    def test_malformed_graphql_shapes_fail_closed(self):
+        fixtures = (
+            {},
+            {'data': None},
+            {'data': []},
+            {'data': 'not-an-object'},
+            {'data': {}, 'errors': 'not-a-list'},
+            {'data': {}, 'errors': {'message': 'wrong shape'}},
+            {'data': {}, 'errors': ["wrong item"]},
+        )
+        for body in fixtures:
+            with self.subTest(body=body):
+                exc = self._raises_with(FakeResponse(200, json_body=body))
+                if 'errors' in body:
+                    self.assertEqual(
+                        exc.error_code, 'MALFORMED_GRAPHQL_ERRORS'
+                    )
+                else:
+                    self.assertEqual(exc.error_code, 'INVALID_JSON_DATA')
+
+    def test_nonfinite_cost_metadata_fails_closed(self):
+        for value in (
+            float('nan'), float('inf'), float('-inf'), 'NaN', '42',
+            'customer@example.invalid', True,
+        ):
+            with self.subTest(value=value):
+                exc = self._raises_with(FakeResponse(200, json_body={
+                    'data': {},
+                    'extensions': {
+                        'cost': {'actualQueryCost': value},
+                    },
+                }))
+                self.assertEqual(exc.error_code, 'INVALID_COST_METADATA')
 
     # 18. Public surface and exact accepted Layer 2 mutation boundary.
     def test_read_only_guarantee(self):
@@ -515,7 +743,8 @@ class TestApiClient(TransactionCase):
             return FakeResponse(200, json_body=_success_body())
 
         with patch.object(
-            ClientClass, '_admit_business_read', return_value=('lease', 'token'),
+            ClientClass, '_admit_business_read',
+            return_value=('lease', 'token', self.store),
         ), patch.object(ClientClass, '_send', fake_send), patch.object(
             ClientClass, '_release_lease', side_effect=released.append,
         ):

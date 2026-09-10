@@ -4,9 +4,11 @@ import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
-from odoo import fields
+from odoo import SUPERUSER_ID, fields
 from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase, tagged
+
+from ..integration.shopify.read_contracts import ReadResult
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 
@@ -31,6 +33,7 @@ class TestJobDispatch(TransactionCase):
             'shop_domain': 'job-dispatch-test.myshopify.com',
             'api_version': '2026-07',
         })
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.JobLog = cls.env['shopify.connector.job.log']
         cls.Dispatch = cls.env['shopify.connector.job.dispatch']
@@ -152,6 +155,78 @@ class TestJobDispatch(TransactionCase):
         self.assertTrue(job.finished_at)
         logs = self._logs_for(job)
         self.assertTrue(any(log.to_state == 'succeeded' for log in logs))
+
+    def test_installed_cron_action_scopes_root_p06_read_to_claimed_company(self):
+        """The installed action admits P06 in its job's company.
+
+        This executes the configured Scheduler User and exact installed server
+        action on the test cursor.  Odoo's separate-cursor scheduler remains an
+        integration qualification; this regression covers connector dispatch.
+        """
+        company = self.env['res.company'].sudo().create({
+            'name': 'Job Dispatch Foreign Company',
+        })
+        store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Job Dispatch Foreign Store',
+            'shop_domain': 'job-dispatch-foreign.myshopify.com',
+            'api_version': '2026-07',
+            'company_id': company.id,
+            'state': 'connected',
+        })
+        store._p15_set_activation('active')
+        job = self.Job.sudo().create({
+            'store_id': store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_dispatch_selftest',
+            'state': 'queued',
+            'payload_hash': str(uuid.uuid4()),
+        })
+        observed = []
+
+        def worker_read(dispatch, claimed):
+            gateway = dispatch.env['shopify.connector.read.gateway']
+            operation = gateway._core_capability_operation()
+            result = gateway._run(
+                claimed.store_id,
+                claimed,
+                operation,
+                {'ConnectorTestConnection'},
+                lambda adapter: ReadResult(
+                    {'authorized': True}, operation.operation_name,
+                ),
+                {},
+                purpose='fulfillment',
+            )
+            observed.append((
+                dispatch.env.uid,
+                dispatch.env.company.id,
+                claimed.company_id.id,
+                claimed.store_id.company_id.id,
+                result.value['authorized'],
+            ))
+
+        DispatchModel = self.env.registry['shopify.connector.job.dispatch']
+        cron = self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain'
+        ).sudo()
+        self.assertEqual(cron.user_id.id, SUPERUSER_ID)
+        action = cron.ir_actions_server_id.with_user(cron.user_id).with_context(
+            cron_id=cron.id,
+        )
+        with patch.object(
+            DispatchModel,
+            '_get_handlers',
+            lambda dispatch: {'core_dispatch_selftest': (
+                lambda claimed: worker_read(dispatch, claimed)
+            )},
+        ):
+            action.run()
+
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(observed, [(
+            SUPERUSER_ID, company.id, company.id, company.id, True,
+        )])
 
     def test_retry_success_clears_current_failure_metadata(self):
         """A successful retry clears current error/scheduling fields.

@@ -225,7 +225,7 @@ class ShopifyConnectorStoreSettingsFulfillmentCatchup(models.Model):
         ])
         if blocking:
             return False
-        settings.sudo().write({
+        settings._settings_service_write('_fulfillment_system', {
             'fulfillment_catchup_generation': current_generation,
             'fulfillment_catchup_observed_through_at': pending_through,
         })

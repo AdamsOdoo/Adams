@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product Webhooks',
-    'version': '19.0.0.3.0',
+    'version': '19.0.0.4.0',
     'summary': (
         'Read-first Shopify product webhook acceleration for the product '
         'importer.'

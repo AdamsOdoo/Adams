@@ -32,6 +32,7 @@ class TestFulfillmentLifecycle(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
         cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id, 'fulfillment_domain_enabled': True,
         })

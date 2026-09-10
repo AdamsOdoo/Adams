@@ -104,6 +104,31 @@ CORE_CLASSIFICATION = {
         INTERNAL_PROTECTED,
         'Setup rerun actor, written only by the setup service.',
     ),
+    'configuration_generation': (
+        INTERNAL_PROTECTED,
+        'Monotonic configuration fence maintained by named settings services; '
+        'never a merchant-editable generation number.',
+    ),
+    'v2_ui_mode': (
+        INTERNAL_PROTECTED,
+        'Temporary migration control owned by the audited Administrator-only '
+        '_set_v2_modes_service; not ordinary Store Settings configuration.',
+    ),
+    'v2_gateway_mode': (
+        INTERNAL_PROTECTED,
+        'Temporary gateway migration control owned by _set_v2_modes_service; '
+        'compare mode must never be an unguarded form write.',
+    ),
+    'v2_runtime_mode': (
+        INTERNAL_PROTECTED,
+        'Temporary runtime cutover control owned by _set_v2_modes_service '
+        'and its generation compare-and-set fence.',
+    ),
+    'setup_step_payloads': (
+        INTERNAL_PROTECTED,
+        'Validated P15 setup-step evidence written by the setup command '
+        'service; the raw JSON is not a configuration editor.',
+    ),
 }
 
 

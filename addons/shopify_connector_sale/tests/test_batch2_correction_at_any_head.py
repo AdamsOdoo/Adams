@@ -159,6 +159,7 @@ class TestBatch2SaleCorrectionAtAnyHead(OrderImportCase):
             'state': 'connected',
             'company_id': company.id,
         })
+        store._p15_set_activation('active')
         job = self.Job.sudo().create({
             'store_id': store.id,
             'job_source': 'manual_sync',

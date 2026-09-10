@@ -1,0 +1,43 @@
+// V2 connector tokens.  Keep this file independent from Odoo's global
+// stylesheet so the eventual asset wiring can scope every value to the
+// connector root and coexist with Community or Enterprise themes.
+
+@mixin connector-v2-tokens {
+    --sc-ink: #19231f;
+    --sc-ink-soft: #34423b;
+    // These text tokens remain above WCAG AA on the canvas and soft surfaces.
+    --sc-muted: #69766f;
+    --sc-canvas: #f3f5f2;
+    --sc-surface: #ffffff;
+    --sc-surface-soft: #f8faf8;
+    --sc-line: #dfe5e1;
+    --sc-line-strong: #b7c2bc;
+    --sc-success: #287a52;
+    --sc-success-soft: #e8f4ed;
+    --sc-info: #71516f;
+    --sc-info-soft: #f1eaf0;
+    --sc-warning: #a86612;
+    --sc-warning-soft: #fcf2dc;
+    --sc-danger: #b23c3c;
+    --sc-danger-soft: #f9eaea;
+    --sc-nav: #17251f;
+    --sc-focus: #1d5e9c;
+
+    --sc-space-1: 4px;
+    --sc-space-2: 8px;
+    --sc-space-3: 12px;
+    --sc-space-4: 16px;
+    --sc-space-5: 24px;
+    --sc-space-6: 32px;
+    --sc-space-7: 40px;
+
+    --sc-radius-panel: 14px;
+    --sc-radius-control: 9px;
+    --sc-radius-pill: 999px;
+    --sc-shadow-quiet: 0 1px 2px rgb(25 35 31 / 6%);
+    --sc-shadow-elevated: 0 12px 32px rgb(25 35 31 / 12%);
+    --sc-motion-fast: 150ms;
+    --sc-motion-medium: 180ms;
+    --sc-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --sc-font-stack: inherit;
+}

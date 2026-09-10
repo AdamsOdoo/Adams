@@ -156,6 +156,7 @@ class TestInventoryConcurrency(TransactionCase):
                 'inventory_domain_enabled': True,
             })
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             warehouse = env['stock.warehouse'].search(
                 [('company_id', '=', env.company.id)], limit=1,
             )

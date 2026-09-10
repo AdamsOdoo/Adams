@@ -14,6 +14,9 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
 from odoo.addons.shopify_connector_core.tools.redaction import redact
+from ..integration.shopify.webhook_subscription_read_gateway import (
+    WebhookSubscriptionReadError,
+)
 from .shopify_connector_webhook_subscription import ShopifyWebhookSchemaError
 
 
@@ -164,6 +167,17 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
                 'Webhook reconciliation was refused by store quiescence.',
                 type(exc).__name__,
             )
+        except WebhookSubscriptionReadError as exc:
+            error_class = (
+                'shopify_temporary_server_network'
+                if exc.code == 'shopify_unavailable'
+                else 'data_shape_schema_mismatch'
+            )
+            raise JobHandlerError(
+                error_class,
+                'Shopify webhook subscription evidence could not be read safely.',
+                type(exc).__name__,
+            ) from exc
         except ShopifyWebhookSchemaError as exc:
             raise JobHandlerError(
                 'data_shape_schema_mismatch',

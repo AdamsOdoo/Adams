@@ -17,7 +17,7 @@ connector system code is unaffected.
 No Shopify transport of any kind occurs in this module.
 """
 
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
@@ -91,6 +91,54 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
 
     def _as(self, user, model):
         return self.env[model].with_user(user)
+
+    def test_settings_service_derives_company_after_input_admission(self):
+        # Like SEC-2, reach the model boundary under a hypothetical create ACL.
+        # Shipped connector roles deliberately cannot create settings directly.
+        self.env['ir.model.access'].create({
+            'name': 'sec3_test_settings_create',
+            'model_id': self.env['ir.model']._get_id('shopify.connector.store.settings'),
+            'group_id': self.env.ref('%s.group_shopify_connector_admin' % CORE).id,
+            'perm_read': True,
+            'perm_write': True,
+            'perm_create': True,
+            'perm_unlink': False,
+        })
+        self.user_b.write({
+            'company_ids': [(6, 0, [self.company_a.id, self.company_b.id])],
+        })
+        Settings = self._as(self.user_b, 'shopify.connector.store.settings').with_context(
+            allowed_company_ids=[self.company_a.id, self.company_b.id],
+        )
+        self.assertEqual(Settings.env.company, self.company_a)
+        # Even the correct derived company is not caller-supplied setup input.
+        with self.assertRaises(AccessError):
+            Settings._settings_service_create('_setup', {
+                'store_id': self.store_b.id,
+                'order_company_id': self.company_b.id,
+            })
+        values = {'store_id': self.store_b.id}
+        settings = Settings._settings_service_create('_setup', values)
+        self.assertEqual(values, {'store_id': self.store_b.id})
+        self.assertEqual(settings.order_company_id, self.company_b)
+        self.assertEqual(settings.company_id, self.company_b)
+
+    def test_root_settings_batch_derives_each_company_and_rejects_mismatch(self):
+        Settings = self.env['shopify.connector.store.settings'].sudo()
+        with self.assertRaises(ValidationError), self.env.cr.savepoint():
+            Settings.create({
+                'store_id': self.store.id,
+                'order_company_id': self.company_b.id,
+            })
+        rows = Settings.create([
+            {'store_id': self.store.id}, {'store_id': self.store_b.id},
+        ])
+        self.assertEqual(
+            set(rows.mapped('order_company_id').ids),
+            {self.company_a.id, self.company_b.id},
+        )
+        for row in rows:
+            self.assertEqual(row.order_company_id, row.store_id.company_id)
 
     # ------------------------------------------------------------------
     # Customer binding

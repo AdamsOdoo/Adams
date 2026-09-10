@@ -78,6 +78,7 @@ class TestProductVariantGeneration(TransactionCase):
         cls.env['shopify.connector.store.credential'].action_set_token(
             cls.store, DUMMY_TOKEN,
         )
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):

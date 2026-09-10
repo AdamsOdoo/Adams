@@ -69,6 +69,18 @@ ACCEPTED_PREPARE_TRANSPORT_SPLIT = {
         'ShopifyConnectorWebhookSubscription',
         '_prepare_subscription_preconditions',
     ): '_transport_subscription_mutation',
+    (
+        'shopify_connector_fulfillment/models/'
+        'shopify_connector_fulfillment_create_strategy.py',
+        'ShopifyConnectorFulfillmentCreateStrategy',
+        '_prepare_preconditions_fulfillment_create',
+    ): '_transport_fulfillment_create',
+    (
+        'shopify_connector_fulfillment/models/'
+        'shopify_connector_fulfillment_tracking_strategy.py',
+        'ShopifyConnectorFulfillmentTrackingStrategy',
+        '_prepare_preconditions_fulfillment_tracking_update',
+    ): '_transport_fulfillment_tracking_update',
     # Task 015 / 015B (2026-07-26 ruling). The export module splits its
     # mutations across four product and three media domains; every one
     # reaches transport ONLY through the single shared guarded helper
@@ -135,6 +147,126 @@ SHARED_GUARDED_TRANSPORT = (
     'shopify_connector_product_export_service.py',
     'ShopifyConnectorProductExportService',
     '_transport',
+)
+
+
+# Typed gateways now own the checked-in GraphQL documents while the existing
+# Layer-2 services still own admission and guarded transport.  Every document
+# is therefore bound here to one exact consumer prepare method; that method's
+# exact transport sibling remains governed by ACCEPTED_PREPARE_TRANSPORT_SPLIT.
+# A new gateway document, consumer, class or method is rejected until it is
+# reviewed and named explicitly.
+_INV_SPLIT_FILE = (
+    'shopify_connector_inventory/models/'
+    'shopify_connector_inventory_service.py'
+)
+_INV_SPLIT_CLASS = 'ShopifyConnectorInventoryService'
+_INVENTORY_GATEWAY = (
+    'shopify_connector_inventory/integration/shopify/'
+    'inventory_mutation_gateway.py'
+)
+_FULFILLMENT_GATEWAY = (
+    'shopify_connector_fulfillment/integration/shopify/'
+    'fulfillment_mutation_gateway.py'
+)
+_PRODUCT_GATEWAY = (
+    'shopify_connector_product_export/integration/shopify/'
+    'product_export_mutation_gateway.py'
+)
+_MEDIA_GATEWAY = (
+    'shopify_connector_product_export/integration/shopify/'
+    'product_media_mutation_gateway.py'
+)
+_WEBHOOK_GATEWAY = (
+    'shopify_connector_webhook/integration/shopify/'
+    'webhook_subscription_mutation_gateway.py'
+)
+_FULFILLMENT_CREATE_SERVICE = (
+    'shopify_connector_fulfillment/models/'
+    'shopify_connector_fulfillment_create_strategy.py'
+)
+_FULFILLMENT_TRACKING_SERVICE = (
+    'shopify_connector_fulfillment/models/'
+    'shopify_connector_fulfillment_tracking_strategy.py'
+)
+_PRODUCT_SERVICE = (
+    'shopify_connector_product_export/models/'
+    'shopify_connector_product_export_service.py'
+)
+_MEDIA_SERVICE = (
+    'shopify_connector_product_export/models/'
+    'shopify_connector_media_export_service.py'
+)
+_WEBHOOK_SERVICE = (
+    'shopify_connector_webhook/models/'
+    'shopify_connector_webhook_subscription.py'
+)
+
+MUTATION_DOCUMENT_CONSUMERS = {
+    (_INVENTORY_GATEWAY, 'INVENTORY_SET_QUANTITIES_DOCUMENT'): (
+        _INV_SPLIT_FILE, _INV_SPLIT_CLASS,
+        '_prepare_preconditions_set_quantities',
+    ),
+    (_INVENTORY_GATEWAY, 'INVENTORY_ACTIVATE_DOCUMENT'): (
+        _INV_SPLIT_FILE, _INV_SPLIT_CLASS, '_prepare_preconditions_activate',
+    ),
+    (_FULFILLMENT_GATEWAY, 'FULFILLMENT_CREATE_DOCUMENT'): (
+        _FULFILLMENT_CREATE_SERVICE,
+        'ShopifyConnectorFulfillmentCreateStrategy',
+        '_prepare_preconditions_fulfillment_create',
+    ),
+    (_FULFILLMENT_GATEWAY, 'FULFILLMENT_TRACKING_UPDATE_DOCUMENT'): (
+        _FULFILLMENT_TRACKING_SERVICE,
+        'ShopifyConnectorFulfillmentTrackingStrategy',
+        '_prepare_preconditions_fulfillment_tracking_update',
+    ),
+    (_PRODUCT_GATEWAY, 'BINDING_NAMESPACE_DOCUMENT'): (
+        _PRODUCT_SERVICE, 'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_binding_namespace',
+    ),
+    (_PRODUCT_GATEWAY, 'PRODUCT_CREATE_DOCUMENT'): (
+        _PRODUCT_SERVICE, 'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_create',
+    ),
+    (_PRODUCT_GATEWAY, 'PRODUCT_UPDATE_DOCUMENT'): (
+        _PRODUCT_SERVICE, 'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_update',
+    ),
+    (_PRODUCT_GATEWAY, 'VARIANTS_UPDATE_DOCUMENT'): (
+        _PRODUCT_SERVICE, 'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_variants_update',
+    ),
+    (_PRODUCT_GATEWAY, 'VARIANTS_CREATE_DOCUMENT'): (
+        _PRODUCT_SERVICE, 'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_variants_create',
+    ),
+    (_MEDIA_GATEWAY, 'MEDIA_STAGE_DOCUMENT'): (
+        _MEDIA_SERVICE, 'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_stage',
+    ),
+    (_MEDIA_GATEWAY, 'MEDIA_FILE_CREATE_DOCUMENT'): (
+        _MEDIA_SERVICE, 'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_file_create',
+    ),
+    (_MEDIA_GATEWAY, 'MEDIA_ASSOCIATE_DOCUMENT'): (
+        _MEDIA_SERVICE, 'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_associate',
+    ),
+    (_WEBHOOK_GATEWAY, 'WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT'): (
+        _WEBHOOK_SERVICE, 'ShopifyConnectorWebhookSubscription',
+        '_prepare_subscription_preconditions',
+    ),
+    (_WEBHOOK_GATEWAY, 'WEBHOOK_SUBSCRIPTION_DELETE_DOCUMENT'): (
+        _WEBHOOK_SERVICE, 'ShopifyConnectorWebhookSubscription',
+        '_prepare_subscription_preconditions',
+    ),
+}
+
+RECONCILIATION_READ_SEND_SURFACE = (
+    'shopify_connector_core/models/'
+    'shopify_connector_api_client_v2_runtime.py',
+    'ShopifyConnectorApiClientV2Runtime',
+    '_execute_v2_reconciliation_read',
 )
 
 
@@ -242,9 +374,124 @@ def _single_paired_transport(owner_class, paired_name):
     return siblings[0]
 
 
-def _mutation_literal_violations(source, relative, shared_transport=None):
+def _top_level_mutation_documents(tree):
+    documents = {}
+    for statement in tree.body:
+        if isinstance(statement, ast.Assign):
+            names = [
+                target.id for target in statement.targets
+                if isinstance(target, ast.Name)
+            ]
+            value = statement.value
+        elif (
+            isinstance(statement, ast.AnnAssign)
+            and isinstance(statement.target, ast.Name)
+        ):
+            names = [statement.target.id]
+            value = statement.value
+        else:
+            continue
+        literals = [
+            node for node in ast.walk(value)
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and GRAPHQL_MUTATION_LITERAL.search(node.value)
+            )
+        ] if value is not None else []
+        if len(names) == 1 and len(literals) == 1:
+            documents[names[0]] = literals[0]
+    return documents
+
+
+def _module_imports_exact_name(tree, module_suffix, name):
+    dotted_suffix = module_suffix[:-3].replace('/', '.')
+    return any(
+        isinstance(node, ast.ImportFrom)
+        and node.module
+        and node.module.endswith(dotted_suffix)
+        and any(
+            alias.name == name and alias.asname is None
+            for alias in node.names
+        )
+        for node in tree.body
+    )
+
+
+def _validated_document_bindings(
+    addon_root, shared_transport=None, source_overrides=None,
+):
+    source_overrides = source_overrides or {}
+    violations = []
+    validated = set()
+    for key, consumer in MUTATION_DOCUMENT_CONSUMERS.items():
+        gateway_suffix, document_name = key
+        consumer_suffix, class_name, prepare_name = consumer
+        gateway_path = addon_root / gateway_suffix
+        consumer_path = addon_root / consumer_suffix
+        if not gateway_path.exists() or not consumer_path.exists():
+            violations.append(('missing_binding_file',) + key + consumer)
+            continue
+        gateway_source = source_overrides.get(gateway_suffix)
+        if gateway_source is None:
+            gateway_source = gateway_path.read_text(encoding='utf-8')
+        gateway_tree = ast.parse(gateway_source, filename=str(gateway_path))
+        if document_name not in _top_level_mutation_documents(gateway_tree):
+            violations.append(('invalid_document',) + key)
+            continue
+        consumer_source = source_overrides.get(consumer_suffix)
+        if consumer_source is None:
+            consumer_source = consumer_path.read_text(encoding='utf-8')
+        consumer_tree = ast.parse(consumer_source, filename=str(consumer_path))
+        classes = [
+            node for node in consumer_tree.body
+            if isinstance(node, ast.ClassDef) and node.name == class_name
+        ]
+        owner_class = classes[0] if len(classes) == 1 else None
+        prepare = _single_paired_transport(owner_class, prepare_name)
+        paired_name = _accepted_split_transport_name(
+            consumer_suffix, class_name, prepare_name,
+        )
+        transport = _single_paired_transport(owner_class, paired_name)
+        transport_is_guarded = transport is not None and (
+            _method_has_guarded_execute_business(transport)
+            or (
+                shared_transport is not None
+                and _method_delegates_to_shared_transport(transport)
+                and _method_has_guarded_execute_business(shared_transport)
+                and not _method_has_forbidden_transport(shared_transport)
+            )
+        )
+        name_uses = [
+            node for node in ast.walk(prepare) if (
+                isinstance(node, ast.Name)
+                and isinstance(node.ctx, ast.Load)
+                and node.id == document_name
+            )
+        ] if prepare is not None else []
+        if not (
+            _module_imports_exact_name(
+                consumer_tree, gateway_suffix, document_name,
+            )
+            and len(name_uses) == 1
+            and paired_name is not None
+            and transport_is_guarded
+            and not _method_has_guarded_execute_business(prepare)
+            and not _method_has_forbidden_transport(prepare)
+            and not _method_has_forbidden_transport(transport)
+        ):
+            violations.append(('invalid_consumer',) + key + consumer)
+            continue
+        validated.add(key)
+    return validated, violations
+
+
+def _mutation_literal_violations(
+    source, relative, shared_transport=None, validated_documents=frozenset(),
+):
     tree = ast.parse(source, filename=relative)
     parents = _parent_map(tree)
+    documents = _top_level_mutation_documents(tree)
     violations = []
     for node in ast.walk(tree):
         if not (
@@ -257,6 +504,19 @@ def _mutation_literal_violations(source, relative, shared_transport=None):
         owner_name = owner.name if owner else False
         owner_class = _owning_class(node, parents)
         owner_class_name = owner_class.name if owner_class else False
+        document_names = [
+            name for name, literal in documents.items() if literal is node
+        ]
+        document_key = next((
+            key for key in validated_documents
+            if (
+                len(document_names) == 1
+                and relative.endswith(key[0])
+                and document_names[0] == key[1]
+            )
+        ), None)
+        if document_key in validated_documents:
+            continue
         selftest = (
             relative.endswith(
                 'shopify_connector_core/models/'
@@ -323,6 +583,63 @@ def _contains_attempt_env_lookup(node):
     )
 
 
+def _class_owns_model(class_node, model_name):
+    if class_node is None:
+        return False
+    for statement in class_node.body:
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = (
+            statement.targets if isinstance(statement, ast.Assign)
+            else (statement.target,)
+        )
+        if any(
+            isinstance(target, ast.Name)
+            and target.id in {'_name', '_inherit'}
+            for target in targets
+        ) and any(
+            isinstance(value, ast.Constant) and value.value == model_name
+            for value in ast.walk(statement.value)
+        ):
+            return True
+    return False
+
+
+def _retention_write_is_closed(tree, node, owner, owner_class, relative):
+    if not (
+        relative.endswith(
+            'shopify_connector_core/models/'
+            'shopify_connector_mutation_attempt_retention.py'
+        )
+        and owner is not None
+        and owner.name == '_retention_mark_masked'
+        and owner_class is not None
+        and owner_class.name == 'ShopifyConnectorMutationAttemptRetention'
+        and _class_owns_model(
+            owner_class, 'shopify.connector.mutation.attempt',
+        )
+        and ast.unparse(node) == (
+            "records._surface('_mask_terminal_evidence').write("
+            "{'evidence_masked_at': fields.Datetime.now()})"
+        )
+    ):
+        return False
+    parents = _parent_map(tree)
+    calls = [
+        call for call in ast.walk(tree)
+        if (
+            isinstance(call, ast.Call)
+            and ast.unparse(call) == 'self._retention_mark_masked(self)'
+        )
+    ]
+    return bool(
+        len(calls) == 1
+        and _owning_method(calls[0], parents) is not None
+        and _owning_method(calls[0], parents).name == '_mask_terminal_evidence'
+        and _owning_class(calls[0], parents) is owner_class
+    )
+
+
 def _attempt_write_violations(source, relative):
     tree = ast.parse(source, filename=relative)
     parents = _parent_map(tree)
@@ -334,7 +651,7 @@ def _attempt_write_violations(source, relative):
         'action_resolve_mutation_attempt', '_mask_terminal_evidence',
     }
     violations = []
-    attempt_model_file = relative.endswith(
+    base_attempt_model_file = relative.endswith(
         'shopify_connector_core/models/'
         'shopify_connector_mutation_attempt.py'
     )
@@ -351,26 +668,58 @@ def _attempt_write_violations(source, relative):
             part.id.lower() for part in ast.walk(target)
             if isinstance(part, ast.Name)
         }
+        owner = _owning_method(node, parents)
+        owner_name = owner.name if owner else False
+        owner_class = _owning_class(node, parents)
+        owning_attempt_model = _class_owns_model(
+            owner_class, 'shopify.connector.mutation.attempt',
+        )
         is_attempt_target = (
             bool(root_names & {'attempt', 'attempts'})
             or _contains_attempt_env_lookup(target)
-            or '._surface(' in target_source
             or (
-                attempt_model_file
-                and ('self' in root_names or target_source.startswith('super()'))
+                owning_attempt_model
+                and (
+                    'self' in root_names
+                    or target_source.startswith('super()')
+                    or (
+                        isinstance(target, ast.Call)
+                        and isinstance(target.func, ast.Attribute)
+                        and target.func.attr == '_surface'
+                    )
+                )
             )
         )
         if not is_attempt_target:
             continue
-        owner = _owning_method(node, parents)
-        owner_name = owner.name if owner else False
         if node.func.attr == 'create':
             sanctioned = (
-                attempt_model_file
+                base_attempt_model_file
                 and owner_name in {'create', '_create_attempt_intent'}
             )
         elif node.func.attr == 'write':
-            sanctioned = attempt_model_file and owner_name in allowed
+            sanctioned = (
+                (base_attempt_model_file and owner_name in allowed)
+                or (
+                    relative.endswith(
+                        'shopify_connector_core/models/'
+                        'shopify_connector_mutation_attempt_v2_runtime.py'
+                    )
+                    and owning_attempt_model
+                    and owner_class.name == (
+                        'ShopifyConnectorMutationAttemptV2Runtime'
+                    )
+                    and owner_name == 'write'
+                    and target_source == 'super()'
+                    and len(node.args) == 1
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == 'vals'
+                    and not node.keywords
+                )
+                or _retention_write_is_closed(
+                    tree, node, owner, owner_class, relative,
+                )
+            )
         else:
             sanctioned = False
         if not sanctioned:
@@ -378,6 +727,114 @@ def _attempt_write_violations(source, relative):
                 relative, node.lineno, owner_name,
                 node.func.attr, target_source,
             ))
+    return violations
+
+
+def _method_calls(method_node, name):
+    return [
+        node for node in ast.walk(method_node)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == name
+        )
+    ] if method_node is not None else []
+
+
+def _nodes_contain(nodes, needle):
+    return any(
+        candidate is needle
+        for node in nodes
+        for candidate in ast.walk(node)
+    )
+
+
+def _reconciliation_read_sender_is_closed(method_node):
+    validations = _method_calls(method_node, '_validate_graphql_operation')
+    admissions = _method_calls(method_node, '_admit_v2_reconciliation_read')
+    sends = _method_calls(method_node, '_send')
+    normalizations = _method_calls(method_node, '_normalize_response')
+    releases = _method_calls(method_node, '_release_lease')
+    if not (
+        len(validations) == 1
+        and any(
+            keyword.arg == 'mutation_context'
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is None
+            for keyword in validations[0].keywords
+        )
+        and len(admissions) == 1
+        and len(sends) == 1
+        and len(normalizations) == 1
+        and len(releases) == 2
+    ):
+        return False
+    # Keep the mutation/containment check explicit rather than accepting any
+    # preceding validation call as a query-only fence.
+    mutation_rejections = [
+        node for node in ast.walk(method_node)
+        if (
+            isinstance(node, ast.If)
+            and _method_calls(node.test, '_graphql_contains_mutation')
+            and any(isinstance(child, ast.Raise) for child in node.body)
+        )
+    ]
+    if len(mutation_rejections) != 1:
+        return False
+    if not (
+        validations[0].lineno < mutation_rejections[0].lineno
+        < admissions[0].lineno < sends[0].lineno
+        < normalizations[0].lineno
+    ):
+        return False
+    for try_node in ast.walk(method_node):
+        if not isinstance(try_node, (ast.Try, ast.TryStar)):
+            continue
+        if not _nodes_contain(try_node.body, sends[0]):
+            continue
+        error_release = any(
+            'BaseException' in _exception_handler_names(handler.type)
+            and any(
+                _nodes_contain(handler.body, call) for call in releases
+            )
+            for handler in try_node.handlers
+        )
+        success_release = any(
+            _nodes_contain(try_node.orelse, call) for call in releases
+        )
+        if error_release and success_release:
+            return True
+    return False
+
+
+def _direct_send_violations(source, relative):
+    tree = ast.parse(source, filename=relative)
+    parents = _parent_map(tree)
+    violations = []
+    base_client = relative.endswith(
+        'shopify_connector_core/models/shopify_connector_api_client.py'
+    )
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == '_send'
+        ):
+            continue
+        if base_client:
+            continue
+        owner = _owning_method(node, parents)
+        owner_class = _owning_class(node, parents)
+        exact_sender = (
+            relative.endswith(RECONCILIATION_READ_SEND_SURFACE[0])
+            and owner_class is not None
+            and owner_class.name == RECONCILIATION_READ_SEND_SURFACE[1]
+            and owner is not None
+            and owner.name == RECONCILIATION_READ_SEND_SURFACE[2]
+            and _reconciliation_read_sender_is_closed(owner)
+        )
+        if not exact_sender:
+            violations.append((relative, node.lineno))
     return violations
 
 
@@ -421,12 +878,6 @@ def _exception_shadowing_violations(source, relative):
 
 
 # --- Synthetic-source builders for the accepted-split adversarial tests ---
-
-_INV_SPLIT_FILE = (
-    'shopify_connector_inventory/models/'
-    'shopify_connector_inventory_service.py'
-)
-_INV_SPLIT_CLASS = 'ShopifyConnectorInventoryService'
 
 
 def _make_split_source(
@@ -504,6 +955,15 @@ class TestMutationSourceGuards(TransactionCase):
             if 'tests' not in path.parts
         )
 
+    def _document_bindings(self):
+        shared = _shared_guarded_transport_node(self._addon_root())
+        self.assertIsNotNone(shared)
+        validated, violations = _validated_document_bindings(
+            self._addon_root(), shared,
+        )
+        self.assertFalse(violations, violations)
+        return shared, validated
+
     def test_repo_wide_raw_transport_guard(self):
         violations = []
         for path in self._python_files():
@@ -577,18 +1037,13 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertFalse(violations, violations)
 
     def test_mutation_literals_require_guarded_transport_or_selftest(self):
-        shared = _shared_guarded_transport_node(self._addon_root())
-        self.assertIsNotNone(
-            shared,
-            'the shared guarded transport helper named in '
-            'SHARED_GUARDED_TRANSPORT must exist, or the allowlist entries '
-            'that rely on it silently accept an unguarded delegation',
-        )
+        shared, validated_documents = self._document_bindings()
         violations = []
         for path in self._python_files():
             relative = str(path.relative_to(self._addon_root()))
             violations.extend(_mutation_literal_violations(
                 path.read_text(encoding='utf-8'), relative, shared,
+                validated_documents,
             ))
         self.assertFalse(violations, violations)
 
@@ -625,12 +1080,8 @@ class TestMutationSourceGuards(TransactionCase):
         # explicitly, so widening it (e.g. to every `_prepare_preconditions_*`,
         # or to a whole file) fails this test rather than passing quietly.
         #
-        # Eleven entries: the two original inventory pairs, the bounded
-        # webhook-subscription pair, plus the five product-export and three
-        # media-export pairs Task 015/015B added. Each split reaches transport
-        # only through its exact paired method; export pairs additionally use
-        # the ONE shared guarded helper named in SHARED_GUARDED_TRANSPORT,
-        # whose existence and guardedness are asserted separately.
+        # Thirteen entries: inventory (two), webhook subscription (one),
+        # fulfillment (two), product export (five), and media export (three).
         export_service = (
             'shopify_connector_product_export/models/'
             'shopify_connector_product_export_service.py'
@@ -658,6 +1109,18 @@ class TestMutationSourceGuards(TransactionCase):
                     'ShopifyConnectorWebhookSubscription',
                     '_prepare_subscription_preconditions',
                 ): '_transport_subscription_mutation',
+                (
+                    'shopify_connector_fulfillment/models/'
+                    'shopify_connector_fulfillment_create_strategy.py',
+                    'ShopifyConnectorFulfillmentCreateStrategy',
+                    '_prepare_preconditions_fulfillment_create',
+                ): '_transport_fulfillment_create',
+                (
+                    'shopify_connector_fulfillment/models/'
+                    'shopify_connector_fulfillment_tracking_strategy.py',
+                    'ShopifyConnectorFulfillmentTrackingStrategy',
+                    '_prepare_preconditions_fulfillment_tracking_update',
+                ): '_transport_fulfillment_tracking_update',
                 (
                     export_service, export_class,
                     '_prepare_preconditions_binding_namespace',
@@ -711,59 +1174,38 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertFalse(_method_delegates_to_shared_transport(None))
 
     def test_accepted_split_real_inventory_service_passes(self):
-        # The REAL production file: both accepted prepare/transport pairs
-        # must be recognised, producing zero mutation-literal violations.
-        # Guarded against vacuity: the two GraphQL mutation literals and the
-        # guarded transport surface must genuinely exist in the file, and
-        # the two prepare methods must NOT themselves hold `execute_business`
-        # (so the only way they pass is via the accepted split).
-        root = self._addon_root()
-        path = (
-            root / 'shopify_connector_inventory' / 'models'
-            / 'shopify_connector_inventory_service.py'
+        _, validated = self._document_bindings()
+        self.assertTrue({
+            (_INVENTORY_GATEWAY, 'INVENTORY_SET_QUANTITIES_DOCUMENT'),
+            (_INVENTORY_GATEWAY, 'INVENTORY_ACTIVATE_DOCUMENT'),
+        } <= validated)
+
+    def test_typed_gateway_binding_rejects_wrong_consumer_import(self):
+        source = (self._addon_root() / _INV_SPLIT_FILE).read_text(
+            encoding='utf-8',
+        ).replace(
+            '    INVENTORY_SET_QUANTITIES_DOCUMENT,',
+            '    UNKNOWN_INVENTORY_DOCUMENT,',
+            1,
         )
-        source = path.read_text(encoding='utf-8')
-        relative = str(path.relative_to(root))
-        self.assertIn('mutation InventorySetQuantities', source)
-        self.assertIn('mutation InventoryActivate', source)
-        tree = ast.parse(source)
-        prepare_methods = {
-            node.name: node for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef)
-            and node.name in {
-                '_prepare_preconditions_set_quantities',
-                '_prepare_preconditions_activate',
-            }
-        }
-        self.assertEqual(len(prepare_methods), 2)
-        for method in prepare_methods.values():
-            self.assertFalse(
-                _method_has_guarded_execute_business(method),
-                'prepare method unexpectedly holds the guarded call; the '
-                'split test would be vacuous',
-            )
-        self.assertEqual(_mutation_literal_violations(source, relative), [])
+        shared = _shared_guarded_transport_node(self._addon_root())
+        validated, violations = _validated_document_bindings(
+            self._addon_root(), shared, {_INV_SPLIT_FILE: source},
+        )
+        key = (_INVENTORY_GATEWAY, 'INVENTORY_SET_QUANTITIES_DOCUMENT')
+        self.assertNotIn(key, validated)
+        self.assertTrue(any(
+            violation[0] == 'invalid_consumer'
+            and violation[1:3] == key
+            for violation in violations
+        ))
 
     def test_accepted_split_real_webhook_subscription_service_passes(self):
-        """The W1 Layer-2 subscription pair stays on guarded transport."""
-        root = self._addon_root()
-        path = (
-            root / 'shopify_connector_webhook' / 'models'
-            / 'shopify_connector_webhook_subscription.py'
-        )
-        source = path.read_text(encoding='utf-8')
-        relative = str(path.relative_to(root))
-        self.assertIn('mutation ConnectorWebhookSubscriptionCreate', source)
-        self.assertIn('mutation ConnectorWebhookSubscriptionDelete', source)
-        tree = ast.parse(source)
-        prepare_methods = [
-            node for node in ast.walk(tree)
-            if isinstance(node, ast.FunctionDef)
-            and node.name == '_prepare_subscription_preconditions'
-        ]
-        self.assertEqual(len(prepare_methods), 1)
-        self.assertFalse(_method_has_guarded_execute_business(prepare_methods[0]))
-        self.assertEqual(_mutation_literal_violations(source, relative), [])
+        _, validated = self._document_bindings()
+        self.assertTrue({
+            (_WEBHOOK_GATEWAY, 'WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT'),
+            (_WEBHOOK_GATEWAY, 'WEBHOOK_SUBSCRIPTION_DELETE_DOCUMENT'),
+        } <= validated)
 
     def test_accepted_split_both_synthetic_pairs_pass(self):
         for prepare, transport, literal in (
@@ -862,21 +1304,54 @@ class TestMutationSourceGuards(TransactionCase):
     def test_no_production_direct_send_caller(self):
         violations = []
         for path in self._python_files():
-            tree = ast.parse(path.read_text(encoding='utf-8'))
             relative = str(path.relative_to(self._addon_root()))
-            for node in ast.walk(tree):
-                if not (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == '_send'
-                ):
-                    continue
-                if not relative.endswith(
-                    'shopify_connector_core/models/'
-                    'shopify_connector_api_client.py'
-                ):
-                    violations.append((relative, node.lineno))
+            violations.extend(_direct_send_violations(
+                path.read_text(encoding='utf-8'), relative,
+            ))
         self.assertFalse(violations, violations)
+
+    def test_reconciliation_read_sender_requires_mutation_and_lease_fences(self):
+        relative, class_name, method_name = RECONCILIATION_READ_SEND_SURFACE
+        valid = '''
+class %s:
+    def %s(self, job, attempt, store, query, variables):
+        self._validate_graphql_operation(
+            query, variables, mutation_context=None,
+        )
+        if self._graphql_contains_mutation(query):
+            raise ValidationError('queries only')
+        lease_key, token, transport_store = (
+            self._admit_v2_reconciliation_read(job.id, attempt.id, store.id)
+        )
+        try:
+            response = self._send(
+                transport_store, {'query': query}, token,
+            )
+            yield self._normalize_response(transport_store, response)
+        except BaseException:
+            self._release_lease(lease_key)
+            raise
+        else:
+            self._release_lease(lease_key)
+''' % (class_name, method_name)
+        self.assertFalse(_direct_send_violations(valid, relative))
+        missing_mutation_rejection = valid.replace(
+            "        if self._graphql_contains_mutation(query):\n"
+            "            raise ValidationError('queries only')\n",
+            '',
+        )
+        missing_error_release = valid.replace(
+            '        except BaseException:\n'
+            '            self._release_lease(lease_key)\n'
+            '            raise\n',
+            '        except BaseException:\n'
+            '            raise\n',
+        )
+        unknown_sender = valid.replace(method_name, 'other_sender', 1)
+        for source in (
+            missing_mutation_rejection, missing_error_release, unknown_sender,
+        ):
+            self.assertTrue(_direct_send_violations(source, relative), source)
 
     def test_attempt_write_surface_is_closed_and_unlink_forbidden(self):
         source = Path(
@@ -920,8 +1395,8 @@ class TestMutationSourceGuards(TransactionCase):
             "def bad(self, attempts):\n    attempts.unlink()\n",
             "def bad(self):\n"
             "    self.env['shopify.connector.mutation.attempt'].create({})\n",
-            "def bad(self, other):\n"
-            "    other._surface('forged').write({'x': 1})\n",
+            "def bad(self, attempt):\n"
+            "    attempt._surface('forged').write({'x': 1})\n",
         )
         for source in bad_sources:
             self.assertTrue(_attempt_write_violations(
@@ -934,6 +1409,54 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertFalse(_attempt_write_violations(
             unrelated, 'shopify_connector_core/models/store.py',
         ))
+        unrelated_surface = (
+            "class Run:\n"
+            "    _name = 'shopify.connector.run'\n"
+            "    def ok(self):\n"
+            "        self._surface('finalize').write({'name': 'run'})\n"
+        )
+        self.assertFalse(_attempt_write_violations(
+            unrelated_surface, 'shopify_connector_core/models/run.py',
+        ))
+
+    def test_attempt_write_detector_rejects_rogue_inherited_override(self):
+        source = (
+            "class Rogue:\n"
+            "    _inherit = 'shopify.connector.mutation.attempt'\n"
+            "    def write(self, vals):\n"
+            "        return super().write(vals)\n"
+        )
+        self.assertTrue(_attempt_write_violations(
+            source,
+            'shopify_connector_other/models/mutation_attempt_extension.py',
+        ))
+
+    def test_retention_write_requires_exact_surface_payload_and_caller(self):
+        relative = (
+            'shopify_connector_core/models/'
+            'shopify_connector_mutation_attempt_retention.py'
+        )
+        path = self._addon_root() / relative
+        source = path.read_text(encoding='utf-8')
+        self.assertFalse(_attempt_write_violations(source, relative))
+        wrong_surface = source.replace(
+            "records._surface('_mask_terminal_evidence')",
+            "records._surface('forged')",
+            1,
+        )
+        extra_field = source.replace(
+            "'evidence_masked_at': fields.Datetime.now(),",
+            "'evidence_masked_at': fields.Datetime.now(),\n"
+            "                'observed_outcome': 'succeeded',",
+            1,
+        )
+        wrong_caller = source.replace(
+            'self._retention_mark_masked(self)',
+            'other._retention_mark_masked(self)',
+            1,
+        )
+        for invalid in (wrong_surface, extra_field, wrong_caller):
+            self.assertTrue(_attempt_write_violations(invalid, relative))
 
     def test_attempt_write_detector_rejects_external_same_named_methods(self):
         external = (

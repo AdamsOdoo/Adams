@@ -75,6 +75,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             'inventory_domain_enabled': True,
         })
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         warehouse = cls.env['stock.warehouse'].search(
             [('company_id', '=', cls.env.company.id)], limit=1,
         )
@@ -733,6 +734,9 @@ class TestUiU2InventoryActionTours(HttpCase):
             'the fixture no longer produces the counts the tour asserts',
         )
 
+        # Activation already created a root-owned setup audit. Preserve it
+        # and inspect only the decisions made by this browser action.
+        _setup_logs, prior_jobs = self._audit_logs()
         self.start_tour(self._url(MAPPING_ACTION),
                         'shopify_connector_u2_location_withdraw_all_tour',
                         login='u2act_wdall_admin')
@@ -755,7 +759,12 @@ class TestUiU2InventoryActionTours(HttpCase):
         )
 
         logs, jobs = self._audit_logs()
-        self.assertTrue(jobs)
+        jobs -= prior_jobs
+        logs = logs.filtered(lambda log: log.job_id in jobs)
+        self.assertEqual(
+            len(jobs), 4,
+            'expected one mapping decision and three pair withdrawal audits',
+        )
         self.assertEqual(
             set(jobs.mapped('create_uid')), {admin},
             'the audit trail must name the administrator who decided',

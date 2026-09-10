@@ -1004,6 +1004,9 @@ OVERFLOW_JS = r"""
     // so the inventory guard cannot mistake shared styling for missing
     // measurement coverage.
     ".o_sc_connector_health",
+    ".o_sc_v2",
+    // Parked admin prototype remains unmanifested; measure if ever rendered.
+    ".o_sc_p16_admin",
     ".o_sc_export_diff", ".o_sc_export_diff__inner",
     // Static connector note bands are layout-bearing content surfaces too:
     // long consequence copy must be measured where it wraps inside dialogs
@@ -1572,6 +1575,7 @@ class TestUiVisualEvidence(HttpCase):
             'api_version': '2026-07',
         })
         store.sudo().write({'state': 'connected'})
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].sudo().create({
             'store_id': store.id,
             'inventory_domain_enabled': True,

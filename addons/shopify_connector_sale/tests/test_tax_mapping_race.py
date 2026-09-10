@@ -178,6 +178,7 @@ class TestTaxMappingCompetingChoiceRace(TransactionCase):
                 'company_id': company.id,
             })
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             partner = env['res.partner'].create({
                 'name': 'Tax mapping race fallback %s' % suffix,
             })

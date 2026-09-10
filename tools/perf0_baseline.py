@@ -99,6 +99,55 @@ SCENARIOS = (
     'job_claim_contention',
 )
 
+# A domain row expands into several ORM rows (products, bindings, orders,
+# evidence and lines). Keep a malformed or accidental CLI value from asking
+# Odoo to materialize an unbounded fixture before the first measurement starts.
+MAX_DATASET_ROWS = 100_000
+
+
+def validate_scale(scale):
+    """Return ``scale`` when it is a safe, positive integer multiplier."""
+    if isinstance(scale, bool) or not isinstance(scale, int):
+        raise ValueError('scale must be a positive integer')
+    if scale <= 0:
+        raise ValueError('scale must be greater than zero')
+    if scale > MAX_DATASET_ROWS:
+        raise ValueError(
+            'scale exceeds the safety limit of %d' % MAX_DATASET_ROWS)
+    return scale
+
+
+def scaled_dataset_rows(base_rows, scale):
+    """Return the requested domain rows without allowing an unsafe size.
+
+    ``base_rows`` is the per-operation batch size. Only the seeded domain
+    dataset is multiplied; callers continue to use the unscaled batch for
+    operation and repetition counts.
+    """
+    if isinstance(base_rows, bool) or not isinstance(base_rows, int):
+        raise ValueError('base dataset rows must be a non-negative integer')
+    if base_rows < 0:
+        raise ValueError('base dataset rows must be non-negative')
+    scale = validate_scale(scale)
+    if base_rows > MAX_DATASET_ROWS // scale:
+        raise ValueError(
+            'requested dataset rows exceed the safety limit of %d'
+            % MAX_DATASET_ROWS)
+    return base_rows * scale
+
+
+def _scale_argument(value):
+    """Argparse converter that reports scale errors before Odoo bootstrap."""
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError('scale must be a positive integer')
+    try:
+        return validate_scale(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error))
+
+
 # Tables that grow for reasons this harness does not own: framework logging,
 # the bus, chatter written as a side effect of creating a business record, and
 # the cron/queue bookkeeping Odoo does on its own. They are EXCLUDED from the
@@ -335,7 +384,7 @@ class Fixture:
 
     def __init__(self, env, scale):
         self.env = env
-        self.scale = scale
+        self.scale = validate_scale(scale)
         self.tag = uuid.uuid4().hex[:12]
         self.store = None
         self.job_ids = []
@@ -799,7 +848,7 @@ def scenario_order_binding_projection(env, fixture, batch):
     reconciliation throughput while the body performed a `search` and a `read`.
     The real order-scan admission path is `scenario_order_scan_admission`.
     """
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     Binding = env['shopify.connector.order.binding'].sudo()
     for _ in range(max(1, batch // 10)):
         Binding.search([
@@ -810,7 +859,7 @@ def scenario_order_binding_projection(env, fixture, batch):
 
 def scenario_inventory_pair_projection(env, fixture, batch):
     """READ/projection over inventory pairs. Not reconciliation."""
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     Binding = env['shopify.connector.inventory.level.binding'].sudo()
     for _ in range(max(1, batch // 10)):
         Binding.search([
@@ -820,7 +869,7 @@ def scenario_inventory_pair_projection(env, fixture, batch):
 
 def scenario_fulfillment_evidence_projection(env, fixture, batch):
     """READ/projection over inbound evidence rows. Not reconciliation."""
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     Evidence = env['shopify.connector.fulfillment.inbound.evidence'].sudo()
     for _ in range(max(1, batch // 10)):
         Evidence.search([
@@ -845,7 +894,7 @@ def scenario_fulfillment_evidence_projection(env, fixture, batch):
 
 def scenario_order_scan_admission(env, fixture, batch):
     """`_cron_enqueue_order_scans` -- the real order-scan admission path."""
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     # The cron lives on `shopify.connector.store` (the sale module extends
     # the store model with it), not on the abstract scan service.
     env['shopify.connector.store'].sudo()._cron_enqueue_order_scans()
@@ -854,14 +903,14 @@ def scenario_order_scan_admission(env, fixture, batch):
 
 def scenario_inventory_push_scan_admission(env, fixture, batch):
     """`run_inventory_push_scan` -- the real inventory push-scan cron path."""
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     env['shopify.connector.inventory.service'].sudo().run_inventory_push_scan()
     env.flush_all()
 
 
 def scenario_fulfillment_reconciliation_admission(env, fixture, batch):
     """`_cron_enqueue_reconciliation_checks` -- the real fulfillment path."""
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     env['shopify.connector.fulfillment.service'].sudo(
     )._cron_enqueue_reconciliation_checks()
     env.flush_all()
@@ -874,7 +923,7 @@ def scenario_fulfillment_ledger_reconcile(env, fixture, batch):
     application backstop the fulfillment design relies on, and it runs entirely
     on local evidence rows.
     """
-    fixture.build_domain_dataset(batch)
+    fixture.build_domain_dataset(scaled_dataset_rows(batch, fixture.scale))
     Evidence = env['shopify.connector.fulfillment.inbound.evidence'].sudo()
     for evidence in Evidence.search([
         ('store_id', '=', fixture.store.id),
@@ -1167,6 +1216,7 @@ def run_scenario(runtime, name, args):
     result = {
         'scenario': name,
         'batch_size': args.batch,
+        'dataset_rows': scaled_dataset_rows(args.batch, args.scale),
         'repeats': args.repeats,
         'warmup_discarded': args.warmup,
         'latency': percentiles(latencies),
@@ -1277,8 +1327,9 @@ def main(argv=None):
                         help='discarded warm-up repetitions per scenario')
     parser.add_argument('--batch', type=int, default=50,
                         help='units of work per repetition')
-    parser.add_argument('--scale', type=int, default=1,
-                        help='dataset multiplier, recorded in the output')
+    parser.add_argument('--scale', type=_scale_argument, default=1,
+                        help='positive multiplier for domain dataset rows; '
+                             'operation batch/repetition counts are unchanged')
     parser.add_argument('--passes', type=int, default=1,
                         help='run the whole scenario set this many times in '
                              'the SAME database; pass 2 proves the second run '
@@ -1286,6 +1337,11 @@ def main(argv=None):
     parser.add_argument('--output', default='-',
                         help='write JSON here; "-" for stdout')
     args = parser.parse_args(argv)
+
+    try:
+        requested_dataset_rows = scaled_dataset_rows(args.batch, args.scale)
+    except ValueError as error:
+        parser.error(str(error))
 
     requested = [s.strip() for s in args.scenarios.split(',') if s.strip()]
     unknown = set(requested) - set(SCENARIOS)
@@ -1308,6 +1364,7 @@ def main(argv=None):
         'workload': {
             'scenarios': requested,
             'batch_size': args.batch,
+            'dataset_rows': requested_dataset_rows,
             'repeats': args.repeats,
             'warmup': args.warmup,
             'scale': args.scale,

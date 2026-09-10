@@ -1,0 +1,201 @@
+diff --git a/addons/shopify_connector_fulfillment/tests/test_fulfillment_scans.py b/addons/shopify_connector_fulfillment/tests/test_fulfillment_scans.py
+index 8c7a98d..5270764 100644
+--- a/addons/shopify_connector_fulfillment/tests/test_fulfillment_scans.py
++++ b/addons/shopify_connector_fulfillment/tests/test_fulfillment_scans.py
+@@ -538,3 +538,196 @@ class TestFulfillmentScans(TransactionCase):
+         # A gap-period external can never be retroactively auto-applied.
+         self.assertEqual(evidence.reconciled_state, 'review')
+         self.assertNotEqual(evidence.reconciled_state, 'applied')
++
++
++@tagged('post_install', '-at_install')
++class TestFulfillmentClaimReadCompany(TransactionCase):
++    """Real claim/scope/admission proof, not installed-cron scheduler proof.
++
++    Only transport is replaced. The registry cursor factory is redirected to
++    pooled cursors because Odoo test mode otherwise shares the test connection.
++    No handler or terminalization is invoked; the running transaction rolls back.
++    """
++
++    def _real_cursor(self):
++        from odoo.sql_db import db_connect
++
++        cr = db_connect(self.env.cr.dbname).cursor()
++        try:
++            cr.execute(
++                "SELECT set_config('statement_timeout', '10000', true), "
++                "set_config('lock_timeout', '8000', true)"
++            )
++            return cr
++        except BaseException:
++            cr.close()
++            raise
++
++    def test_claimed_foreign_company_read_has_independent_lease(self):
++        import json
++
++        from odoo import SUPERUSER_ID, api
++        from odoo.exceptions import AccessError
++        from requests import Response
++
++        store_id = company_id = None
++        worker_cr = None
++        setup = self._real_cursor()
++        try:
++            env = api.Environment(setup, SUPERUSER_ID, {})
++            company = env['res.company'].create({
++                'name': 'FUL claimed reader %s' % uuid.uuid4().hex,
++            })
++            company_id = company.id
++            store = env['shopify.connector.store'].with_company(company).create({
++                'name': 'FUL claimed reader',
++                'shop_domain': 'ful-claim-%s.myshopify.com' % uuid.uuid4().hex,
++                'api_version': '2026-07',
++                'company_id': company_id,
++            })
++            store_id = store.id
++            env['shopify.connector.store.credential'].action_set_token(
++                store, 'shpat_DUMMYDUMMYDUMMY0000000000000000',
++            )
++            store.write({'state': 'connected'})
++            store._p15_set_activation('active')
++            env['shopify.connector.store.settings'].create({
++                'store_id': store_id,
++                'fulfillment_domain_enabled': True,
++            })
++            job = env['shopify.connector.job'].create({
++                'store_id': store_id,
++                'job_source': 'reconciliation',
++                'job_type': 'fulfillment_reconciliation_check',
++                'state': 'queued',
++                'expected_connection_generation': store.connection_generation,
++                'payload_hash': uuid.uuid4().hex,
++            })
++            job_id = job.id
++            setup.commit()
++            setup.close()
++            setup = None
++
++            worker_cr = self._real_cursor()
++            worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
++            self.assertNotEqual(worker_env.company.id, company_id)
++            worker_cr.execute('SELECT pg_backend_pid()')
++            worker_pid = worker_cr.fetchone()[0]
++            Job = worker_env['shopify.connector.job']
++            # Exclude unrelated committed fixtures without changing the claim.
++            excluded = worker_env['shopify.connector.store'].search([
++                ('id', '!=', store_id),
++            ]).ids
++            claimed = Job._claim_for_dispatch(1, exclude_store_ids=excluded)
++            self.assertEqual(claimed.ids, [job_id])
++            gateway = worker_env['shopify.connector.read.gateway']
++            dispatch, claimed, _, _ = gateway._claimed_dispatch_scope(
++                worker_env['shopify.connector.job.dispatch'], claimed,
++            )
++            self.assertTrue(dispatch._start_running(claimed))
++            scoped_gateway = dispatch.env['shopify.connector.read.gateway']
++            self.assertEqual(dispatch.env.company.id, company_id)
++            self.assertEqual(claimed.store_id.company_id.id, company_id)
++            with self.assertRaises(AccessError):
++                gateway.read_location_page(
++                    Job.browse(job_id),
++                    worker_env['shopify.connector.store'].browse(store_id),
++                )
++
++            side_pids = []
++            sends = []
++
++            def side_cursor(*_args, **_kwargs):
++                cr = self._real_cursor()
++                cr.execute('SELECT pg_backend_pid()')
++                side_pids.append(cr.fetchone()[0])
++                return cr
++
++            def send(client, transport_store, body, token=None):
++                self.assertEqual(client.env.company.id, company_id)
++                self.assertEqual(transport_store.id, store_id)
++                self.assertIn('ConnectorFulfillmentLocations', body['query'])
++                sends.append(transport_store.id)
++                with self._real_cursor() as observer:
++                    observer.execute('SELECT pg_backend_pid()')
++                    self.assertNotEqual(observer.fetchone()[0], worker_pid)
++                    observer.execute(
++                        'SELECT job_id, company_id FROM '
++                        'shopify_connector_call_lease WHERE store_id = %s',
++                        (store_id,),
++                    )
++                    self.assertEqual(observer.fetchall(), [(job_id, company_id)])
++                response = Response()
++                response.status_code = 200
++                response.headers['X-Shopify-API-Version'] = '2026-07'
++                response._content = json.dumps({'data': {'locations': {
++                    'nodes': [],
++                    'pageInfo': {'hasNextPage': False, 'endCursor': None},
++                }}}).encode()
++                return response
++
++            Client = type(worker_env['shopify.connector.api.client'])
++            with patch.object(self.registry, 'cursor', side_effect=side_cursor), \
++                    patch.object(Client, '_send', new=send):
++                scoped_gateway.read_location_page(claimed, claimed.store_id)
++            self.assertEqual(sends, [store_id])
++            self.assertGreaterEqual(len(side_pids), 2)
++            self.assertNotIn(worker_pid, side_pids)
++            with self._real_cursor() as observer:
++                observer.execute(
++                    'SELECT count(*) FROM shopify_connector_call_lease '
++                    'WHERE store_id = %s', (store_id,),
++                )
++                self.assertEqual(observer.fetchone()[0], 0)
++            # The original root environment did not inherit the capability.
++            with self.assertRaises(AccessError):
++                gateway.read_location_page(
++                    Job.browse(job_id),
++                    worker_env['shopify.connector.store'].browse(store_id),
++                )
++        finally:
++            if setup is not None:
++                setup.rollback()
++                setup.close()
++            if worker_cr is not None:
++                worker_cr.rollback()
++                worker_cr.close()
++            # Committed fixture cleanup is scoped to this store, never cron
++            # triggers or other test fixtures. Remove logs before restricted jobs.
++            with self._real_cursor() as cleanup:
++                cleanup.execute(
++                    'DELETE FROM shopify_connector_job_log WHERE job_id IN '
++                    '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
++                    (store_id,),
++                )
++                for table in (
++                    'shopify_connector_call_lease', 'shopify_connector_job',
++                    'shopify_connector_store_settings',
++                    'shopify_connector_store_access_token',
++                    'shopify_connector_store_credential',
++                ):
++                    cleanup.execute(
++                        'DELETE FROM %s WHERE store_id = %%s' % table,
++                        (store_id,),
++                    )
++                cleanup.execute(
++                    'DELETE FROM shopify_connector_store WHERE id = %s',
++                    (store_id,),
++                )
++                env = api.Environment(cleanup, SUPERUSER_ID, {})
++                env['res.company'].browse(company_id).exists().unlink()
++                cleanup.commit()
++            with self._real_cursor() as observer:
++                for table, column, identifier in (
++                    ('shopify_connector_store', 'id', store_id),
++                    ('shopify_connector_job', 'store_id', store_id),
++                    ('shopify_connector_call_lease', 'store_id', store_id),
++                    ('shopify_connector_store_settings', 'store_id', store_id),
++                    ('shopify_connector_store_credential', 'store_id', store_id),
++                    ('res_company', 'id', company_id),
++                ):
++                    observer.execute(
++                        'SELECT count(*) FROM %s WHERE %s = %%s' %
++                        (table, column), (identifier,),
++                    )
++                    self.assertEqual(observer.fetchone()[0], 0, table)

@@ -146,7 +146,6 @@ CREDENTIAL_WRITE_SURFACES = frozenset((
     '_apply_probe_failure',
 ))
 
-
 class ShopifyConnectorStoreCredential(models.Model):
     """Admin-only Shopify Admin API credential for one store (Task 002).
 
@@ -550,7 +549,7 @@ class ShopifyConnectorStoreCredential(models.Model):
         if locked_state == 'connected':
             store_vals['state'] = 'reconnect_needed'
             store_vals['connection_generation'] = locked_generation + 1
-        store.write(store_vals)
+        store._store_service_write('_credential', store_vals)
         return None
 
     @api.model
@@ -633,7 +632,7 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'credential_epoch': self._next_credential_epoch(credential),
             })
         self._discard_token_cache(store)
-        store.write({
+        store._store_service_write('_credential', {
             'credential_present': False,
             'credential_last_verified_at': False,
             'credential_last_failure_reason': False,

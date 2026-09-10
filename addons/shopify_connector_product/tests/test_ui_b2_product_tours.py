@@ -86,6 +86,7 @@ class TestUiB2ProductTours(HttpCase):
             'product_first_sync_source': 'shopify_source',
         })
         cls.store.write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         cls.Job = cls.env['shopify.connector.job']
         cls.Decision = cls.env['shopify.connector.product.match.decision']
         cls.TemplateBinding = cls.env[

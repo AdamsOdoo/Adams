@@ -630,6 +630,7 @@ class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
             'credential_epoch': 1,
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         env['shopify.connector.store.settings'].create({
             'store_id': store.id,
             'product_export_domain_enabled': True,
@@ -863,6 +864,7 @@ class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
 
         from odoo.addons.shopify_connector_core.models import (
             shopify_connector_job_dispatch as dispatch_module,
+            shopify_connector_v2_mutation_dispatch as v2_dispatch_module,
         )
 
         drain_one = inspect.getsource(
@@ -873,7 +875,13 @@ class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
         mutation = inspect.getsource(
             dispatch_module.ShopifyConnectorJobDispatch._drain_mutation_one
         )
-        self.assertIn("strategy['prepare_preconditions']", mutation)
+        self.assertIn('self._prepare_mutation_request(', mutation)
+        preparation = inspect.getsource(
+            v2_dispatch_module.ShopifyConnectorV2MutationDispatch
+            ._prepare_mutation_request
+        )
+        self.assertIn("strategy['prepare_preconditions']", preparation)
+        self.assertIn('dispatch._validated_mutation_strategy(job_type)', preparation)
 
         strategies = self.env[
             'shopify.connector.job.dispatch'

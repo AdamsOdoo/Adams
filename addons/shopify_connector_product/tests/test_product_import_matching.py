@@ -90,6 +90,7 @@ class TestProductImportMatching(TransactionCase):
         cls.env['shopify.connector.store.credential'].action_set_token(
             cls.store, DUMMY_TOKEN,
         )
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):
@@ -106,8 +107,8 @@ class TestProductImportMatching(TransactionCase):
         self.registry_enter_test_mode()
 
     def _import_job(self, shopify_target_gid):
-        """Connect the store (the business-job create gate requires `connected`)
-        and return a product-import job at generation 0 (matching the store), so
+        """Connect the active fixture for business-job admission and return
+        a product-import job at generation 0 (matching the store), so
         `execute_business._admit` admits it. Flush so the admission side cursor
         observes the connected store and the job."""
         self.store.write({'state': 'connected'})
@@ -1864,6 +1865,7 @@ class TestProductCallSiteExecuteBusiness(TransactionCase):
         cls.env['shopify.connector.store.credential'].action_set_token(
             cls.store, DUMMY_TOKEN,
         )
+        cls.store._p15_set_activation('active')
         cls.env.flush_all()
 
     def setUp(self):
@@ -2627,6 +2629,7 @@ class TestProductCallSiteLifecycleGenuine(TransactionCase):
             )
             # action_set_token demotes connected -> reconnect_needed; re-assert.
             store.write({'state': 'connected'})
+            store._p15_set_activation('active')
             # Enable the product domain flag so the REAL scheduled-dispatch start
             # gate (`_domain_flag_for_job_type` -> `product_domain_enabled`) admits
             # a `product_import_sync` job driven through run_drain. (The other

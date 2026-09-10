@@ -277,6 +277,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })
@@ -312,6 +313,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })
@@ -343,6 +345,7 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
                 'api_version': '2026-07', 'state': 'connected',
             })
+            store._p15_set_activation('active')
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id, 'fulfillment_domain_enabled': True,
             })
@@ -396,6 +399,14 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'DELETE FROM shopify_connector_order_binding WHERE store_id = %s',
                 (store_id,),
             )
+            # Activation produces a durable lifecycle audit as well as a
+            # job. Remove only this fixture's evidence before its parent job.
+            cr.execute(
+                'DELETE FROM shopify_connector_job_log '
+                'WHERE store_id = %s OR job_id IN ('
+                'SELECT id FROM shopify_connector_job WHERE store_id = %s)',
+                (store_id, store_id),
+            )
             cr.execute(
                 'DELETE FROM shopify_connector_job WHERE store_id = %s',
                 (store_id,),
@@ -418,6 +429,28 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'DELETE FROM shopify_connector_store WHERE id = %s', (store_id,),
             )
             cr.commit()
+        # Check the committed outcome through a new connection: a leaked
+        # connected fixture would contaminate the subsequent warm update.
+        with db_connect(self.dbname).cursor() as cr:
+            for table, column in (
+                ('shopify_connector_store', 'id'),
+                ('shopify_connector_job', 'store_id'),
+                ('shopify_connector_job_log', 'store_id'),
+                ('shopify_connector_store_settings', 'store_id'),
+                ('shopify_connector_fulfillment_inbound_evidence', 'store_id'),
+                ('shopify_connector_location', 'store_id'),
+                ('shopify_connector_order_binding', 'store_id'),
+                ('sale_order', 'shopify_connector_store_id'),
+            ):
+                cr.execute(
+                    'SELECT count(*) FROM %s WHERE %s = %%s' % (table, column),
+                    (store_id,),
+                )
+                self.assertEqual(
+                    cr.fetchone()[0], 0,
+                    'durable fixture residue in %s for store %s'
+                    % (table, store_id),
+                )
 
     def _cleanup_business_records(self, ids):
         """Delete exact fixture-owned, independently-committed business
@@ -903,6 +936,7 @@ class TestFulfillmentConcurrency(TransactionCase):
             'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store._p15_set_activation('active')
         settings = self.env['shopify.connector.store.settings'].create({
             'store_id': store.id, 'fulfillment_domain_enabled': True,
         })

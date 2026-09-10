@@ -226,6 +226,13 @@ class TestExportSec3AndPermissions(ExportCase):
         )
         activation_store = self.store
         activation_settings = self.settings
+        if not webhook_installed:
+            # This test seeds pre-activation readiness, unlike ExportCase's
+            # operational fixture. It does not exercise an active-to-draft
+            # production transition. Keep its initial activation explicit.
+            activation_store._store_service_write(
+                '_lifecycle', {'activation_state': 'draft'},
+            )
         if webhook_installed:
             activation_store = self.Store.sudo().create({
                 'name': 'Export Activation Only Store',

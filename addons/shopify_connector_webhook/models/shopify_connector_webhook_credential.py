@@ -34,10 +34,7 @@ class ShopifyConnectorWebhookCredential(models.Model):
         # captured secret the immediate predecessor of this mutation; a
         # concurrent replacement cannot slip between the read and super().
         store._lock_store_for_lifecycle()
-        credential = self.sudo().search([
-            ('store_id', '=', store.id),
-        ], limit=1)
-        return credential.client_secret if credential else False
+        return self._get_client_secret(store)
 
     @api.model
     def _record_client_secret_transition(
@@ -89,8 +86,9 @@ class ShopifyConnectorWebhookCredential(models.Model):
         if not credential:
             return ()
         secrets = []
-        if credential.client_secret:
-            secrets.append(credential.client_secret)
+        current_secret = self._get_client_secret(store)
+        if current_secret:
+            secrets.append(current_secret)
         if (
             credential.webhook_previous_client_secret
             and credential.webhook_previous_client_secret_expires_at

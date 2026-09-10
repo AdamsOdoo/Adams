@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <!--
+        P03/P04 Odoo client-action shell.  The source is intentionally not
+        referenced by the addon manifest yet; the later activation gate adds
+        this template, JS, SCSS and the inert component assets together.
+    -->
+    <t t-name="shopify_connector_core.v2.ActionShell" owl="1">
+        <div t-ref="shell" class="o_sc_v2-shell" t-att-dir="direction">
+            <nav class="sc-v2-shell__nav" aria-label="Shopify Connector">
+                <div class="sc-v2-shell__identity">
+                    <span class="sc-v2-shell__eyebrow">Shopify Connector</span>
+                    <strong t-if="activeStoreName" t-esc="activeStoreName"/>
+                    <span t-else="">Store selection required</span>
+                </div>
+                <div class="sc-v2-shell__links">
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-att-aria-current="state.view === 'overview' ? 'page' : undefined"
+                            t-on-click="openOverview">
+                        Overview
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-att-aria-current="state.view === 'attention' ? 'page' : undefined"
+                            t-on-click="() => this.openAttention()">
+                        Needs Attention
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openUnavailable('Products')">
+                        Products
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openUnavailable('Orders')">
+                        Orders
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openUnavailable('Inventory')">
+                        Inventory
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openUnavailable('Fulfillment')">
+                        Fulfillment
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openRuns()"
+                            t-att-aria-current="state.view === 'run' ? 'page' : undefined">
+                        Runs
+                    </button>
+                    <button type="button"
+                            class="sc-v2-shell__link"
+                            t-on-click="() => this.openUnavailable('Settings')">
+                        Settings
+                    </button>
+                </div>
+                <span t-if="roleLabel" class="sc-v2-shell__role" t-esc="roleLabel"/>
+            </nav>
+
+            <div t-if="state.notice"
+                 class="sc-v2-shell__notice"
+                 role="alert"
+                 aria-live="assertive">
+                <span t-esc="state.notice.message"/>
+                <button t-if="state.notice.retry"
+                        type="button"
+                        class="sc-v2-button sc-v2-button--secondary"
+                        t-on-click="retryNotice">
+                    Try again
+                </button>
+                <button type="button"
+                        class="sc-v2-link-button"
+                        t-on-click="() => this.clearNotice()">
+                    Dismiss
+                </button>
+            </div>
+
+            <div class="sc-v2-shell__surface">
+                <Overview t-if="state.view === 'overview'"
+                          envelope="state.overview"
+                          onStoreChange.bind="selectStore"
+                          onAction.bind="handleAction"
+                          onOpenAttention.bind="openAttention"
+                          onOpenWorkflow.bind="openWorkflow"
+                          onOpenRun.bind="openRun"/>
+                <AttentionWorkspace t-elif="state.view === 'attention'"
+                                    envelope="state.attention"
+                                    selectedItemRef="state.selectedItemRef"
+                                    onSelect.bind="openAttention"
+                                    onAction.bind="handleAction"
+                                    onPage.bind="nextAttentionPage"
+                                    onBack.bind="backToAttention"
+                                    onOpenRun.bind="openRun"/>
+                <RunTimeline t-else=""
+                             envelope="state.run"
+                             onAction.bind="handleAction"
+                             onOpenRecord.bind="openRecord"/>
+            </div>
+        </div>
+    </t>
+
+</templates>

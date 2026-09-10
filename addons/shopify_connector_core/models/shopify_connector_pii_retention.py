@@ -122,6 +122,7 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
 
     @api.model
     def _run_attempt_evidence_masking(self):
+        """Mask at most one indexed, oldest batch of resolved attempts."""
         cutoff = fields.Datetime.now() - timedelta(
             days=self._attempt_evidence_retention_days(),
         )
@@ -129,7 +130,8 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
         attempts = Attempt.search([
             ('resolved_at', '!=', False),
             ('resolved_at', '<', cutoff),
-        ], order='store_id, id')
+            ('evidence_masked_at', '=', False),
+        ], order='resolved_at, id', limit=RETENTION_BATCH_SIZE)
         counts = {}
         for attempt in attempts:
             if attempt.effective_disposition() == 'unresolved':
@@ -195,7 +197,7 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                 ('store_id', '=', store.id),
                 ('occurred_at', '<', cutoff),
                 ('payload_snapshot', 'not in', (False, '')),
-            ])
+            ], order='occurred_at, id', limit=RETENTION_BATCH_SIZE)
             for log in logs:
                 try:
                     payload = json.loads(log.payload_snapshot)
@@ -224,4 +226,9 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                 )
         self._run_attempt_evidence_masking()
         self._run_terminal_job_retention()
+        # Named P15 acknowledgements are bounded, non-secret evidence too.
+        # Keep their cleanup on the same administrator/root cron so there is
+        # one retention control and no unbounded replay table.
+        if 'shopify.connector.command.result' in self.env:
+            self.env['shopify.connector.command.result'].run_retention()
         return True

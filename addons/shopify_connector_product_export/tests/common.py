@@ -40,7 +40,7 @@ class FakeSendResponse:
 
 
 class ExportCase(TransactionCase):
-    """Fixtures for a connected store with the export domain enabled."""
+    """Fixtures for an active, connected store with the export domain enabled."""
 
     @classmethod
     def setUpClass(cls):
@@ -63,6 +63,7 @@ class ExportCase(TransactionCase):
             'api_version': SHOPIFY_API_VERSION,
         })
         cls.store.sudo().write({'state': 'connected'})
+        cls.store._p15_set_activation('active')
         # Batch 1 correction (§9.1): `create()` on the credential model is
         # refused outside the credential service's own write surface, so this
         # fixture mints through that surface. Mechanical, test-only, and

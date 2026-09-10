@@ -1,0 +1,122 @@
+// Responsive and high-contrast overrides.  The wrapper is intentional: even
+// media-query selectors remain scoped to an active V2 root.
+.o_sc_v2 {
+    @media (max-width: 1199px) {
+        .sc-v2-workflow-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .sc-v2-run-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(220px, 0.75fr);
+        }
+    }
+
+    @media (max-width: 767px) {
+        .sc-v2__viewport {
+            padding: var(--sc-space-5) var(--sc-space-3);
+        }
+
+        .sc-v2-page-header,
+        .sc-v2-run-summary {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .sc-v2-store-switcher {
+            align-items: stretch;
+            justify-content: flex-start;
+
+            &__control,
+            .sc-v2-select {
+                inline-size: 100%;
+            }
+        }
+
+        .sc-v2-health-band {
+            grid-template-columns: auto minmax(0, 1fr);
+
+            > .sc-v2-button {
+                grid-column: 1 / -1;
+                inline-size: 100%;
+            }
+        }
+
+        .sc-v2-workflow-grid,
+        .sc-v2-activity__summary,
+        .sc-v2-run-grid {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .sc-v2-attention__layout {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .sc-v2-attention__detail {
+            position: static;
+        }
+
+        .sc-v2-attention:not(.sc-v2-attention--has-detail) .sc-v2-attention__detail--empty {
+            display: none;
+        }
+
+        .sc-v2-attention--has-detail .sc-v2-attention__list {
+            display: none;
+        }
+
+        .sc-v2-attention--has-detail .sc-v2-attention__detail {
+            display: block;
+            scroll-margin-block-start: var(--sc-space-4);
+        }
+
+        .sc-v2-attention-row {
+            grid-template-columns: auto minmax(0, 1fr);
+
+            &__age {
+                grid-column: 2;
+            }
+        }
+
+        .sc-v2-section,
+        .sc-v2-attention__detail {
+            padding: var(--sc-space-4);
+        }
+    }
+
+    @media (max-width: 374px) {
+        .sc-v2-attention-row {
+            grid-template-columns: minmax(0, 1fr);
+
+            &__age {
+                grid-column: auto;
+            }
+        }
+
+        .sc-v2-health-band {
+            grid-template-columns: minmax(0, 1fr);
+
+            &__leading {
+                padding-block-start: 0;
+            }
+        }
+
+        .sc-v2-evidence-row,
+        .sc-v2-key-value-list > div {
+            grid-template-columns: minmax(0, 1fr);
+            gap: var(--sc-space-1);
+        }
+    }
+
+    @media (forced-colors: active) {
+        border-color: CanvasText;
+
+        .sc-v2-status-pill,
+        .sc-v2-button,
+        .sc-v2-select,
+        .sc-v2-section,
+        .sc-v2-health-band,
+        .sc-v2-attention__detail,
+        .sc-v2-run-summary {
+            border-color: CanvasText;
+        }
+    }
+}

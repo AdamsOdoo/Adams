@@ -45,6 +45,7 @@ class TestFulfillmentScans(TransactionCase):
             'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
         cls.settings = cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id, 'fulfillment_domain_enabled': True,
         })
@@ -267,6 +268,22 @@ class TestFulfillmentScans(TransactionCase):
         batched.assert_called_once()
 
     def test_batched_reader_requires_exact_requested_identity(self):
+        # This direct reader test bypasses the claimed worker boundary.
+        # Exercise it as an ordinary authorized connector operator.
+        reader = self.env['res.users'].create({
+            'name': 'FUL batch reader',
+            'login': 'ful-batch-reader-%s' % uuid.uuid4().hex,
+            'company_id': self.store.company_id.id,
+            'company_ids': [(6, 0, self.store.company_id.ids)],
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
+                ).id,
+            ])],
+        })
+        service = self.Service.with_user(reader)
+        store = self.store.with_user(reader)
         gids = [
             'gid://shopify/Fulfillment/BATCH-1',
             'gid://shopify/Fulfillment/BATCH-2',
@@ -275,12 +292,12 @@ class TestFulfillmentScans(TransactionCase):
             {'id': gid, 'status': 'SUCCESS', 'trackingInfo': []}
             for gid in gids
         ]
-        job = self._scan_job('fulfillment_reconciliation_check')
+        job = self._scan_job('fulfillment_reconciliation_check').with_user(reader)
         with patch.object(
             type(self.Service), '_read_data', return_value={'nodes': nodes},
         ):
-            result = self.Service._read_fulfillments_batch(
-                job, self.store, gids,
+            result = service._read_fulfillments_batch(
+                job, store, gids,
             )
         self.assertEqual(set(result), set(gids))
         with patch.object(
@@ -288,8 +305,8 @@ class TestFulfillmentScans(TransactionCase):
             return_value={'nodes': list(reversed(nodes))},
         ):
             with self.assertRaises(FulfillmentReadError):
-                self.Service._read_fulfillments_batch(
-                    job, self.store, gids,
+                service._read_fulfillments_batch(
+                    job, store, gids,
                 )
 
     # ------------------------------------------------------------------
@@ -310,6 +327,7 @@ class TestFulfillmentScans(TransactionCase):
             'shop_domain': 'ful2-%s.myshopify.com' % uuid.uuid4().hex,
             'api_version': '2026-07', 'state': 'connected',
         })
+        store_2._p15_set_activation('active')
         self.env['shopify.connector.store.settings'].create({
             'store_id': store_2.id, 'fulfillment_domain_enabled': True,
         })

@@ -1,0 +1,201 @@
+{
+  "scope": "activation, API/DTO foundations, matching, mutation recovery, core jobs, and store/company security and mutation boundary guards",
+  "classes": [
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestBusinessAdmission"
+    },
+    {
+      "addon": "shopify_connector_inventory",
+      "class": "TestInventoryPushMechanics"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductMatchDecision"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductImportMatching"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationRecovery"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2RuntimeAdapter"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestP15StoreAdmin"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestJobEnqueue"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestJobDispatch"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec3ModelMatrix"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec3InventoryCompleteness"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec3RelationalClosure"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec3HistoricRows"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2RuntimeSchema"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestCommandResultSecurity"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2MutationRuntime"
+    },
+    {
+      "addon": "shopify_connector_webhook",
+      "class": "TestShopifyConnectorWebhookP11"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestV2RecoveryCommands"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestSec2Roles"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestSec3SaleCompanyIsolation"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestProductContractRepair"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_webhook",
+      "class": "TestShopifyConnectorWebhookW1"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestUiSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentReaderPagination"
+    },
+    {
+      "addon": "shopify_connector_inventory_webhook",
+      "class": "TestShopifyConnectorInventoryWebhookW3"
+    },
+    {
+      "addon": "shopify_connector_product_webhook",
+      "class": "TestShopifyConnectorProductWebhookW2"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestReadGatewayScope"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestP07DomainReadGateway"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationDispatch"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentModeSwitch"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentScans"
+    },
+    {
+      "addon": "shopify_connector_fulfillment_webhook",
+      "class": "TestShopifyConnectorFulfillmentWebhook"
+    },
+    {
+      "addon": "shopify_connector_sale_webhook",
+      "class": "TestShopifyConnectorSaleWebhook"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestTaxDecisionRoute"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestMutationConcurrency"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportCreateDedup"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentConcurrency"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductCallSiteLifecycleGenuine"
+    },
+    {
+      "addon": "shopify_connector_product",
+      "class": "TestProductRuntimePerformance"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerMatchingConcurrency"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteLeaseVisibilityGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteRaceAGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestCustomerCallsiteRaceBGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestOrderDiscoveryConcurrencyGenuine"
+    },
+    {
+      "addon": "shopify_connector_sale",
+      "class": "TestTaxMappingCompetingChoiceRace"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportMutationExpiryThroughTheDispatcher"
+    }
+  ]
+}

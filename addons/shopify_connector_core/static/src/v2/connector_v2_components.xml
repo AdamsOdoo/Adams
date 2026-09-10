@@ -1,0 +1,571 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <!--
+        V2 presentation templates.  These names are intentionally separate
+        from the accepted U0/U3 templates.  The bundle is not wired yet, so
+        adding this file cannot change the current production surface.
+    -->
+
+    <t t-name="shopify_connector_core.v2.StatusPill" owl="1">
+        <span t-att-class="className"
+              t-att-role="props.live ? 'status' : undefined"
+              t-att-aria-live="props.live ? 'polite' : undefined">
+            <i t-att-class="'fa ' + meta.icon" aria-hidden="true"/>
+            <span class="sc-v2-status-pill__label" t-esc="displayLabel"/>
+        </span>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.StateMessage" owl="1">
+        <section t-att-class="'sc-v2-state-message sc-v2-state-message--' + meta.tone"
+                 t-att-role="isError ? 'alert' : 'status'"
+                 t-att-aria-live="isError ? 'assertive' : 'polite'"
+                 t-att-aria-busy="props.busy ? 'true' : undefined">
+            <div class="sc-v2-state-message__icon" aria-hidden="true">
+                <i t-att-class="'fa ' + meta.icon"/>
+            </div>
+            <div class="sc-v2-state-message__body">
+                <h2 class="sc-v2-state-message__title" t-esc="displayTitle"/>
+                <p class="sc-v2-state-message__detail" t-esc="displayDetail"/>
+                <button t-if="props.action"
+                        type="button"
+                        class="sc-v2-button sc-v2-button--secondary"
+                        t-att-disabled="props.busy ? 'disabled' : undefined"
+                        t-on-click="emitAction">
+                    <t t-esc="props.action.label"/>
+                </button>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.HealthBand" owl="1">
+        <t t-if="screen.state === 'loading'">
+            <section class="sc-v2-health-band sc-v2-health-band--loading"
+                     aria-busy="true"
+                     aria-label="Loading store health">
+                <div class="sc-v2-skeleton sc-v2-skeleton--title" aria-hidden="true"/>
+                <div class="sc-v2-skeleton sc-v2-skeleton--line" aria-hidden="true"/>
+            </section>
+        </t>
+        <t t-elif="screen.state === 'refreshing' &amp;&amp; health">
+            <section t-att-class="'sc-v2-health-band sc-v2-health-band--' + healthToneClass"
+                     aria-live="polite">
+                <div class="sc-v2-health-band__leading">
+                    <StatusPill state="severity" label="health.severity_label || undefined"/>
+                </div>
+                <div class="sc-v2-health-band__content">
+                    <strong t-esc="healthTitle"/>
+                    <p t-esc="healthReason"/>
+                    <div class="sc-v2-health-band__meta">
+                        <span>Observed <time t-att-datetime="health.observed_at || undefined" t-esc="observedAt"/></span>
+                        <span class="sc-v2-refresh-note"><i class="fa fa-refresh" aria-hidden="true"/> Refreshing</span>
+                    </div>
+                </div>
+                <button t-if="action"
+                        type="button"
+                        class="sc-v2-button sc-v2-button--secondary"
+                        t-on-click="emitAction"
+                        t-esc="action.label"/>
+            </section>
+        </t>
+        <t t-elif="(screen.state === 'success' || screen.state === 'partial' || screen.state === 'stale' || screen.state === 'manual_review') &amp;&amp; health">
+            <section t-att-class="'sc-v2-health-band sc-v2-health-band--' + healthToneClass"
+                     aria-live="polite">
+                <div class="sc-v2-health-band__leading">
+                    <StatusPill state="severity" label="health.severity_label || undefined"/>
+                </div>
+                <div class="sc-v2-health-band__content">
+                    <strong t-esc="healthTitle"/>
+                    <p t-esc="healthReason"/>
+                    <div class="sc-v2-health-band__meta">
+                        <span>Observed <time t-att-datetime="health.observed_at || undefined" t-esc="observedAt"/></span>
+                        <span t-if="nextCheckAt">Next check <time t-att-datetime="health.next_check_at || undefined" t-esc="nextCheckAt"/></span>
+                        <span t-if="screen.dataThrough">Data through <time t-att-datetime="screen.dataThrough" t-esc="screen.dataThrough"/></span>
+                    </div>
+                </div>
+                <button t-if="action"
+                        type="button"
+                        class="sc-v2-button sc-v2-button--secondary"
+                        t-on-click="emitAction"
+                        t-esc="action.label"/>
+            </section>
+        </t>
+        <t t-else="">
+            <StateMessage state="screen.state"
+                          action="action"
+                          onAction.bind="emitAction"/>
+        </t>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.StoreSwitcher" owl="1">
+        <div class="sc-v2-store-switcher">
+            <label class="sc-v2-store-switcher__label" t-att-for="selectId">Store</label>
+            <div class="sc-v2-store-switcher__control">
+                <select t-att-id="selectId"
+                        class="sc-v2-select"
+                        t-on-change="selectStore"
+                        t-att-disabled="!stores.length &amp;&amp; !hasAllStoresOption ? 'disabled' : undefined">
+                    <option t-if="hasAllStoresOption"
+                            value="__all__"
+                            t-att-selected="selectedId === '__all__' ? 'selected' : undefined">
+                        All stores · health summary
+                    </option>
+                    <t t-foreach="stores" t-as="store" t-key="store.id">
+                        <option t-att-value="store.id"
+                                t-att-selected="this.isSelectedStore(store) ? 'selected' : undefined"
+                                t-esc="store.name"/>
+                    </t>
+                    <option t-if="!stores.length &amp;&amp; selectedStore"
+                            t-att-value="selectedStore.id"
+                            selected="selected"
+                            t-esc="selectedStore.name"/>
+                </select>
+                <StatusPill t-if="selectedStore"
+                            state="selectedStore.runtime_health || selectedStore.connection || 'neutral'"
+                            label="selectedStore.connection_label || undefined"
+                            compact="true"/>
+            </div>
+            <button t-if="canManage"
+                    type="button"
+                    class="sc-v2-button sc-v2-button--quiet"
+                    t-on-click="manageStores">
+                Manage stores
+            </button>
+        </div>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.Overview" owl="1">
+        <main t-att-class="'o_sc_v2 sc-v2-overview sc-v2-overview--' + screen.state"
+              t-att-dir="localizationDirection"
+              t-att-aria-labelledby="titleId">
+            <div class="sc-v2__viewport">
+                <header class="sc-v2-page-header">
+                    <div>
+                        <p class="sc-v2-eyebrow">Shopify Connector</p>
+                        <h1 t-att-id="titleId" class="sc-v2-page-header__title">Overview</h1>
+                        <p class="sc-v2-page-header__subtitle">Know what is safe, what needs a person, and what happened.</p>
+                    </div>
+                    <StoreSwitcher envelope="props.envelope" onSelect.bind="selectStore" onManage.bind="emitAction"/>
+                </header>
+
+                <t t-if="screen.state === 'loading'">
+                    <section class="sc-v2-overview__loading" aria-busy="true">
+                        <div class="sc-v2-skeleton sc-v2-skeleton--hero" aria-hidden="true"/>
+                        <div class="sc-v2-skeleton-grid" aria-hidden="true">
+                            <div class="sc-v2-skeleton sc-v2-skeleton--card"/>
+                            <div class="sc-v2-skeleton sc-v2-skeleton--card"/>
+                            <div class="sc-v2-skeleton sc-v2-skeleton--card"/>
+                            <div class="sc-v2-skeleton sc-v2-skeleton--card"/>
+                        </div>
+                        <p class="sc-v2-visually-hidden" role="status">Loading store overview</p>
+                    </section>
+                </t>
+                <t t-elif="screen.state === 'terminal_error' || screen.state === 'retryable_error' || screen.state === 'offline'">
+                    <StateMessage state="screen.state"
+                                  detail="screen.hasErrorMessage ? screen.errorMessage : undefined"
+                                  action="stateAction"
+                                  onAction.bind="emitAction"/>
+                </t>
+                <t t-elif="!hasStore || screen.state === 'empty' || screen.state === 'unconfigured' || screen.state === 'filtered_empty' || screen.state === 'permission_empty'">
+                    <StateMessage state="screen.state"
+                                  action="stateAction"
+                                  onAction.bind="emitAction"/>
+                </t>
+                <t t-else="">
+                    <HealthBand envelope="props.envelope" onAction.bind="emitAction"/>
+
+                    <section t-if="screen.state === 'partial' || screen.state === 'stale'"
+                             class="sc-v2-inline-notice"
+                             role="status">
+                        <StatusPill state="screen.state"/>
+                        <span t-esc="screen.state === 'partial' ? 'Some sections are unavailable; valid evidence remains visible.' : 'The read is older than the current freshness target.'"/>
+                    </section>
+
+                    <section class="sc-v2-section" t-att-aria-labelledby="workflowsTitleId">
+                        <div class="sc-v2-section__header">
+                            <div>
+                                <p class="sc-v2-eyebrow">Work moving through the connector</p>
+                                <h2 t-att-id="workflowsTitleId" class="sc-v2-section__title">Workflows</h2>
+                            </div>
+                        </div>
+                        <div t-if="workflows.length" class="sc-v2-workflow-grid">
+                            <t t-foreach="workflows" t-as="workflow" t-key="workflow.key">
+                                <button type="button"
+                                        class="sc-v2-workflow-card"
+                                        t-on-click="() => this.openWorkflow(workflow)">
+                                    <span class="sc-v2-workflow-card__topline">
+                                        <span class="sc-v2-workflow-card__name" t-esc="workflow.label || this.displayWorkflowLabel(workflow)"/>
+                                        <StatusPill state="workflow.health || workflow.readiness"
+                                                    label="workflow.health_label || workflow.readiness_label || undefined"/>
+                                    </span>
+                                    <span class="sc-v2-workflow-card__meta">
+                                        <span t-if="workflow.freshness &amp;&amp; workflow.freshness.label"
+                                              t-esc="workflow.freshness.label"/>
+                                        <span t-else="">Freshness is not available</span>
+                                    </span>
+                                    <span class="sc-v2-workflow-card__bottomline">
+                                        <span t-if="workflow.attention_count"
+                                              class="sc-v2-workflow-card__attention">
+                                            <i class="fa fa-exclamation-circle" aria-hidden="true"/>
+                                            <t t-esc="workflow.attention_count"/> needs attention
+                                        </span>
+                                        <span t-else="">No active attention</span>
+                                        <i class="fa fa-arrow-right" aria-hidden="true"/>
+                                    </span>
+                                </button>
+                            </t>
+                        </div>
+                        <StateMessage t-else=""
+                                      state="'empty'"
+                                      title="'No workflows are enabled'"
+                                      detail="'Enable a workflow in Settings to see its operational evidence.'"/>
+                    </section>
+
+                    <section class="sc-v2-section" t-att-aria-labelledby="attentionTitleId">
+                        <div class="sc-v2-section__header">
+                            <div>
+                                <p class="sc-v2-eyebrow">Ranked by impact</p>
+                                <h2 t-att-id="attentionTitleId" class="sc-v2-section__title">Needs Attention</h2>
+                            </div>
+                            <button type="button"
+                                    class="sc-v2-button sc-v2-button--quiet"
+                                    t-on-click="() => this.openAttention({ kind: 'list' })">
+                                View all
+                            </button>
+                        </div>
+                        <div t-if="attentionItems.length" class="sc-v2-attention-preview">
+                            <t t-foreach="attentionItems" t-as="item" t-key="item.item_ref">
+                                <button type="button"
+                                        class="sc-v2-attention-row"
+                                        t-on-click="() => this.openAttention(item)">
+                                    <StatusPill state="item.severity" label="item.severity_label || undefined"/>
+                                    <span class="sc-v2-attention-row__content">
+                                        <strong t-esc="item.title"/>
+                                        <span t-esc="item.impact_summary"/>
+                                    </span>
+                                <span class="sc-v2-attention-row__age"
+                                          t-esc="this.ageLabel(item)"/>
+                                </button>
+                            </t>
+                        </div>
+                        <section t-if="attentionIncomplete"
+                                 class="sc-v2-inline-notice"
+                                 role="status">
+                            <StatusPill state="'partial'" label="'Incomplete preview'"/>
+                            <span t-esc="attentionIncompleteMessage"/>
+                        </section>
+                        <StateMessage t-if="!attentionItems.length &amp;&amp; attentionIncomplete"
+                                      state="'partial'"
+                                      title="'Attention evidence is incomplete'"
+                                      detail="attentionIncompleteMessage"/>
+                        <StateMessage t-if="!attentionItems.length &amp;&amp; !attentionIncomplete"
+                                      state="'empty'"
+                                      title="'Nothing needs attention'"
+                                      detail="'Healthy work recedes until a decision is required.'"/>
+                    </section>
+
+                    <section t-if="activity" class="sc-v2-section sc-v2-activity" t-att-aria-labelledby="activityTitleId">
+                        <div class="sc-v2-section__header">
+                            <div>
+                                <p class="sc-v2-eyebrow">Material connector activity</p>
+                                <h2 t-att-id="activityTitleId" class="sc-v2-section__title">Last <t t-esc="activity.window_days || 7"/> days</h2>
+                            </div>
+                        </div>
+                        <div class="sc-v2-activity__summary" role="list" aria-label="Operation summary">
+                            <div role="listitem" class="sc-v2-activity__metric">
+                                <strong t-esc="activity.succeeded || 0"/>
+                                <span>completed</span>
+                            </div>
+                            <div role="listitem" class="sc-v2-activity__metric sc-v2-activity__metric--held">
+                                <strong t-esc="activity.held || 0"/>
+                                <span>held for a decision</span>
+                            </div>
+                            <div role="listitem" class="sc-v2-activity__metric">
+                                <strong t-esc="screen.data_through || screen.dataThrough || '—'"/>
+                                <span>evidence through</span>
+                            </div>
+                        </div>
+                    </section>
+                </t>
+            </div>
+        </main>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.AttentionWorkspace" owl="1">
+        <main t-att-class="'o_sc_v2 sc-v2-attention sc-v2-attention--' + screen.state + (hasDetail ? ' sc-v2-attention--has-detail' : '')"
+              t-att-dir="localizationDirection"
+              t-att-aria-labelledby="workspaceTitleId">
+            <div class="sc-v2__viewport">
+                <header class="sc-v2-page-header">
+                    <div>
+                        <p class="sc-v2-eyebrow">Ranked by impact and ownership</p>
+                        <h1 t-att-id="workspaceTitleId" class="sc-v2-page-header__title">Needs Attention</h1>
+                        <p class="sc-v2-page-header__subtitle">
+                            Review the exact evidence and the safe transition returned by the server.
+                        </p>
+                    </div>
+                    <span class="sc-v2-count" t-esc="total"/>
+                </header>
+
+                <t t-if="screen.state === 'loading'">
+                    <section class="sc-v2-attention__loading" aria-busy="true">
+                        <div class="sc-v2-skeleton sc-v2-skeleton--list" aria-hidden="true"/>
+                        <div class="sc-v2-skeleton sc-v2-skeleton--panel" aria-hidden="true"/>
+                        <p class="sc-v2-visually-hidden" role="status">Loading attention items</p>
+                    </section>
+                </t>
+                <t t-elif="screen.state === 'terminal_error' || screen.state === 'retryable_error' || screen.state === 'offline' || screen.state === 'permission_empty' || screen.state === 'unconfigured'">
+                    <StateMessage state="screen.state"
+                                  detail="screen.hasErrorMessage ? screen.errorMessage : undefined"/>
+                </t>
+                <t t-else="">
+                    <div class="sc-v2-attention__toolbar" role="status">
+                        <span t-if="filtersSummary" t-esc="filtersSummary"/>
+                        <span t-else="">The server returned <t t-esc="total"/> attention item(s).</span>
+                        <StatusPill t-if="screen.state === 'partial' || screen.state === 'stale' || screen.state === 'refreshing'"
+                                    state="screen.state"/>
+                    </div>
+                    <section t-if="incompleteProjection"
+                             class="sc-v2-inline-notice"
+                             role="status">
+                        <StatusPill state="'partial'" label="'Bounded result'"/>
+                        <span t-esc="incompleteProjectionMessage"/>
+                    </section>
+                    <div class="sc-v2-attention__layout">
+                        <section class="sc-v2-attention__list" t-att-aria-labelledby="listTitleId">
+                            <h2 t-att-id="listTitleId" class="sc-v2-visually-hidden">Attention items</h2>
+                            <div t-if="items.length" class="sc-v2-attention__rows" role="list">
+                                <t t-foreach="items" t-as="item" t-key="item.item_ref">
+                                    <div role="listitem" class="sc-v2-attention-row-container">
+                                        <button type="button"
+                                                t-att-class="'sc-v2-attention-row' + (selected &amp;&amp; selected.item_ref === item.item_ref ? ' sc-v2-attention-row--selected' : '')"
+                                                t-att-aria-current="selected &amp;&amp; selected.item_ref === item.item_ref ? 'true' : undefined"
+                                                t-att-aria-expanded="selected &amp;&amp; selected.item_ref === item.item_ref ? 'true' : 'false'"
+                                                t-att-aria-controls="detailId"
+                                                t-on-click="() => this.select(item)">
+                                            <StatusPill state="item.severity" label="item.severity_label || undefined"/>
+                                            <span class="sc-v2-attention-row__content">
+                                                <strong t-esc="item.title"/>
+                                                <span t-esc="item.impact_summary"/>
+                                                <span class="sc-v2-attention-row__meta">
+                                                    <t t-esc="this.displayWorkflowLabel(item.workflow)"/> · <t t-esc="this.displayOwnerRoleLabel(item.owner_role)"/>
+                                                </span>
+                                            </span>
+                                            <span class="sc-v2-attention-row__age" t-esc="this.ageLabel(item)"/>
+                                        </button>
+                                    </div>
+                                </t>
+                            </div>
+                            <StateMessage t-else=""
+                                          state="emptyState"
+                                          detail="emptyState === 'empty' ? 'No active attention items were returned for this store.' : undefined"/>
+                            <button t-if="hasNextPage"
+                                    type="button"
+                                    class="sc-v2-button sc-v2-button--secondary sc-v2-attention__next"
+                                    t-on-click="nextPage">
+                                Load the next bounded page
+                            </button>
+                        </section>
+
+                        <aside t-if="hasDetail"
+                               class="sc-v2-attention__detail"
+                               t-att-id="detailId"
+                               tabindex="-1"
+                               aria-live="polite"
+                               t-att-aria-labelledby="detailTitleId">
+                            <button type="button"
+                                    class="sc-v2-button sc-v2-button--quiet sc-v2-attention__back"
+                                    t-on-click="back">
+                                <i class="fa fa-arrow-left" aria-hidden="true"/> Back to attention list
+                            </button>
+                            <div class="sc-v2-detail-header">
+                                <StatusPill state="selected.severity" label="selected.severity_label || undefined"/>
+                                <h2 t-att-id="detailTitleId" t-esc="selected.title"/>
+                                <p t-esc="selected.what_happened || selected.impact_summary"/>
+                            </div>
+                            <div class="sc-v2-detail-impact">
+                                <strong>Impact</strong>
+                                <span t-esc="selected.impact_summary"/>
+                            </div>
+                            <div t-if="selected.evidence_groups &amp;&amp; selected.evidence_groups.length"
+                                 class="sc-v2-evidence-groups">
+                                <section t-foreach="selected.evidence_groups" t-as="group" t-key="group.key" class="sc-v2-evidence-group">
+                                    <h3 t-esc="group.label"/>
+                                    <dl>
+                                        <t t-foreach="group.rows || []" t-as="row" t-key="row.label">
+                                            <div class="sc-v2-evidence-row">
+                                                <dt t-esc="row.label"/>
+                                                <dd t-esc="row.display_value || row.value || '—'"/>
+                                            </div>
+                                        </t>
+                                    </dl>
+                                </section>
+                            </div>
+                            <section t-if="selected.history &amp;&amp; selected.history.length" class="sc-v2-detail-history">
+                                <h3>History</h3>
+                                <ol>
+                                    <li t-foreach="selected.history" t-as="entry" t-key="entry.event_id || entry.occurred_at">
+                                        <strong t-esc="entry.title || this.displayEventLabel(entry.kind)"/>
+                                        <span t-esc="entry.detail || entry.occurred_at"/>
+                                    </li>
+                                </ol>
+                            </section>
+                            <section class="sc-v2-resolution" t-att-aria-labelledby="resolutionTitleId">
+                                <h3 t-att-id="resolutionTitleId">Safety decision</h3>
+                                <p t-if="action &amp;&amp; action.consequence" t-esc="action.consequence"/>
+                                <p t-else="">The server has not returned a safe transition for this item.</p>
+                                <button t-if="action"
+                                        type="button"
+                                        class="sc-v2-button sc-v2-button--primary"
+                                        t-on-click="() => this.act(action)">
+                                    <t t-esc="action.label"/>
+                                    <span t-if="action.requires_reason" class="sc-v2-button__hint">Reason required</span>
+                                </button>
+                                <button t-if="selected.run_ref"
+                                        type="button"
+                                        class="sc-v2-button sc-v2-button--quiet"
+                                        t-on-click="openRun">
+                                    View run evidence
+                                </button>
+                            </section>
+                        </aside>
+                        <section t-else=""
+                                 class="sc-v2-attention__detail sc-v2-attention__detail--empty"
+                                 t-att-id="detailId"
+                                 tabindex="-1"
+                                 aria-live="polite"
+                                 t-att-aria-labelledby="detailTitleId">
+                            <i class="fa fa-hand-o-up" aria-hidden="true"/>
+                            <h2 t-att-id="detailTitleId">Select an item to review its evidence</h2>
+                            <p>Choose one attention item. Its filters remain in the list while the detail is opened.</p>
+                        </section>
+                    </div>
+                </t>
+            </div>
+        </main>
+    </t>
+
+    <t t-name="shopify_connector_core.v2.RunTimeline" owl="1">
+        <main t-att-class="'o_sc_v2 sc-v2-run sc-v2-run--' + screen.state"
+              t-att-dir="localizationDirection"
+              t-att-aria-labelledby="titleId"
+              aria-label="Run evidence">
+            <div class="sc-v2__viewport">
+                <t t-if="screen.state === 'loading'">
+                    <section class="sc-v2-run__loading" aria-busy="true">
+                        <div class="sc-v2-skeleton sc-v2-skeleton--hero" aria-hidden="true"/>
+                        <div class="sc-v2-skeleton sc-v2-skeleton--timeline" aria-hidden="true"/>
+                        <p class="sc-v2-visually-hidden" role="status">Loading run evidence</p>
+                    </section>
+                </t>
+                <t t-elif="screen.state === 'terminal_error' || screen.state === 'retryable_error' || screen.state === 'offline' || screen.state === 'permission_empty' || screen.state === 'empty' || screen.state === 'unconfigured' || screen.state === 'filtered_empty' || !hasRun">
+                    <StateMessage state="screen.state"
+                                  detail="screen.hasErrorMessage ? screen.errorMessage : undefined"/>
+                </t>
+                <t t-else="">
+                    <header class="sc-v2-page-header">
+                        <div>
+                            <p class="sc-v2-eyebrow"><t t-esc="this.displayWorkflowLabel(run.workflow)"/></p>
+                            <h1 t-att-id="titleId" class="sc-v2-page-header__title" t-esc="run.display_name || run.run_ref"/>
+                            <p class="sc-v2-page-header__subtitle" t-esc="this.scopeLabel(run.scope)"/>
+                        </div>
+                    <StatusPill state="run.state" label="run.state_label || undefined" live="true"/>
+                    </header>
+
+                    <section t-if="screen.state === 'partial' || screen.state === 'stale' || screen.state === 'refreshing'"
+                             class="sc-v2-inline-notice"
+                             role="status">
+                        <StatusPill state="screen.state"/>
+                        <span t-esc="screen.state === 'partial' ? 'Some run evidence is unavailable.' : screen.state === 'refreshing' ? 'Existing run evidence remains visible while this read refreshes.' : 'This run read is stale; refresh before acting.'"/>
+                    </section>
+
+                    <section t-if="incompleteEvidence"
+                             class="sc-v2-inline-notice"
+                             role="status">
+                        <StatusPill state="'partial'" label="'Bounded evidence'"/>
+                        <span t-esc="incompleteEvidenceMessage"/>
+                    </section>
+
+                    <section class="sc-v2-run-summary" t-att-aria-labelledby="resultTitleId">
+                        <div class="sc-v2-run-summary__body">
+                            <p class="sc-v2-eyebrow">Current result</p>
+                            <h2 t-att-id="resultTitleId" t-esc="result.title || 'Result recorded'"/>
+                            <p t-esc="result.message || 'The connector has recorded the latest available evidence.'"/>
+                        </div>
+                        <button t-if="action"
+                                type="button"
+                                class="sc-v2-button sc-v2-button--primary"
+                                t-on-click="() => this.act(action)">
+                            <t t-esc="action.label"/>
+                        </button>
+                    </section>
+
+                    <div class="sc-v2-run-grid">
+                        <section class="sc-v2-section sc-v2-run__timeline-section" t-att-aria-labelledby="timelineTitleId">
+                            <div class="sc-v2-section__header">
+                                <div>
+                                    <p class="sc-v2-eyebrow">Append-only narrative</p>
+                                    <h2 t-att-id="timelineTitleId" class="sc-v2-section__title">What happened</h2>
+                                </div>
+                            </div>
+                            <ol t-if="timeline.length" class="sc-v2-timeline" aria-label="Run timeline">
+                                <li t-foreach="timeline" t-as="event" t-key="event.event_id" class="sc-v2-timeline__event">
+                                    <span class="sc-v2-timeline__rail" aria-hidden="true"/>
+                                    <div class="sc-v2-timeline__marker" aria-hidden="true">
+                                        <i t-att-class="'fa ' + (event.tone === 'danger' ? 'fa-times' : event.tone === 'warning' ? 'fa-exclamation' : 'fa-check')"/>
+                                    </div>
+                                    <div class="sc-v2-timeline__body">
+                                        <div class="sc-v2-timeline__heading">
+                                            <strong t-esc="event.title"/>
+                                            <StatusPill state="event.tone" label="event.tone_label || undefined"/>
+                                        </div>
+                                        <p t-esc="event.detail"/>
+                                        <time t-att-datetime="event.occurred_at || undefined" t-esc="event.occurred_label || event.occurred_at"/>
+                                        <span t-if="event.technical_detail_available" class="sc-v2-technical-note">
+                                            <i class="fa fa-lock" aria-hidden="true"/> Technical evidence is restricted
+                                        </span>
+                                    </div>
+                                </li>
+                            </ol>
+                            <StateMessage t-else=""
+                                          state="'empty'"
+                                          title="'No timeline events yet'"
+                                          detail="'The request exists, but no material event has been recorded.'"/>
+                        </section>
+
+                        <aside class="sc-v2-run__evidence">
+                            <section class="sc-v2-section" t-att-aria-labelledby="contextTitleId">
+                                <h2 t-att-id="contextTitleId" class="sc-v2-section__title">Run context</h2>
+                                <dl class="sc-v2-key-value-list">
+                                    <div><dt>Trigger</dt><dd t-esc="this.triggerLabel(run.trigger)"/></div>
+                                    <div><dt>Configuration</dt><dd t-esc="run.configuration_generation || '—'"/></div>
+                                    <div><dt>Correlation</dt><dd class="sc-v2-mono" t-esc="screen.correlationId || '—'"/></div>
+                                </dl>
+                            </section>
+                            <section t-if="jobs.length" class="sc-v2-section" t-att-aria-labelledby="jobsTitleId">
+                                <h2 t-att-id="jobsTitleId" class="sc-v2-section__title">Work items</h2>
+                                <ul class="sc-v2-compact-list">
+                                    <li t-foreach="jobs" t-as="job" t-key="job.id || job.ref">
+                                        <StatusPill state="job.state" label="job.state_label || undefined"/>
+                                        <span t-esc="this.jobLabel(job)"/>
+                                    </li>
+                                </ul>
+                            </section>
+                            <section t-if="affectedRecords.length" class="sc-v2-section" t-att-aria-labelledby="recordsTitleId">
+                                <h2 t-att-id="recordsTitleId" class="sc-v2-section__title">Affected records</h2>
+                                <ul class="sc-v2-compact-list">
+                                    <li t-foreach="affectedRecords" t-as="record" t-key="record.ref || record.id">
+                                        <button type="button" class="sc-v2-link-button" t-on-click="() => this.openRecord(record)">
+                                            <t t-esc="this.recordLabel(record)"/>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </section>
+                        </aside>
+                    </div>
+                </t>
+            </div>
+        </main>
+    </t>
+
+</templates>

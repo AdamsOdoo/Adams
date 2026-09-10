@@ -13,11 +13,12 @@
 #      verifies it on every run so a cached checkout can never silently execute
 #      a different Odoo
 #   2. installs the connector modules into a disposable PostgreSQL database
-#   3. runs FOUR passes, each into its own database with its own log:
+#   3. runs qualification passes, each with its own database and log:
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
-#        * the complete NON-STANDARD tag suite
-#        * W2-only install over an older installed W1 (no W1 upgrade)
+#        * the complete NON-STANDARD tag suite (P10 in a disposable clone)
+#        * installed owner upgrades then W2, retaining the durable old origin
+#        * candidate-only DEC-029 Lite and Full meta-addon installs
 #   4. verifies the checked-out connector commit against the commit the caller
 #      says this run is testing ($SOURCE_HEAD_SHA), and ABORTS on a mismatch
 #   5. writes durable per-pass logs and a machine-readable summary under
@@ -25,10 +26,10 @@
 #      head and base, the event type, the worktree state, the exact Odoo SHA
 #      and the Python/PostgreSQL versions
 #
-# Why the third pass exists. Eight connector test classes are tagged
-# `-standard`, which is correct -- they are expensive and some spawn real OS
-# processes -- but it also means `--test-enable` alone NEVER runs them. Four of
-# them are the genuine concurrency proofs. Before this, running them required an
+# Why the third pass exists. Connector test classes in NONSTANDARD_TAGS are
+# tagged `-standard`, which is correct -- they are expensive and some spawn
+# real OS processes -- but it also means `--test-enable` alone NEVER runs them.
+# Several are genuine concurrency proofs. Before this, running them required an
 # operator to remember an optional `--tags` argument, so in practice they were
 # never run at all and "full suite green" silently excluded them. They are now
 # part of the default run and the tag list lives in this file, next to the code
@@ -43,7 +44,9 @@
 #
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
-#                                [--skip-w2-only-install]
+#                                [--skip-w2-owner-upgrade]
+#                                [--w2-owner-upgrade-only] (diagnostic, not full qualification)
+#                                [--skip-meta-install]
 #                                [--tags <extra-test-tags>]
 #   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
 #
@@ -60,13 +63,27 @@
 
 set -euo pipefail
 
+# Runtime regression passes continue to exercise the complete engineering
+# family, including webhook satellites.  DEC-029 marketplace meta-addons are
+# intentionally a separate candidate-only install pass below.
 MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
+META_MODULES="shopify_connector_lite,shopify_connector_full"
+# The direct domain sets remain DEC-029's six-module boundary.  The explicit
+# closure also installs the generic webhook foundation and the separate domain
+# satellites required by the near-real-time contract; P20 consolidation is not
+# being performed here.
+META_LITE_EXPECTED="shopify_connector_lite,shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_sale_webhook"
+META_FULL_EXPECTED="shopify_connector_full,shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_sale_webhook,shopify_connector_inventory_webhook,shopify_connector_fulfillment_webhook"
 W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
+# The addon release moves for P11's production model/dispatch extension.  The
+# schema-verification migration remains separately named: it is the existing
+# .3.0 migration and no new database migration is required by P11.
+W1_WEBHOOK_VERSION="19.0.1.4.0"
 W1_WEBHOOK_SCHEMA_VERSION="19.0.1.3.0"
-W2_PRODUCT_WEBHOOK_VERSION="19.0.0.3.0"
-W3_INVENTORY_WEBHOOK_VERSION="19.0.0.4.0"
-W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
-W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
+W2_PRODUCT_WEBHOOK_VERSION="19.0.0.4.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.5.0"
+W2_OWNER_UPGRADE_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
+W2_OWNER_UPGRADE_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -120,7 +137,10 @@ EXTRA_MODULES="account,stock"
 # overtake the exchange it is racing. This class opens genuine `db_connect`
 # sessions with distinct backend PIDs, and its first half is written to run
 # unchanged against the vulnerable head as a before/after reproducer.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race,shopify_connector_tax_mapping_race"
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race,shopify_connector_tax_mapping_race,shopify_connector_v2_runtime_concurrency"
+P10_TAG="shopify_connector_v2_runtime_concurrency"
+SHARED_NONSTANDARD_TAGS="${NONSTANDARD_TAGS//,$P10_TAG/}"
+
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #
@@ -216,8 +236,9 @@ export PGHOST PGPORT
 RUN_FRESH=1
 RUN_WARM=1
 RUN_NONSTANDARD=1
-RUN_W2_ONLY_INSTALL=1
+RUN_W2_OWNER_UPGRADE=1
 RUN_SELF_TEST=0
+CAMPAIGN_SCOPE="full"
 TEST_TAGS=""
 # --- The migration passes (2026-07-30) ---------------------------------------
 #
@@ -253,19 +274,28 @@ MIGRATION_FROM_REFS=(
     "50b770a315b53f0c05f0b8867bb801d75c6476ef"
     "0a15b176e60b77bf2f40195a9961591c788e14f8"
 )
+# Keep old-tree upgrades explicitly scoped to the legacy engineering module
+# set.  The DEC-029 meta-addons are introduced only in the candidate checkout;
+# putting them in this variable would make every historical ref appear to need
+# modules that did not exist when it was recorded.
+MIGRATION_MODULES="$MODULES"
 RUN_MIGRATION=1
+RUN_META_INSTALL=1
+ARGUMENT_COUNT=$#
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
-        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --w2-owner-upgrade-only) CAMPAIGN_SCOPE="w2-owner-upgrade-diagnostic"; RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_META_INSTALL=0; shift ;;
+        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_OWNER_UPGRADE=0; RUN_META_INSTALL=0; shift ;;
+        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_OWNER_UPGRADE=0; RUN_META_INSTALL=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
         # Same rule, same reason: opt-OUT only. A run that skips the genuine
         # version-to-version upgrade must say so in the summary, which it does.
         --skip-migration)   RUN_MIGRATION=0; shift ;;
-        --skip-w2-only-install) RUN_W2_ONLY_INSTALL=0; shift ;;
-        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --skip-w2-owner-upgrade) RUN_W2_OWNER_UPGRADE=0; shift ;;
+        --skip-meta-install) RUN_META_INSTALL=0; shift ;;
+        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_OWNER_UPGRADE=0; RUN_META_INSTALL=0; shift ;;
         # Override the upgrade origins (space-separated refs), for a one-off
         # check against some other ancestor.
         --migration-from)   read -r -a MIGRATION_FROM_REFS <<< "$2"; shift 2 ;;
@@ -278,6 +308,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 log() { printf '[connector-suite] %s\n' "$*"; }
+
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" && "$ARGUMENT_COUNT" -ne 1 ]]; then
+    echo '--w2-owner-upgrade-only must be used alone; diagnostic scope cannot mix selectors' >&2
+    exit 2
+fi
 
 # --- Browser resolution and preflight (TD-010) -------------------------------
 #
@@ -522,9 +557,9 @@ verify_connector_module_inventory() {
     esac
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py" ]]; then
         evidence_fail "shopify_connector_webhook manifest is missing from the checkout"
-    elif ! grep -Fq "'version': '${W1_WEBHOOK_SCHEMA_VERSION}'" \
+    elif ! grep -Fq "'version': '${W1_WEBHOOK_VERSION}'" \
         "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py"; then
-        evidence_fail "shopify_connector_webhook manifest is not bumped for the includeFields schema"
+        evidence_fail "shopify_connector_webhook manifest is not at the current P11 release version"
     fi
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/migrations/${W1_WEBHOOK_SCHEMA_VERSION}/post-migrate.py" ]]; then
         evidence_fail "shopify_connector_webhook schema-verification migration is missing"
@@ -544,10 +579,10 @@ verify_connector_module_inventory() {
         evidence_fail "shopify_connector_product_webhook manifest version is not current"
     elif ! grep -Fq "'pre_init_hook': 'pre_init_hook'" \
         "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
-        evidence_fail "product webhook W2-only install schema bridge is not registered"
+        evidence_fail "product webhook owner-upgrade installation preflight is not registered"
     fi
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_product_webhook/pre_init.py" ]]; then
-        evidence_fail "product webhook W2-only install schema bridge is missing"
+        evidence_fail "product webhook owner-upgrade installation preflight is missing"
     fi
     # W2 depends on W1's upgraded model.  Keep the dependency before the
     # optional addon in every fresh/warm install set; a list edit that installs
@@ -560,9 +595,9 @@ verify_connector_module_inventory() {
         "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
         evidence_fail "product webhook addon dependency closure is not W1 + product"
     fi
-    if ! grep -Fq "${W2_ONLY_INSTALL_ORIGIN}" \
+    if ! grep -Fq "${W2_OWNER_UPGRADE_ORIGIN}" \
         "${REPO_ROOT}/tools/run_connector_suite.sh"; then
-        evidence_fail "W2-only install phase does not use the durable old-W1 origin"
+        evidence_fail "owner-upgrade/W2-install phase does not use the durable old-W1 origin"
     fi
     case ",${MODULES}," in
         *,shopify_connector_inventory_webhook,*) ;;
@@ -1103,7 +1138,12 @@ if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then
 fi
 EVIDENCE_ERRORS=()
 
-preflight_browser
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" ]]; then
+    ODOO_BROWSER_BIN="not-executed"
+    BROWSER_VERSION="not-executed"
+else
+    preflight_browser
+fi
 
 
 # --- Odoo config -------------------------------------------------------------
@@ -1146,11 +1186,11 @@ STANDARD_TAG_ARGS=(--test-tags "$STANDARD_TAGS")
 clone_db() {  # clone_db <template_db> <new_db>
     local src="$1" dst="$2"
     dropdb --if-exists "$dst" 2>/dev/null || true
-    createdb -T "$src" "$dst"
+    createdb -T "$src" "$dst" || return 1
     local store="${ARTIFACT_DIR}/odoo-data/filestore"
     if [[ -d "${store}/${src}" ]]; then
         rm -rf "${store}/${dst}"
-        cp -a "${store}/${src}" "${store}/${dst}"
+        cp -a "${store}/${src}" "${store}/${dst}" || return 1
     fi
 }
 
@@ -1173,12 +1213,74 @@ result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" 
 FRESH_STATUS="skipped"; FRESH_RESULT=""
 WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
-W2_ONLY_INSTALL_STATUS="skipped"; W2_ONLY_INSTALL_RESULT=""
-W2_ONLY_INSTALL_DB=""
-W2_ONLY_INSTALL_COLUMNS=""
-W2_ONLY_INSTALL_W1_VERSION=""
-W2_ONLY_INSTALL_W2_VERSION=""
+P10_STATUS="skipped"; P10_RESULT=""; P10_EXECUTED=0; P10_EXPECTED=0
+W2_OWNER_UPGRADE_STATUS="skipped"; W2_OWNER_UPGRADE_RESULT=""
+W2_OWNER_UPGRADE_STAGE="not-started"; W2_OWNER_UPGRADE_STAGE_LOG=""
+META_INSTALL_STATUS="skipped"; META_INSTALL_RESULT=""
+META_LITE_STATUS="skipped"; META_LITE_RESULT=""
+META_FULL_STATUS="skipped"; META_FULL_RESULT=""
+W2_OWNER_UPGRADE_DB=""
+W2_OWNER_UPGRADE_COLUMNS=""
+W2_OWNER_UPGRADE_W1_VERSION=""
+W2_OWNER_UPGRADE_W2_VERSION=""
 OVERALL=0
+
+# --- DEC-029 candidate meta-addon installs ----------------------------------
+#
+# This pass deliberately installs the candidate meta-addons from the current
+# checkout only.  It never runs against an older migration tree and it never
+# changes MODULES/MIGRATION_MODULES.  The version-to-version migration loop
+# below therefore remains compatible with historical refs that predate these
+# two new addon directories.
+run_meta_install_edition() {  # run_meta_install_edition <edition> <meta> <expected>
+    local edition="$1" meta="$2" expected="$3" db logfile module state
+    local status_var="META_${edition^^}_STATUS"
+    local result_var="META_${edition^^}_RESULT"
+    db="connector_meta_${edition}_$$"
+    logfile="${ARTIFACT_DIR}/meta-${edition}-install.log"
+    log "DEC-029 ${edition} meta install -> ${db}"
+    dropdb --if-exists "$db" 2>/dev/null || true
+    createdb "$db"
+    if ! run_odoo "$db" "$logfile" -i "$meta"; then
+        evidence_fail "meta-${edition}: installing ${meta} failed"
+        printf -v "$status_var" '%s' "fail"
+        printf -v "$result_var" '%s' "$(result_line "$logfile")"
+        return 1
+    fi
+    for module in ${expected//,/ }; do
+        state="$(psql -tAc \
+            "SELECT state FROM ir_module_module WHERE name = '${module}'" "$db" \
+            | tr -d '[:space:]')"
+        if [[ "$state" != "installed" ]]; then
+            evidence_fail "meta-${edition}: expected ${module}=installed, got ${state:-missing}"
+            printf -v "$status_var" '%s' "fail"
+            printf -v "$result_var" '%s' "module ${module} is ${state:-missing}"
+            return 1
+        fi
+    done
+    printf -v "$status_var" '%s' "pass"
+    printf -v "$result_var" '%s' "$(result_line "$logfile")"
+    return 0
+}
+
+run_meta_install() {
+    local result=0
+    run_meta_install_edition lite shopify_connector_lite "$META_LITE_EXPECTED" || result=1
+    run_meta_install_edition full shopify_connector_full "$META_FULL_EXPECTED" || result=1
+    if [[ "$result" -eq 0 ]]; then
+        META_INSTALL_STATUS="pass"
+        META_INSTALL_RESULT="Lite and Full candidate meta-addons installed"
+    else
+        META_INSTALL_STATUS="fail"
+        META_INSTALL_RESULT="one or more candidate meta-addon installs failed"
+        OVERALL=1
+    fi
+    return "$result"
+}
+
+if [[ $RUN_META_INSTALL -eq 1 ]]; then
+    run_meta_install || true
+fi
 
 # --- Pass 1: fresh install ---------------------------------------------------
 if [[ $RUN_FRESH -eq 1 ]]; then
@@ -1231,103 +1333,114 @@ if [[ $RUN_WARM -eq 1 ]]; then
     verify_no_migration_ran "${ARTIFACT_DIR}/warm.log" "warm"
 fi
 
-# --- W2-only install over an older installed W1 -----------------------------
-# Odoo does not upgrade an already-installed dependency during `-i W2`.  This
-# is therefore a distinct install contract, not a combined `-u` migration:
-# install the durable old-W1 origin into a disposable database, switch the
-# addons path back to this candidate, and install ONLY W2.  The candidate's
-# pre-init bridge must make the W1-owned JSONB evidence columns available
-# before the current W1 registry is loaded, while the installed W1 version must
-# remain unchanged.  A missing origin, failed old install, failed W2 tests, or
-# wrong schema/version is evidence failure rather than a skipped scenario.
-if [[ $RUN_W2_ONLY_INSTALL -eq 1 ]]; then
-    bridge_short="${W2_ONLY_INSTALL_ORIGIN:0:8}"
-    bridge_tree="${ARTIFACT_DIR}/base-w2-only-${bridge_short}"
-    bridge_old_conf="${ARTIFACT_DIR}/odoo-w2-only-old-${bridge_short}.conf"
-    bridge_old_log="${ARTIFACT_DIR}/w2-only-old-w1-install.log"
-    bridge_log="${ARTIFACT_DIR}/w2-only-install.log"
-    W2_ONLY_INSTALL_DB="connector_w2_only_$$"
-    log "W2-only install bridge from ${bridge_short} -> ${W2_ONLY_INSTALL_DB}"
-    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
-        log "${bridge_short} is not in this clone; fetching durable W2-only origin"
-        git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin \
-            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 \
-            || git -C "$REPO_ROOT" fetch --no-tags origin \
-            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 || true
-    fi
-    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
-        W2_ONLY_INSTALL_STATUS="fail"
-        W2_ONLY_INSTALL_RESULT="durable W2-only origin is unavailable"
-        evidence_fail "w2-only: origin ${W2_ONLY_INSTALL_ORIGIN} is unavailable"
-    else
-        rm -rf "$bridge_tree"
-        mkdir -p "$bridge_tree"
-        git -C "$REPO_ROOT" archive "$W2_ONLY_INSTALL_ORIGIN" addons \
-            | tar -x -C "$bridge_tree"
-        sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${bridge_tree}/addons|" \
-            "$CONF" > "$bridge_old_conf"
-        dropdb --if-exists "$W2_ONLY_INSTALL_DB" 2>/dev/null || true
-        createdb "$W2_ONLY_INSTALL_DB"
-        if ! run_odoo_with_conf "$bridge_old_conf" "$W2_ONLY_INSTALL_DB" \
-                "$bridge_old_log" -i "${W1_ONLY_MODULES},${EXTRA_MODULES}"; then
-            W2_ONLY_INSTALL_STATUS="fail"
-            W2_ONLY_INSTALL_RESULT="old W1 install failed"
-            evidence_fail "w2-only: old W1 origin install failed"
-        else
-            W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
-                "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
-                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-            bridge_before_w2="$(psql -tAc \
-                "SELECT count(*) FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
-                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-            bridge_before_columns="$(psql -tAc \
-                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields')" \
-                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-            log "w2-only old base: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2 rows=${bridge_before_w2}, includeFields columns=${bridge_before_columns}"
-            if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
-                  || "$bridge_before_w2" != "0" \
-                  || "$bridge_before_columns" != "0" ]]; then
-                W2_ONLY_INSTALL_STATUS="fail"
-                W2_ONLY_INSTALL_RESULT="old base was not W1-only with the pre-bridge schema"
-                evidence_fail "w2-only: old base identity/schema precondition failed"
-            elif run_odoo "$W2_ONLY_INSTALL_DB" "$bridge_log" \
-                    -i shopify_connector_product_webhook --test-enable \
-                    --test-tags "$W2_ONLY_INSTALL_TEST_TAGS"; then
-                W2_ONLY_INSTALL_STATUS="pass"
-                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
-            else
-                W2_ONLY_INSTALL_STATUS="fail"
-                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
-                evidence_fail "w2-only: installing W2 over old W1 failed"
-            fi
-            if [[ "$W2_ONLY_INSTALL_STATUS" == "pass" ]]; then
-                verify_no_unexpected_skips "$bridge_log" "w2-only"
-                verify_no_migration_ran "$bridge_log" "w2-only"
-                if ! grep -Eq '[0-9]+ failed, [0-9]+ error\(s\) of [1-9][0-9]* tests' \
-                    "$bridge_log"; then
-                    W2_ONLY_INSTALL_STATUS="fail"
-                    evidence_fail "w2-only: no installed W2 test result was recorded"
-                fi
-                W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
-                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
-                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-                W2_ONLY_INSTALL_W2_VERSION="$(psql -tAc \
-                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
-                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-                W2_ONLY_INSTALL_COLUMNS="$(psql -tAc \
-                    "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields') AND udt_name = 'jsonb'" \
-                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
-                log "w2-only result: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2=${W2_ONLY_INSTALL_W2_VERSION}, JSONB columns=${W2_ONLY_INSTALL_COLUMNS}"
-                if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
-                      || "$W2_ONLY_INSTALL_W2_VERSION" != "$W2_PRODUCT_WEBHOOK_VERSION" \
-                      || "$W2_ONLY_INSTALL_COLUMNS" != "2" ]]; then
-                    W2_ONLY_INSTALL_STATUS="fail"
-                    evidence_fail "w2-only: W1 was upgraded or W2/schema verification failed"
-                fi
-            fi
+# --- Approved owner upgrades, then W2 installation --------------------------
+# Document 19 approval supersedes the old mixed-version W2-only promise. Keep
+# the exact historical origin; execute each installed owner's real migrations.
+# Fixed stage names and relative log basenames only; never serialize commands,
+# connection settings, database dumps, or fixture payloads into stage evidence.
+w2_stage() {
+    W2_OWNER_UPGRADE_STAGE="$1"
+    W2_OWNER_UPGRADE_STAGE_LOG="${2:-}"
+    local status="${3:-running}"
+    printf '{"stage":"%s","status":"%s","log":"%s"}\n' \
+        "$W2_OWNER_UPGRADE_STAGE" "$status" "$W2_OWNER_UPGRADE_STAGE_LOG" \
+        > "${ARTIFACT_DIR}/w2-owner-upgrade-stage.json" || return 1
+    log "W2 owner upgrade: ${W2_OWNER_UPGRADE_STAGE} (${status}); log=${W2_OWNER_UPGRADE_STAGE_LOG}"
+}
+if [[ $RUN_W2_OWNER_UPGRADE -eq 1 ]]; then
+    w2_preservation_fixture() {
+        local mode="$1" conf="$2" logfile="$3"
+        ( cd "$ODOO_SRC" && W2_PRESERVATION_MODE="$mode" \
+            W2_PRESERVATION_SNAPSHOT="${ARTIFACT_DIR}/w2-preservation.json" \
+            "$VENV/bin/python" odoo-bin shell -c "$conf" -d "$W2_OWNER_UPGRADE_DB" \
+            --no-http --max-cron-threads=0 \
+            < "${REPO_ROOT}/tools/w2_upgrade_preservation_fixture.py" ) > "$logfile" 2>&1
+    }
+    run_w2_owner_upgrade() {
+        local bridge_short="${W2_OWNER_UPGRADE_ORIGIN:0:8}"
+        local bridge_tree="${ARTIFACT_DIR}/base-w2-owner-upgrade-${bridge_short}"
+        local bridge_old_conf="${ARTIFACT_DIR}/odoo-w2-owner-upgrade-old.conf"
+        local bridge_old_log="${ARTIFACT_DIR}/w2-owner-old-install.log"
+        local upgrade_log="${ARTIFACT_DIR}/w2-owner-upgrade.log"
+        local bridge_log="${ARTIFACT_DIR}/w2-after-owner-upgrade-install.log"
+        local repeat_log="${ARTIFACT_DIR}/w2-owner-upgrade-repeat.log"
+        local evidence="${ARTIFACT_DIR}/w2-owner-upgrade-evidence.json"
+        local helper="${REPO_ROOT}/tools/connector_owner_upgrade_evidence.py"
+        local owners old_w1 old_w2
+        local initial_evidence_errors="${#EVIDENCE_ERRORS[@]}"
+        W2_OWNER_UPGRADE_DB="connector_w2_owner_upgrade_$$"
+        w2_stage "prepare-old-source" "" || return 1
+        if ! git -C "$REPO_ROOT" cat-file -e "${W2_OWNER_UPGRADE_ORIGIN}^{commit}" 2>/dev/null; then
+            git -C "$REPO_ROOT" fetch --no-tags origin "$W2_OWNER_UPGRADE_ORIGIN" || return 1
         fi
-    fi
-    if [[ "$W2_ONLY_INSTALL_STATUS" == "fail" ]]; then
+        mkdir -p "$bridge_tree" || return 1
+        git -C "$REPO_ROOT" archive "$W2_OWNER_UPGRADE_ORIGIN" addons | tar -x -C "$bridge_tree" || return 1
+        sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${bridge_tree}/addons|" "$CONF" > "$bridge_old_conf" || return 1
+        w2_stage "create-old-database" "" || return 1
+        createdb "$W2_OWNER_UPGRADE_DB" || return 1
+        w2_stage "install-old-owners" "w2-owner-old-install.log" || return 1
+        run_odoo_with_conf "$bridge_old_conf" "$W2_OWNER_UPGRADE_DB" "$bridge_old_log" -i "${W1_ONLY_MODULES},${EXTRA_MODULES}" || return 1
+        w2_stage "verify-old-versions" "" || return 1
+        old_w1="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
+        old_w2="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT count(*) FROM ir_module_module WHERE name='shopify_connector_product_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
+        [[ "$old_w1" == "19.0.1.0.0" && "$old_w2" == "0" ]] || return 1
+        # Legacy semantic fixture is seeded with the matching old registry.
+        w2_stage "seed-preservation-fixture" "w2-preservation-seed.log" || return 1
+        w2_preservation_fixture seed "$bridge_old_conf" "${ARTIFACT_DIR}/w2-preservation-seed.log" || return 1
+        w2_stage "inventory-installed-owners" "w2-owner-upgrade-evidence.json" || return 1
+        owners="$(python3 "$helper" before --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence")" || return 1
+        [[ -n "$owners" ]] || return 1
+        w2_stage "reject-mixed-owner-versions" "w2-owner-preflight-rejection.log" || return 1
+        "$VENV/bin/python" "$helper" reject-old --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" > "${ARTIFACT_DIR}/w2-owner-preflight-rejection.log" 2>&1 || return 1
+        # Exercise restoration of the actual pre-upgrade fixture before switching
+        # source. The old install's filestore stays with the restored database.
+        w2_stage "backup-old-database" "" || return 1
+        pg_dump -Fc "$W2_OWNER_UPGRADE_DB" > "${ARTIFACT_DIR}/w2-owner-before.dump" || return 1
+        w2_stage "restore-old-database" "" || return 1
+        dropdb "$W2_OWNER_UPGRADE_DB" || return 1
+        createdb "$W2_OWNER_UPGRADE_DB" || return 1
+        pg_restore --exit-on-error --dbname "$W2_OWNER_UPGRADE_DB" "${ARTIFACT_DIR}/w2-owner-before.dump" || return 1
+        w2_stage "verify-restored-preservation" "w2-preservation-restored.log" || return 1
+        w2_preservation_fixture verify "$bridge_old_conf" "${ARTIFACT_DIR}/w2-preservation-restored.log" || return 1
+        w2_stage "upgrade-installed-owners" "w2-owner-upgrade.log" || return 1
+        run_odoo "$W2_OWNER_UPGRADE_DB" "$upgrade_log" -u "$owners" || return 1
+        w2_stage "verify-owner-migrations" "w2-owner-upgrade-evidence.json" || return 1
+        python3 "$helper" after --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" --log "$upgrade_log" || return 1
+        w2_stage "install-w2" "w2-after-owner-upgrade-install.log" || return 1
+        run_odoo "$W2_OWNER_UPGRADE_DB" "$bridge_log" -i shopify_connector_product_webhook --test-enable --test-tags "$W2_OWNER_UPGRADE_TEST_TAGS" || return 1
+        w2_stage "verify-w2-tests" "w2-after-owner-upgrade-install.log" || return 1
+        grep -Eq '0 failed, 0 error\(s\) of [1-9][0-9]* tests' "$bridge_log" || return 1
+        verify_no_unexpected_skips "$bridge_log" "w2-after-owner-upgrade"
+        [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
+        [[ -z "$(migration_lines "$bridge_log")" ]] || return 1
+        w2_stage "verify-installed-versions" "" || return 1
+        W2_OWNER_UPGRADE_W1_VERSION="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
+        W2_OWNER_UPGRADE_W2_VERSION="$(psql -X -v ON_ERROR_STOP=1 -tAc "SELECT latest_version FROM ir_module_module WHERE name='shopify_connector_product_webhook' AND state='installed'" "$W2_OWNER_UPGRADE_DB")" || return 1
+        [[ "$W2_OWNER_UPGRADE_W1_VERSION" == "$W1_WEBHOOK_VERSION" && "$W2_OWNER_UPGRADE_W2_VERSION" == "$W2_PRODUCT_WEBHOOK_VERSION" ]] || return 1
+        w2_stage "verify-preservation-after-install" "w2-preservation-check.log" || return 1
+        w2_preservation_fixture verify "$CONF" "${ARTIFACT_DIR}/w2-preservation-check.log" || return 1
+        w2_stage "repeat-owner-and-w2-upgrade" "w2-owner-upgrade-repeat.log" || return 1
+        run_odoo "$W2_OWNER_UPGRADE_DB" "$repeat_log" -u "${owners},shopify_connector_product_webhook" --test-enable --test-tags "$W2_OWNER_UPGRADE_TEST_TAGS" || return 1
+        w2_stage "verify-repeat-tests" "w2-owner-upgrade-repeat.log" || return 1
+        grep -Eq '0 failed, 0 error\(s\) of [1-9][0-9]* tests' "$repeat_log" || return 1
+        verify_no_unexpected_skips "$repeat_log" "w2-owner-upgrade-repeat"
+        [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
+        [[ -z "$(migration_lines "$repeat_log")" ]] || return 1
+        w2_stage "verify-repeat-owner-versions" "w2-owner-upgrade-evidence.json" || return 1
+        python3 "$helper" after --db "$W2_OWNER_UPGRADE_DB" --root "$REPO_ROOT" --evidence "$evidence" --log "$upgrade_log" || return 1
+        w2_stage "verify-preservation-after-repeat" "w2-preservation-repeat.log" || return 1
+        w2_preservation_fixture verify "$CONF" "${ARTIFACT_DIR}/w2-preservation-repeat.log" || return 1
+        [[ "${#EVIDENCE_ERRORS[@]}" -eq "$initial_evidence_errors" ]] || return 1
+        W2_OWNER_UPGRADE_RESULT="$(result_line "$bridge_log")"
+    }
+    if run_w2_owner_upgrade; then
+        w2_stage "complete" "" "pass"
+        W2_OWNER_UPGRADE_STATUS="pass"
+    else
+        W2_OWNER_UPGRADE_STATUS="fail"
+        w2_stage "$W2_OWNER_UPGRADE_STAGE" "$W2_OWNER_UPGRADE_STAGE_LOG" "fail"
+        W2_OWNER_UPGRADE_RESULT="failed at ${W2_OWNER_UPGRADE_STAGE}; see ${W2_OWNER_UPGRADE_STAGE_LOG:-workflow job log}"
+        evidence_fail "w2-owner-upgrade: ${W2_OWNER_UPGRADE_RESULT}"
         OVERALL=1
     fi
 fi
@@ -1390,7 +1503,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
         # 1. install the OLD tree
         if ! ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$OLD_CONF" \
                 -d "$DB" --stop-after-init --log-level=warn \
-                -i "${MODULES},${EXTRA_MODULES}" ) \
+                -i "${MIGRATION_MODULES},${EXTRA_MODULES}" ) \
                 > "${ARTIFACT_DIR}/${label}-install.log" 2>&1; then
             log "FATAL: installing ${short} failed; see ${label}-install.log"
             MIGRATION_OVERALL="fail"; OVERALL=1
@@ -1403,7 +1516,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
             | tr '\n' ' ')"
         log "${label}: installed versions ${BEFORE_VERSIONS}"
         # 2. upgrade the CANDIDATE tree onto it, with the standard suite
-        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}.log" -u "$MODULES" \
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}.log" -u "$MIGRATION_MODULES" \
                 --test-enable "${STANDARD_TAG_ARGS[@]}"; then
             MIG_STATUS="pass"
         else
@@ -1424,7 +1537,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
 was not a version-to-version upgrade at all"
         fi
         # 3. idempotency: a SECOND update must be green and run nothing again
-        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}-again.log" -u "$MODULES" \
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}-again.log" -u "$MIGRATION_MODULES" \
                 --test-enable "${STANDARD_TAG_ARGS[@]}"; then
             MIG_AGAIN="pass"
         else
@@ -1448,7 +1561,8 @@ was not a version-to-version upgrade at all"
 fi
 
 # --- Pass 3: the non-standard tag suite --------------------------------------
-# The eight `-standard` classes, run explicitly by tag. This pass gets its own
+# Every class in the authoritative NONSTANDARD_TAGS inventory, run explicitly
+# by tag. This pass gets its own
 # database and its own log because several of these tests spawn real OS
 # processes and commit; mixing them into the standard log made it impossible to
 # tell which pass produced which residue.
@@ -1465,7 +1579,7 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     log "non-standard tag suite -> ${DB}"
     clone_db "$TEMPLATE_DB" "$DB"
     if run_odoo "$DB" "${ARTIFACT_DIR}/nonstandard.log" -u "$MODULES" \
-            --test-enable --test-tags "$NONSTANDARD_TAGS"; then
+            --test-enable --test-tags "$SHARED_NONSTANDARD_TAGS"; then
         NONSTD_STATUS="pass"
     else
         NONSTD_STATUS="fail"; OVERALL=1
@@ -1474,6 +1588,54 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     log "non-standard: ${NONSTD_STATUS} ${NONSTD_RESULT}"
     verify_no_unexpected_skips "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
     verify_hoot_evidence "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
+
+    # Company creation in P10 has committed, cross-model side effects. Confine
+    # them to a dedicated clone and destroy that database even on test failure.
+    run_p10_disposable() (
+        local db="connector_p10_$$"
+        cleanup_p10() {
+            local status=$?
+            if ! dropdb --if-exists "$db"; then
+                status=1
+            fi
+            rm -rf "${ARTIFACT_DIR}/odoo-data/filestore/${db}"
+            exit "$status"
+        }
+        trap cleanup_p10 EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        clone_db "$TEMPLATE_DB" "$db" || return 1
+        CONNECTOR_P10_DISPOSABLE_DB="$db" run_odoo "$db" \
+            "${ARTIFACT_DIR}/p10-runtime.log" -u "$MODULES" \
+            --test-enable --test-tags "$P10_TAG"
+    )
+    if run_p10_disposable; then
+        P10_STATUS="pass"
+    else
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    P10_RESULT="$(result_line "${ARTIFACT_DIR}/p10-runtime.log")"
+    P10_ERRORS_BEFORE=${#EVIDENCE_ERRORS[@]}
+    verify_no_unexpected_skips "${ARTIFACT_DIR}/p10-runtime.log" "P10 runtime"
+    if [[ "${#EVIDENCE_ERRORS[@]}" -gt "$P10_ERRORS_BEFORE" ]]; then
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    # Fail closed for any missing test method, even if Odoo exits zero.
+    while read -r test_name; do
+        P10_EXPECTED=$((P10_EXPECTED + 1))
+        if grep -Eq "Starting [^.]+\.${test_name} \.\.\." "${ARTIFACT_DIR}/p10-runtime.log"; then
+            P10_EXECUTED=$((P10_EXECUTED + 1))
+        else
+            evidence_fail "P10 runtime: missing ${test_name}"
+            P10_STATUS="fail"; OVERALL=1
+        fi
+    done < <(sed -n 's/^    def \(test_[a-zA-Z0-9_]*\)(.*/\1/p' \
+        "${REPO_ROOT}/addons/shopify_connector_core/tests/test_v2_runtime_concurrency.py")
+    if [[ "$P10_EXPECTED" -eq 0 || -z "$P10_RESULT" ]]; then
+        evidence_fail "P10 runtime: empty test inventory or result"
+        P10_STATUS="fail"; OVERALL=1
+    fi
+    log "P10 runtime: ${P10_STATUS} ${P10_RESULT}; ${P10_EXECUTED}/${P10_EXPECTED} executed"
 fi
 
 # --- The fail-closed decision ------------------------------------------------
@@ -1495,11 +1657,16 @@ fi
 if (( ! RUN_FRESH || ! RUN_WARM )); then
     BROWSER_EVIDENCE_STATUS="${BROWSER_EVIDENCE_STATUS}; single-pass mode"
 fi
+if [[ "$CAMPAIGN_SCOPE" == "w2-owner-upgrade-diagnostic" ]]; then
+    BROWSER_EVIDENCE_STATUS="not-executed: W2 diagnostic scope"
+fi
 if (( ${#EVIDENCE_ERRORS[@]} )); then
-    BROWSER_EVIDENCE_STATUS="FAILED"
+    if [[ "$CAMPAIGN_SCOPE" != "w2-owner-upgrade-diagnostic" ]]; then
+        BROWSER_EVIDENCE_STATUS="FAILED: campaign evidence errors; inspect failed lane"
+    fi
     OVERALL=1
     log "-------------------------------------------------------------------"
-    log "BROWSER EVIDENCE VERIFICATION FAILED (${#EVIDENCE_ERRORS[@]} problems)."
+    log "CAMPAIGN EVIDENCE VERIFICATION FAILED (${#EVIDENCE_ERRORS[@]} problems)."
     log "The suite's own pass/fail counts may be green; they do not describe"
     log "tests that never executed. This run is NOT browser evidence."
     for problem in "${EVIDENCE_ERRORS[@]}"; do log "  * ${problem}"; done
@@ -1512,6 +1679,7 @@ fi
 # can never be quoted as Odoo.sh acceptance.
 cat > "$SUMMARY" <<EOF
 {
+  "campaign_scope": "${CAMPAIGN_SCOPE}",
   "tested_checkout_sha": "${SHA}",
   "connector_sha": "${SHA}",
   "source_head_sha": "${SOURCE_HEAD_SHA}",
@@ -1536,6 +1704,8 @@ cat > "$SUMMARY" <<EOF
   "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
   "postgres_server_version": "$(psql -tAc 'show server_version;' postgres 2>/dev/null | head -1 | tr -d '[:space:]')",
   "modules": "${MODULES}",
+  "meta_modules": "${META_MODULES}",
+  "migration_modules": "${MIGRATION_MODULES}",
   "extra_modules": "${EXTRA_MODULES}",
   "standard_tags": "${STANDARD_TAGS}",
   "extra_test_tags": "${TEST_TAGS}",
@@ -1546,8 +1716,10 @@ cat > "$SUMMARY" <<EOF
                                "kind": "SAME-VERSION module update",
                                "runs_migration_scripts": false,
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
-    "w2_only_install_over_old_w1": {"status": "${W2_ONLY_INSTALL_STATUS}", "result": "${W2_ONLY_INSTALL_RESULT}", "db": "${W2_ONLY_INSTALL_DB}", "origin": "${W2_ONLY_INSTALL_ORIGIN}", "w1_version_after": "${W2_ONLY_INSTALL_W1_VERSION}", "w2_version_after": "${W2_ONLY_INSTALL_W2_VERSION}", "jsonb_columns": "${W2_ONLY_INSTALL_COLUMNS}", "log": "w2-only-install.log", "kind": "W2 -i over installed old W1; W1 is not upgraded"},
-    "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
+    "owner_upgrade_then_w2_install": {"status": "${W2_OWNER_UPGRADE_STATUS}", "result": "${W2_OWNER_UPGRADE_RESULT}", "stage": "${W2_OWNER_UPGRADE_STAGE}", "stage_evidence": "w2-owner-upgrade-stage.json", "db": "${W2_OWNER_UPGRADE_DB}", "origin": "${W2_OWNER_UPGRADE_ORIGIN}", "w1_version_after": "${W2_OWNER_UPGRADE_W1_VERSION}", "w2_version_after": "${W2_OWNER_UPGRADE_W2_VERSION}", "log": "w2-after-owner-upgrade-install.log", "upgrade_log": "w2-owner-upgrade.log", "repeat_log": "w2-owner-upgrade-repeat.log", "evidence": "w2-owner-upgrade-evidence.json", "kind": "approved installed owner versioned upgrades, then W2 install and same-version repeat"},
+    "dec029_meta_install": {"status": "${META_INSTALL_STATUS}", "result": "${META_INSTALL_RESULT}", "lite": {"status": "${META_LITE_STATUS}", "result": "${META_LITE_RESULT}", "log": "meta-lite-install.log"}, "full": {"status": "${META_FULL_STATUS}", "result": "${META_FULL_RESULT}", "log": "meta-full-install.log"}, "kind": "candidate-only meta-addon install; excluded from migration module set"},
+    "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"},
+    "p10_runtime": {"status": "${P10_STATUS}", "result": "${P10_RESULT}", "executed": ${P10_EXECUTED}, "expected": ${P10_EXPECTED}, "missing": $((P10_EXPECTED - P10_EXECUTED)), "log": "p10-runtime.log", "isolation": "dedicated disposable database"}
   },
   "migration_passes": {
     "status": "${MIGRATION_OVERALL}",

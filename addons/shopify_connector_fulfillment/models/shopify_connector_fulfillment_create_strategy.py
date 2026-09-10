@@ -4,12 +4,16 @@ import uuid
 
 from odoo import api, fields, models
 
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_gateway import (
+    FULFILLMENT_CREATE_DOCUMENT,
+)
+
 from .shopify_connector_fulfillment_reader import FulfillmentReadError
 
 _logger = logging.getLogger(__name__)
 
 # The fulfillmentCreate mutation document (RA-022: FulfillmentOrder-based, never
-# the legacy V2/REST path). Written as an ANONYMOUS GraphQL operation and held
+# the legacy V2/REST path). Written as a named GraphQL operation and held
 # as a module constant referenced by name from prepare/transport — fulfillment
 # mutation documents are guarded by this addon's own source-guard test, which
 # proves they are only ever reachable through the guarded
@@ -17,19 +21,6 @@ _logger = logging.getLogger(__name__)
 # @idempotent directive (fulfillmentCreate is not on Shopify's 17-mutation
 # @idempotent list); dedup is business_intent_fingerprint + operation-scope
 # serialization + the reconcile read.
-FULFILLMENT_CREATE_DOCUMENT = (
-    'mutation ($fulfillment: FulfillmentInput!) {\n'
-    '  fulfillmentCreate(fulfillment: $fulfillment) {\n'
-    '    fulfillment {\n'
-    '      id\n'
-    '      status\n'
-    '      trackingInfo { number url company }\n'
-    '    }\n'
-    '    userErrors { field message }\n'
-    '  }\n'
-    '}'
-)
-
 # FulfillmentOrder statuses that are eligible for a create attempt.
 FO_ELIGIBLE_STATUSES = ('OPEN', 'IN_PROGRESS')
 FO_BLOCKING_STATUSES = ('ON_HOLD', 'SCHEDULED', 'INCOMPLETE')

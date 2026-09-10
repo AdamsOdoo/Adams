@@ -10,6 +10,8 @@ Two obligations, both PROVEN rather than asserted:
    the owning company's user still sees the same row.
 """
 
+import importlib.util
+from pathlib import Path
 import uuid
 
 from odoo.tests.common import TransactionCase, tagged
@@ -195,6 +197,77 @@ class TestUiSec3Scope(TransactionCase):
             seen_by_b,
             'Company B must not see company A fulfillment evidence.',
         )
+
+    def test_evidence_company_rule_xml_ids_have_one_canonical_declaration(self):
+        addon = Path(__file__).resolve().parents[1]
+        security_sources = ''.join(
+            path.read_text(encoding='utf-8')
+            for path in sorted((addon / 'security').glob('*.xml'))
+        )
+        for local_id in (
+            'fulfillment_inbound_evidence_company_rule',
+            'fulfillment_inbound_evidence_line_company_rule',
+        ):
+            self.assertEqual(
+                security_sources.count('id="%s"' % local_id),
+                1,
+                '%s must have exactly one XML owner.' % local_id,
+            )
+
+    def test_evidence_company_rule_migration_repairs_noupdate_idempotently(self):
+        path = (
+            Path(__file__).resolve().parents[1]
+            / 'migrations' / '19.0.1.11.0' / 'post-migrate.py'
+        )
+        spec = importlib.util.spec_from_file_location(
+            'fulfillment_company_rule_migration', path,
+        )
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        Imd = self.env['ir.model.data'].sudo()
+        for local_id, target in migration.RULES.items():
+            rule = self.env.ref(
+                'shopify_connector_fulfillment.%s' % local_id,
+            ).sudo()
+            rule.write({
+                'name': 'Legacy permissive rule',
+                'domain_force': "[(1, '=', 1)]",
+            })
+            metadata = Imd.search([
+                ('module', '=', 'shopify_connector_fulfillment'),
+                ('name', '=', local_id),
+            ])
+            self.assertEqual(len(metadata), 1)
+            metadata.write({'noupdate': True})
+
+        migration.migrate(self.env.cr, '19.0.1.10.0')
+        first = {}
+        for local_id, target in migration.RULES.items():
+            rule = self.env.ref(
+                'shopify_connector_fulfillment.%s' % local_id,
+            ).sudo()
+            metadata = Imd.search([
+                ('module', '=', 'shopify_connector_fulfillment'),
+                ('name', '=', local_id),
+            ])
+            self.assertEqual(rule.model_id.model, target['model'])
+            self.assertEqual(rule.name, target['name'])
+            self.assertEqual(rule.domain_force, target['domain_force'])
+            self.assertTrue(rule.active)
+            self.assertTrue(rule['global'])
+            self.assertFalse(metadata.noupdate)
+            first[local_id] = (rule.write_date, metadata.write_date)
+
+        migration.migrate(self.env.cr, '19.0.1.11.0')
+        for local_id in migration.RULES:
+            rule = self.env.ref(
+                'shopify_connector_fulfillment.%s' % local_id,
+            ).sudo()
+            metadata = Imd.search([
+                ('module', '=', 'shopify_connector_fulfillment'),
+                ('name', '=', local_id),
+            ])
+            self.assertEqual(first[local_id], (rule.write_date, metadata.write_date))
 
     def test_quarantined_rows_are_absent_from_every_u1_read_shape(self):
         self.env.cr.execute(

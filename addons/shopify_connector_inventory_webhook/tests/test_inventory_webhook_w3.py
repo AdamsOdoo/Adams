@@ -39,6 +39,9 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     ERROR_CLASS_DATA_SHAPE,
     ERROR_CLASS_TEMPORARY,
 )
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_read_gateway import (
+    INVENTORY_LEVEL_QUERY,
+)
 from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
     INTERNAL_PROTECTED,
     assert_module_classification,
@@ -70,7 +73,38 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_domain_enabled': True,
             'inventory_scheduled_sync_enabled': True,
         })
+        store._p15_set_activation('active')
         return store
+
+    def _reader_actor(self, suffix):
+        return self.env['res.users'].create({
+            'name': 'W3 inventory reader %s' % suffix,
+            'login': 'w3-inventory-reader-%s' % suffix,
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
+                ).id,
+            ])],
+        })
+
+    def _reader_scope(self, suffix):
+        store = self._store('read-%s' % suffix)
+        actor = self._reader_actor(suffix)
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'webhook',
+            'job_type': INVENTORY_OBSERVATION_JOB_TYPE,
+            'state': 'running',
+            'res_model': 'shopify.connector.store',
+            'res_id': store.id,
+            'payload_hash': hashlib.sha256(suffix.encode()).hexdigest(),
+            'expected_connection_generation': store.connection_generation,
+        })
+        service = self.env[
+            'shopify.connector.inventory.observation.service'
+        ].with_user(actor)
+        return service, job.with_user(actor), store.with_user(actor)
 
     def test_webhook_settings_fields_have_canonical_classification(self):
         assert_module_classification(
@@ -370,11 +404,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             self.assertFalse(service._valid_level_gid(invalid), invalid)
 
     def test_authoritative_graphql_read_uses_quantity_timestamp_only(self):
-        service = self.env[
-            'shopify.connector.inventory.observation.service'
-        ]
-        store = SimpleNamespace(shop_domain='w3-read.myshopify.com')
-        job = SimpleNamespace(id=991)
+        service, job, store = self._reader_scope('authoritative')
         level_gid = (
             'gid://shopify/InventoryLevel/7001?inventory_item_id=8001'
         )
@@ -425,11 +455,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                          execute.call_args.args[2])
 
     def test_missing_or_naive_quantity_timestamp_never_uses_level_timestamp(self):
-        service = self.env[
-            'shopify.connector.inventory.observation.service'
-        ]
-        store = SimpleNamespace(shop_domain='w3-read.myshopify.com')
-        job = SimpleNamespace(id=992)
+        service, job, store = self._reader_scope('timestamp')
         level_gid = (
             'gid://shopify/InventoryLevel/7001?inventory_item_id=8001'
         )
@@ -900,6 +926,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_domain_enabled': True,
             'inventory_scheduled_sync_enabled': True,
         })
+        other_store._p15_set_activation('active')
         own_store = self._store('allowed-company')
         service = self.env[
             'shopify.connector.inventory.observation.service'
@@ -1140,7 +1167,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         ), patch.object(
             Client, 'execute_business_read', new=guarded_read,
         ):
-            dispatch = self.env['shopify.connector.job.dispatch']
+            # This unit entry bypasses the cron claim boundary. Use an
+            # authorized operator; installed-cron coverage lives in core.
+            actor = self._reader_actor('handler-replay')
+            dispatch = self.env['shopify.connector.job.dispatch'].with_user(actor)
+            job = job.with_user(actor)
             dispatch._dispatch_one(job)
             job.invalidate_recordset()
             self.assertEqual(job.state, 'retry_waiting')
@@ -1215,7 +1246,13 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertTrue(job.transitions)
 
     def test_real_handler_applies_read_evidence_without_stock_or_mutation_work(self):
-        """Run the registered child handler against real ORM pair records."""
+        self._assert_real_observation_read()
+
+    def test_claimed_root_worker_applies_real_p07_read_evidence(self):
+        self._assert_real_observation_read(claimed_worker=True)
+
+    def _assert_real_observation_read(self, *, claimed_worker=False):
+        """Real ORM pair and registered handler; only remote I/O is replaced."""
         store = self._store('orm-handler')
         warehouse = self.env['stock.warehouse'].search(
             [('company_id', '=', self.env.company.id)], limit=1,
@@ -1272,7 +1309,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'store_id': store.id,
             'job_source': 'scheduled_sync',
             'job_type': INVENTORY_OBSERVATION_JOB_TYPE,
-            'state': 'running',
+            'state': 'queued' if claimed_worker else 'running',
             'started_at': fields.Datetime.now(),
             'running_since': fields.Datetime.now(),
             'res_model': 'shopify.connector.store',
@@ -1315,11 +1352,21 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             self.assertEqual(purpose, 'inventory')
             yield result
 
-        handler = self.env['shopify.connector.job.dispatch']._get_handlers()[
-            INVENTORY_OBSERVATION_JOB_TYPE
-        ]
+        dispatch = self.env['shopify.connector.job.dispatch']
         with patch.object(Client, 'execute_business_read', new=guarded_read):
-            handler(job)
+            if claimed_worker:
+                # Real claim/start/registered handler/P07 gateway path. This
+                # shared test cursor does not prove scheduler cursor commits.
+                self.assertEqual(dispatch._drain_one(), store.id)
+                self.assertEqual(job.state, 'succeeded')
+            else:
+                # Direct calls have no dispatcher-owned claim capability.
+                actor = self._reader_actor('orm-handler')
+                job = job.with_user(actor)
+                handler = dispatch.with_user(actor)._get_handlers()[
+                    INVENTORY_OBSERVATION_JOB_TYPE
+                ]
+                handler(job)
 
         evidence = self.env[
             'shopify.connector.inventory.observation'
@@ -1361,6 +1408,14 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         root = Path(__file__).resolve().parents[1]
         service = (root / 'models' /
                    'shopify_connector_inventory_observation.py').read_text()
+        read_adapter = (
+            root / 'models'
+            / 'shopify_connector_inventory_observation_p07_read_adapter.py'
+        ).read_text()
+        read_document = (
+            root.parent / 'shopify_connector_inventory' / 'integration'
+            / 'shopify' / 'inventory_read_gateway.py'
+        ).read_text()
         handler = (root / 'models' /
                    'shopify_connector_inventory_webhook.py').read_text()
         constants = (root / 'models' / 'constants.py').read_text()
@@ -1376,10 +1431,14 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'def _handle_inventory_observation_sync', 1,
         )[1].split('def _observation_candidates', 1)[0]
         self.assertIn('execute_business_read', service)
-        self.assertIn('inventoryLevel(id: $levelId) { id', service)
+        self.assertIn('INVENTORY_LEVEL_QUERY', service)
+        self.assertIn('INVENTORY_LEVEL_QUERY = (', read_document)
+        self.assertIn('read_inventory_level(', read_adapter)
+        self.assertNotIn('execute_business(', read_adapter)
+        self.assertIn('inventoryLevel(id: $levelId) { id', INVENTORY_LEVEL_QUERY)
         self.assertIn(
             'quantities(names: ["available"]) { name quantity updatedAt }',
-            service,
+            INVENTORY_LEVEL_QUERY,
         )
         self.assertNotIn('execute_business(', child)
         self.assertNotIn('job.enqueue', child)

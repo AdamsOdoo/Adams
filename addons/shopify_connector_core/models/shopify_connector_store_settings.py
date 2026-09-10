@@ -3,7 +3,9 @@ import logging
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
+
+from ..domain.store_admin import MAX_SUPPORTED_STORES
 
 _logger = logging.getLogger(__name__)
 
@@ -17,7 +19,6 @@ _logger = logging.getLogger(__name__)
 CANONICAL_STORE_SETTINGS_ACTION = (
     'shopify_connector_core.action_shopify_connector_store_settings_canonical'
 )
-
 
 class ShopifyConnectorStoreSettings(models.Model):
     """Store-scoped feature flags and domain-enablement configuration.
@@ -74,7 +75,8 @@ class ShopifyConnectorStoreSettings(models.Model):
             ('shopify_authoritative', 'Shopify Authoritative'),
         ],
     )
-    notification_default_enabled = fields.Boolean(default=False)
+    # Opt-in is owned by named setup services and the server-side guard.
+    notification_default_enabled = fields.Boolean(default=False, readonly=True)
     # SEC-2: this was `pii_snapshot_retention_days`, which drove *both* the
     # removed customer-binding masking and the retained log redaction. With
     # masking gone (packet §D Option 1) the setting is renamed to what it
@@ -166,6 +168,19 @@ class ShopifyConnectorStoreSettings(models.Model):
         readonly=True,
         ondelete='set null',
     )
+    # Semantic setup choices are retained as a bounded, non-secret evidence
+    # map.  They are not a new source of truth: settings-backed entries are
+    # written atomically alongside their owning fields, while acknowledgement
+    # entries cover optional-domain steps whose concrete owner is not
+    # installed in core.  The P15 command service supplies the closed key and
+    # scalar allowlist; ordinary ORM writes remain blocked by the settings
+    # security inheritance.
+    setup_step_payloads = fields.Json(
+        default=dict,
+        readonly=True,
+        help='Sanitized semantic setup-step values; never credentials or '
+             'arbitrary record payloads.',
+    )
 
     _store_id_uniq = models.Constraint(
         'UNIQUE(store_id)',
@@ -186,7 +201,7 @@ class ShopifyConnectorStoreSettings(models.Model):
         setup-progress fields beside it; the caller has already established
         its own authority before reaching here.
         """
-        self.sudo().write({
+        self.sudo()._settings_service_write('_readiness', {
             'setup_readiness_stale_since': fields.Datetime.now(),
         })
         return True
@@ -204,7 +219,7 @@ class ShopifyConnectorStoreSettings(models.Model):
         this service did not perform (`action_reconnect`'s, for instance);
         this is what makes the ordinary path exact.
         """
-        self.sudo().write({'setup_readiness_stale_since': False})
+        self.sudo()._settings_service_write('_readiness', {'setup_readiness_stale_since': False})
         return True
 
     # ------------------------------------------------------------------
@@ -329,7 +344,7 @@ class ShopifyConnectorStoreSettings(models.Model):
         for store_id in sorted(missing_ids):
             try:
                 with self.env.cr.savepoint():
-                    Settings.create({'store_id': store_id})
+                    Settings._settings_service_create('_canonical_settings', {'store_id': store_id})
             except IntegrityError:
                 # A concurrent opener won `UNIQUE(store_id)`. Its row is the
                 # one we wanted; there is nothing to repair and nothing to
@@ -358,7 +373,14 @@ class ShopifyConnectorStoreSettings(models.Model):
         Nothing between steps 2 and 4 can widen the set.
         """
         self._assert_canonical_settings_administrator()
-        stores = self.env['shopify.connector.store'].search([])
+        stores = self.env['shopify.connector.store'].search(
+            [], limit=MAX_SUPPORTED_STORES + 1,
+        )
+        if len(stores) > MAX_SUPPORTED_STORES:
+            raise UserError(
+                'The supported store capacity is exceeded; refusing to '
+                'open an incomplete settings set.'
+            )
         if stores:
             stores.check_access('read')
             # A REFUSAL, NOT A FILTER, AND THAT DISTINCTION IS THE POINT.

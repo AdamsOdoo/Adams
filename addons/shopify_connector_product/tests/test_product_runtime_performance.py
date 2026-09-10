@@ -716,6 +716,7 @@ class TestProductRuntimePerformance(TransactionCase):
         )
         self.registry_enter_test_mode()
         self.store.write({'state': 'connected'})
+        self.store._p15_set_activation('active')
         self.Settings.create({
             'store_id': self.store.id,
             'product_domain_enabled': True,

@@ -29,8 +29,13 @@ from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_cred
 from odoo.addons.shopify_connector_webhook.hooks import (
     uninstall_hook as webhook_uninstall_hook,
 )
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (
+    WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT,
+)
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_read_gateway import (
+    SUBSCRIPTIONS_QUERY as SUBSCRIPTION_LIST_QUERY,
+)
 from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subscription import (
-    SUBSCRIPTION_LIST_QUERY,
     ShopifyWebhookSchemaError,
     _api_version_handle,
     _bounded_sweep_remaining,
@@ -176,6 +181,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        store._p15_set_activation('active')
         delivery, duplicate = self.env[
             'shopify.connector.webhook.delivery'
         ].with_context(inline_webhook_expansion=True)._ingest(
@@ -230,6 +236,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         delivery, duplicate = self.env[
             'shopify.connector.webhook.delivery'
         ]._ingest(
@@ -319,6 +326,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env[
             'shopify.connector.webhook.subscription'
         ]
@@ -383,6 +391,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env['shopify.connector.webhook.subscription']
         row = Subscription._ensure_expected_for_store(store).filtered(
             lambda item: item.topic == 'app/uninstalled'
@@ -447,6 +456,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'api_version': '2026-07',
         })
         store.write({'state': 'connected'})
+        store._p15_set_activation('active')
         Subscription = self.env['shopify.connector.webhook.subscription']
         row = Subscription._ensure_expected_for_store(store).filtered(
             lambda item: item.topic == 'app/uninstalled'
@@ -580,18 +590,14 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
                 _api_version_handle(malformed)
 
     def test_subscription_queries_select_the_api_version_object(self):
-        self.assertIn(
-            'apiVersion { handle displayName supported }',
+        for document in (
             SUBSCRIPTION_LIST_QUERY,
-        )
-        subscription = (
-            Path(__file__).resolve().parents[1] / 'models' /
-            'shopify_connector_webhook_subscription.py'
-        ).read_text()
-        self.assertIn(
-            'apiVersion { handle displayName supported }', subscription,
-        )
-        self.assertNotIn('apiVersion format includeFields', subscription)
+            WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT,
+        ):
+            self.assertIn(
+                'apiVersion { handle displayName supported }', document,
+            )
+            self.assertNotIn('apiVersion format includeFields', document)
 
     def test_invalid_create_shape_is_data_shape_not_unknown(self):
         subscription = self.env[
