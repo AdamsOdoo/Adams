@@ -12,6 +12,8 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
+- Frozen correction source `b66f829faba90d1251a5bd2cb565a92fb0f75412` matches reviewed local commit `4627537`. Independent final review found no blocker. Six source artifacts reproduce identically; final baseline and catalog consistency pass. Lite/Full packages validate. Evidence commit publication/native qualification pending.
+
 - Remote candidate `6fc17f5a97fe5b07bc7044ab2c53708bba9246f7`, source `fdf96fb94211a2c8c4104829ed2614d8928a1602`. Full native 34398695973 completed failure. Focus48, fresh3014, warm3014, Lite/Full, both migrations2879 and both repeats2879 passed. Artifact digest and raw summaries preserved in document18.
 - Remaining failures: export inline-preparation source assertion; P10 cancellation parent run stale state; old-core W2 10 errors/18 tests. Browser-evidence FAILED is the W2 error in shared evidence-error list, not an additional missing-tour defect.
 - Prepared correction updates full export call-chain assertion and selects its whole class (49 focused classes). Repository-wide assertion search found no further inline-preparation expectations. Updated source assertions execute locally.
