@@ -404,10 +404,69 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
 
     def test_stale_owner_after_run_cancellation_finishes_cancelled(self):
         """A cancellation request never becomes stale-owner duplicate risk."""
+        for job_count in (1, 2):
+            with self.subTest(job_count=job_count):
+                self._assert_stale_cancel_projection(job_count)
+        for scope_change in ('cancel', 'configuration_generation'):
+            with self.subTest(finalizer_scope_change=scope_change):
+                self._assert_finalizer_scope_projection(scope_change)
+
+    def _assert_finalizer_scope_projection(self, scope_change):
         fixture = self._create_fixture(job_count=1)
         claims = self._claim_fixture(fixture, limit=1)
         self.assertEqual(len(claims), 1)
         claim = claims[0]
+        cr, env = self._new_env(
+            allowed_company_ids=(fixture['stores'][0]['company_id'],),
+        )
+        try:
+            if scope_change == 'cancel':
+                env['shopify.connector.run'].browse(claim.run_id)._request_cancel_service(
+                    'P10 direct finalizer cancellation',
+                )
+            else:
+                # Fence the immutable claim after admission, on the exact
+                # committed fixture settings; no production method is mocked.
+                cr.execute(
+                    'UPDATE shopify_connector_store_settings '
+                    'SET configuration_generation = configuration_generation + 1 '
+                    'WHERE id = %s',
+                    (fixture['stores'][0]['settings_id'],),
+                )
+            env.flush_all()
+            cr.commit()
+        finally:
+            cr.rollback()
+            cr.close()
+        cr, env = self._new_env(
+            allowed_company_ids=(fixture['stores'][0]['company_id'],),
+        )
+        try:
+            with self._real_registry_cursor():
+                OdooReadOnlyRuntimeRepository(env).finalize_attempt(
+                    claim=claim, result=Succeeded({}), finished_at=NOW,
+                    phase=FINALIZE_TRANSACTION,
+                )
+        finally:
+            cr.rollback()
+            cr.close()
+        expected = (
+            ('cancelled', 'cancelled', 'cancelled')
+            if scope_change == 'cancel' else
+            ('blocked_manual_review', 'manual_review', 'blocked_manual_review')
+        )
+        self.assertEqual(self._observe(
+            'SELECT j.state, a.outcome, r.state '
+            'FROM shopify_connector_job j '
+            'JOIN shopify_connector_job_attempt a ON a.job_id = j.id '
+            'JOIN shopify_connector_run r ON r.id = j.run_id '
+            'WHERE j.id = %s', (claim.job_id,),
+        ), [expected])
+
+    def _assert_stale_cancel_projection(self, job_count):
+        fixture = self._create_fixture(job_count=job_count)
+        claims = self._claim_fixture(fixture, limit=job_count)
+        self.assertEqual(len(claims), job_count)
 
         cr, env = self._new_env(
             allowed_company_ids=(fixture['stores'][0]['company_id'],),
@@ -427,12 +486,11 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             cr.execute(
                 'UPDATE shopify_connector_job_attempt '
                 'SET claimed_at = %s, heartbeat_at = %s '
-                'WHERE job_id = %s AND claim_token = %s',
+                'WHERE job_id = ANY(%s)',
                 (
                     stale_at.replace(tzinfo=None),
                     stale_at.replace(tzinfo=None),
-                    claim.job_id,
-                    claim.claim_token,
+                    [claim.job_id for claim in claims],
                 ),
             )
             cr.commit()
@@ -440,30 +498,38 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             cr.rollback()
             cr.close()
 
-        cr, env = self._new_env(
-            allowed_company_ids=(fixture['stores'][0]['company_id'],),
-        )
-        try:
-            with self._real_registry_cursor():
-                count = OdooReadOnlyRuntimeRepository(env).sweep_stale_read_only(
-                    now=NOW, limit=1,
-                )
-        finally:
-            cr.rollback()
-            cr.close()
-        self.assertEqual(count, 1)
-        self.assertEqual(
-            self._observe(
+        # Separate bounded sweeps must keep the run active while one child
+        # still runs, and terminalize it with the last child in the same commit.
+        for settled_count in range(1, job_count + 1):
+            cr, env = self._new_env(
+                allowed_company_ids=(fixture['stores'][0]['company_id'],),
+            )
+            try:
+                with self._real_registry_cursor():
+                    count = OdooReadOnlyRuntimeRepository(env).sweep_stale_read_only(
+                        now=NOW, limit=1,
+                    )
+            finally:
+                cr.rollback()
+                cr.close()
+            self.assertEqual(count, 1)
+            rows = self._observe(
                 'SELECT j.state, a.outcome, r.state, '
                 'j.manual_review_subreason '
                 'FROM shopify_connector_job j '
                 'JOIN shopify_connector_job_attempt a ON a.job_id = j.id '
                 'JOIN shopify_connector_run r ON r.id = j.run_id '
-                'WHERE j.id = %s',
-                (claim.job_id,),
-            ),
-            [('cancelled', 'cancelled', 'cancelled', None)],
-        )
+                'WHERE j.id = ANY(%s) ORDER BY j.id',
+                ([claim.job_id for claim in claims],),
+            )
+            expected_run = 'cancelled' if settled_count == job_count else 'running'
+            self.assertEqual(sum(row[0] == 'cancelled' for row in rows), settled_count)
+            self.assertEqual(len(rows), job_count)
+            for state, outcome, run_state, review in rows:
+                self.assertIn(state, ('running', 'cancelled'))
+                self.assertEqual(outcome, state)
+                self.assertEqual(run_state, expected_run)
+                self.assertIsNone(review)
 
     def test_stale_job_with_removed_handler_is_quarantined_not_replayed(self):
         fixture = self._create_fixture(job_count=1)
@@ -501,14 +567,15 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         self.assertEqual(
             self._observe(
                 'SELECT j.state, j.manual_review_subreason, '
-                'a.outcome, a.error_code '
+                'a.outcome, a.error_code, r.state '
                 'FROM shopify_connector_job j '
                 'JOIN shopify_connector_job_attempt a ON a.job_id = j.id '
+                'JOIN shopify_connector_run r ON r.id = j.run_id '
                 'WHERE j.id = %s',
                 (claim.job_id,),
             ),
             [('blocked_manual_review', 'duplicate_risk',
-              'owner_lost', 'unregistered_read_handler')],
+              'owner_lost', 'unregistered_read_handler', 'blocked_manual_review')],
         )
 
 

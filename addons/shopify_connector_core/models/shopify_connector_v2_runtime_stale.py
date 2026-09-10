@@ -74,7 +74,7 @@ class StaleOwnerRepositoryMixin:
         # child is the last active job.  It also preserves the established
         # behavior for a multi-job run whose other children still need their
         # own cancellation sweep pass.
-        self._refresh_run_state(side_env, run)
+        self._refresh_run_state(side_env, run, changed_job=job)
 
     def _stale_sql(self, env, cutoff, limit, handler_keys):
         # Lock jobs first, then fetch/lock their attempts and scope parents.
@@ -375,7 +375,7 @@ class StaleOwnerRepositoryMixin:
                             from_state='running',
                             to_state='retry_waiting',
                         )
-                        self._refresh_run_state(side_env, run)
+                        self._refresh_run_state(side_env, run, changed_job=job)
                         processed += 1
                         continue
                 # Verification/quarantine/unknown scope is never replayed as
@@ -407,6 +407,6 @@ class StaleOwnerRepositoryMixin:
                     from_state='running',
                     to_state='blocked_manual_review',
                 )
-                self._refresh_run_state(side_env, run)
+                self._refresh_run_state(side_env, run, changed_job=job)
                 processed += 1
         return processed

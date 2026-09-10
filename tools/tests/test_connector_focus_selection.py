@@ -13,7 +13,7 @@ class TestConnectorFocusSelection(unittest.TestCase):
     def test_inventory_selects_exact_classes_without_implicit_standard_tag(self):
         config = json.loads(focus.CONFIG.read_text())
         selectors, names = focus.selected_classes(config)
-        self.assertEqual(len(selectors), 48)
+        self.assertEqual(len(selectors), 49)
         self.assertEqual(names, [item['class'] for item in config['classes']])
         # Pinned Odoo tag_selector.py defaults an omitted positive tag to
         # 'standard', while '*' removes the tag filter and retains module/class.

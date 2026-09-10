@@ -13,7 +13,7 @@ from ..runtime.p10_coordinator import (
     ClaimedWork,
     RuntimeBoundaryError,
 )
-from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES, project_run_state
+from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES
 from ..runtime.contracts import (
     NeedsReview,
     NeedsVerification,
@@ -26,6 +26,7 @@ from ..runtime.p10_sql import build_claim_statement
 from ..runtime.p10_repository_locks import lock_claim_batch_scopes
 from .shopify_connector_v2_runtime_common import (
     V2_RUNTIME_MODE,
+    refresh_run_state,
     runtime_mode_includes,
     _ACTIVE_ATTEMPT_OUTCOMES,
     _ACTIVE_RUN_STATES,
@@ -483,7 +484,7 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
             from_state='running',
             to_state='blocked_manual_review',
         )
-        self._refresh_run_state(side_env, run)
+        self._refresh_run_state(side_env, run, changed_job=job)
 
     def _finish_cancelled(self, side_env, row, claim, finished_at):
         Attempt = side_env['shopify.connector.job.attempt']
@@ -515,7 +516,7 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
             from_state='running',
             to_state='cancelled',
         )
-        self._refresh_run_state(side_env, run)
+        self._refresh_run_state(side_env, run, changed_job=job)
 
     def _finish_result(self, side_env, row, claim, result, finished_at):
         Attempt = side_env['shopify.connector.job.attempt']
@@ -687,7 +688,7 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
             claim=claim,
             result=result,
         )
-        self._refresh_run_state(side_env, run)
+        self._refresh_run_state(side_env, run, changed_job=job)
 
     def finalize_attempt(
         self, *, claim, result, finished_at, phase,
@@ -721,30 +722,4 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                 return
             self._finish_result(side_env, row, claim, result, finished_at)
 
-    @staticmethod
-    def _refresh_run_state(side_env, run):
-        if not run or not run.exists() or run.state in (
-            'succeeded', 'partially_succeeded', 'failed_terminal', 'cancelled',
-        ):
-            return
-        side_env.cr.execute(
-            """
-                SELECT state, COUNT(*)
-                  FROM shopify_connector_job
-                 WHERE run_id = %s
-                 GROUP BY state
-            """,
-            [run.id],
-        )
-        counts = {state: int(count) for state, count in side_env.cr.fetchall()}
-        target = project_run_state(
-            counts, cancel_requested=bool(run.cancel_requested_at),
-        )
-        if target == run.state:
-            return
-        if target in (
-            'succeeded', 'partially_succeeded', 'failed_terminal', 'cancelled',
-        ):
-            run._finish_service(target, finished_at=fields.Datetime.now())
-        else:
-            run._transition_service(target)
+    _refresh_run_state = staticmethod(refresh_run_state)

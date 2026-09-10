@@ -1,17 +1,19 @@
-"""Shared, framework-light helpers for the V2 runtime adapters.
+"""Shared helpers and run projection for the V2 runtime adapters.
 
-The claim/finalize repository and stale-owner repository are separate modules
-so each remains reviewable.  This module contains only their common constants,
-validation and redaction helpers; it owns no ORM model or database operation.
+The claim/finalize and stale-owner repositories share constants, validation,
+redaction and the locked-job run projection boundary.  The projection executes
+inside the caller's transaction; this module owns no ORM model or commit.
 """
 
 from datetime import timedelta, timezone
 import re
 
+from odoo import fields
+
 from ..domain.immutability import to_plain
 from ..domain.runtime_modes import runtime_mode_includes, runtime_modes_including
 from ..runtime.p10_coordinator import RuntimeBoundaryError
-from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES
+from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES, project_run_state
 from ..tools.redaction import redact
 from .shopify_connector_job import MANUAL_REVIEW_SUBREASON_SELECTION
 
@@ -140,3 +142,45 @@ __all__ = [
     '_worker',
     'runtime_mode_includes',
 ]
+
+
+def refresh_run_state(side_env, run, *, changed_job):
+    """Project a locked run after flushing its already-locked changed child.
+
+    Both finalization and stale recovery call this inside their short side
+    transaction.  The caller owns job-before-run locks and the commit boundary.
+    """
+    if not run or not run.exists() or run.state in (
+        'succeeded', 'partially_succeeded', 'failed_terminal', 'cancelled',
+    ):
+        return
+    # Every caller owns this job lock before the run lock.  ORM writes
+    # remain deferred until flush; raw SQL would otherwise project the
+    # preceding state and persist a running run with terminal children.
+    # Request the changed state explicitly.  Odoo may also flush other dirty
+    # jobs: safety relies on the fresh side environment containing only the
+    # finalizer's locked job (plus newly admitted continuation jobs), or the
+    # stale sweep's prelocked batch.  Do not dirty unlocked sibling jobs in
+    # these transactions; that would invert job-before-run lock ordering.
+    changed_job.flush_recordset(['state'])
+    side_env.cr.execute(
+        """
+            SELECT state, COUNT(*)
+              FROM shopify_connector_job
+             WHERE run_id = %s
+             GROUP BY state
+        """,
+        [run.id],
+    )
+    counts = {state: int(count) for state, count in side_env.cr.fetchall()}
+    target = project_run_state(
+        counts, cancel_requested=bool(run.cancel_requested_at),
+    )
+    if target == run.state:
+        return
+    if target in (
+        'succeeded', 'partially_succeeded', 'failed_terminal', 'cancelled',
+    ):
+        run._finish_service(target, finished_at=fields.Datetime.now())
+    else:
+        run._transition_service(target)

@@ -12,12 +12,12 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
-- Frozen test-repair source `fdf96fb94211a2c8c4104829ed2614d8928a1602` matches local `a8c4bae`. Independent review found no blockers and executed the exact updated source assertion successfully. Six generated artifacts reproduce identically; baseline and five catalog tests pass after synchronization. Final branch publication and native verification pending.
-
-- Published head `8727b50cea694590fa4c70cec2e44aba4ee883bc`, source `19ce79419f8bfa3beaf9b360cdc30d4971b28e41`. Policy passed. Native 34379511455 failed: 901 tests, one failure, two errors, all 48 selected classes present, no skips. Full campaign skipped. Original summary/digest in document 18.
-- Production mutation success and preparation rollback regressions passed. Prepared test-only follow-up updates source ordering for the extracted helper and moves identity checks onto the existing committed fixture with real independent cursors. Missing-run rejection remains unchanged; no production correction in this packet.
-- All 471 local tests pass (26.576 seconds); changed Python syntax passes. Final exact-source evidence and native results remain pending.
-- First next action: finish review, freeze and publish the coherent correction with synchronized catalog evidence, inspect expanded prerequisite and full campaign. Preserve histories and W2/release gates. No live Shopify or production activity.
+- Remote candidate `6fc17f5a97fe5b07bc7044ab2c53708bba9246f7`, source `fdf96fb94211a2c8c4104829ed2614d8928a1602`. Full native 34398695973 completed failure. Focus48, fresh3014, warm3014, Lite/Full, both migrations2879 and both repeats2879 passed. Artifact digest and raw summaries preserved in document18.
+- Remaining failures: export inline-preparation source assertion; P10 cancellation parent run stale state; old-core W2 10 errors/18 tests. Browser-evidence FAILED is the W2 error in shared evidence-error list, not an additional missing-tour defect.
+- Prepared correction updates full export call-chain assertion and selects its whole class (49 focused classes). Repository-wide assertion search found no further inline-preparation expectations. Updated source assertions execute locally.
+- P10 correction flushes job state before shared SQL run projection on all six caller paths; covers cancellation, stale retry/quarantine, scope mismatch and normal finalization. Multi-job bounded cancellation regression retains original single-job coverage and checks parent state. Pinned Odoo may flush other dirty rows of the model; safety depends on the owned transaction and prelocked job batch, not recordset scoping alone.
+- Settled local checks: 474 tests pass in 15.638 seconds; static, change-size, syntax and whitespace pass. Expanded native regressions include direct cancellation and generation mismatch; native verification pending.
+- First next action: settle independent review/checks, publish exact-source candidate and synchronized evidence, then verify focused/full native results. Document19 remains the explicit unresolved compatibility decision; no waiver or alternative lane relabeling. Preserve histories, UI parked, no live/production action.
 
 ## Preceding published candidate — 9 September 2026
 

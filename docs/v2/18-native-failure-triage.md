@@ -201,3 +201,15 @@ Mutation success still missed its consequence callback. V2 request validation op
 [Native 34379511455](https://github.com/AdamsOdoo/Adams/actions/runs/34379511455) executed 901 tests: one failure, two errors, all 48 classes present, no selected skips. Full campaign skipped. Artifact 10115565161 digest `939e642d478868b04b4bdbf7c8b432ae0e80b1178ed5433eae77c39d08473748` verified; summary preserved. Policy passed.
 
 Mutation durable success and preparation rollback regressions passed. Remaining failure: source sequence guard still searched for inline preparation after extraction into the owned-cursor helper. Two new identity tests incorrectly expected independent cursors to see uncommitted TransactionCase fixtures. Corrected sequence assertion retains C1/preparation/C2/NET/C3 ordering; identity cases now share the existing genuinely committed fixture, explicitly commit the lane marker before independent validation, retain real identity locking and missing-run rejection, and verify main cursor stays idle. No production change in this packet. Native requalification pending.
+
+## Candidate 6fc17f5 — full campaign narrows to three gates
+
+[Run 34398695973](https://github.com/AdamsOdoo/Adams/actions/runs/34398695973) completed failure. Exact candidate verified; artifact 10124749126 SHA-256 `aa193703c40c81758b02d3fd86a9d053ab438952d409203a4f3bcb6ec063444e` verified. Original focus/full summaries preserved.
+
+- Focus passed all 48 selected classes. Fresh and warm each passed 3014 tests. Lite/Full installs passed.
+- Both genuine migration origins passed 2879 tests each, and both repeats passed 2879 each; 20/19 upgrade scripts executed respectively.
+- Nonstandard: 62 tests, one failure, zero errors. Stale source assertion in export expiry still expected inline preparation. Updated full call-chain assertion and added the whole class to focused inventory (49 classes). Repository search found no additional assertion expecting inline dispatcher preparation.
+- P10: all 8 mandatory tests executed on disposable database; one failure, zero errors. Cancelled job and attempt left run running. Shared raw-SQL projection read deferred ORM job state; a job-state flush is required before aggregation on every caller path. Pinned Odoo may flush other dirty model rows; the owned transaction and prelocked job batch provide the lock invariant.
+- Old-core W2 remains 18 tests/10 errors. The summary's browser-evidence FAILED label is caused by that same W2 evidence error in the shared error list; no additional missing-tour error was reported. Document19's compatibility decision remains unaccepted.
+
+No full qualification or release claim. P10 and export corrections require native verification.

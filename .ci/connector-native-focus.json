@@ -192,6 +192,10 @@
     {
       "addon": "shopify_connector_sale",
       "class": "TestTaxMappingCompetingChoiceRace"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportMutationExpiryThroughTheDispatcher"
     }
   ]
 }
