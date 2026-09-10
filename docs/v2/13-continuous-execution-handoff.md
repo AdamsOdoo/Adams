@@ -12,6 +12,8 @@ This file owns current execution state. AGENTS.md owns authority and development
 
 ## Current checkpoint
 
+- Frozen repair source `f661cb43849661d681cd582ebb9af37c955bf940`, tree `e382850c07b1003945b3205c46793c5bb752a662`, matches local900cd1e. Six artifacts reproduce identically; frozen baseline/catalog consistency pass. Evidence-head publication and isolated native result remain pending.
+
 - Published head `9909a4ecafbce3ca86163d6e7bc006c8e35bb1f9`, source `255a69308a37e2fcc691d2f4b0f6340be7b4f9fa`. Local merge `c380fd84588114ace07bc1684d1650d000ac17a1` preserves local/API histories. Later local status commits are unpublished; inspect git status for the active repair.
 - Policy34464295059 passed. Native34464295127 attempt1 stopped at transient Chrome HTTP readiness timeout. Attempt2 passed browser startup, focus903 tests/49 classes, fresh/warm3014 each, Lite/Full, both migrations/repeats2879 each, nonstandard62 and P10all8. Its sole failed lane is owner_upgrade_then_w2_install; full qualification remains failed.
 - Exact root from raw `w2-owner-upgrade.log`: mutation_attempt.init invokes historic scope quarantine, which ORM-prefetches parent job fields before job.run_id exists. Old fixture seeding, read-only old-version rejection and database restore completed before this error. W2 installation and repeat preservation were never reached. Artifact10150014587 SHA256 `e89d8dd33b36fe4d20a748eeeede936cbc07034260a41a4eaed2c49b5e3aa96f` verified; original summaries and root excerpt retained in evidence/document18.
