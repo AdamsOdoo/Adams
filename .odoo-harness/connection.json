@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "application_repository": "AdamsOdoo/Adams",
+  "toolkit_repository": "MostafaEssamm12/Odoo",
+  "toolkit_commit": "10ec1d059b5ddc5d422875f68e0726cc500487ce",
+  "mode": "external-private",
+  "runner": "private-harness-actions",
+  "scope": "development-only"
+}
