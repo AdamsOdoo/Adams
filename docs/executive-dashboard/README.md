@@ -66,3 +66,25 @@ Documentation only; no addon, schema or data change and no migration. Feature na
 The original onboarding checkout and private toolkit remain clean. The new worktree is at `/workspace/scratch/0d625603a72e/adams-dashboard`. Review the commit containing this checkpoint and current Git status when continuing; never infer unchanged remote state from this note. Durable continuation is this feature branch and the original attached archive.
 
 Rollback is removal/reversion of only this feature's documentation commit. No application or runtime rollback is required. Learning: distinguish inherited Community harness qualification from feature-specific licensed report compatibility; verify environment identity before writing financial adapters.
+
+## First implementation slice — login deferred
+
+The owner authorized building before Odoo.sh authentication on 19 September 2026.
+`adams_executive_dashboard` is now a separate addon with an Owl client action,
+responsive report cards, company/period/cutoff filters, independently loaded sections,
+stale-response protection, dashboard membership and native report access checks.
+Native analytical adapters cover posted net invoiced sales, confirmed untaxed sales,
+distinct orders and confirmed untaxed purchases. Sale/Purchase apps are optional.
+Financial mappings, stock/CRM/HR measures, charts, exports, persistent preferences,
+Enterprise parity and actual English/Arabic browser acceptance remain incomplete.
+This is a development slice, not a completed dashboard or release candidate.
+
+Validation: Python compilation, JavaScript syntax and XML parsing passed locally.
+Feature-specific native harness execution is being prepared; these checks alone do
+not establish runtime correctness. Existing harness qualification is reused.
+
+Install the addon only in a disposable development database. Administrators can
+open its menu; other users need the Executive Dashboard group plus their existing
+native report permissions. The dashboard group grants no accounting access.
+The feature adds no accounting records or scheduled jobs. Enterprise source access
+and a source-matched test build are deferred, not waived.

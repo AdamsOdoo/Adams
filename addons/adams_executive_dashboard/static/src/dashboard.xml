@@ -1,0 +1,59 @@
+<templates xml:space="preserve">
+    <t t-name="adams_executive_dashboard.Dashboard">
+        <main class="o_adams_dashboard">
+            <header class="adams_header">
+                <div><span class="adams_eyebrow">ADAMS · EXECUTIVE WORKSPACE</span>
+                    <h1>Business overview</h1><p>Native reports. One clear view.</p></div>
+                <span class="adams_preview">Development preview</span>
+            </header>
+            <div t-if="state.error" class="alert alert-warning" role="alert"><t t-esc="state.error"/></div>
+            <t t-if="state.companies.length">
+                <form class="adams_filters" t-on-submit.prevent="refresh">
+                    <label>Company<select t-model="state.draft.company_id" class="form-select" required="required">
+                        <option t-foreach="state.companies" t-as="company" t-key="company.id" t-att-value="company.id"><t t-esc="company.name"/></option>
+                    </select></label>
+                    <label>From<input class="form-control" type="date" t-model="state.draft.date_from" required="required"/></label>
+                    <label>To<input class="form-control" type="date" t-model="state.draft.date_to" required="required"/></label>
+                    <label>Balance as of<input class="form-control" type="date" t-model="state.draft.as_of" required="required"/></label>
+                    <button class="btn btn-primary" type="submit">Apply filters</button>
+                </form>
+                <p class="adams_scope" t-if="state.applied">
+                    Applied period: <bdi t-esc="state.applied.date_from"/> — <bdi t-esc="state.applied.date_to"/>
+                    <span> · Balance cutoff: <bdi t-esc="state.applied.as_of"/></span>
+                </p>
+                <nav class="adams_nav" aria-label="Dashboard sections">
+                    <a t-foreach="sections" t-as="section" t-key="section.key" t-att-href="'#adams-' + section.key"><t t-esc="section.name"/></a>
+                </nav>
+                <section t-foreach="sections" t-as="section" t-key="section.key" t-att-id="'adams-' + section.key" class="adams_section" t-att-aria-labelledby="'title-' + section.key">
+                    <h2 t-att-id="'title-' + section.key"><t t-esc="section.name"/></h2>
+                    <p t-esc="section.description"/>
+                    <t t-set="result" t-value="state.sections[section.key]"/>
+                    <div t-if="!result || result.status === 'loading'" class="adams_message" role="status">Loading native reports…</div>
+                    <div t-elif="result.status === 'error'" class="adams_message" role="alert">
+                        This section could not be loaded. Check the filters and your access, then apply filters to retry.
+                    </div>
+                    <div t-else="" class="adams_grid">
+                        <article t-foreach="result.items" t-as="item" t-key="item.key" class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready' }">
+                            <h3 t-esc="labels[item.key]"/>
+                            <div class="adams_value" t-esc="formatted(item, result)"/>
+                            <span t-if="item.value !== null &amp;&amp; item.key !== 'orders'" class="adams_currency" t-esc="result.currency"/>
+                            <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
+                            <p t-if="item.key === 'invoiced_sales'" class="adams_hint">Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue.</p>
+                            <p t-if="item.key === 'confirmed_sales' || item.key === 'orders'" class="adams_hint">Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales.</p>
+                            <p t-if="item.key === 'purchases'" class="adams_hint">Confirmed purchase orders by order date, untaxed. This is not an outstanding balance.</p>
+                            <footer t-if="item.source">
+                                <details><summary>Source and scope</summary>
+                                    <p t-esc="item.source"/><code t-esc="item.measure"/>
+                                    <p>Date basis: <code t-esc="item.date_field"/></p>
+                                    <p>One company · native report currency · current access rules</p>
+                                </details>
+                                <button t-if="item.drilldown" type="button" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openReport(item.key)">Open native report <span aria-hidden="true">↗</span></button>
+                            </footer>
+                        </article>
+                    </div>
+                </section>
+                <p class="adams_scope">Financial integrations and browser acceptance are pending. No financial totals are estimated.</p>
+            </t>
+        </main>
+    </t>
+</templates>
