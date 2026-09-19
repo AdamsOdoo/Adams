@@ -124,6 +124,9 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         self.assertEqual(len(second['rows']), 2)
         self.assertFalse(second['has_more'])
         self.assertEqual([r['id'] for r in first['rows'] + second['rows']], sorted(quotes.ids, reverse=True))
+        self.env.flush_all()
+        quotation = next(r for r in self.dashboard.get_section('sales', self.options)['items'] if r['key'] == 'quotations')
+        self.assertEqual(quotation['value'], 378)
         orders = self.dashboard.get_recent_sales('orders', self.options)
         self.assertEqual([r['id'] for r in orders['rows']], confirmed.ids)
         self.assertEqual(orders['rows'][0]['amount_untaxed'], 500)
@@ -207,3 +210,22 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         employee.active = False
         self.env.flush_all()
         self.assertEqual(self.dashboard.get_trend('hr', self.options)['rows'], [])
+
+    def test_fulfillment_reuses_signed_native_product_quantities(self):
+        product = self.env['product.product'].create({'name': 'Dashboard delivery service', 'type': 'service'})
+        order = self.env['sale.order'].create({'partner_id': self.partner_a.id,
+            'order_line': [Command.create({'product_id': product.id, 'product_uom_qty': 5,
+                                          'price_unit': 10, 'tax_ids': [Command.clear()]})]})
+        order.action_confirm()
+        order.date_order = '2026-08-15 12:00:00'
+        order.order_line.qty_delivered = 2
+        self.env.flush_all()
+        row = self.dashboard.get_fulfillment(self.options)['rows'][0]
+        self.assertEqual((row['ordered'], row['delivered'], row['remaining']), (5, 2, 3))
+        self.assertEqual(row['unit'], product.uom_id.display_name)
+        action = self.dashboard.open_fulfillment(self.options)
+        self.assertEqual(action['context']['pivot_measures'], ['product_uom_qty', 'qty_delivered', 'qty_to_deliver'])
+        self.assertEqual(sum(self.env['sale.report'].search(action['domain']).mapped('qty_to_deliver')), 3)
+        order.order_line.qty_delivered = 7
+        self.env.flush_all()
+        self.assertEqual(self.dashboard.get_fulfillment(self.options)['rows'][0]['remaining'], -2)

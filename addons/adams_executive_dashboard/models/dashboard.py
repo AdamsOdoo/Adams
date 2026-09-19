@@ -18,6 +18,8 @@ SOURCES = {
                        'price_subtotal:sum', 'account.action_account_invoice_report_all'),
     'confirmed_sales': ('sale.report', 'date', [('state', '=', 'sale')],
                         'price_subtotal:sum', 'sale.action_order_report_all'),
+    'quotations': ('sale.report', 'date', [('state', 'in', ['draft', 'sent'])],
+                   'price_subtotal:sum', 'sale.action_order_report_all'),
     'orders': ('sale.report', 'date', [('state', '=', 'sale')],
                'order_reference:count_distinct', 'sale.action_order_report_all'),
     'purchases': ('purchase.report', 'date_order', [('state', '=', 'purchase')],
@@ -31,6 +33,7 @@ SOURCES = {
 DIMENSIONS = {
     'invoiced_sales': {'customer': 'commercial_partner_id', 'salesperson': 'invoice_user_id', 'product': 'product_id'},
     'confirmed_sales': {'customer': 'commercial_partner_id', 'salesperson': 'user_id', 'product': 'product_id'},
+    'quotations': {'customer': 'commercial_partner_id', 'salesperson': 'user_id', 'product': 'product_id'},
     'orders': {'customer': 'commercial_partner_id', 'salesperson': 'user_id'},
     'purchases': {'vendor': 'partner_id', 'buyer': 'user_id', 'product': 'product_id'},
     'crm': {'stage': 'stage_id', 'salesperson': 'user_id'},
@@ -38,7 +41,7 @@ DIMENSIONS = {
 }
 SECTIONS = {
     'finance': ['revenue', 'profit', 'cash', 'receivables', 'payables'],
-    'sales': ['invoiced_sales', 'confirmed_sales', 'orders'],
+    'sales': ['invoiced_sales', 'confirmed_sales', 'orders', 'quotations'],
     'operations': ['purchases', 'inventory', 'crm', 'hr'],
 }
 
@@ -114,6 +117,41 @@ class ExecutiveDashboard(models.AbstractModel):
         domain = [('company_id', '=', self.env.company.id), ('state', 'in', states),
                   *self._date_bounds(orders, 'date_order', dates)]
         return orders, domain
+
+    @api.model
+    def get_fulfillment(self, options, offset=0):
+        scoped, dates = self._scope(options)
+        if type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid page.'))
+        if 'sale.report' not in scoped.env:
+            return {'status': 'not_installed', 'rows': []}
+        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
+        report.check_field_access_rights('read', columns)
+        rows = report._read_group([*domain, ('product_id', '!=', False)],
+            groupby=['product_id', 'product_uom_id'],
+            aggregates=['product_uom_qty:sum', 'qty_delivered:sum', 'qty_to_deliver:sum'],
+            order='product_id ASC, product_uom_id ASC', offset=offset, limit=26)
+        return {'status': 'ready' if rows else 'empty', 'has_more': len(rows) > 25,
+                'rows': [{'id': product.id, 'name': product.display_name, 'unit': unit.display_name,
+                          'ordered': ordered, 'delivered': delivered, 'remaining': remaining}
+                         for product, unit, ordered, delivered, remaining in rows[:25]],
+                'provenance': scoped._provenance('confirmed_sales', domain,
+                    'product_uom_qty:sum,qty_delivered:sum,qty_to_deliver:sum')}
+
+    @api.model
+    def open_fulfillment(self, options):
+        scoped, dates = self._scope(options)
+        if 'sale.report' not in scoped.env:
+            raise ValidationError(_('This native report is not configured.'))
+        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        measures = ['product_uom_qty', 'qty_delivered', 'qty_to_deliver']
+        report.check_field_access_rights('read', ['product_id', 'product_uom_id', *measures])
+        action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
+        action.update(domain=[*domain, ('product_id', '!=', False)], context={**scoped.env.context,
+            'pivot_measures': measures, 'pivot_row_groupby': ['product_id', 'product_uom_id'],
+            'graph_measure': 'qty_to_deliver', 'group_by': ['product_id', 'product_uom_id']})
+        return action
 
     @api.model
     def get_recent_sales(self, kind, options, offset=0):

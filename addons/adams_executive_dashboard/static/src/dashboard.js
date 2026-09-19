@@ -24,7 +24,7 @@ export class ExecutiveDashboard extends Component {
             revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'),
             receivables: _t('Receivables'), payables: _t('Payables'),
             invoiced_sales: _t('Net invoiced sales'), confirmed_sales: _t('Confirmed sales'),
-            orders: _t('Distinct sales orders'), purchases: _t('Confirmed purchases'),
+            orders: _t('Distinct sales orders'), quotations: _t('Draft and sent quotations'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (native signed)'),
         };
         this.groupHeadings = { revenue: _t('Profitability'), cash: _t('Liquidity'), receivables: _t('Working capital'), invoiced_sales: _t('Commercial performance') };
@@ -35,11 +35,11 @@ export class ExecutiveDashboard extends Component {
         this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
             vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };
         this.dimensions = { invoiced_sales: ['customer', 'salesperson', 'product'], confirmed_sales: ['customer', 'salesperson', 'product'],
-            orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
+            quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
         this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { operations: true }, detail: null, directory: null, inventory: null, recent: null, exporting: false, restored: false });
+            collapsed: { operations: true }, detail: null, directory: null, inventory: null, fulfillment: null, recent: null, exporting: false, restored: false });
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -80,7 +80,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
-            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset']) };
+            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
     async restoreNavigation(saved) {
@@ -95,6 +95,7 @@ export class ExecutiveDashboard extends Component {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
         }
         if (saved.directory) { jobs.push(this.loadDirectory('cash', saved.directory.offset)); }
+        if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
         if (saved.inventory) { jobs.push(this.loadDirectory('inventory', saved.inventory.offset)); }
         for (const section of this.sections) {
             if (typeof saved.collapsed?.[section.key] === 'boolean') { this.state.collapsed[section.key] = saved.collapsed[section.key]; }
@@ -143,6 +144,7 @@ export class ExecutiveDashboard extends Component {
         this.state.detail = null;
         this.state.directory = null;
         this.state.inventory = null;
+        this.state.fulfillment = null;
         this.state.recent = null;
         this.detailGeneration++;
         this.state.error = '';
@@ -204,12 +206,13 @@ export class ExecutiveDashboard extends Component {
 
     async loadDirectory(kind, offset = 0) {
         const generation = this.generation;
-        const stateKey = kind === 'cash' ? 'directory' : 'inventory';
+        const stateKey = kind === 'cash' ? 'directory' : kind;
+        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment' }[kind];
         const request = (this[`${stateKey}Request`] || 0) + 1;
         this[`${stateKey}Request`] = request;
         this.state[stateKey] = { status: 'loading', rows: [], offset };
         try {
-            const data = await this.orm.call('adams.executive.dashboard', kind === 'cash' ? 'get_cash_directory' : 'get_inventory', [{ ...this.state.applied }, offset]);
+            const data = await this.orm.call('adams.executive.dashboard', method, [{ ...this.state.applied }, offset]);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
                 this.state[stateKey] = { ...data, offset };
             }
@@ -242,8 +245,9 @@ export class ExecutiveDashboard extends Component {
         const generation = this.generation;
         this.state.opening = true;
         try {
-            const args = key === 'inventory' ? [{ ...this.state.applied }] : [key, { ...this.state.applied }, dimension, groupId];
-            const action = await this.orm.call('adams.executive.dashboard', key === 'inventory' ? 'open_inventory' : 'open_report', args);
+            const isDirectory = ['inventory', 'fulfillment'].includes(key);
+            const args = isDirectory ? [{ ...this.state.applied }] : [key, { ...this.state.applied }, dimension, groupId];
+            const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);
             if (this.alive && generation === this.generation) { await this.action.doAction(action); }
         } catch {
             if (this.alive) { this.notification.add(_t('The native report could not be opened. Check your access.'), { type: 'warning' }); }

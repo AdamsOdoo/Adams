@@ -720,3 +720,69 @@ msgstr "تنفيذ الطلبات"
 #, python-format
 msgid "Backlog and delivery performance are not configured. Native delivery sources and business definitions must be verified before displaying these measures."
 msgstr "مقاييس الطلبات المتبقية وأداء التسليم غير مهيأة. يجب التحقق من مصادر التسليم الأصلية والتعريفات التجارية قبل عرض هذه المقاييس."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. Each product uses its own unit. Signed values are retained; quantities are not combined across units."
+msgstr "الكميات الأصلية المطلوبة والمسلّمة والمتبقية للطلبات المؤكدة خلال فترة تاريخ الطلب المحددة. لكل منتج وحدته، مع الاحتفاظ بالإشارات دون جمع وحدات مختلفة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Explore delivery quantities"
+msgstr "استعراض كميات التسليم"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Backlog value and on-time completion are not configured. Partial deliveries, returns and commitment-date rules require verified definitions."
+msgstr "قيمة الطلبات المتبقية والإكمال في الموعد غير مهيأتين. تتطلب قواعد التسليم الجزئي والمرتجعات ومواعيد الالتزام تعريفات موثقة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Delivery quantities unavailable. Check your access and retry."
+msgstr "كميات التسليم غير متاحة. تحقق من صلاحياتك وأعد المحاولة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Ordered"
+msgstr "المطلوب"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Delivered"
+msgstr "المسلّم"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Remaining"
+msgstr "المتبقي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Draft and sent quotations"
+msgstr "عروض الأسعار المسودة والمرسلة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Draft and sent quotations by native order date, untaxed. Expired quotations remain included while their native state is draft or sent."
+msgstr "عروض الأسعار المسودة والمرسلة حسب تاريخ الطلب الأصلي، دون ضريبة. تظل العروض منتهية الصلاحية مشمولة ما دامت حالتها الأصلية مسودة أو مرسلة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Fetched at"
+msgstr "تم جلب البيانات في"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "UTC. Source completeness has not been assessed."
+msgstr "بالتوقيت العالمي المنسق. لم يُقيّم اكتمال بيانات المصدر."

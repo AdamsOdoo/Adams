@@ -87,6 +87,7 @@
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
                             <p t-if="item.key === 'invoiced_sales'" class="adams_hint">Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue.</p>
                             <p t-if="item.key === 'confirmed_sales' || item.key === 'orders'" class="adams_hint">Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales.</p>
+                            <p t-if="item.key === 'quotations'" class="adams_hint">Draft and sent quotations by native order date, untaxed. Expired quotations remain included while their native state is draft or sent.</p>
                             <p t-if="item.key === 'purchases'" class="adams_hint">Confirmed purchase orders by order date, untaxed. This is not an outstanding balance.</p>
                             <p t-if="item.key === 'crm'" class="adams_hint">Active open opportunities created in the period. Native probability-weighted revenue, not a cash forecast. Company-unassigned opportunities are excluded.</p>
                             <p t-if="item.key === 'hr'" class="adams_hint">Approved requests starting in the period, for active employees. Native report hours are negative for leave taken. Not period-prorated capacity.</p>
@@ -102,6 +103,7 @@
                         </article>
                         </t>
                     </div>
+                    <p t-if="result &amp;&amp; result.generated_at" class="adams_scope">Fetched at <bdi t-esc="result.generated_at"/> UTC. Source completeness has not been assessed.</p>
                     <t t-if="section.key === 'finance'">
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('cash')">Discover bank and cash accounts</button>
                         <div t-if="state.directory" class="adams_analysis">
@@ -152,7 +154,28 @@
                         </section>
                     </t>
                     <section t-if="section.key === 'sales'" class="adams_analysis">
-                        <h3>Fulfillment</h3><p>Backlog and delivery performance are not configured. Native delivery sources and business definitions must be verified before displaying these measures.</p>
+                        <h3>Fulfillment</h3>
+                        <p>Native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>
+                        <button class="btn btn-outline-secondary" t-on-click="() => this.loadDirectory('fulfillment')">Explore delivery quantities</button>
+                        <p class="adams_hint">Backlog value and on-time completion are not configured. Partial deliveries, returns and commitment-date rules require verified definitions.</p>
+                        <t t-if="state.fulfillment">
+                            <t t-set="delivery" t-value="state.fulfillment"/>
+                            <p t-if="delivery.status === 'loading'" role="status">Loading…</p>
+                            <p t-elif="delivery.status === 'error'" role="alert">Delivery quantities unavailable. Check your access and retry.</p>
+                            <p t-elif="delivery.status === 'not_installed'">App not installed</p>
+                            <p t-elif="delivery.status === 'empty'">No matching records</p>
+                            <div class="adams_table_wrap"><table t-if="delivery.rows.length" class="table">
+                                <thead><tr><th scope="col">Product</th><th scope="col">Unit</th><th scope="col">Ordered</th><th scope="col">Delivered</th><th scope="col">Remaining</th></tr></thead>
+                                <tbody><tr t-foreach="delivery.rows" t-as="row" t-key="row.id">
+                                    <td t-esc="row.name"/><td t-esc="row.unit"/><td><bdi t-esc="row.ordered"/></td><td><bdi t-esc="row.delivered"/></td><td><bdi t-esc="row.remaining"/></td>
+                                </tr></tbody>
+                            </table></div>
+                            <div class="adams_page_controls">
+                                <button class="btn btn-outline-secondary" t-att-disabled="delivery.offset === 0 || delivery.status === 'loading'" t-on-click="() => this.loadDirectory('fulfillment', delivery.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!delivery.has_more" t-on-click="() => this.loadDirectory('fulfillment', delivery.offset + 25)">Next</button>
+                                <button t-if="delivery.status === 'ready' || delivery.status === 'empty'" class="btn btn-outline-primary" t-att-disabled="state.opening" t-on-click="() => this.openReport('fulfillment')">Open native report</button>
+                            </div>
+                        </t>
                     </section>
                     <t t-if="section.key === 'operations'">
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('inventory')">Explore current stock</button>
