@@ -80,11 +80,27 @@ Enterprise parity and actual English/Arabic browser acceptance remain incomplete
 This is a development slice, not a completed dashboard or release candidate.
 
 Validation: Python compilation, JavaScript syntax and XML parsing passed locally.
-Feature-specific native harness execution is being prepared; these checks alone do
-not establish runtime correctness. Existing harness qualification is reused.
+The first native harness campaign passed seven exact contracted tests (zero failures,
+errors or skips). See `implementation-status.md` for its exact source and limits. Existing harness qualification is reused.
 
 Install the addon only in a disposable development database. Administrators can
 open its menu; other users need the Executive Dashboard group plus their existing
 native report permissions. The dashboard group grants no accounting access.
 The feature adds no accounting records or scheduled jobs. Enterprise source access
 and a source-matched test build are deferred, not waived.
+
+Arabic UI messages are included as an initial translation catalog, checked by GNU
+msgfmt. Responsive CSS uses logical inline spacing for RTL. Neither language is
+browser-qualified yet. Three Node controller tests pass for overlapping company
+refreshes, independent section failure, and component destruction; their stubbed
+Owl/services setup does not prove Odoo assets or DOM behavior. Run them with:
+
+```sh
+node --test addons/adams_executive_dashboard/tests/frontend.test.mjs
+```
+
+Private native campaign: `harness/adams-dashboard-20260919` in the private harness
+repository, workflow `adams-dashboard.yml`. It uses the original pinned executor
+and a new feature-specific contract. Its screenshots remain required and pending;
+a native-test pass is not overall acceptance. The first campaign targets application
+commit `96b8501d20ba842dc08df2390ba12f8c8b5382bf`, fresh installation only.

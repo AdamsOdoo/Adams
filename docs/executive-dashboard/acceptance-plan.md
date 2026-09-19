@@ -1,6 +1,6 @@
 # ED-001 acceptance plan
 
-All dashboard execution results are **not_run**; G0 installation discovery is **blocked** by ED-B01. These IDs organize the original v4 contract without replacing or relaxing it. No executable runner contract or expected native test IDs have been invented before implementation.
+The first implementation slice is in progress after the owner deferred Odoo.sh login. A feature-specific native contract now binds seven dashboard tests in the private runner; full Enterprise discovery and browser acceptance remain blocked. Three isolated JavaScript controller tests pass locally; they do not replace Odoo browser acceptance. These IDs retain the original v4 acceptance scope.
 
 | IDs / gate | Required behavior and evidence |
 |---|---|

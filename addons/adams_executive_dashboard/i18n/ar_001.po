@@ -1,0 +1,299 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo 19.0\n"
+"Language: ar_001\n"
+"PO-Revision-Date: 2026-09-19 00:00+0000\n"
+"Last-Translator: Adams\n"
+"Language-Team: Arabic\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Finance"
+msgstr "المالية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Profitability, liquidity and working capital"
+msgstr "الربحية والسيولة ورأس المال العامل"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Sales"
+msgstr "المبيعات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Invoiced sales and confirmed orders"
+msgstr "المبيعات المفوترة والطلبات المؤكدة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Operations"
+msgstr "العمليات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Purchasing, inventory, CRM and people"
+msgstr "المشتريات والمخزون والعملاء والموظفون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Accounting revenue"
+msgstr "الإيرادات المحاسبية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Net profit"
+msgstr "صافي الربح"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Bank and cash"
+msgstr "البنوك والنقدية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Receivables"
+msgstr "الذمم المدينة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Payables"
+msgstr "الذمم الدائنة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Net invoiced sales"
+msgstr "صافي المبيعات المفوترة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Confirmed sales"
+msgstr "المبيعات المؤكدة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Distinct sales orders"
+msgstr "عدد أوامر البيع الفريدة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Confirmed purchases"
+msgstr "المشتريات المؤكدة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Inventory"
+msgstr "المخزون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "CRM"
+msgstr "إدارة علاقات العملاء"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "People"
+msgstr "الموظفون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Not configured"
+msgstr "غير مهيأ"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "App not installed"
+msgstr "التطبيق غير مثبت"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Access restricted"
+msgstr "الوصول مقيد"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "No matching records"
+msgstr "لا توجد سجلات مطابقة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "The dashboard could not be loaded. Check your access and try again."
+msgstr "تعذر تحميل لوحة المعلومات. تحقق من صلاحياتك وحاول مجددًا."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "The native report could not be opened. Check your access."
+msgstr "تعذر فتح التقرير الأصلي. تحقق من صلاحياتك."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "ADAMS · EXECUTIVE WORKSPACE"
+msgstr "آدمز · مساحة عمل الإدارة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Business overview"
+msgstr "نظرة عامة على الأعمال"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Native reports. One clear view."
+msgstr "تقارير أودو الأصلية في رؤية موحدة وواضحة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Development preview"
+msgstr "معاينة قيد التطوير"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Company"
+msgstr "الشركة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "From"
+msgstr "من"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "To"
+msgstr "إلى"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Balance as of"
+msgstr "الرصيد حتى تاريخ"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Apply filters"
+msgstr "تطبيق المرشحات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Applied period:"
+msgstr "الفترة المطبقة:"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "· Balance cutoff:"
+msgstr "· تاريخ الرصيد:"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Dashboard sections"
+msgstr "أقسام لوحة المعلومات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Loading native reports…"
+msgstr "جارٍ تحميل التقارير الأصلية…"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "This section could not be loaded. Check the filters and your access, then apply filters to retry."
+msgstr "تعذر تحميل هذا القسم. تحقق من المرشحات وصلاحياتك، ثم أعد تطبيق المرشحات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Native report mapping awaits verification."
+msgstr "ربط التقرير الأصلي بانتظار التحقق."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue."
+msgstr "فواتير العملاء المرحلة مطروحًا منها الإشعارات الدائنة، دون ضرائب، حسب تاريخ الفاتورة. تختلف عن الإيرادات المحاسبية."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales."
+msgstr "الطلبات المؤكدة حسب تاريخ الطلب، دون ضرائب. لا تمثل المبيعات المسلمة أو المفوترة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Confirmed purchase orders by order date, untaxed. This is not an outstanding balance."
+msgstr "أوامر الشراء المؤكدة حسب تاريخ الطلب، دون ضرائب. لا تمثل رصيدًا مستحقًا."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Source and scope"
+msgstr "المصدر والنطاق"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Date basis:"
+msgstr "أساس التاريخ:"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "One company · native report currency · current access rules"
+msgstr "شركة واحدة · عملة التقرير الأصلي · قواعد الوصول الحالية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Open native report"
+msgstr "فتح التقرير الأصلي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Financial integrations and browser acceptance are pending. No financial totals are estimated."
+msgstr "تكاملات التقارير المالية واختبارات المتصفح لم تكتمل بعد. لا يتم تقدير الإجماليات المالية."
+
+#. module: adams_executive_dashboard
+#: model:ir.actions.client,name:adams_executive_dashboard.action_dashboard
+#: model:ir.ui.menu,name:adams_executive_dashboard.menu_dashboard
+#: model:res.groups,name:adams_executive_dashboard.group_dashboard_user
+msgid "Executive Dashboard"
+msgstr "لوحة الإدارة التنفيذية"

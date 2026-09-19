@@ -37,7 +37,8 @@ export class ExecutiveDashboard extends Component {
                 if (!this.alive) { return; }
                 this.state.companies = data.companies;
                 this.state.draft = data.options;
-                await this.refresh();
+                // Render the shell while each section completes independently.
+                void this.refresh();
             } catch {
                 this.state.error = _t('The dashboard could not be loaded. Check your access and try again.');
             }

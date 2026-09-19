@@ -40,3 +40,11 @@ Automatic approval review rejected an attempted navigation to the separate Odoo.
 Required clarification: authorize access to the Adams Odoo.sh project's **development build/source tools**, limited to reading native source/build revisions and preparing/testing the dashboard feature branch. Production and staging remain excluded. This is the automatic review's boundary, not a new requirement to reapprove ordinary dashboard development.
 
 Next: inspect the exact native report engine/options/actions and complete G0, then implement the receivables journey using the pinned harness. Do not rerun unchanged Community harness qualification or label it Enterprise/dashboard qualification.
+
+## Login deferral and implementation
+
+The owner subsequently authorized the separate Adams Odoo.sh development source
+and build tools. GitHub authentication was not completed; the owner then explicitly
+asked to defer login and start building. No additional login attempt is required now.
+The standalone dashboard addon has begun; see `implementation-status.md`. The earlier
+permission blocker is historical, while exact Enterprise source discovery remains open.
