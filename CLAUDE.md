@@ -1,4 +1,4 @@
-> **Current Work onboarding scope (19 September 2026):** Read [the onboarding handoff](docs/harness-onboarding.md) first for harness setup. The user authorized this isolated setup in ChatGPT Work. Preserve the historical instructions below; do not resume their old feature/research program automatically. The application baseline for the next requirement remains undecided. Private harness source stays outside this public checkout.
+> **Current ChatGPT Work development entrypoint:** Read [the verified harness handoff](docs/harness-onboarding.md). Use the exact external private toolkit pinned in `.odoo-harness/connection.json` and run `python3 scripts/work-harness.py check` after loading it. Follow the latest user-authorized requirement and the selected branch's applicable instructions; preserve existing work and do not resume an old feature automatically. The historical governance below is preserved for provenance. Its research-only phase and Claude-only role assignment do not override newly authorized Work development. Production and release remain separate approvals.
 
 # CLAUDE.md — Project Governance Contract
 

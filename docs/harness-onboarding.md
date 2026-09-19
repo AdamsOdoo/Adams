@@ -1,61 +1,87 @@
-# ChatGPT Work harness onboarding — 19 September 2026
+# Adams development harness — ready for new development
 
-Status: private workspace setup and resource smoke checks complete; full onboarding qualification BLOCKED.
+Verified 19 September 2026. Status: **development-ready for bounded Odoo 19 Community work using the private remote runner**.
 
-## Identity and scope
+## Start the next requirement
 
-- Application repository: AdamsOdoo/Adams (public), using the AdamsOdoo connection.
-- Separate toolkit: MostafaEssamm12/Odoo (private), using the MostafaEssamm12 connection.
-- Pinned setup candidate: `222b7339adc055d4dff619ab105c2712fae1435b`; verified Git tree `c9c31ec1568adabc0a2c259f1f27e040c741b765`.
-- Dedicated branch: `harness/onboard-work-20260919`.
-- Documentation-only branch base: `a5d45432a9b60f724c1aff700f4b371ea019960e`. Main was inspected, not assumed to be the application baseline. It contains the governance scaffold and adams_base; current connector development remains on separate branches. This base isolates onboarding without adopting an unfinished feature. Select the actual development baseline after the new requirement is supplied.
-- No merge, deployment, database access, visibility change or application change is part of onboarding.
+Use branch `harness/onboard-work-20260919` as the prepared starting point for a new standalone development. State the business requirement and whether the UI should be standard Odoo or custom. The Work agent will create a feature branch, load the relevant external skills, implement the change, run its contracted tests and preserve documentation/evidence. No main merge or additional onboarding is required to start from this branch.
 
-## Existing work preserved
+If the requirement extends an existing feature branch, inspect that branch and reconcile these setup files and instructions first. Do not replace its code or automatically resume the old Shopify program. The prepared baseline contains adams_base, not the unmerged connector program.
 
-All 14 remote branches were inspected. Open PRs [210](https://github.com/AdamsOdoo/Adams/pull/210), [211](https://github.com/AdamsOdoo/Adams/pull/211), and [212](https://github.com/AdamsOdoo/Adams/pull/212) remain unchanged. Observed heads: 210 `f77bfcc25e63615e6226dd9a9329f8f943593cb2`; 211 `3914004e27630b09b211e3d2ee92a8e6d9a0e55e`; 212 `5dbd4504d4ab08998598a5d6cc5933386679ed06`.
+## Immutable qualification identities
 
-Read the [current connector checkpoint](https://github.com/AdamsOdoo/Adams/blob/390f4d9f38604b17fcc290c26a05db330608d96e/docs/v2/13-continuous-execution-handoff.md) only when working on that program; this onboarding does not resume it. Preserved local repositories include connector at `31d597a660e567b815cabb3af27a101da12508ec`, published-check at `30bde525c9d003a9b00eb4175eed012dc65e8c2c`, and adams-v2 at `14be4c0ea94a2ad9fbb5f05322f309deff53c1fb`. No reset, rebase, stash, force-push or overwrite was used.
-
-Existing AGENTS.md and CLAUDE.md bodies remain intact. Their historical research-only/Claude execution rules do not override the user's explicit authorization for this narrowly scoped Work onboarding. They also do not authorize resuming an old feature. On any later application branch, read and reconcile that branch's own instructions and overrides before making changes.
-
-## Load in a future Work session
-
-1. Read this handoff and the selected Adams branch's AGENTS.md / CLAUDE.md. Verify remote head, local status, visibility and account identity again.
-2. Through the MostafaEssamm12 connection, read START_HERE.md, ONBOARDING.md and CLOSURE.md at the full pinned commit above. Check [harness PR 2](https://github.com/MostafaEssamm12/Odoo/pull/2) for review state. Do not silently upgrade this pin.
-3. Obtain that exact source in a separate private workspace, never inside the public Adams checkout. An authenticated Git checkout is preferred when available. Connector file access is a separate capability from shell Git credentials. In this session, all 151 source blobs, the tree and exact commit were reconstructed from authenticated GitHub objects and verified by their Git hashes.
-4. Current transient source location: `/workspace/scratch/2a2ff17b4bfd/private-harness/222b7339adc055d4dff619ab105c2712fae1435b`. Current Adams checkout: `/workspace/scratch/2a2ff17b4bfd/adams-onboarding`. Recreate from GitHub if scratch is absent; do not rely on these paths for durability.
-5. Set ODOO_HARNESS_HOME to the separate source location for tools that support it. Read its skill registry and quality guidance, then only the skills relevant to the new task. Skills are manually loaded from the external source; no automatic discovery or isolated target-model evaluation is claimed.
-6. From that source, run `python3 -m odoo_harness doctor`. A read-only `onboard --project <Adams path> --repository AdamsOdoo/Adams` preview is supported. Do not use --apply under this private-workspace mode.
-7. Select application branch, modules, exact Odoo/edition/dependency pins, authorized runner, acceptance contract and private retention before application testing. Do not copy pilot settings or infer them from this documentation branch.
-
-This is an external-resource arrangement, not a standard installed consumer. No harness-managed lock, copied skill, entrypoint or workflow was installed in Adams. Accordingly, standard check-onboarding is not claimed as passing. It requires the installer-managed resources that privacy constraints presently exclude.
-
-## Verification
-
-| Surface | Observed result |
+| Component | Exact revision |
 |---|---|
-| Repository file access | Both named account connections can read their respective repositories; permissions report push access. |
-| Exact source loading | All 151 tracked blobs and the Git tree/commit verified; private source checkout clean. Eight skill files found; verification and delivery skills loaded for this task. |
-| Local tools | Python 3.12.14 and Git available. Docker, PostgreSQL client, Odoo, gh, Codex CLI and Python Playwright unavailable. |
-| Static checks | 69 Python, 13 JSON, 2 TOML and 8 skills checked successfully. |
-| Focused local smoke | 38 tests passed: tests.unit.test_consumer_hook, tests.unit.test_onboarding_review, tests.unit.test_state_scaffold_cli. These test toolkit behavior with fixtures, not Adams business behavior. |
-| Installer preview | Passed at the pinned source; proposed 34 files. Not applied because it copies private resources and adds the unsupported shared-action reference. |
-| Exact-source upstream CI | [Quality 35437107658](https://github.com/MostafaEssamm12/Odoo/actions/runs/35437107658) and [runtime 35437107638](https://github.com/MostafaEssamm12/Odoo/actions/runs/35437107638) completed successfully on the pinned commit; job/step results inspected. Separate PR quality run 35437111515 was skipped. |
-| Actual Adams Odoo testing | NOT RUN. No selected feature baseline, verified Odoo environment or Docker runner in this session. Upstream fixture qualification is not Adams qualification. |
-| GitHub workflow integration | NOT ENABLED. Public Adams / private toolkit / different owners; no private cross-owner uses reference created. |
-| Acceptance and retention | Independent acceptance policy, isolated target-model qualification and durable private evidence retention remain unverified. Scratch is not a permanent archive. |
+| Tested Adams source | `cb521c07ec2d9b15348cacf1499a8ff5886e6694` |
+| Pinned harness executor | `10ec1d059b5ddc5d422875f68e0726cc500487ce` |
+| Private runner controller | `8b17239100d6327479c0caea0c731ed7d96bf75f` |
+| Prior Adams version used for update | `dec6e6e4046fc4ba4ceec14379551a90f4de5702` |
+| Chosen disposable Odoo 19 Community source | `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f` |
+| Odoo documentation source | `f827d1229cc09aecf2dc3e79f51cc9a65eb5ea77` |
 
-## Remaining gates and publication decision
+The later handoff commit changes documentation only; it does not retest or relabel the executable candidate above. This is a deliberate disposable Community test baseline, not a claimed match to an Odoo.sh/customer database.
 
-The pinned candidate has exact-source tests and a review, but an unresolved review finding remains. It is a setup candidate, not an accepted release. See [current review](https://github.com/MostafaEssamm12/Odoo/pull/2#pullrequestreview-5255346527); private review content is not reproduced here. Resolve and qualify a future candidate through the toolkit's own repository, then update this pin in a separate reviewed change.
+## What is connected
 
-The standard installer would publish private skills/references and install a private action that is not established as accessible from Adams. User ownership of both accounts does not establish that workflow access. Keep private-workspace mode unless the owner explicitly approves a specific publishable subset or chooses a supported private runner integration. No visibility change or private content publication is authorized by this record.
+Adams remains public and owns application code, its original adapter, connection metadata and tests. The harness remains private under MostafaEssamm12 with separate code/history. No private skill/reference content was copied into Adams and no cross-owner private Actions reference was installed.
 
-Full onboarding cannot be marked ready until the review gate and actual consumer configuration/runner/retention gates close. The next business input is the new development requirement; it determines the correct application baseline and required tests.
+- `.odoo-harness/connection.json` pins the external toolkit.
+- `scripts/work-harness.py` validates its repository, exact commit and clean checkout, lists available skills, checks capabilities and invokes the separate runtime.
+- `.github/workflows/harness-metadata.yml` checks public metadata and adapter identity regressions.
+- The private harness workflow `adams-consumer.yml` checks out the pinned public Adams commit and pinned private executor, runs disposable Odoo/PostgreSQL tests, and retains execution evidence.
+- Native smoke tests under `addons/adams_base/tests/` verify module installation, active English/Arabic languages and a rollback-isolated ORM round trip. They add no business functionality.
 
-## Recovery and learning
+Use AdamsOdoo for Adams GitHub operations and MostafaEssamm12 for harness operations. No extra cross-account secret is needed for this tested private-runner/public-consumer arrangement.
 
-Revert only this onboarding documentation commit to remove the public pointers. Existing code, instructions and histories remain preserved. No schema/data migration or application screenshot is applicable: no Odoo screen or behavior changed.
+## Load resources in Work
 
-Lesson: verify visibility, ownership, exact source review/CI and shell capabilities independently. A connected GitHub account and a historical green run do not establish a runnable, qualified consumer. Public handoffs contain only original setup metadata and links, never copied private toolkit resources.
+1. Read this file, AGENTS.md, CLAUDE.md and any instructions on the selected feature branch.
+2. Read the private harness START_HERE.md, ONBOARDING.md and CLOSURE.md at the pinned executor revision, plus the current [readiness PR](https://github.com/MostafaEssamm12/Odoo/pull/3). Their older open-review statements are historical; the exact-source evidence and separate review below close the findings for this development scope. Do not change the executor pin silently.
+3. Obtain a separate clean private checkout at that full SHA. Connector file access and shell Git credentials are different: an agent may materialize authenticated Git objects and verify their blob/tree/commit hashes if private shell cloning is unavailable. Preserve existing caches.
+4. Set `ODOO_HARNESS_HOME` to that checkout, outside Adams. Run `python3 scripts/work-harness.py check`. The verified current path is `/workspace/scratch/2a2ff17b4bfd/private-harness/10ec1d059b5ddc5d422875f68e0726cc500487ce`; recreate it from the private repository if scratch has expired.
+5. Read the external skill registry and quality guidance; load only task-relevant skill files. Verification and delivery were exercised in this onboarding. All eight skills are accessible; automatic global installation and a benchmark of every model/skill combination are not claimed.
+6. Python/Git execution works locally. `doctor` reports local capability only; this Work shell has no Docker/Odoo. Use the verified private Actions runner for native tests.
+
+## Run feature tests
+
+For a committed feature candidate, choose the relevant modules, exact expected test IDs, Community/authorized Enterprise dependencies and feature-specific acceptance contract before testing. The present smoke contract is not acceptance of a future feature.
+
+The generic adapter accepts a private runtime configuration and contract:
+
+```bash
+python3 scripts/work-harness.py test \
+  --project /private/runtime-config.json \
+  --contract /approved/feature-contract.json \
+  --check-id native --cache /runner/odoo-resources \
+  --output /evidence/unique-run
+```
+
+The adapter binds candidate path and source SHA itself; it rejects overrides and abbreviations. Odoo databases are newly allocated and disposable.
+
+In this Work environment, use the MostafaEssamm12 GitHub connection to update the private runner's `consumers/adams/request.json` with the exact candidate, prior revision if applicable, modules and expected test IDs. Update its contracted requirement for the actual feature, retaining exact source checks. Publish on the dedicated private runner branch; its push triggers execution. Read raw results before claiming a pass. Do not run the onboarding smoke as a substitute for feature tests. More complex browser/integration checks use the existing runtime's reviewed probe/contract options and must be configured for that feature.
+
+## Verified results
+
+| Check | Result and evidence |
+|---|---|
+| File access and resource loading | Both account connections verified; exact private executor checkout reconstructed and Git hashes verified; external adapter check passed; original repository instruction bodies preserved. |
+| Harness unit/static | **270 passed**, zero failures/errors/skips; clean exact source. [Quality run 35452490995](https://github.com/MostafaEssamm12/Odoo/actions/runs/35452490995). |
+| Harness Odoo qualification | Native fresh/update, bilingual browser, shell, recovery, deliberate failure/zero-discovery controls and separate synthetic consumer campaign passed. [Runtime run 35452491048](https://github.com/MostafaEssamm12/Odoo/actions/runs/35452491048). |
+| Actual Adams native tests | **3 passed fresh + 3 passed after update**, zero failures/errors/skips, exact Adams and executor identities. [Consumer run 35452924190](https://github.com/MostafaEssamm12/Odoo/actions/runs/35452924190). |
+| Public GitHub integration | Connection metadata and two adapter regression tests passed on the tested Adams source. [Run 35452888997](https://github.com/AdamsOdoo/Adams/actions/runs/35452888997). |
+| Independent review | Separate read-only review found an abbreviated-argument bypass; it was fixed and regression-tested. Follow-up code and raw-evidence review identified no remaining blocker for bounded Community development. This is not institutional certification. |
+| Durable evidence | Raw GitHub job logs, exact source/run metadata and independent review archived, retrieved separately and every member checksum verified. Archive: Adams_Harness_Qualification_Evidence_20260919.zip; SHA-256 `e08a6658e14d725a38bb5a8e9cc698c5868b7b3254ae016946b79253721dc46a`. |
+
+The harness log-publication finding is fixed in the pinned executor: capture stays host-private during execution; forged destination paths are rejected. The separate reviewer checked the correction and regressions. PR #2's unchanged head is not the adopted executor.
+
+The retained archive preserves retrieved job logs; it does not claim read-back of the original Actions artifact ZIP bytes. Full runtime artifacts remain available in the private Actions runs with their retention limits. Retain new feature evidence privately for its supported lifetime, verify retrieval/hashes, and link it from the feature dossier; never rely solely on expiring CI URLs. Owner: repository owner; performing agent completes retention for each delivery.
+
+## Boundaries and preserved work
+
+Development readiness is not acceptance of future business behavior, Enterprise/third-party compatibility, every possible model configuration, protected institutional verification, production access or release approval. Each feature still needs its own tests, relevant English/Arabic screens and independent review. Owner UAT and production/release approval remain separate.
+
+No merge, deployment, visibility change, production action or private resource publication occurred. PRs 210–212 and original local repositories remain untouched. Preserved local heads include `31d597a660e567b815cabb3af27a101da12508ec`, `30bde525c9d003a9b00eb4175eed012dc65e8c2c` and `14be4c0ea94a2ad9fbb5f05322f309deff53c1fb`. The [previous onboarding record](https://github.com/AdamsOdoo/Adams/blob/dec6e6e4046fc4ba4ceec14379551a90f4de5702/docs/harness-onboarding.md) preserves initial findings.
+
+Rollback: revert only the onboarding adapter/config/tests/workflow and instruction additions on the onboarding branch. No data migration is involved. No Odoo screenshots are applicable to this infrastructure-only change.
+
+Next action: receive the new business development requirement and create its feature branch.
