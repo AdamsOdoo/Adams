@@ -1,9 +1,93 @@
-# Expanded dashboard implementation — 19 September 2026
+# Executive dashboard — latest pre-login development
+
+**Status: development continues; full dashboard is NOT ready for business UAT.**
+Login remains deferred as requested. No Odoo.sh authentication retry, main merge,
+production change or Shopify work was performed in this continuation.
+
+## Latest implementation
+
+- Recent orders and quotations: native paged records, document currency/untaxed
+  values, localized states and timezone-labelled dates; scoped native list/form
+  actions reject wrong-company, wrong-state and out-of-period records.
+- Draft/sent quotation value, grouped dimensions and trends use Sales Analysis.
+  Expired quotations remain included while their native state is draft/sent;
+  no separate validity rule is silently introduced.
+- Fulfillment detail uses native ordered/delivered/to-deliver quantities grouped
+  by product/UoM, preserving negative values. Quantities are current for the
+  selected order-date cohort, not an as-of backlog valuation. No mixed-unit total.
+- Native action-stack restoration retains applied filters, selected analysis and
+  pages, collapsed sections and scroll. It stores no business values and refreshes
+  data/access on return. Actual breadcrumb/scroll behavior still needs browser QA.
+- Finance subheadings now follow Profitability / Liquidity / Working capital;
+  Sales separates Commercial performance / Fulfillment. New UI text has Arabic
+  translations. Fetched timestamps do not claim source completeness.
+- Every public dashboard RPC is covered by the no-dashboard-permission fixture.
+  New fixtures cover sales-only records/export denial, company isolation,
+  27-row recent lists, 27-group totals/full exports and signed HR values.
+- Native source inspection and unresolved definition decisions are recorded in
+  [native gaps](native-gaps.md); [UAT preparation](uat-checklist.md) covers the
+  first session after build/source access is restored.
+
+## Current verification
+
+Latest application: `365a0f1056613e3e4e1999bc768595f9235eda67`.
+Private controller: `e16a42d03410e2e07d6f86f505e1eee55e2cd896`.
+Executor remains `10ec1d059b5ddc5d422875f68e0726cc500487ce` and Community remains
+`82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`. The original harness qualification is
+reused, not repeated. All new campaigns are dashboard feature checks.
+
+[Final native campaign 35474133751](https://github.com/MostafaEssamm12/Odoo/actions/runs/35474133751)
+passed **22/22 fresh-install tests and 12/12 core-addon upgrade tests**, with zero
+failures/errors/skips. Upgrade baseline was
+`ec53289713ee1ca7550886f127d05e0055521ab7`. Optional-app fixtures run on install;
+upgrade covers the core addon, not every optional-app/customer migration.
+
+Private artifact `10594037826` is retained until 2026-12-18. Observation archive
+SHA256: `81c66ade62ec1f7d5ab34ad9ace2b8dc347994a5af292827c24c861035826bbf`.
+The runner verified archive readback. Structured native job summaries and artifact
+metadata were retrieved and bound to the exact source above. The final follow-up
+changes documentation only; executable and test source remain unchanged.
+
+Ten isolated controller tests pass on the final source, covering stale company,
+section, export, recent-list and analysis responses; unmount; selection-only
+navigation snapshots; and changing filters while restoration is pending. They
+are not browser/DOM tests. Python/JS/XML and Arabic-catalog checks pass. Native
+Sass compilation is included in the contracted Odoo suite.
+
+Preceding exact-source evidence remains valid and retained:
+
+| Application | Private campaign | Result |
+|---|---|---|
+| `ec53289713ee1ca7550886f127d05e0055521ab7` | [35473705772](https://github.com/MostafaEssamm12/Odoo/actions/runs/35473705772) | 21 install + 12 core upgrade passed; numeric HR, recent records, paging/access fixtures |
+| `895e908082fa7da87c83587f0db13f1d324ec555` | [35473961480](https://github.com/MostafaEssamm12/Odoo/actions/runs/35473961480) | 22 install + 12 core upgrade passed; native quotation and signed delivery quantities |
+
+All reported native passes have zero failures/errors/skips. The final correction
+adds the product-presence filter to delivery provenance and verifies that its
+domain exactly matches native drilldown. It also makes current-versus-cutoff
+semantics explicit in both languages. Prior campaign success does not substitute
+for that latest-source verification.
+
+## What still needs access or decisions
+
+Enterprise P&L/Balance Sheet/Cash Flow/aging/Partner Ledger results, dated cash
+balances and financial comparisons remain unconfigured. The feature branch has
+not been verified in the provided Odoo.sh database. Customer report variants,
+installed extensions, exact source identities, live exports, bilingual/mobile
+rendering, actual return navigation and representative-volume performance still
+require the matching development build.
+
+Backlog value, final on-time completion, historical inventory/shortage/valuation,
+workforce/attendance/capacity, targets and management alerts remain incomplete.
+Native source inspection must precede any new calculations; custom gaps need
+approved business definitions. Restoring login alone does not complete these
+requirements. No full UAT or release pass is claimed.
+
+## Historical expanded implementation — before the latest pre-login work
 
 Status: **bounded development slice verified; full dashboard NOT ready for UAT**.
 The original requirements have not been reduced to the implemented subset.
 
-## Current candidate and evidence
+### Current candidate and evidence
 
 - Tested application: `27817631693a4babb1a9d3434697cd7c3e0363cb`.
 - Private controller: `ad341c51f88d27e9cd4dca2e399c18f19c312a7f`.
@@ -22,7 +106,7 @@ The original requirements have not been reduced to the implemented subset.
   were retrieved. Final follow-up changes are documentation only; application and
   test files remain exactly at this tested source.
 
-## Expanded behavior
+### Expanded behavior
 
 Native analytical totals, dynamic customer/salesperson/product/vendor/buyer/stage/
 department groups, monthly trends, scoped group drilldowns and CSV exports are
@@ -46,7 +130,7 @@ CRM expected value, current stock, invoice/refund scope, authorization and expor
 No claim is made for historical inventory, fulfillment, full workforce reporting,
 financial totals or actual English/Arabic rendering.
 
-## Failure and correction record
+### Failure and correction record
 
 [Expanded first attempt](https://github.com/MostafaEssamm12/Odoo/actions/runs/35471424730)
 retains 13 passes, one failure and two errors. Two errors identified missing Sales
@@ -59,7 +143,7 @@ was inspected without rerunning tests via the private diagnostic workflow.
 The corrected campaign above closes those fixture failures. Stylesheet syntax was
 also made compatible with Odoo Sass and tested with the actual compiler.
 
-## Blocking next action and remaining scope
+### Blocking next action and remaining scope
 
 Odoo.sh is still at GitHub device verification. Both designated GitHub connections
 return 404 for the licensed Enterprise report source. Complete that authentication
@@ -79,7 +163,7 @@ Nothing was merged, released, deployed to production/staging, or added to Shopif
 
 Status: implemented first development slice; full dashboard incomplete.
 
-## Implemented
+### Implemented
 
 - Separate `adams_executive_dashboard` addon and Owl client action inside Odoo.
 - Finance, Sales and Operations cards; responsive layout; company, period and
@@ -94,7 +178,7 @@ Status: implemented first development slice; full dashboard incomplete.
   not-configured states. No guessed financial values or prototype fixtures.
 - Initial Arabic catalog and RTL-compatible logical CSS; real browser review pending.
 
-## Verification
+### Verification
 
 Private run: https://github.com/MostafaEssamm12/Odoo/actions/runs/35470273977
 
@@ -125,7 +209,7 @@ late prior-company responses, immediate old-value clearing with partial failure,
 and unmount suppression. Services/Owl lifecycle are stubbed: no DOM or actual
 Odoo browser behavior is claimed.
 
-## Remaining work
+### Remaining work
 
 Complete Enterprise source/build discovery and native financial mappings, including
 dynamic bank/cash directory, historical aging and financial report parity. Complete

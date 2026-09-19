@@ -72,3 +72,22 @@ amounts use native ORM report aggregation. Total cards are independent of paged
 groups. Group CSV exports require native export permission, escape text formulas,
 and refuse more than 5,000 groups rather than truncate. Full native exports remain
 available via the native action; financial exports are not implemented.
+
+
+## Further pre-login native mappings
+
+[Native gap inspection](native-gaps.md) records exact pinned sources and decisions.
+Recent orders/quotations use `sale.order` with native read rules and company/state/
+order-date domains. Record drilldowns validate membership in that exact scope;
+list actions discard native default filters which would silently narrow it.
+Draft/sent quotation value uses native `sale.report.price_subtotal:sum`, including
+expired records still in these states, with native report currency conversion.
+
+Delivery quantity detail groups `sale.report` by product and product UoM and reads
+native `product_uom_qty`, `qty_delivered`, `qty_to_deliver`. Signed values remain
+unchanged, with no overall mixed-unit total. Its order-date cohort is explicit;
+it is not historical as-of backlog value or an on-time-completion rate.
+
+Navigation reuses Odoo's verified `@web/search/action_hook` and action stack.
+No report values are retained in navigation snapshots; return performs fresh RPCs.
+Deployment-specific native UI, localization and browser parity remain pending.

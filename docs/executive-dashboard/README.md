@@ -3,6 +3,7 @@
 Status: **Development in progress; expanded native analytical/operational implementation. Not ready for business UAT. Enterprise source/build access and deployed browser acceptance remain blocked.**
 
 Latest implementation and evidence: [implementation status](implementation-status.md).
+Native source findings and definition decisions: [native gaps](native-gaps.md).
 Business acceptance preparation: [UAT checklist](uat-checklist.md).
 The owner authorized Odoo.sh development access and subsequently deferred login.
 A later access check found GitHub device verification still pending; no new

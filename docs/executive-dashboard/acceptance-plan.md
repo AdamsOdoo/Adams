@@ -1,6 +1,12 @@
 # ED-001 acceptance plan
 
-The first implementation slice is in progress after the owner deferred Odoo.sh login. The latest feature-specific contract passed 17 fresh-install and 12 core update tests in the private runner; full Enterprise discovery and browser acceptance remain blocked. Seven isolated JavaScript controller tests pass locally; they do not replace Odoo browser acceptance. These IDs retain the original v4 acceptance scope.
+Development continues under the owner's deferred-login instruction. The latest
+exact-source evidence is recorded in [implementation status](implementation-status.md).
+The expanded campaign covers recent sales, multi-page groups, sales-only/export
+permissions, cross-company records and numeric signed HR values. Native delivery
+quantity/quotation additions have separate candidate evidence. Ten isolated
+JavaScript controller tests pass locally; they do not replace Odoo browser
+acceptance. These IDs retain the original v4 acceptance scope.
 
 | IDs / gate | Required behavior and evidence |
 |---|---|
@@ -32,12 +38,12 @@ Owner/finance UAT will confirm real source completeness, report variant/financia
 | ED-ENV | Authorized onboarding Enterprise DB inspected. Feature build identity and licensed source still blocked at GitHub device verification; no new permission request. |
 | ED-AR / ED-FIN / ED-LEDGER | Financial numeric adapters are not implemented. Native definitions/UI inspection is not parity evidence. |
 | ED-CASH | Dynamic authorized account/journal metadata discovery implemented and tested. Native dated balances and full mandatory financial cases remain blocked. |
-| ED-SEC | RPC membership/company checks, underlying account permissions, export checks, context validation and revocation covered by bounded fixtures. Full role/company/browser matrix remains pending. |
-| ED-SALES | Invoice fixtures and grouped/trend/source action tests; expanded Sale/Purchase known-value fixtures passed. Currency/UoM/history/complete browser matrix still pending. |
-| ED-OPS | Current Stock product quantities, native CRM weighted pipeline and signed Time Off adapter implemented. The HR test covers action scope, not leave-value parity. Other operational scope remains unfinished. |
-| ED-UX / ED-ASYNC | Seven isolated controller checks and static/catalog checks. Stylesheet native compilation added. No deployed DOM/visual/RTL/mobile pass. |
-| ED-DELIVERY | Feature-native install/update campaign passed on exact candidate 27817631693a4babb1a9d3434697cd7c3e0363cb. No UAT/release closure, independent review or production deployment. |
-| ED-PERF / ED-FULFILL | Not run / not implemented; source discovery and business-definition approval remain required where native gaps are established. |
+| ED-SEC | RPC membership/company checks, underlying account permissions, export checks, context validation and revocation covered by bounded fixtures. Added sales-only record restrictions, separate-company record scopes, export-disabled users and membership checks on every public RPC. Full browser/field/currency role matrix remains pending. |
+| ED-SALES | Invoice fixtures and grouped/trend/source action tests; expanded Sale/Purchase known-value fixtures passed, including 27-group completeness and scoped recent orders/quotations. Currency/UoM/history/complete browser matrix still pending. |
+| ED-OPS | Current Stock product quantities, native CRM weighted pipeline and signed Time Off adapter implemented. A four-hour approved leave fixture proves the native −4-hour report value and exclusion after employee archival. Other operational scope remains unfinished. |
+| ED-UX / ED-ASYNC | Ten isolated controller checks and static/catalog checks. Stylesheet native compilation added. No deployed DOM/visual/RTL/mobile pass. |
+| ED-DELIVERY | Feature-native install/update campaigns are bound to the exact sources in implementation-status.md. No UAT/release closure, independent review or production deployment. |
+| ED-PERF / ED-FULFILL | Performance remains pending. Native product/UoM delivery quantities are implemented; backlog value and on-time completion still need installed-source inspection and approved definitions. |
 
 The failed expanded run is retained, not relabeled as passing. Corrected fixture
 roles and flush boundaries are recorded alongside the new campaign result in
