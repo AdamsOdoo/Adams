@@ -1,0 +1,54 @@
+{
+  "archive": "Astra_Dashboard_Report_First_Handoff_v4(1).zip",
+  "archive_sha256": "984b1059b602d2cee5e2b948e15d32650cca11a0f8e9f3ee2c3cda5c70bf7dfc",
+  "files": [
+    {
+      "name": "Astra_Dashboard_Implementation_Prompt_v4.md",
+      "sha256": "d242d39da6f06a831d10f645304b4304d4a268cd73a78b91b2983c43846be856",
+      "bytes": 15873,
+      "included_in_repository": true
+    },
+    {
+      "name": "Dashboard_Report_First_Contract_v4.md",
+      "sha256": "f3bdabe3384149169f88f528e668b70dd127150cebf8333806ec7e9086483a14",
+      "bytes": 55824,
+      "included_in_repository": true
+    },
+    {
+      "name": "Dashboard_Report_First_Readme_v4.md",
+      "sha256": "ed190158b544f14649feb0d361aa30c4181985cd598ae993b8dd4fb995224c81",
+      "bytes": 1765,
+      "included_in_repository": true
+    },
+    {
+      "name": "Odoo_Dashboard_UX_v2_Finance.png",
+      "sha256": "383c9e0a74d70078b1878fc32fc1827544f29234c86fa08f11cdedd088ebd0b4",
+      "bytes": 182638,
+      "included_in_repository": false
+    },
+    {
+      "name": "Odoo_Dashboard_UX_v2_Mobile.png",
+      "sha256": "a944b53c7b180bd8df81719144279f2e360e56d9474150463a9b277f2723bce3",
+      "bytes": 76866,
+      "included_in_repository": false
+    },
+    {
+      "name": "Odoo_Dashboard_UX_v2_Sales.png",
+      "sha256": "f9b3f95e4ae6b8f3daed50bae2a310e17b3657ad45c91c2176d95863aa54e1d9",
+      "bytes": 189740,
+      "included_in_repository": false
+    },
+    {
+      "name": "Odoo_Executive_Dashboard_UX_v2.html",
+      "sha256": "ac8278b8baae7fd401011ff8b0b5e4a2ec03b97d02eb90e88c106897d290ed0c",
+      "bytes": 710811,
+      "included_in_repository": false
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "sha256": "2da9ec97a684779be434a802d0c4d627ba8e3283031d4a2b6dd0e49f1d473dae",
+      "bytes": 712,
+      "included_in_repository": false
+    }
+  ]
+}
