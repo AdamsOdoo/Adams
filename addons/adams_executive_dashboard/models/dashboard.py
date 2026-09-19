@@ -1,5 +1,9 @@
 """Bounded native analytical report adapters. Enterprise financial mappings pending."""
 from datetime import date, datetime, time, timedelta
+import csv
+import hashlib
+import io
+import json
 
 import pytz
 
@@ -18,6 +22,19 @@ SOURCES = {
                'order_reference:count_distinct', 'sale.action_order_report_all'),
     'purchases': ('purchase.report', 'date_order', [('state', '=', 'purchase')],
                   'untaxed_total:sum', 'purchase.action_purchase_order_report_all'),
+    'crm': ('crm.lead', 'create_date', [('type', '=', 'opportunity'), ('active', '=', True),
+                                      ('won_status', '=', 'pending')],
+            'prorated_revenue:sum', 'crm.crm_opportunity_report_action'),
+    'hr': ('hr.leave.report', 'date_from', [('state', '=', 'validate'), ('leave_type', '=', 'request')],
+           'number_of_hours:sum', 'hr_holidays.action_hr_leave_report'),
+}
+DIMENSIONS = {
+    'invoiced_sales': {'customer': 'commercial_partner_id', 'salesperson': 'invoice_user_id', 'product': 'product_id'},
+    'confirmed_sales': {'customer': 'commercial_partner_id', 'salesperson': 'user_id', 'product': 'product_id'},
+    'orders': {'customer': 'commercial_partner_id', 'salesperson': 'user_id'},
+    'purchases': {'vendor': 'partner_id', 'buyer': 'user_id', 'product': 'product_id'},
+    'crm': {'stage': 'stage_id', 'salesperson': 'user_id'},
+    'hr': {'department': 'department_id'},
 }
 SECTIONS = {
     'finance': ['revenue', 'profit', 'cash', 'receivables', 'payables'],
@@ -48,13 +65,17 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('Use valid ISO dates.')) from None
         if dates[0] > dates[1] or (dates[1] - dates[0]).days > 1095:
             raise ValidationError(_('Select a period of up to three years with the start before the end.'))
-        return self.with_context(allowed_company_ids=[company_id]), dates
+        # Keep client-injected report flags, currency context and timezone out of
+        # native evaluation. Scope derives only from validated filters/user data.
+        return self.with_context({}, allowed_company_ids=[company_id],
+                                 lang=self.env.user.lang or 'en_US', tz=self.env.user.tz or 'UTC'), dates
 
     @api.model
     def get_bootstrap(self):
         self._authorize()
         today = fields.Date.context_today(self)
         return {
+            'user_id': self.env.uid,
             'companies': [{'id': c.id, 'name': c.name} for c in self.env.companies],
             'options': {'company_id': self.env.company.id, 'date_from': today.replace(day=1).isoformat(),
                         'date_to': today.isoformat(), 'as_of': today.isoformat()},
@@ -64,7 +85,8 @@ class ExecutiveDashboard(models.AbstractModel):
         model, date_field, states, aggregate, action_id = SOURCES[key]
         report = self.env[model]
         report.check_access('read')
-        report.check_field_access_rights('read', [date_field, 'company_id', 'state', aggregate.split(':')[0]])
+        report.check_field_access_rights('read', [date_field, 'company_id', aggregate.split(':')[0],
+                                                *[term[0] for term in states]])
         start, end = dates[:2]
         if report._fields[date_field].type == 'datetime':
             # Inclusive local dates become a half-open UTC range, including DST.
@@ -77,6 +99,13 @@ class ExecutiveDashboard(models.AbstractModel):
             bounds = [(date_field, '>=', start.isoformat()), (date_field, '<=', end.isoformat())]
         domain = [('company_id', '=', self.env.company.id), *states, *bounds]
         return report, domain, aggregate, action_id
+
+    def _provenance(self, key, domain, aggregate):
+        scope = {'model': SOURCES[key][0], 'action': SOURCES[key][4], 'domain': domain,
+                 'company_id': self.env.company.id, 'tz': self.env.user.tz or 'UTC',
+                 'measure': aggregate, 'mapping_version': 1}
+        scope['fingerprint'] = hashlib.sha256(json.dumps(scope, sort_keys=True).encode()).hexdigest()
+        return scope
 
     @api.model
     def get_section(self, section, options):
@@ -98,7 +127,9 @@ class ExecutiveDashboard(models.AbstractModel):
                         item.update(status='ready' if count else 'empty', value=value if count else None,
                                     source=report._description, measure=aggregate,
                                     date_field=SOURCES[key][1], domain=domain,
-                                    drilldown=bool(scoped.env.ref(action_id, raise_if_not_found=False)))
+                                    drilldown=bool(scoped.env.ref(action_id, raise_if_not_found=False)),
+                                    unit='hours' if key == 'hr' else 'count' if key == 'orders' else 'currency',
+                                    provenance=scoped._provenance(key, domain, aggregate))
                     except AccessError:
                         item['status'] = 'restricted'
             result.append(item)
@@ -108,11 +139,17 @@ class ExecutiveDashboard(models.AbstractModel):
                 'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
 
     @api.model
-    def open_report(self, key, options):
+    def open_report(self, key, options, dimension=None, group_id=None):
         scoped, dates = self._scope(options)
         if key not in SOURCES or SOURCES[key][0] not in scoped.env:
             raise ValidationError(_('This native report is not configured.'))
         report, domain, aggregate, action_id = scoped._native_scope(key, dates)
+        if dimension is not None:
+            field = DIMENSIONS.get(key, {}).get(dimension)
+            if not field or (group_id is not False and (type(group_id) is not int or group_id < 1)):
+                raise ValidationError(_('Invalid report dimension.'))
+            report.check_field_access_rights('read', [field])
+            domain = [*domain, (field, '=', group_id)]
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
         # Discard native default filters that would silently change the chosen scope.
         action.update(domain=domain, context={
@@ -121,4 +158,128 @@ class ExecutiveDashboard(models.AbstractModel):
             'pivot_measures': [aggregate.split(':')[0]],
             'graph_measure': aggregate.split(':')[0],
         })
+        return action
+
+    @api.model
+    def get_breakdown(self, key, dimension, options, offset=0):
+        scoped, dates = self._scope(options)
+        field = DIMENSIONS.get(key, {}).get(dimension)
+        if not field or type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid report dimension or page.'))
+        if SOURCES[key][0] not in scoped.env:
+            return {'status': 'not_installed', 'rows': []}
+        report, domain, aggregate, action_id = scoped._native_scope(key, dates)
+        report.check_field_access_rights('read', [field])
+        rows = report._read_group(domain, groupby=[field], aggregates=[aggregate],
+                                  order=f'{aggregate} DESC, {field} ASC', offset=offset, limit=26)
+        # Label resolution uses normal record/field access, including archived history.
+        values = [{'id': group.id or False, 'label': group.display_name if group else _('Unassigned'),
+                   'value': value} for group, value in rows[:25]]
+        return {'status': 'ready' if values else 'empty', 'rows': values,
+                'has_more': len(rows) > 25, 'offset': offset,
+                'unit': 'hours' if key == 'hr' else 'count' if key == 'orders' else 'currency',
+                'currency': scoped.env.company.currency_id.name,
+                'digits': scoped.env.company.currency_id.decimal_places,
+                'provenance': scoped._provenance(key, domain, aggregate)}
+
+    @api.model
+    def get_trend(self, key, options):
+        scoped, dates = self._scope(options)
+        if key not in SOURCES:
+            raise ValidationError(_('Unknown dashboard measure.'))
+        if SOURCES[key][0] not in scoped.env:
+            return {'status': 'not_installed', 'rows': []}
+        report, domain, aggregate, action_id = scoped._native_scope(key, dates)
+        field = SOURCES[key][1] + ':month'
+        rows = report._read_group(domain, groupby=[field], aggregates=[aggregate], order=field)
+        return {'status': 'ready' if rows else 'empty',
+                'rows': [{'label': period.strftime('%Y-%m'), 'value': value} for period, value in rows],
+                'unit': 'hours' if key == 'hr' else 'count' if key == 'orders' else 'currency',
+                'currency': scoped.env.company.currency_id.name,
+                'digits': scoped.env.company.currency_id.decimal_places,
+                'provenance': scoped._provenance(key, domain, aggregate)}
+
+    @api.model
+    def export_breakdown(self, key, dimension, options):
+        # Native report export is the full-data route. This bounded CSV explicitly
+        # refuses truncation rather than exporting a partial ranking as complete.
+        scoped, dates = self._scope(options)
+        if not self.env.user.has_group('base.group_allow_export'):
+            raise AccessError(_('You do not have export permission.'))
+        field = DIMENSIONS.get(key, {}).get(dimension)
+        if not field or SOURCES[key][0] not in scoped.env:
+            raise ValidationError(_('This native report is not configured.'))
+        report, domain, aggregate, action_id = scoped._native_scope(key, dates)
+        report.check_field_access_rights('read', [field])
+        rows = report._read_group(domain, groupby=[field], aggregates=[aggregate],
+                                  order=f'{aggregate} DESC, {field} ASC', limit=5001)
+        if len(rows) > 5000:
+            raise ValidationError(_('Use the native report export for more than 5,000 groups.'))
+        output = io.StringIO(newline='')
+        writer = csv.writer(output)
+        writer.writerow(['Group', 'Value', 'Unit', 'Company', 'From', 'To', 'Source', 'Measure'])
+        def safe_text(value):
+            value = str(value)
+            return "'" + value if value.startswith(('\t', '\r', '\n')) or value.lstrip().startswith(('=', '+', '-', '@')) else value
+        for group, value in rows:
+            writer.writerow([safe_text(group.display_name if group else _('Unassigned')), value,
+                             'hours' if key == 'hr' else 'count' if key == 'orders' else scoped.env.company.currency_id.name,
+                             safe_text(scoped.env.company.name), dates[0].isoformat(), dates[1].isoformat(),
+                             SOURCES[key][0], aggregate])
+        return {'filename': f'adams-{key}-{dimension}.csv', 'content': '\ufeff' + output.getvalue(),
+                'row_count': len(rows), 'provenance': scoped._provenance(key, domain, aggregate)}
+
+    @api.model
+    def get_cash_directory(self, options, offset=0):
+        scoped, dates = self._scope(options)
+        if type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid page.'))
+        accounts = scoped.env['account.account'].with_context(active_test=False)
+        journals = scoped.env['account.journal'].with_context(active_test=False)
+        accounts.check_access('read')
+        journals.check_access('read')
+        accounts.check_field_access_rights('read', ['name', 'code', 'active', 'currency_id', 'account_type', 'company_ids'])
+        journals.check_field_access_rights('read', ['name', 'default_account_id', 'type', 'company_id'])
+        records = accounts.search([('company_ids', 'in', [scoped.env.company.id]),
+                                   ('account_type', '=', 'asset_cash')], order='id', limit=26, offset=offset)
+        linked = journals.search([('company_id', '=', scoped.env.company.id),
+                                   ('type', 'in', ['bank', 'cash']),
+                                   ('default_account_id', 'in', records[:25].ids)])
+        return {'status': 'ready' if records else 'empty', 'has_more': len(records) > 25,
+                'rows': [{'id': account.id, 'name': account.name, 'code': account.code,
+                          'active': account.active,
+                          'currency': (account.currency_id or scoped.env.company.currency_id).name,
+                          'journals': linked.filtered(lambda j: j.default_account_id == account).mapped('name'),
+                          'balance': None, 'balance_status': 'not_configured'} for account in records[:25]],
+                'as_of': dates[2].isoformat()}
+
+    @api.model
+    def get_inventory(self, options, offset=0):
+        scoped, dates = self._scope(options)
+        if type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid page.'))
+        if 'stock.quant' not in scoped.env:
+            return {'status': 'not_installed', 'rows': []}
+        if not self.env.user.has_group('stock.group_stock_user'):
+            raise AccessError(_('Inventory reporting access is required.'))
+        products = scoped.env['product.product']
+        columns = ['display_name', 'qty_available', 'free_qty', 'virtual_available', 'uom_id']
+        products.check_access('read')
+        products.check_field_access_rights('read', columns)
+        domain = [('is_storable', '=', True), ('company_id', 'in', [False, scoped.env.company.id])]
+        records = products.search(domain, order='id', offset=offset, limit=26)
+        return {'status': 'ready' if records else 'empty', 'rows': records[:25].read(columns),
+                'has_more': len(records) > 25, 'date_basis': 'current',
+                'company_id': scoped.env.company.id, 'source': 'stock.action_product_stock_view'}
+
+    @api.model
+    def open_inventory(self, options):
+        scoped, dates = self._scope(options)
+        if 'stock.quant' not in scoped.env or not self.env.user.has_group('stock.group_stock_user'):
+            raise AccessError(_('Inventory reporting access is required.'))
+        scoped.env['product.product'].check_access('read')
+        action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
+        action.update(domain=[('is_storable', '=', True), ('company_id', 'in', [False, scoped.env.company.id])],
+                      context={'allowed_company_ids': [scoped.env.company.id],
+                               'lang': scoped.env.lang, 'tz': self.env.user.tz or 'UTC'})
         return action

@@ -93,3 +93,54 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         self.reader.group_ids = [Command.clear(), Command.link(self.env.ref('base.group_user').id)]
         with self.assertRaises(AccessError):
             self.dashboard.with_user(self.reader).get_section('finance', self.options)
+
+    def test_grouped_native_values_and_trend_preserve_refund_sign(self):
+        self._invoice(100)
+        self._invoice(25, move_type='out_refund')
+        grouped = self.dashboard.get_breakdown('invoiced_sales', 'customer', self.options)
+        self.assertEqual(len(grouped['rows']), 1)
+        self.assertEqual(grouped['rows'][0]['id'], self.partner_a.commercial_partner_id.id)
+        self.assertAlmostEqual(grouped['rows'][0]['value'], 75)
+        trend = self.dashboard.get_trend('invoiced_sales', self.options)
+        self.assertEqual(trend['rows'], [{'label': '2026-08', 'value': 75.0}])
+        action = self.dashboard.open_report('invoiced_sales', self.options, 'customer', self.partner_a.commercial_partner_id.id)
+        self.assertIn(('commercial_partner_id', '=', self.partner_a.commercial_partner_id.id), action['domain'])
+
+    def test_native_scope_rejects_client_report_context(self):
+        clean = self.dashboard.get_trend('invoiced_sales', self.options)
+        injected = self.dashboard.with_context(tz='Pacific/Honolulu', active_test=False, to_date='1900-01-01').get_trend('invoiced_sales', self.options)
+        self.assertEqual(clean['provenance'], injected['provenance'])
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_breakdown('invoiced_sales', 'bank_account_id', self.options)
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_breakdown('invoiced_sales', 'customer', self.options, offset=-1)
+
+    def test_export_permission_and_formula_safety(self):
+        self.partner_a.name = '=HYPERLINK("https://example.invalid")'
+        self._invoice(100)
+        result = self.dashboard.export_breakdown('invoiced_sales', 'customer', self.options)
+        self.assertEqual(result['row_count'], 1)
+        self.assertIn("'=HYPERLINK", result['content'])
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).export_breakdown('invoiced_sales', 'customer', self.options)
+
+    def test_cash_discovery_tracks_configuration_without_guessed_balances(self):
+        account = self.env['account.account'].create({
+            'name': 'Dashboard cash fixture', 'code': '991010', 'account_type': 'asset_cash',
+            'company_ids': [Command.set(self.env.company.ids)],
+        })
+        def find_account():
+            offset = 0
+            while True:
+                page = self.dashboard.get_cash_directory(self.options, offset)
+                for row in page['rows']:
+                    if row['id'] == account.id:
+                        return row
+                if not page['has_more']:
+                    self.fail('New eligible cash account was not discovered')
+                offset += 25
+        self.assertIsNone(find_account()['balance'])
+        account.write({'name': 'Renamed dashboard cash', 'active': False})
+        row = find_account()
+        self.assertEqual(row['name'], 'Renamed dashboard cash')
+        self.assertFalse(row['active'])

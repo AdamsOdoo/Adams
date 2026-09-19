@@ -2,7 +2,7 @@
 
 Status: partial source inspection; **not an installed-report catalog or approved production mapping**. All installation-specific mappings remain blocked by ED-B01 in [the dossier](README.md).
 
-Public code below was fetched on 19 September 2026 at Odoo Community commit `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`, the inherited disposable runner pin. Future target extensions must be inspected before adopting these measures. No report value has been evaluated.
+Public code below was fetched on 19 September 2026 at Odoo Community commit `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`, the inherited disposable runner pin. Future target extensions must be inspected before adopting these measures. The initial native invoice adapter was exercised in the first campaign; subsequent adapters are tracked in implementation-status.md.
 
 ## Verified source findings
 
@@ -54,3 +54,21 @@ Inventory, CRM and HR implementation sources have not yet been inspected. Their 
 ## Additional-logic register
 
 No demonstrated native gap and no approved custom formula yet. Candidate investigations are the contract section 2.5 items: cash planning, backlog, on-time delivery, collection rate, attention/targets and stock/procurement/history metrics. Each requires inspected native alternatives, exact source/formula/dates/exclusions/currency, owner, supporting records and independent expectations before an approval can enable it. A missing dependency is not a native gap.
+
+## Expanded Community adapters (19 September 2026)
+
+The following mappings were inspected at the same immutable Community source before
+implementation. Their runtime results are bound to the subsequent feature campaign.
+
+| Source | Verified definition and implementation boundary |
+|---|---|
+| CRM Pipeline Analysis | `crm.crm_opportunity_report_action`, `crm.lead`, native `prorated_revenue:sum`. Inspected `addons/crm/report/crm_opportunity_report_views.xml` and `addons/crm/models/crm_lead.py`. Scope is active pending opportunities created within the period and assigned to the selected company. Native weighted revenue is not a cash forecast; no custom probability formula. Stage/salesperson groups are native. |
+| Time Off by Type | `hr_holidays.action_hr_leave_report`, `hr.leave.report`, native `number_of_hours:sum`. Inspected `addons/hr_holidays/report/hr_leave_report.py` and `hr_leave_reports.xml`. Approved requests starting in period only. The report excludes inactive employees and represents request hours as negative; preserve the sign. This is not headcount, period-prorated leave or available capacity. |
+| Stock | `stock.action_product_stock_view`, `product.product`, native `qty_available`, `free_qty`, `virtual_available`, `uom_id`. Inspected `addons/stock/views/product_views.xml` and `addons/stock/models/product.py`. Current active storable products in selected company/shared product scope. Native computed quantities by product; no total across UoMs and no historical/valuation claim. Specialized forecast and valuation remain separate pending sources. |
+| Dynamic cash directory | Authorized `account.account` with `asset_cash`, `company_ids` and archived history, joined to visible company bank/cash journals by `default_account_id`. Identity deduplicates accounts; unlinked accounts remain visible. Paginated metadata only; native financial balances still unavailable. This does not satisfy ED-CASH financial acceptance. |
+
+All analytical dimensions are server-allowlisted; grouping, monthly trends and
+amounts use native ORM report aggregation. Total cards are independent of paged
+groups. Group CSV exports require native export permission, escape text formulas,
+and refuse more than 5,000 groups rather than truncate. Full native exports remain
+available via the native action; financial exports are not implemented.

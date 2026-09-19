@@ -297,3 +297,318 @@ msgstr "تكاملات التقارير المالية واختبارات الم
 #: model:res.groups,name:adams_executive_dashboard.group_dashboard_user
 msgid "Executive Dashboard"
 msgstr "لوحة الإدارة التنفيذية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "(Archived)"
+msgstr "(مؤرشف)"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Account"
+msgstr "الحساب"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Balance"
+msgstr "الرصيد"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Bank and cash directory"
+msgstr "دليل البنوك والنقدية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Buyer"
+msgstr "المشتري"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Close analysis"
+msgstr "إغلاق التحليل"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Currency"
+msgstr "العملة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Current stock by product"
+msgstr "المخزون الحالي حسب المنتج"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Customer"
+msgstr "العميل"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Department"
+msgstr "القسم"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Discover bank and cash accounts"
+msgstr "اكتشاف حسابات البنوك والنقدية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Explore breakdown and trend"
+msgstr "عرض التفاصيل والاتجاه"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Explore current stock"
+msgstr "استعراض المخزون الحالي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Export all groups"
+msgstr "تصدير جميع المجموعات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Forecasted"
+msgstr "المتوقع"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Free to use"
+msgstr "المتاح للاستخدام"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Group by"
+msgstr "تجميع حسب"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Inventory valuation"
+msgstr "تقييم المخزون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Journals"
+msgstr "دفاتر اليومية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Loading…"
+msgstr "جارٍ التحميل…"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Month"
+msgstr "الشهر"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Next"
+msgstr "التالي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "No linked journal"
+msgstr "لا يوجد دفتر يومية مرتبط"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "On hand"
+msgstr "المتوفر"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Previous"
+msgstr "السابق"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Product"
+msgstr "المنتج"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Salesperson"
+msgstr "مندوب المبيعات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Scope fingerprint:"
+msgstr "بصمة النطاق:"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Stage"
+msgstr "المرحلة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Unit"
+msgstr "الوحدة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Value"
+msgstr "القيمة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Vendor"
+msgstr "المورد"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Weighted open pipeline"
+msgstr "القيمة المرجحة للفرص المفتوحة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "hours"
+msgstr "ساعات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Approved leave hours (native signed)"
+msgstr "ساعات الإجازات المعتمدة (بإشارة التقرير الأصلي)"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Active open opportunities created in the period. Native probability-weighted revenue, not a cash forecast. Company-unassigned opportunities are excluded."
+msgstr "الفرص النشطة المفتوحة المنشأة خلال الفترة. إيرادات مرجحة بالاحتمال من التقرير الأصلي وليست توقعًا نقديًا. تستبعد الفرص غير المرتبطة بشركة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Approved requests starting in the period, for active employees. Native report hours are negative for leave taken. Not period-prorated capacity."
+msgstr "الطلبات المعتمدة التي تبدأ خلال الفترة للموظفين النشطين. يعرض التقرير الأصلي ساعات الإجازات بالسالب. لا تمثل الطاقة المتاحة الموزعة على الفترة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Analysis unavailable. Check your access and retry."
+msgstr "التحليل غير متاح. تحقق من صلاحياتك وحاول مجددًا."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Directory unavailable. Check your access and retry."
+msgstr "الدليل غير متاح. تحقق من صلاحياتك وحاول مجددًا."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Inventory unavailable. Check your access and retry."
+msgstr "المخزون غير متاح. تحقق من صلاحياتك وحاول مجددًا."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Configuration only. Native financial balances are not connected yet. Archived accounts are included; credit-card liabilities are excluded."
+msgstr "بيانات الإعداد فقط. لم يتم ربط الأرصدة المالية الأصلية بعد. تشمل الحسابات المؤرشفة وتستبعد التزامات بطاقات الائتمان."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Current native Stock report quantities, in each product's unit. Period and balance cutoff do not apply. Quantities are not added across different units."
+msgstr "كميات تقرير المخزون الأصلي الحالية بوحدة كل منتج. لا تنطبق الفترة أو تاريخ الرصيد. لا تجمع الكميات ذات الوحدات المختلفة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Export unavailable. Check your export permissions or use the native report for large exports."
+msgstr "التصدير غير متاح. تحقق من صلاحيات التصدير أو استخدم التقرير الأصلي للبيانات الكبيرة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Monthly native values. Bar length shows magnitude; negative amounts retain their sign. Months without records are omitted."
+msgstr "القيم الشهرية الأصلية. طول الشريط يعكس المقدار مع الحفاظ على إشارة المبالغ السالبة. لا تظهر الأشهر التي لا تحتوي على سجلات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Native grouped values. Pages do not define the headline total."
+msgstr "القيم المجمعة من التقرير الأصلي. لا تحدد الصفحات المعروضة الإجمالي الرئيسي."
