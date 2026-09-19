@@ -1,3 +1,5 @@
+> **Current Work onboarding scope (19 September 2026):** Read [the onboarding handoff](docs/harness-onboarding.md) first for harness setup. The user authorized this isolated setup in ChatGPT Work. Preserve the historical instructions below; do not resume their old feature/research program automatically. The application baseline for the next requirement remains undecided. Private harness source stays outside this public checkout.
+
 # AGENTS.md — Proposed Future Agents (not yet active)
 
 > This file lists **proposed** automation agents for the Odoo 19 Shopify
