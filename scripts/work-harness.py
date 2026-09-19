@@ -64,7 +64,9 @@ def main():
         if rest:
             raise ValueError('Unexpected doctor arguments')
         return subprocess.call([sys.executable, '-m', 'odoo_harness', 'doctor'], cwd=root)
-    if any(x.split('=')[0] in ('--candidate', '--expected-commit') for x in rest):
+    protected = ('--candidate', '--expected-commit')
+    if any(x.startswith('--') and any(flag.startswith(x.split('=')[0]) for flag in protected)
+           for x in rest):
         raise ValueError('The adapter binds candidate and expected commit; do not override them')
     if git(PROJECT, 'status', '--porcelain', '--untracked-files=no'):
         raise ValueError('Commit candidate changes before running Odoo tests')

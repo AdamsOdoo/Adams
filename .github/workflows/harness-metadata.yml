@@ -1,9 +1,9 @@
 name: Harness connection metadata
 on:
   push:
-    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', '.github/workflows/harness-metadata.yml']
+    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
   pull_request:
-    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', '.github/workflows/harness-metadata.yml']
+    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
 permissions:
   contents: read
 jobs:
@@ -15,3 +15,5 @@ jobs:
           persist-credentials: false
       - name: Check public connection metadata (not Odoo testing)
         run: python3 scripts/work-harness.py check --metadata-only
+      - name: Reject candidate-identity overrides
+        run: python3 -m unittest discover -s tests -p test_work_harness.py -v
