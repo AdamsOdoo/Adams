@@ -1,6 +1,8 @@
 # Executive dashboard — ED-001
 
-Status: **G0 blocked on target environment; implementation not started.**
+Status: **G0 in progress; Enterprise database access verified; native source/build access still blocked. Implementation not started.**
+
+Latest update: [authorized Enterprise database inspection](development-environment.md). The user supplied the target, sign-in succeeded, native Accounting was installed and native aging definitions/drill-down were inspected. ED-B01 is resolved; ED-B02 records the remaining Odoo.sh source/build access boundary. The initial observations below are retained as the earlier checkpoint.
 Checkpoint: 19 September 2026. This is preparation, not an installed or UAT-ready dashboard.
 
 ## Authority and scope
