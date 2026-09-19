@@ -16,7 +16,7 @@
     .adams_nav { display: flex; gap: 24px; border-bottom: 1px solid #dce1e7; margin: 20px 0; }
     .adams_nav a { color: #674a73; padding: 10px 0; font-weight: 600; }
     .adams_section { margin: 28px 0; scroll-margin-top: 16px; }
-    .adams_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 16px; }
+    .adams_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
     .adams_card { background: white; border: 1px solid #e2e6eb; border-radius: 14px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
     .adams_card h3 { font-size: 14px; font-weight: 600; color: #596574; margin-bottom: 18px; }
     .adams_value { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
@@ -42,5 +42,5 @@
     .adams_analysis code { overflow-wrap: anywhere; }
     @media (max-width: 900px) { .adams_analysis_columns { grid-template-columns: 1fr; } }
     :focus-visible { outline: 3px solid #795789; outline-offset: 3px; }
-    @media (max-width: 480px) { .adams_filters button { width: 100%; } .adams_card { padding: 18px; } }
+    @media (max-width: 480px) { .adams_grid { grid-template-columns: 1fr; } .adams_filters button { width: 100%; } .adams_card { padding: 18px; } }
 }

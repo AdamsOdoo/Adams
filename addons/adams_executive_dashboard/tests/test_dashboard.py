@@ -1,6 +1,8 @@
 from odoo import Command
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import new_test_user, tagged
+from odoo.tools import file_open
+import sass
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
 
@@ -144,3 +146,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         row = find_account()
         self.assertEqual(row['name'], 'Renamed dashboard cash')
         self.assertFalse(row['active'])
+
+    def test_dashboard_styles_compile_with_odoo_sass(self):
+        with file_open('adams_executive_dashboard/static/src/dashboard.scss') as source:
+            compiled = sass.compile(string=source.read())
+        self.assertIn('.o_adams_dashboard', compiled)

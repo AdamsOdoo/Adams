@@ -8,6 +8,14 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        # AccountTestInvoicingCommon creates a finance administrator, not a Sales
+        # administrator. Grant fixture roles explicitly; application ACLs stay unchanged.
+        cls.env.user.group_ids |= (
+            cls.env.ref('sales_team.group_sale_manager')
+            | cls.env.ref('purchase.group_purchase_manager')
+            | cls.env.ref('stock.group_stock_manager')
+            | cls.env.ref('hr_holidays.group_hr_holidays_manager')
+        )
         cls.dashboard = cls.env['adams.executive.dashboard']
         cls.options = {'company_id': cls.env.company.id, 'date_from': '2026-08-01',
                        'date_to': '2026-08-31', 'as_of': '2026-08-31'}
@@ -21,6 +29,7 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         })
         order.action_confirm()
         order.date_order = '2026-08-15 12:00:00'
+        self.env.flush_all()
         items = {item['key']: item for item in self.dashboard.get_section('sales', self.options)['items']}
         self.assertEqual(items['orders']['value'], 1)
         self.assertAlmostEqual(items['confirmed_sales']['value'], 100)
@@ -38,6 +47,8 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         })
         purchase.button_confirm()
         purchase.date_order = '2026-08-15 12:00:00'
+        self.assertEqual(purchase.state, 'purchase')
+        self.env.flush_all()
         groups = self.dashboard.get_breakdown('purchases', 'vendor', self.options)
         self.assertEqual(len(groups['rows']), 1)
         self.assertEqual(groups['rows'][0]['id'], self.partner_a.id)
@@ -53,15 +64,18 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         # Creation date is immutable in normal workflows; fixed test-only clock fixture.
         self.env.cr.execute('UPDATE crm_lead SET create_date = %s WHERE id = %s', ['2026-08-15 12:00:00', opportunity.id])
         opportunity.invalidate_recordset(['create_date'])
+        self.env.flush_all()
         groups = self.dashboard.get_breakdown('crm', 'stage', self.options)
         self.assertAlmostEqual(sum(row['value'] for row in groups['rows']), 250)
         opportunity.action_set_won_rainbowman()
+        self.env.flush_all()
         self.assertEqual(self.dashboard.get_trend('crm', self.options)['rows'], [])
 
     def test_current_stock_uses_native_product_quantity(self):
         product = self.env['product.product'].create({'name': 'Dashboard stock fixture', 'is_storable': True})
         location = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1).lot_stock_id
         self.env['stock.quant']._update_available_quantity(product, location, 12)
+        self.env.flush_all()
         rows = []
         offset = 0
         while True:
