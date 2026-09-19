@@ -31,13 +31,13 @@ Verified native route: `https://adamsmen-harness-onboard-work-20260919-38320135.
 
 These are live native UI observations using standard demo records, not independently specified fixture tests, adapter parity, role-isolation proof or dashboard UAT evidence. No financial values or customer records are copied into this public dossier.
 
-## Remaining access boundary
+## Earlier access boundary (resolved authorization; retained provenance)
 
 ED-B01 (unknown target database) is resolved. **ED-B02** remains: inspect licensed native code, exact build identities and a development build for the feature branch.
 
 Automatic approval review rejected an attempted navigation to the separate Odoo.sh project-management site. Its reason was that the supplied database URL did not explicitly authorize access to private build/source controls on that separate origin. The navigation was not bypassed or retried by another route. Database-only inspection continued safely.
 
-Required clarification: authorize access to the Adams Odoo.sh project's **development build/source tools**, limited to reading native source/build revisions and preparing/testing the dashboard feature branch. Production and staging remain excluded. This is the automatic review's boundary, not a new requirement to reapprove ordinary dashboard development.
+Historical clarification, subsequently granted: authorize access to the Adams Odoo.sh project's **development build/source tools**, limited to reading native source/build revisions and preparing/testing the dashboard feature branch. Production and staging remain excluded. This is the automatic review's boundary, not a new requirement to reapprove ordinary dashboard development.
 
 Next: inspect the exact native report engine/options/actions and complete G0, then implement the receivables journey using the pinned harness. Do not rerun unchanged Community harness qualification or label it Enterprise/dashboard qualification.
 
@@ -48,3 +48,12 @@ and build tools. GitHub authentication was not completed; the owner then explici
 asked to defer login and start building. No additional login attempt is required now.
 The standalone dashboard addon has begun; see `implementation-status.md`. The earlier
 permission blocker is historical, while exact Enterprise source discovery remains open.
+
+## Latest access check
+
+During expanded implementation, the Odoo.sh tab remained at GitHub device
+verification. The Enterprise source connector request still returned 404. Feature
+commit status/check runs showed only the metadata workflow and no Odoo.sh build
+link. The provided onboarding host is therefore not relabeled as a deployed
+dashboard feature build. Authentication is required to proceed with the original
+financial source and deployment gates. No new permission is being requested.

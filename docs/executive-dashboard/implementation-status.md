@@ -1,4 +1,81 @@
-# Initial dashboard implementation — 19 September 2026
+# Expanded dashboard implementation — 19 September 2026
+
+Status: **bounded development slice verified; full dashboard NOT ready for UAT**.
+The original requirements have not been reduced to the implemented subset.
+
+## Current candidate and evidence
+
+- Tested application: `27817631693a4babb1a9d3434697cd7c3e0363cb`.
+- Private controller: `ad341c51f88d27e9cd4dca2e399c18f19c312a7f`.
+- Executor remains `10ec1d059b5ddc5d422875f68e0726cc500487ce`.
+- Community remains `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`.
+- Prior application for update: `b3b37eacb02890a935cbe992daeae5c400aa65e5`.
+- [Native install/update campaign](https://github.com/MostafaEssamm12/Odoo/actions/runs/35471793918):
+  **17/17 fresh-install tests and 12/12 core-addon update tests passed**, zero
+  skips/errors/failures. Install includes optional app fixtures; update covers the
+  prior core addon, not a production migration or every optional-app combination.
+- Seven isolated controller tests passed locally on this source. Python/JS/XML,
+  Arabic catalog and native Sass compilation checks passed. No DOM/browser pass.
+- Private artifact `10593185704`, retained until 2026-12-18. Observation ZIP SHA256:
+  `9c04a9b0bdf0d47d5bdfba64b015b17ae5f057cdc64a5234603ca049189db89a`.
+  Runner archive readback passed; structured native job logs and artifact metadata
+  were retrieved. Final follow-up changes are documentation only; application and
+  test files remain exactly at this tested source.
+
+## Expanded behavior
+
+Native analytical totals, dynamic customer/salesperson/product/vendor/buyer/stage/
+department groups, monthly trends, scoped group drilldowns and CSV exports are
+implemented. Groups paginate independently of headline totals. Export requires
+native permission, escapes formula-like labels and refuses silent truncation.
+The server discards client-injected report/currency/timezone context and validates
+all requested dimensions. Source fingerprints bind the report options, not an
+unavailable data-version timestamp.
+
+Current stock uses native per-product quantities/UoMs. CRM uses native weighted
+revenue for active pending company-assigned opportunities created in the period.
+Time Off preserves native negative hours for approved requests starting in the
+period. HR tests currently verify action scope, not a full numeric leave fixture.
+The cash directory dynamically discovers visible eligible ledger accounts, linked
+journals, unlinked and archived accounts; **financial balances remain unconfigured**.
+
+The interface adds translated breakdown/trend tables, signed magnitude bars,
+section-expansion preferences and race protection for analysis, paging and export.
+The native fixture tests verify known Sales/Purchase amounts, distinct orders,
+CRM expected value, current stock, invoice/refund scope, authorization and exports.
+No claim is made for historical inventory, fulfillment, full workforce reporting,
+financial totals or actual English/Arabic rendering.
+
+## Failure and correction record
+
+[Expanded first attempt](https://github.com/MostafaEssamm12/Odoo/actions/runs/35471424730)
+retains 13 passes, one failure and two errors. Two errors identified missing Sales
+roles in the finance test fixture; the purchase fixture returned no report rows.
+The latter did not independently identify whether confirmation state or pending
+writes caused the empty result. The correction grants only the intended fixture
+roles, asserts confirmed purchase state, and flushes fixture changes before report
+reads. Application ACLs and expected amounts were not loosened. Existing evidence
+was inspected without rerunning tests via the private diagnostic workflow.
+The corrected campaign above closes those fixture failures. Stylesheet syntax was
+also made compatible with Odoo Sass and tested with the actual compiler.
+
+## Blocking next action and remaining scope
+
+Odoo.sh is still at GitHub device verification. Both designated GitHub connections
+return 404 for the licensed Enterprise report source. Complete that authentication
+to inspect licensed source/build identities and prepare the feature development
+build. Access was already authorized; this is not a permission approval request.
+
+Financial engine adapters, dynamic dated bank/cash balances, historical aging,
+ledger/statement/forecast/budget journeys, fulfillment and remaining departmental
+scope remain incomplete. Deployed browser/RTL/mobile/navigation acceptance,
+representative performance, complete role matrix and independent review remain
+pending. See [UAT preparation](uat-checklist.md) and [gate ledger](acceptance-plan.md).
+Nothing was merged, released, deployed to production/staging, or added to Shopify.
+
+---
+
+# Historical first implementation checkpoint
 
 Status: implemented first development slice; full dashboard incomplete.
 

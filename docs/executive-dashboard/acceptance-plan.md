@@ -1,6 +1,6 @@
 # ED-001 acceptance plan
 
-The first implementation slice is in progress after the owner deferred Odoo.sh login. A feature-specific native contract now binds seven dashboard tests in the private runner; full Enterprise discovery and browser acceptance remain blocked. Three isolated JavaScript controller tests pass locally; they do not replace Odoo browser acceptance. These IDs retain the original v4 acceptance scope.
+The first implementation slice is in progress after the owner deferred Odoo.sh login. The latest feature-specific contract passed 17 fresh-install and 12 core update tests in the private runner; full Enterprise discovery and browser acceptance remain blocked. Seven isolated JavaScript controller tests pass locally; they do not replace Odoo browser acceptance. These IDs retain the original v4 acceptance scope.
 
 | IDs / gate | Required behavior and evidence |
 |---|---|
@@ -24,3 +24,21 @@ The first implementation slice is in progress after the owner deferred Odoo.sh l
 Run affected slice checks during development and batch broad native/browser/security/performance tests at stable milestones. Reuse unchanged harness qualification. Any feature change invalidates only the relevant feature evidence unless wider risk justifies a broader rerun. A failed, blocked, skipped or zero-discovery campaign is not a pass.
 
 Owner/finance UAT will confirm real source completeness, report variant/financial definitions, cut-off policy and any additional logic. Report parity does not audit the books. Development verification, UAT readiness, business acceptance and production release remain distinct states.
+
+## Expanded implementation gate ledger
+
+| Gate | Current evidence boundary |
+|---|---|
+| ED-ENV | Authorized onboarding Enterprise DB inspected. Feature build identity and licensed source still blocked at GitHub device verification; no new permission request. |
+| ED-AR / ED-FIN / ED-LEDGER | Financial numeric adapters are not implemented. Native definitions/UI inspection is not parity evidence. |
+| ED-CASH | Dynamic authorized account/journal metadata discovery implemented and tested. Native dated balances and full mandatory financial cases remain blocked. |
+| ED-SEC | RPC membership/company checks, underlying account permissions, export checks, context validation and revocation covered by bounded fixtures. Full role/company/browser matrix remains pending. |
+| ED-SALES | Invoice fixtures and grouped/trend/source action tests; expanded Sale/Purchase known-value fixtures passed. Currency/UoM/history/complete browser matrix still pending. |
+| ED-OPS | Current Stock product quantities, native CRM weighted pipeline and signed Time Off adapter implemented. The HR test covers action scope, not leave-value parity. Other operational scope remains unfinished. |
+| ED-UX / ED-ASYNC | Seven isolated controller checks and static/catalog checks. Stylesheet native compilation added. No deployed DOM/visual/RTL/mobile pass. |
+| ED-DELIVERY | Feature-native install/update campaign passed on exact candidate 27817631693a4babb1a9d3434697cd7c3e0363cb. No UAT/release closure, independent review or production deployment. |
+| ED-PERF / ED-FULFILL | Not run / not implemented; source discovery and business-definition approval remain required where native gaps are established. |
+
+The failed expanded run is retained, not relabeled as passing. Corrected fixture
+roles and flush boundaries are recorded alongside the new campaign result in
+implementation-status.md. No application ACL was loosened to pass a fixture.

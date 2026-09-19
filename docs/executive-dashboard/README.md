@@ -1,9 +1,12 @@
 # Executive dashboard — ED-001
 
-Status: **G0 in progress; Enterprise database access verified; native source/build access still blocked. Implementation not started.**
+Status: **Development in progress; expanded native analytical/operational implementation. Not ready for business UAT. Enterprise source/build access and deployed browser acceptance remain blocked.**
 
-Latest update: [authorized Enterprise database inspection](development-environment.md). The user supplied the target, sign-in succeeded, native Accounting was installed and native aging definitions/drill-down were inspected. ED-B01 is resolved; ED-B02 records the remaining Odoo.sh source/build access boundary. The initial observations below are retained as the earlier checkpoint.
-Checkpoint: 19 September 2026. This is preparation, not an installed or UAT-ready dashboard.
+Latest implementation and evidence: [implementation status](implementation-status.md).
+Business acceptance preparation: [UAT checklist](uat-checklist.md).
+The owner authorized Odoo.sh development access and subsequently deferred login.
+A later access check found GitHub device verification still pending; no new
+permission approval is required. The feature remains on draft PR #214.
 
 ## Authority and scope
 
@@ -28,11 +31,11 @@ Allowed development scope is the new dashboard addon(s), their tests and this do
 | External toolkit | Existing separate checkout is clean at the exact pin. `scripts/work-harness.py check` returned `external-resources-verified`, with all eight skills. Its `runtime_verified: false` correctly distinguishes resource loading from a new runtime campaign. |
 | Recorded qualification | Reused the 270 harness checks, full runtime qualification and 3 fresh + 3 update Adams smoke results recorded in [onboarding](../harness-onboarding.md). No unchanged test campaign was rerun. |
 | Qualified Odoo source | Disposable Community `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`; not a verified customer/development-database build. |
-| Current runner request | Lists only `adams_base`; no dashboard acceptance contract or Enterprise dependency. |
-| Target database | Not identified in the selected branch's configuration or onboarding record. Installed modules, localization, report variants, company scope and build are unresolved. |
+| Current runner | Isolated dashboard feature contract, native integration fixtures and prior-version update on the pinned Community baseline. No Enterprise dependency is available. |
+| Target database | Authorized onboarding development host/build 38320135, Odoo 19 Enterprise. Dashboard feature branch deployment and exact Enterprise source are unverified. |
 | Enterprise source | `odoo/enterprise` lookup returned HTTP 404 through both designated connections. This establishes no usable access through these connections; it does not prove the owner lacks a license or other access. |
 | Attachment | All seven members listed in its SHA256SUMS verified. Finance/Sales/mobile supplied PNGs visually inspected. |
-| Browser | Local prototype launch attempted once. Playwright package is present but its Chromium executable is absent. No interaction or live Odoo browser pass is claimed. |
+| Browser | Native Enterprise aging inspection succeeded in the cloud browser. No custom-dashboard browser pass is claimed; Odoo.sh remains at GitHub device verification. |
 
 Skills loaded: solution-design, development, UI and delivery. A compact blueprint is appropriate because this spans financial definitions, department access and report/record handoffs. Private skill contents remain outside Adams.
 
@@ -53,21 +56,19 @@ Then complete Finance and dynamic cash discovery, Sales, and installed supportin
 
 ## Concrete blocker and next action
 
-**ED-B01:** Identify the authorized Odoo 19 development database/build for this dashboard, with its licensed reporting modules and source access. The current Community qualification is insufficient evidence for the required native aging, Partner Ledger and statement APIs. The v4 contract G0 requires those APIs and installed mappings to be inspected before calculations are implemented.
+ED-B01 (unknown database) is resolved. ED-B02 is now an authentication/source/build
+blocker, not an authorization question. Complete GitHub device verification for the
+authorized Odoo.sh development session. Then inspect licensed native financial
+APIs and exact build identities, implement the remaining report mappings, deploy
+the dashboard development branch and execute the complete bilingual browser/UAT
+readiness matrix. Production and staging remain excluded.
 
-The user needs to identify the intended development database/project URL (or an authorized disposable Enterprise target). This is an environment identity question, not a request to reapprove development. Once identified, inspect available connected access before requesting anything further. Do not borrow another project's database authorization or downgrade the requirement to Community-only behavior.
+The public source connection still returns 404 for `odoo/enterprise`. No guessed
+financial API or alternative accounting calculation may replace that inspection.
+The full backlog, including unfinished nonfinancial requirements, is retained in
+[UAT preparation](uat-checklist.md); login alone does not complete it.
 
-Next: verify actual build, installed modules/localization, native action/variant/expression/column and option contracts; finish each catalog row; select exact feature test IDs; implement and qualify the receivables journey. Any genuine custom metric remains disabled until its material business definition is approved. No custom formula has been proposed as necessary or enabled at this checkpoint.
-
-## Checkpoint / evidence / rollback
-
-Documentation only; no addon, schema or data change and no migration. Feature native/browser/security/performance tests are not run, not passed. Independent implementation review and real English/Arabic screenshots remain pending. The input previews are design evidence only.
-
-The original onboarding checkout and private toolkit remain clean. The new worktree is at `/workspace/scratch/0d625603a72e/adams-dashboard`. Review the commit containing this checkpoint and current Git status when continuing; never infer unchanged remote state from this note. Durable continuation is this feature branch and the original attached archive.
-
-Rollback is removal/reversion of only this feature's documentation commit. No application or runtime rollback is required. Learning: distinguish inherited Community harness qualification from feature-specific licensed report compatibility; verify environment identity before writing financial adapters.
-
-## First implementation slice — login deferred
+## Historical first implementation slice — login deferred
 
 The owner authorized building before Odoo.sh authentication on 19 September 2026.
 `adams_executive_dashboard` is now a separate addon with an Owl client action,

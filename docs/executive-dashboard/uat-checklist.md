@@ -27,9 +27,9 @@ locally per user. Company/date filters are not restored from browser preferences
 |---|---|---|
 | Historical receivables/payables | Known dated settlements match native aging; drill to aging, original document, full export and back | Blocked: licensed engine mapping |
 | Financial statements and cash | Native P&L/BS/CFS values and comparisons; complete dynamic account balances including zero and archived history | Blocked: licensed engine mapping |
-| Sales and purchasing | Dashboard amount, distinct count, group/trend, native pivot and full export agree under the same company/dates/state/currency | Native fixture tests in progress; actual browser comparison pending |
-| CRM | Weighted open pipeline uses native prorated revenue and current pending status for opportunities created in period; stages remain dynamic | Native fixture tests in progress; browser comparison pending |
-| Inventory | Current quantities match native Stock by product/UoM; no false historical cutoff or mixed-unit total | Native fixture tests in progress; valuation/history still pending |
+| Sales and purchasing | Dashboard amount, distinct count, group/trend, native pivot and full export agree under the same company/dates/state/currency | Bounded native fixtures passed; actual browser comparison pending |
+| CRM | Weighted open pipeline uses native prorated revenue and current pending status for opportunities created in period; stages remain dynamic | Bounded native fixtures passed; browser comparison pending |
+| Inventory | Current quantities match native Stock by product/UoM; no false historical cutoff or mixed-unit total | Native current-quantity fixture passed; valuation/history/browser checks still pending |
 | HR | Only authorized native approved-request hours appear, retaining negative native signs and start-date semantics | Native action scope only; business-value fixtures/browser checks pending |
 | Authorization | Finance, sales-only, no-dashboard, export-disabled and separate-company users cannot obtain unauthorized values through UI or direct RPC | Bounded automated coverage; full role matrix pending |
 | Navigation and exports | Row drilldown preserves group scope; back restores context; CSV includes all groups or directs large datasets to native export | Server/controller checks only; browser pending |
