@@ -39,7 +39,13 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         outsider = new_test_user(self.env, login='dashboard_outsider', groups='base.group_user')
         dashboard = self.dashboard.with_user(outsider)
         for method, args in [('get_bootstrap', []), ('get_section', ['sales', self.options]),
-                             ('open_report', ['invoiced_sales', self.options])]:
+                             ('open_report', ['invoiced_sales', self.options]),
+                             ('get_breakdown', ['invoiced_sales', 'customer', self.options]),
+                             ('get_trend', ['invoiced_sales', self.options]),
+                             ('export_breakdown', ['invoiced_sales', 'customer', self.options]),
+                             ('get_cash_directory', [self.options]), ('get_inventory', [self.options]),
+                             ('open_inventory', [self.options]), ('get_recent_sales', ['orders', self.options]),
+                             ('open_recent_sale', ['orders', self.options])]:
             with self.assertRaises(AccessError):
                 getattr(dashboard, method)(*args)
 

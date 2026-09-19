@@ -17,6 +17,8 @@
     .adams_nav a { color: #674a73; padding: 10px 0; font-weight: 600; }
     .adams_section { margin: 28px 0; scroll-margin-top: 16px; }
     .adams_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+    .adams_group_heading { grid-column: 1 / -1; font-size: 16px; margin: 12px 0 0; color: #39584f; }
+    #adams-sales .adams_group_heading { color: #674a73; }
     .adams_card { background: white; border: 1px solid #e2e6eb; border-radius: 14px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
     .adams_card h3 { font-size: 14px; font-weight: 600; color: #596574; margin-bottom: 18px; }
     .adams_value { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }

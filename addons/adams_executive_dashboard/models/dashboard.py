@@ -87,6 +87,11 @@ class ExecutiveDashboard(models.AbstractModel):
         report.check_access('read')
         report.check_field_access_rights('read', [date_field, 'company_id', aggregate.split(':')[0],
                                                 *[term[0] for term in states]])
+        bounds = self._date_bounds(report, date_field, dates)
+        domain = [('company_id', '=', self.env.company.id), *states, *bounds]
+        return report, domain, aggregate, action_id
+
+    def _date_bounds(self, report, date_field, dates):
         start, end = dates[:2]
         if report._fields[date_field].type == 'datetime':
             # Inclusive local dates become a half-open UTC range, including DST.
@@ -97,8 +102,53 @@ class ExecutiveDashboard(models.AbstractModel):
                       (date_field, '<', fields.Datetime.to_string(end))]
         else:
             bounds = [(date_field, '>=', start.isoformat()), (date_field, '<=', end.isoformat())]
-        domain = [('company_id', '=', self.env.company.id), *states, *bounds]
-        return report, domain, aggregate, action_id
+        return bounds
+
+    def _recent_scope(self, kind, dates):
+        if kind not in ('orders', 'quotations') or 'sale.order' not in self.env:
+            raise ValidationError(_('This native list is not configured.'))
+        orders = self.env['sale.order']
+        orders.check_access('read')
+        orders.check_field_access_rights('read', ['company_id', 'state', 'date_order'])
+        states = ['sale'] if kind == 'orders' else ['draft', 'sent']
+        domain = [('company_id', '=', self.env.company.id), ('state', 'in', states),
+                  *self._date_bounds(orders, 'date_order', dates)]
+        return orders, domain
+
+    @api.model
+    def get_recent_sales(self, kind, options, offset=0):
+        scoped, dates = self._scope(options)
+        if kind not in ('orders', 'quotations') or type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid native list or page.'))
+        if 'sale.order' not in scoped.env:
+            return {'status': 'not_installed', 'rows': []}
+        orders, domain = scoped._recent_scope(kind, dates)
+        columns = ['name', 'partner_id', 'date_order', 'validity_date', 'state', 'amount_untaxed', 'currency_id']
+        orders.check_field_access_rights('read', columns)
+        records = orders.search(domain, order='date_order desc, id desc', limit=26, offset=offset)
+        rows = records[:25].read(columns)
+        states = dict(orders._fields['state']._description_selection(scoped.env))
+        for row, record in zip(rows, records[:25]):
+            row.update(state_label=states[row['state']], currency=record.currency_id.name,
+                       digits=record.currency_id.decimal_places,
+                       date_label=fields.Datetime.context_timestamp(record, record.date_order).strftime('%Y-%m-%d %H:%M'))
+        return {'status': 'ready' if rows else 'empty', 'rows': rows, 'has_more': len(records) > 25,
+                'offset': offset, 'date_basis': 'date_order', 'timezone': scoped.env.user.tz or 'UTC'}
+
+    @api.model
+    def open_recent_sale(self, kind, options, record_id=None):
+        scoped, dates = self._scope(options)
+        orders, domain = scoped._recent_scope(kind, dates)
+        action_id = 'sale.action_orders' if kind == 'orders' else 'sale.action_quotations'
+        action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
+        action.update(domain=domain, context=dict(scoped.env.context))
+        if record_id is not None:
+            if type(record_id) is not int or record_id < 1:
+                raise ValidationError(_('Invalid sales record.'))
+            if not orders.search([*domain, ('id', '=', record_id)], limit=1):
+                raise AccessError(_('The record is unavailable in the selected scope.'))
+            action.update(res_id=record_id, views=[(False, 'form')], view_mode='form')
+        return action
 
     def _provenance(self, key, domain, aggregate):
         scope = {'model': SOURCES[key][0], 'action': SOURCES[key][4], 'domain': domain,

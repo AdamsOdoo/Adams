@@ -19,6 +19,7 @@ function fixture() {
         .replace(/^import .*;$/gm, '').replace('export class', 'class');
     const Controller = runInNewContext(source + '\nExecutiveDashboard;', {
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
+        useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
         useState: value => value, useService: key => services[key], _t: value => value,
         registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
@@ -120,4 +121,42 @@ test('filter changes suppress exports requested for the previous scope', async (
     assert.equal(controller.state.detail, null);
     assert.equal(controller.state.exporting, false);
     assert.equal(notifications.length, 0);
+});
+
+test('switching recent lists suppresses slower prior results', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const orders = controller.loadRecent('orders');
+    const quotes = controller.loadRecent('quotations');
+    pending[1].resolve({ rows: [{ id: 22 }], status: 'ready' });
+    await quotes;
+    pending[0].resolve({ rows: [{ id: 11 }], status: 'ready' });
+    await orders;
+    assert.equal(controller.state.recent.kind, 'quotations');
+    assert.equal(controller.state.recent.rows[0].id, 22);
+});
+
+test('navigation keeps selections and scroll but never caches business values', () => {
+    const { controller } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    controller.state.detail = { key: 'orders', dimension: 'customer', offset: 25, rows: [{ value: 999 }] };
+    controller.state.recent = { kind: 'orders', offset: 25, rows: [{ name: 'private' }] };
+    const saved = controller.navigationState();
+    assert.equal(saved.scroll, 140);
+    assert.equal(saved.detail.offset, 25);
+    assert.equal(saved.applied.company_id, 1);
+    assert.equal(saved.detail.rows, undefined);
+    assert.equal(saved.recent.rows, undefined);
+});
+
+test('new filters during return prevent old analysis from reopening', async () => {
+    const { controller, pending } = fixture();
+    const returning = controller.restoreNavigation({ detail: { key: 'orders', dimension: 'customer', offset: 25 } });
+    controller.state.draft.company_id = 2;
+    const current = controller.refresh();
+    for (const request of pending) { request.resolve(data(1)); }
+    await Promise.all([returning, current]);
+    assert.equal(pending.length, 6);
+    assert.equal(controller.state.detail, null);
+    assert.equal(controller.state.applied.company_id, 2);
 });

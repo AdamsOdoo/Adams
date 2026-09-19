@@ -1,6 +1,6 @@
 <templates xml:space="preserve">
     <t t-name="adams_executive_dashboard.Dashboard">
-        <main class="o_adams_dashboard">
+        <main class="o_adams_dashboard" t-ref="root">
             <header class="adams_header">
                 <div><span class="adams_eyebrow">ADAMS · EXECUTIVE WORKSPACE</span>
                     <h1>Business overview</h1><p>Native reports. One clear view.</p></div>
@@ -77,7 +77,9 @@
                         This section could not be loaded. Check the filters and your access, then apply filters to retry.
                     </div>
                     <div t-else="" class="adams_grid">
-                        <article t-foreach="result.items" t-as="item" t-key="item.key" class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready' }">
+                        <t t-foreach="result.items" t-as="item" t-key="item.key">
+                        <h3 t-if="groupHeadings[item.key]" class="adams_group_heading" t-esc="groupHeadings[item.key]"/>
+                        <article class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready' }">
                             <h3 t-esc="labels[item.key]"/>
                             <div class="adams_value" t-esc="formatted(item, result)"/>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'currency'" class="adams_currency" t-esc="result.currency"/>
@@ -98,6 +100,7 @@
                                 <button t-if="dimensions[item.key]" type="button" class="btn btn-link" t-on-click="() => this.inspect(item.key)">Explore breakdown and trend</button>
                             </footer>
                         </article>
+                        </t>
                     </div>
                     <t t-if="section.key === 'finance'">
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('cash')">Discover bank and cash accounts</button>
@@ -119,6 +122,38 @@
                                 <button class="btn btn-outline-secondary" t-att-disabled="!state.directory.has_more" t-on-click="() => this.loadDirectory('cash', state.directory.offset + 25)">Next</button></div>
                         </div>
                     </t>
+                    <t t-if="section.key === 'sales'">
+                        <div class="adams_page_controls mt-3">
+                            <button class="btn btn-outline-secondary" t-on-click="() => this.loadRecent('orders')">Recent orders</button>
+                            <button class="btn btn-outline-secondary" t-on-click="() => this.loadRecent('quotations')">Recent quotations</button>
+                        </div>
+                        <section t-if="state.recent" class="adams_analysis" aria-live="polite">
+                            <t t-set="recent" t-value="state.recent"/>
+                            <h3 t-if="recent.kind === 'orders'">Recent orders</h3><h3 t-else="">Recent quotations</h3>
+                            <p>Selected period, newest first. Native order date is the confirmation date for orders and creation date for quotations. Untaxed values use each document's currency; no mixed-currency total.</p>
+                            <p t-if="recent.timezone">Dates shown in <bdi t-esc="recent.timezone"/></p>
+                            <p t-if="recent.status === 'loading'" role="status">Loading…</p>
+                            <p t-elif="recent.status === 'error'" role="alert">Sales list unavailable. Check your access and retry.</p>
+                            <p t-elif="recent.status === 'not_installed'">App not installed</p>
+                            <p t-elif="recent.status === 'empty'">No matching records</p>
+                            <div class="adams_table_wrap"><table t-if="recent.rows.length" class="table">
+                                <thead><tr><th scope="col">Reference</th><th scope="col">Customer</th><th scope="col">Order date</th><th scope="col">Status</th><th scope="col">Expiration</th><th scope="col">Untaxed amount</th></tr></thead>
+                                <tbody><tr t-foreach="recent.rows" t-as="row" t-key="row.id">
+                                    <td><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openRecent(row.id)" t-esc="row.name"/></td>
+                                    <td t-esc="row.partner_id[1]"/><td><bdi t-esc="row.date_label"/></td><td t-esc="row.state_label"/>
+                                    <td><bdi t-esc="row.validity_date || '—'"/></td><td><bdi t-esc="formatted({value: row.amount_untaxed}, row)"/> <bdi t-esc="row.currency"/></td>
+                                </tr></tbody>
+                            </table></div>
+                            <div class="adams_page_controls">
+                                <button class="btn btn-outline-secondary" t-att-disabled="recent.offset === 0 || recent.status === 'loading'" t-on-click="() => this.loadRecent(recent.kind, recent.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!recent.has_more" t-on-click="() => this.loadRecent(recent.kind, recent.offset + 25)">Next</button>
+                                <button t-if="recent.status === 'ready' || recent.status === 'empty'" class="btn btn-outline-primary" t-att-disabled="state.opening" t-on-click="() => this.openRecent()">Open native list</button>
+                            </div>
+                        </section>
+                    </t>
+                    <section t-if="section.key === 'sales'" class="adams_analysis">
+                        <h3>Fulfillment</h3><p>Backlog and delivery performance are not configured. Native delivery sources and business definitions must be verified before displaying these measures.</p>
+                    </section>
                     <t t-if="section.key === 'operations'">
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('inventory')">Explore current stock</button>
                         <div t-if="state.inventory" class="adams_analysis">

@@ -1,7 +1,8 @@
 /** @odoo-module **/
-import { Component, onWillStart, onWillUnmount, useState } from '@odoo/owl';
+import { Component, onWillStart, onWillUnmount, useState, useRef, useEffect } from '@odoo/owl';
 import { registry } from '@web/core/registry';
 import { useService } from '@web/core/utils/hooks';
+import { useSetupAction } from '@web/search/action_hook';
 import { _t } from '@web/core/l10n/translation';
 
 export class ExecutiveDashboard extends Component {
@@ -26,6 +27,7 @@ export class ExecutiveDashboard extends Component {
             orders: _t('Distinct sales orders'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (native signed)'),
         };
+        this.groupHeadings = { revenue: _t('Profitability'), cash: _t('Liquidity'), receivables: _t('Working capital'), invoiced_sales: _t('Commercial performance') };
         this.statusLabels = {
             not_configured: _t('Not configured'), not_installed: _t('App not installed'),
             restricted: _t('Access restricted'), empty: _t('No matching records'),
@@ -34,15 +36,28 @@ export class ExecutiveDashboard extends Component {
             vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };
         this.dimensions = { invoiced_sales: ['customer', 'salesperson', 'product'], confirmed_sales: ['customer', 'salesperson', 'product'],
             orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
+        this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { operations: true }, detail: null, directory: null, inventory: null, exporting: false });
+            collapsed: { operations: true }, detail: null, directory: null, inventory: null, recent: null, exporting: false, restored: false });
+        useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
+        useEffect(() => {
+            if (this.state.restored && this.restoreScroll !== null && this.root.el) {
+                this.root.el.scrollTop = this.restoreScroll;
+                this.restoreScroll = null;
+            }
+        }, () => [this.state.restored]);
         onWillStart(async () => {
             try {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_bootstrap', []);
                 if (!this.alive) { return; }
                 this.state.companies = data.companies;
-                this.state.draft = data.options;
+                this.userId = data.user_id;
+                const savedNavigation = this.props.state?.dashboard;
+                const restore = savedNavigation?.userId === data.user_id &&
+                    data.companies.some(company => company.id === savedNavigation.applied?.company_id)
+                    ? savedNavigation : null;
+                this.state.draft = restore ? { ...restore.applied } : data.options;
                 this.preferenceKey = `adams-dashboard-v1-${data.user_id}`;
                 try {
                     const saved = JSON.parse(window.localStorage.getItem(this.preferenceKey) || '{}');
@@ -51,12 +66,74 @@ export class ExecutiveDashboard extends Component {
                     }
                 } catch { /* Storage may be unavailable; dashboard remains usable. */ }
                 // Render the shell while each section completes independently.
-                void this.refresh();
+                void this.restoreNavigation(restore);
             } catch {
                 this.state.error = _t('The dashboard could not be loaded. Check your access and try again.');
             }
         });
         onWillUnmount(() => { this.alive = false; this.generation++; });
+    }
+
+    navigationState() {
+        const selection = (value, keys) => value ? Object.fromEntries(keys.map(key => [key, value[key]])) : null;
+        return { userId: this.userId, applied: this.state.applied ? { ...this.state.applied } : null,
+            collapsed: { ...this.state.collapsed }, scroll: this.root.el?.scrollTop || 0,
+            detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
+            recent: selection(this.state.recent, ['kind', 'offset']),
+            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset']) };
+    }
+
+    async restoreNavigation(saved) {
+        const generation = this.generation + 1;
+        await this.refresh();
+        if (!this.alive || generation !== this.generation || !saved) { return; }
+        const jobs = [];
+        if (saved.detail && this.dimensions[saved.detail.key]?.includes(saved.detail.dimension)) {
+            jobs.push(this.inspect(saved.detail.key, saved.detail.dimension, saved.detail.offset));
+        }
+        if (saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
+            jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
+        }
+        if (saved.directory) { jobs.push(this.loadDirectory('cash', saved.directory.offset)); }
+        if (saved.inventory) { jobs.push(this.loadDirectory('inventory', saved.inventory.offset)); }
+        for (const section of this.sections) {
+            if (typeof saved.collapsed?.[section.key] === 'boolean') { this.state.collapsed[section.key] = saved.collapsed[section.key]; }
+        }
+        await Promise.all(jobs);
+        if (this.alive && generation === this.generation) {
+            this.restoreScroll = Number.isFinite(saved.scroll) ? Math.max(0, saved.scroll) : 0;
+            this.state.restored = true;
+        }
+    }
+
+    async loadRecent(kind, offset = 0) {
+        const generation = this.generation;
+        const request = (this.recentRequest || 0) + 1;
+        this.recentRequest = request;
+        this.state.recent = { kind, offset, status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_recent_sales', [kind, { ...this.state.applied }, offset]);
+            if (this.alive && generation === this.generation && request === this.recentRequest) {
+                this.state.recent = { ...data, kind, offset };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && request === this.recentRequest) {
+                this.state.recent = { kind, offset, status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async openRecent(recordId = null) {
+        if (this.state.opening || !this.state.recent) { return; }
+        const generation = this.generation;
+        const recent = this.state.recent;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_recent_sale', [recent.kind, { ...this.state.applied }, recordId]);
+            if (this.alive && generation === this.generation && recent === this.state.recent) { await this.action.doAction(action); }
+        } catch {
+            if (this.alive) { this.notification.add(_t('The sales record could not be opened. Check your access and filters.'), { type: 'warning' }); }
+        } finally { if (this.alive) { this.state.opening = false; } }
     }
 
     async refresh() {
@@ -66,6 +143,7 @@ export class ExecutiveDashboard extends Component {
         this.state.detail = null;
         this.state.directory = null;
         this.state.inventory = null;
+        this.state.recent = null;
         this.detailGeneration++;
         this.state.error = '';
         // Immediately remove previous-company values, including during failures.

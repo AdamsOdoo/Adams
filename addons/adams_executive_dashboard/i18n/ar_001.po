@@ -612,3 +612,111 @@ msgstr "القيم الشهرية الأصلية. طول الشريط يعكس �
 #, python-format
 msgid "Native grouped values. Pages do not define the headline total."
 msgstr "القيم المجمعة من التقرير الأصلي. لا تحدد الصفحات المعروضة الإجمالي الرئيسي."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Profitability"
+msgstr "الربحية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Liquidity"
+msgstr "السيولة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Working capital"
+msgstr "رأس المال العامل"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "Commercial performance"
+msgstr "الأداء التجاري"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Recent orders"
+msgstr "أحدث أوامر البيع"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Recent quotations"
+msgstr "أحدث عروض الأسعار"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Reference"
+msgstr "المرجع"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Order date"
+msgstr "تاريخ الطلب"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Status"
+msgstr "الحالة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Expiration"
+msgstr "انتهاء الصلاحية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Untaxed amount"
+msgstr "المبلغ دون ضريبة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Open native list"
+msgstr "فتح القائمة الأصلية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Selected period, newest first. Native order date is the confirmation date for orders and creation date for quotations. Untaxed values use each document's currency; no mixed-currency total."
+msgstr "الفترة المحددة، الأحدث أولاً. تاريخ الطلب الأصلي هو تاريخ التأكيد لأوامر البيع وتاريخ الإنشاء لعروض الأسعار. المبالغ دون ضريبة بعملة كل مستند، دون جمع العملات المختلفة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Dates shown in"
+msgstr "التواريخ معروضة بتوقيت"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Sales list unavailable. Check your access and retry."
+msgstr "قائمة المبيعات غير متاحة. تحقق من صلاحياتك وأعد المحاولة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#, python-format
+msgid "The sales record could not be opened. Check your access and filters."
+msgstr "تعذر فتح سجل المبيعات. تحقق من صلاحياتك والمرشحات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Fulfillment"
+msgstr "تنفيذ الطلبات"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#, python-format
+msgid "Backlog and delivery performance are not configured. Native delivery sources and business definitions must be verified before displaying these measures."
+msgstr "مقاييس الطلبات المتبقية وأداء التسليم غير مهيأة. يجب التحقق من مصادر التسليم الأصلية والتعريفات التجارية قبل عرض هذه المقاييس."
