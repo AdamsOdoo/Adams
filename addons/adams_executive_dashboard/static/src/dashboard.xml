@@ -155,7 +155,7 @@
                     </t>
                     <section t-if="section.key === 'sales'" class="adams_analysis">
                         <h3>Fulfillment</h3>
-                        <p>Native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>
+                        <p>Current native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. The balance cutoff does not apply. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>
                         <button class="btn btn-outline-secondary" t-on-click="() => this.loadDirectory('fulfillment')">Explore delivery quantities</button>
                         <p class="adams_hint">Backlog value and on-time completion are not configured. Partial deliveries, returns and commitment-date rules require verified definitions.</p>
                         <t t-if="state.fulfillment">

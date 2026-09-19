@@ -128,7 +128,8 @@ class ExecutiveDashboard(models.AbstractModel):
         report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', columns)
-        rows = report._read_group([*domain, ('product_id', '!=', False)],
+        domain = [*domain, ('product_id', '!=', False)]
+        rows = report._read_group(domain,
             groupby=['product_id', 'product_uom_id'],
             aggregates=['product_uom_qty:sum', 'qty_delivered:sum', 'qty_to_deliver:sum'],
             order='product_id ASC, product_uom_id ASC', offset=offset, limit=26)

@@ -724,8 +724,8 @@ msgstr "مقاييس الطلبات المتبقية وأداء التسليم �
 #. module: adams_executive_dashboard
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
-msgid "Native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. Each product uses its own unit. Signed values are retained; quantities are not combined across units."
-msgstr "الكميات الأصلية المطلوبة والمسلّمة والمتبقية للطلبات المؤكدة خلال فترة تاريخ الطلب المحددة. لكل منتج وحدته، مع الاحتفاظ بالإشارات دون جمع وحدات مختلفة."
+msgid "Current native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. The balance cutoff does not apply. Each product uses its own unit. Signed values are retained; quantities are not combined across units."
+msgstr "الكميات الأصلية الحالية المطلوبة والمسلّمة والمتبقية للطلبات المؤكدة خلال فترة تاريخ الطلب المحددة. لا ينطبق تاريخ قطع الرصيد. لكل منتج وحدته، مع الاحتفاظ بالإشارات دون جمع وحدات مختلفة."
 
 #. module: adams_executive_dashboard
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0

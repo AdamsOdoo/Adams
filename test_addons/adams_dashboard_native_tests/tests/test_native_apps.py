@@ -220,10 +220,12 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         order.date_order = '2026-08-15 12:00:00'
         order.order_line.qty_delivered = 2
         self.env.flush_all()
-        row = self.dashboard.get_fulfillment(self.options)['rows'][0]
+        result = self.dashboard.get_fulfillment(self.options)
+        row = result['rows'][0]
         self.assertEqual((row['ordered'], row['delivered'], row['remaining']), (5, 2, 3))
         self.assertEqual(row['unit'], product.uom_id.display_name)
         action = self.dashboard.open_fulfillment(self.options)
+        self.assertEqual(action['domain'], result['provenance']['domain'])
         self.assertEqual(action['context']['pivot_measures'], ['product_uom_qty', 'qty_delivered', 'qty_to_deliver'])
         self.assertEqual(sum(self.env['sale.report'].search(action['domain']).mapped('qty_to_deliver')), 3)
         order.order_line.qty_delivered = 7
