@@ -316,11 +316,13 @@ msgstr "فترة مدفوعات الموردين غير معروفة."
 msgid "Posted supplier-bill installments outstanding at the balance cutoff. The 30-day window includes the first 7 days. Standalone credits and unapplied payments remain in full native aging."
 msgstr "أقساط فواتير الموردين المرحلة والمستحقة عند تاريخ الرصيد. تشمل فترة الثلاثين يومًا أول سبعة أيام. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."
 
+#. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/account_report.py:0
 msgid "Supplier payment schedule"
 msgstr "جدول مدفوعات الموردين"
 
+#. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/account_report.py:0
 msgid "Unsupported supplier payment window scope."
