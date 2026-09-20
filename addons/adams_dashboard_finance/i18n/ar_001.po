@@ -199,3 +199,28 @@ msgstr "اختر تعبير المقام الأصلي لهذه النسبة."
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
 msgid "A dependent native report could not be resolved."
 msgstr "تعذر تحديد أحد التقارير الأصلية المعتمَد عليها."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__cash_detail_report_id
+msgid "Cash Detail Report"
+msgstr "تقرير تفاصيل النقدية"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__cash_detail_expression_id
+msgid "Cash Detail Expression"
+msgstr "تعبير تفاصيل النقدية"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Cash detail requires the native General Ledger balance expression."
+msgstr "تتطلب تفاصيل النقدية تعبير الرصيد الأصلي لدفتر الأستاذ العام."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Invalid cash account."
+msgstr "حساب نقدي غير صالح."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Cash account access is required."
+msgstr "يلزم توفر صلاحية الوصول إلى الحساب النقدي."

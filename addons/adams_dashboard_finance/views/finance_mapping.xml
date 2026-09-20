@@ -23,6 +23,9 @@
                             required="metric in ['gross_margin', 'net_margin']"
                             domain="[('report_line_id.report_id', '=', report_id)]" options="{'no_create': True}"/>
                         <field name="definition_note"/><field name="active"/>
+                        <field name="cash_detail_report_id" invisible="metric != 'cash'" options="{'no_create': True}"/>
+                        <field name="cash_detail_expression_id" invisible="metric != 'cash'"
+                            domain="[('report_line_id.report_id', '=', cash_detail_report_id)]" options="{'no_create': True}"/>
                     </group>
                     <group><field name="approved_by"/><field name="approved_at"/></group>
                 </sheet>

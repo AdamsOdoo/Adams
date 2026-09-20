@@ -144,6 +144,10 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key == 'cash_account':
+            if dimension is not None:
+                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            return self._open_cash_account(options, group_id)
         if key not in dict(METRICS):
             return super().open_report(key, options, dimension, group_id)
         scoped, dates = self._scope(options)
@@ -164,3 +168,82 @@ class ExecutiveDashboard(models.AbstractModel):
                 'keep_journal_groups_options': True,
                 'context': dict(scoped.env.context, report_id=mapping.report_id.id),
                 'params': {'options': prepared, 'ignore_session': True}}
+
+    def _cash_detail_mapping(self):
+        mapping = self._financial_mapping('cash')
+        return mapping if self._mapping_ready(mapping) and mapping.cash_detail_report_id else False
+
+    def _cash_options(self, mapping, dates):
+        # GL includes initial balances through its own from_beginning engine.
+        # A one-day period at the cutoff produces the native closing balance.
+        return self._financial_options(mapping.cash_detail_report_id, 'revenue',
+                                       (dates[2], dates[2], dates[2]))
+
+    @api.model
+    def get_cash_directory(self, options, offset=0):
+        result = super().get_cash_directory(options, offset)
+        scoped, dates = self._scope(options)
+        if not result['rows']:
+            return result
+        try:
+            scoped._finance_access()
+            mapping = scoped._cash_detail_mapping()
+            if not mapping:
+                return result
+            report = mapping.cash_detail_report_id
+            expression = mapping.cash_detail_expression_id
+            prepared = scoped._cash_options(mapping, dates)
+            ids = [row['id'] for row in result['rows']]
+            prepared['forced_domain'] = [('account_id', 'in', ids)]
+            scoped.env.flush_all()
+            report._init_currency_table(prepared)
+            warnings = {}
+            native = report._compute_expression_totals_for_each_column_group(
+                expression, prepared, groupby_to_expand='account_id', warnings=warnings)
+            group = next(iter(prepared['column_groups']))
+            balances = dict(native[group][expression]['value'])
+            for row in result['rows']:
+                value = balances.get(row['id'])
+                if value is None:
+                    # Ask the native scalar engine for accounts absent from its
+                    # grouped result. Absence is never assumed to mean zero.
+                    single = dict(prepared, forced_domain=[('account_id', '=', row['id'])])
+                    scalar = report._compute_expression_totals_for_each_column_group(
+                        expression, single, warnings=warnings)
+                    value = scalar[group][expression]['value']
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise UnsupportedFinancialScope()
+                row.update(balance=value, balance_status='ready',
+                           balance_currency=scoped.env.company.currency_id.name,
+                           balance_digits=scoped.env.company.currency_id.decimal_places,
+                           drilldown=True)
+            result.update(native_balances=True, source=report.display_name,
+                          has_warnings=bool(warnings), definition=mapping.definition_note)
+        except (AccessError, UnsupportedFinancialScope, UserError, KeyError, TypeError, ValueError) as error:
+            status = 'restricted' if isinstance(error, AccessError) else 'unsupported_scope' if isinstance(error, UnsupportedFinancialScope) else 'error'
+            for row in result['rows']:
+                row.update(balance=None, balance_status=status, drilldown=False)
+        return result
+
+    def _open_cash_account(self, options, account_id):
+        scoped, dates = self._scope(options)
+        scoped._finance_access()
+        if type(account_id) is not int:
+            raise ValidationError(_('Invalid cash account.'))
+        account = scoped.env['account.account'].with_context(active_test=False).search([
+            ('id', '=', account_id), ('account_type', '=', 'asset_cash'),
+            ('company_ids', 'in', [scoped.env.company.id]),
+        ], limit=1)
+        if not account:
+            raise AccessError(_('Cash account access is required.'))
+        mapping = scoped._cash_detail_mapping()
+        if not mapping:
+            raise ValidationError(_('Review and approve this financial mapping first.'))
+        report = mapping.cash_detail_report_id
+        prepared = scoped._cash_options(mapping, dates)
+        action = report.caret_option_open_general_ledger(prepared, {
+            'line_id': report._get_generic_line_id('account.account', account.id),
+        })
+        action['context'] = dict(action.get('context', {}), **scoped.env.context)
+        action['keep_journal_groups_options'] = True
+        return action

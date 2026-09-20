@@ -196,3 +196,88 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             self._mapping('cash')  # P&L is a period, not an as-of balance.
         with self.assertRaises(ValidationError), self.cr.savepoint():
             self._mapping(report=self.env.ref('account_reports.aged_receivable_report'))
+
+    def _cash_mapping(self):
+        report = self.env.ref('account_reports.balance_sheet')
+        line = self.env.ref('account_reports.account_financial_report_bank_view0')
+        expression = line.expression_ids.filtered(lambda item: item.label == 'balance')
+        mapping = self._mapping('cash', report=report, expression=expression, approve=False)
+        mapping.write({
+            'cash_detail_report_id': self.env.ref('account_reports.general_ledger_report').id,
+            'cash_detail_expression_id': self.env.ref('account_reports.general_ledger_line_balance').id,
+        })
+        mapping.action_approve()
+        return mapping
+
+    def _cash_account(self, code, currency=None):
+        return self.env['account.account'].create({
+            'name': 'Disposable cash fixture ' + code, 'code': code,
+            'account_type': 'asset_cash', 'company_ids': [Command.set(self.env.company.ids)],
+            'currency_id': currency.id if currency else False,
+        })
+
+    def _cash_entry(self, account, amount, date, foreign_amount=None):
+        cash_line = {'account_id': account.id, 'debit': max(amount, 0), 'credit': max(-amount, 0)}
+        if foreign_amount is not None:
+            cash_line.update(currency_id=account.currency_id.id, amount_currency=foreign_amount)
+        move = self.env['account.move'].create({
+            'journal_id': self.company_data['default_journal_misc'].id, 'date': date,
+            'line_ids': [Command.create(cash_line), Command.create({
+                'account_id': self.company_data['default_account_assets'].id,
+                'debit': max(-amount, 0), 'credit': max(amount, 0),
+            })],
+        })
+        move.action_post()
+        return move
+
+    def test_native_cash_cutoff_zero_negative_archived_and_no_journal(self):
+        self._cash_mapping()
+        cash = self._cash_account('990081')
+        zero = self._cash_account('990082')
+        negative = self._cash_account('990083')
+        self._cash_entry(cash, 50, '2026-07-01')
+        self._cash_entry(cash, 100, '2026-08-10')
+        self._cash_entry(cash, -40, '2026-09-10')
+        self._cash_entry(negative, -20, '2026-08-10')
+        cash.write({'name': 'Renamed archived cash fixture', 'active': False})
+        result = self.dashboard.get_cash_directory(self.options)
+        rows = {row['id']: row for row in result['rows']}
+        self.assertTrue(result.get('native_balances'), result)
+        self.assertEqual(rows[cash.id]['balance'], 150)
+        self.assertEqual(rows[zero.id]['balance'], 0)
+        self.assertEqual(rows[negative.id]['balance'], -20)
+        self.assertEqual(rows[cash.id]['name'], 'Renamed archived cash fixture')
+        self.assertFalse(rows[cash.id]['active'])
+        self.assertEqual(rows[cash.id]['journals'], [])
+        later = self.dashboard.get_cash_directory(dict(self.options, as_of='2026-09-30'))
+        self.assertEqual(next(row for row in later['rows'] if row['id'] == cash.id)['balance'], 110)
+        action = self.dashboard.open_report('cash_account', self.options, group_id=cash.id)
+        self.assertEqual(action['tag'], 'account_report')
+        self.assertEqual(action['params']['options']['date']['date_to'], '2026-08-31')
+        self.assertEqual(action['params']['options']['filter_search_bar'], cash.code)
+        self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+
+    def test_native_cash_company_currency_is_distinct_from_account_currency(self):
+        self._cash_mapping()
+        foreign_currency = self.env.ref('base.EUR')
+        self.assertNotEqual(foreign_currency, self.env.company.currency_id)
+        account = self._cash_account('990084', foreign_currency)
+        self._cash_entry(account, 100, '2026-08-10', foreign_amount=120)
+        rows = self.dashboard.get_cash_directory(self.options)['rows']
+        row = next(row for row in rows if row['id'] == account.id)
+        self.assertEqual(row['balance'], 100, row)
+        self.assertEqual(row['currency'], foreign_currency.name)
+        self.assertEqual(row['balance_currency'], self.env.company.currency_id.name)
+
+    def test_cash_action_rejects_wrong_type_and_company(self):
+        self._cash_mapping()
+        for account_id in (True, '1', self.company_data['default_account_assets'].id):
+            with self.assertRaises((AccessError, ValidationError)):
+                self.dashboard.open_report('cash_account', self.options, group_id=account_id)
+        foreign = self.env['res.company'].create({'name': 'Foreign cash fixture'})
+        foreign_account = self.env['account.account'].create({
+            'name': 'Other company cash', 'code': '990085', 'account_type': 'asset_cash',
+            'company_ids': [Command.set(foreign.ids)],
+        })
+        with self.assertRaises(AccessError):
+            self.dashboard.open_report('cash_account', self.options, group_id=foreign_account.id)

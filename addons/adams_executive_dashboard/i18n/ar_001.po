@@ -973,3 +973,9 @@ msgstr "يتضمن التقرير الأصلي تنبيهات. افتحه قبل
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Undefined ratio: zero denominator"
 msgstr "النسبة غير معرّفة: المقام صفر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native General Ledger closing balances at the selected cutoff, in company currency. Account currencies are shown separately. Archived accounts are included; credit-card liabilities are excluded."
+msgstr "أرصدة الإقفال من دفتر الأستاذ العام الأصلي حتى التاريخ المحدد بعملة الشركة. تظهر عملات الحسابات بشكل منفصل. تشمل الحسابات المؤرشفة وتستثني التزامات بطاقات الائتمان."

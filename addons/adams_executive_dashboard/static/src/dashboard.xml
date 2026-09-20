@@ -112,7 +112,10 @@
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('cash')">Discover bank and cash accounts</button>
                         <div t-if="state.directory" class="adams_analysis">
                             <h3>Bank and cash directory</h3>
-                            <p>Configuration only. Native financial balances are not connected yet. Archived accounts are included; credit-card liabilities are excluded.</p>
+                            <p t-if="!state.directory.native_balances">Configuration only. Native financial balances are not connected yet. Archived accounts are included; credit-card liabilities are excluded.</p>
+                            <p t-else="">Native General Ledger closing balances at the selected cutoff, in company currency. Account currencies are shown separately. Archived accounts are included; credit-card liabilities are excluded.</p>
+                            <p t-if="state.directory.native_balances" t-esc="state.directory.definition"/>
+                            <p t-if="state.directory.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
                             <p t-if="state.directory.status === 'loading'" role="status">Loading…</p>
                             <p t-if="state.directory.status === 'error'" role="alert">Directory unavailable. Check your access and retry.</p>
                             <p t-if="state.directory.status === 'empty'">No matching records</p>
@@ -121,7 +124,12 @@
                                 <tbody><tr t-foreach="state.directory.rows" t-as="row" t-key="row.id">
                                     <td><bdi t-esc="row.code"/> · <t t-esc="row.name"/> <span t-if="!row.active">(Archived)</span></td>
                                     <td><t t-esc="row.journals.join(', ')"/><span t-if="!row.journals.length">No linked journal</span></td>
-                                    <td t-esc="row.currency"/><td>Not configured</td>
+                                    <td t-esc="row.currency"/><td>
+                                        <bdi t-esc="formatted({value: row.balance, status: row.balance_status}, {digits: row.balance_digits})"/>
+                                        <span t-if="row.balance !== null" t-esc="row.balance_currency"/>
+                                        <button t-if="row.drilldown" class="btn btn-link" t-att-disabled="state.opening"
+                                            t-on-click="() => this.openReport('cash_account', null, row.id)">Open native report <span aria-hidden="true">↗</span></button>
+                                    </td>
                                 </tr></tbody>
                             </table></div>
                             <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.directory.offset === 0" t-on-click="() => this.loadDirectory('cash', state.directory.offset - 25)">Previous</button>
