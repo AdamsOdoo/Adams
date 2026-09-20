@@ -56,7 +56,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
                              ('get_trend', ['invoiced_sales', self.options]),
                              ('export_breakdown', ['invoiced_sales', 'customer', self.options]),
                              ('get_cash_directory', [self.options]), ('get_inventory', [self.options]),
-                             ('open_inventory', [self.options]), ('get_workforce', [self.options]),
+                             ('open_inventory', [self.options]), ('get_workforce', [self.options]), ('get_procurement', [self.options]),
+                             ('open_procurement', [self.options]),
                              ('open_workforce', [self.options]), ('open_inventory_product', [self.options, 1, 'forecast']), ('get_fulfillment', [self.options]),
                              ('open_fulfillment', [self.options]), ('get_recent_sales', ['orders', self.options]),
                              ('open_recent_sale', ['orders', self.options])]:

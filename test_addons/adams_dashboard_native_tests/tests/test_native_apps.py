@@ -319,3 +319,53 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
                              ('open_inventory_product', [self.options, self.product_a.id, 'forecast'])]:
             with self.assertRaises(AccessError):
                 getattr(self.dashboard.with_user(reader), method)(*args)
+
+    def test_native_commercial_margin_uses_current_cost_not_accounting_profit(self):
+        product = self.env['product.product'].create({'name': 'Commercial margin fixture', 'standard_price': 30})
+        for move_type, quantity in [('out_invoice', 2), ('out_refund', 1)]:
+            self.env['account.move'].create({
+                'move_type': move_type, 'partner_id': self.partner_a.id,
+                'invoice_date': '2026-08-15', 'date': '2026-08-15',
+                'journal_id': self.company_data['default_journal_sale'].id,
+                'invoice_line_ids': [Command.create({'product_id': product.id, 'quantity': quantity,
+                    'price_unit': 100, 'account_id': self.company_data['default_account_revenue'].id,
+                    'tax_ids': [Command.clear()]})],
+            }).action_post()
+        self.env.flush_all()
+        def margin():
+            return next(item for item in self.dashboard.get_section('sales', self.options)['items'] if item['key'] == 'invoiced_margin')['value']
+        self.assertEqual(margin(), 70)
+        product.standard_price = 40
+        self.env.flush_all()
+        self.assertEqual(margin(), 60)
+        action = self.dashboard.open_report('invoiced_margin', self.options)
+        self.assertEqual(action['context']['pivot_measures'], ['price_margin'])
+        self.assertEqual(self.dashboard.get_breakdown('invoiced_margin', 'product', self.options)['rows'][0]['value'], 60)
+
+    def test_native_purchase_current_worklists_do_not_approve(self):
+        from odoo.exceptions import AccessError
+        from odoo import fields
+        from datetime import timedelta
+        planned = fields.Datetime.now() - timedelta(days=5)
+        order = self.env['purchase.order'].create({
+            'partner_id': self.partner_a.id,
+            'order_line': [Command.create({'product_id': self.product_a.id, 'product_qty': 2,
+                'price_unit': 50, 'date_planned': planned, 'tax_ids': [Command.clear()]})],
+        })
+        order.state = 'to approve'
+        approval = self.dashboard.get_procurement(self.options, kind='approvals')
+        self.assertIn(order.id, [row['id'] for row in approval['rows']])
+        self.dashboard.open_procurement(self.options, 'approvals', order.id)
+        self.assertEqual(order.state, 'to approve')
+        order.button_approve()
+        order.order_line.date_planned = planned
+        self.env.flush_all()
+        late = self.dashboard.get_procurement(self.options, kind='late')
+        self.assertIn(order.id, [row['id'] for row in late['rows']])
+        action = self.dashboard.open_procurement(self.options, 'late', order.id)
+        self.assertEqual(action['res_id'], order.id)
+        with self.assertRaises(AccessError):
+            self.dashboard.open_procurement(self.options, 'approvals', order.id)
+        order.order_line.qty_received = 2
+        self.env.flush_all()
+        self.assertNotIn(order.id, [row['id'] for row in self.dashboard.get_procurement(self.options, kind='late')['rows']])

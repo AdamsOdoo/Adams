@@ -46,3 +46,149 @@
     :focus-visible { outline: 3px solid #795789; outline-offset: 3px; }
     @media (max-width: 480px) { .adams_grid { grid-template-columns: 1fr; } .adams_filters button { width: 100%; } .adams_card { padding: 18px; } }
 }
+
+// UX v2 reference: workspace rail, compact metrics, four-column profitability,
+// chart/context composition and two-column mobile cards. Odoo retains its shell.
+.o_adams_dashboard {
+    --adams-paper: #fff; --adams-ink: #172631; --adams-sub: #526476;
+    --adams-line: #e1e7ee; --adams-purple: #77516f; --adams-green: #176d59;
+    padding: 0; display: grid; grid-template-columns: 222px minmax(0, 1fr);
+    align-items: start; background: #f4f6f8; color: var(--adams-ink);
+    font-family: Inter, "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums;
+    .adams_icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+    .adams_sidebar { position: sticky; top: 0; height: calc(100vh - 48px); min-height: 540px; background: #fff; border-inline-end: 1px solid var(--adams-line); padding: 24px 14px; display: flex; flex-direction: column; }
+    .adams_brand { display: flex; align-items: center; gap: 12px; margin: 0 13px 28px; }
+    .adams_wordmark { font-size: 36px; line-height: 1; font-weight: 650; letter-spacing: -2.8px; color: #89929e; }
+    .adams_wordmark b { color: var(--adams-purple); }
+    .adams_brand > span:last-child { font-size: 10px; line-height: 1.6; color: #8a939d; letter-spacing: .8px; border-inline-start: 1px solid var(--adams-line); padding-inline-start: 12px; }
+    .adams_nav_label { margin: 12px 13px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #8995a5; text-transform: uppercase; }
+    .adams_side_link { display: flex; width: 100%; align-items: center; gap: 11px; min-height: 46px; border: 0; background: transparent; padding: 11px 13px; margin-bottom: 4px; border-radius: 9px; text-align: start; color: #526476; text-decoration: none; font-size: 13px; font-weight: 550; }
+    .adams_side_link.active { background: #f2ecf3; color: var(--adams-purple); font-weight: 700; }
+    .adams_side_link:hover { background: #f6f7f9; }
+    .adams_nav_dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-inline-start: auto; opacity: 0; }
+    .adams_side_link.active .adams_nav_dot { opacity: 1; }
+    .adams_sidebar_bottom { margin-top: auto; padding: 16px; border: 1px solid var(--adams-line); border-radius: 11px; background: #f8f9fb; font-size: 11px; color: var(--adams-sub); }
+    .adams_sidebar_bottom strong { display: block; font-size: 12px; margin-bottom: 6px; }
+    .adams_sidebar_bottom p { font-size: 11px; margin: 0 0 12px; line-height: 1.6; }
+    .adams_content { width: 100%; max-width: 1580px; padding: 28px 32px 34px; margin-inline: auto; min-width: 0; }
+    .adams_header { align-items: center; margin-bottom: 20px; }
+    .adams_eyebrow { font-size: 11px; font-weight: 700; color: #8b7590; letter-spacing: 1.8px; }
+    h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.9px; margin: 6px 0; font-weight: 650; }
+    .adams_header p { font-size: 14px; line-height: 1.55; margin: 0; color: var(--adams-sub); }
+    .adams_mobile_menu, .adams_mobile_only { display: none; }
+    .adams_filters { margin-top: 0; padding: 13px 17px; gap: 14px; border-color: var(--adams-line); border-radius: 11px; box-shadow: 0 3px 14px #26334105; }
+    .adams_filters label { flex: 1 1 120px; gap: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--adams-sub); min-width: 0; }
+    .adams_filters input, .adams_filters select { background-color: transparent; border-color: transparent; padding-inline: 0; font-size: 12px; font-weight: 600; color: #394755; min-height: 32px; }
+    .btn-primary { background: var(--adams-purple); border-color: var(--adams-purple); }
+    .btn { border-radius: 7px; font-size: 12px; min-height: 35px; font-weight: 600; }
+    .adams_scope { font-size: 11px; color: #65778a; overflow-wrap: anywhere; margin: 10px 0 16px; }
+    .adams_nav { position: sticky; top: 0; z-index: 3; background: #f4f6f8f7; backdrop-filter: blur(10px); align-items: center; gap: 5px; padding: 11px 0; margin: 0 0 24px; overflow-x: auto; border-color: #dce3e9; }
+    .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: #526476; font-weight: 600; border-radius: 7px; white-space: nowrap; text-decoration: none; }
+    .adams_nav .active { background: #ece4ef; color: #724b76; }
+    .adams_nav .adams_trust_link { background: #fff; border: 1px solid #d9e1e8; color: #326c59; margin-inline-start: auto; }
+    .adams_section { margin: 0 0 32px; scroll-margin-top: 76px; }
+    .adams_section_heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
+    .adams_section_icon { width: 41px; height: 41px; border-radius: 11px; display: grid; place-items: center; background: #eaf5ef; color: var(--adams-green); flex-shrink: 0; }
+    #adams-sales .adams_section_icon { background: #f2ecf3; color: var(--adams-purple); }
+    .adams_section_heading h2 { font-size: 24px; font-weight: 650; letter-spacing: -.45px; margin: 0 0 4px; line-height: 1.2; }
+    .adams_section_heading p { font-size: 12px; color: var(--adams-sub); margin: 0; }
+    .adams_section_number { font-size: 10px; letter-spacing: 1.3px; margin-inline-end: 8px; color: var(--adams-green); }
+    .adams_section_toggle { margin-inline-start: auto; border: 1px solid var(--adams-line); border-radius: 8px; width: 35px; height: 35px; flex-shrink: 0; display: grid; place-items: center; background: #fff; font-size: 18px; }
+    .adams_metric_group { margin-bottom: 24px; scroll-margin-top: 76px; }
+    .adams_group_heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-inline-start: 3px solid var(--adams-green); padding-inline-start: 12px; margin: 0 0 14px; }
+    .adams_group_heading h3 { font-size: 18px; font-weight: 650; margin: 0 0 3px; color: var(--adams-ink); }
+    .adams_group_heading p { font-size: 12px; margin: 0; color: var(--adams-sub); }
+    .adams_period_chip { font-size: 10px; font-weight: 600; color: #53697b; background: #edf2f5; padding: 4px 8px; border-radius: 5px; flex-shrink: 0; }
+    .adams_grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
+    .adams_grid_three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .adams_grid_two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .adams_card { border-radius: 13px; border-color: var(--adams-line); padding: 17px 17px 0; box-shadow: 0 3px 14px #26334105; min-height: 184px; overflow: hidden; }
+    .adams_card_top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .adams_metric_icon { width: 28px; height: 28px; display: grid; place-items: center; color: var(--adams-green); background: #eaf5ef; border-radius: 7px; flex-shrink: 0; }
+    .adams_metric_icon .adams_icon { width: 15px; height: 15px; }
+    .adams_card h3 { margin: 0; color: #495d70; font-size: 12px; font-weight: 600; line-height: 1.4; }
+    .adams_metric_arrow { margin-inline-start: auto; color: #8595a5; border: 0; background: transparent; min-width: 24px; min-height: 28px; padding: 0; }
+    .adams_amount { display: flex; gap: 5px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+    .adams_currency { font-size: 10px; letter-spacing: .4px; color: #536f7e; margin: 0; }
+    .adams_value, .adams_available .adams_value { font-size: clamp(20px, 1.9vw, 29px); color: var(--adams-ink); line-height: 1.15; letter-spacing: -.6px; font-weight: 650; }
+    .adams_card:not(.adams_available) .adams_value { font-size: 17px; color: #667585; line-height: 1.35; }
+    .adams_margin_note { font-size: 11px; margin: 12px 0 0; color: #526476; }
+    .adams_margin_note strong { color: var(--adams-green); margin-inline-end: 4px; }
+    .adams_hint { font-size: 11px; margin: 9px 0; }
+    .adams_card_date { color: #61778a; font-size: 10px; margin: auto 0 12px; padding-top: 14px; }
+    .adams_metric_foot { background: #f8fafb; margin-inline: -17px; padding: 8px 12px; border-top: 1px solid var(--adams-line); margin-top: 0; font-size: 10px; }
+    .adams_metric_foot summary { color: #326c59; font-size: 10px; min-height: 24px; display: list-item; }
+    .adams_metric_foot .btn { font-size: 10px; min-height: 26px; }
+    .adams_metric_foot code { overflow-wrap: anywhere; }
+    .adams_metric_foot details[open] { padding-block: 5px; }
+    .adams_cash_card { background: #183f38; border-color: #183f38; }
+    .adams_cash_card h3, .adams_cash_card .adams_currency, .adams_cash_card .adams_card_date { color: #bed4cb; }
+    .adams_cash_card .adams_value, .adams_cash_card:not(.adams_available) .adams_value { color: #fff; }
+    .adams_cash_card .adams_metric_icon { background: #ffffff15; color: #b9d6ca; }
+    .adams_cash_card .adams_hint { color: #c3d8cf; }
+    .adams_profit_grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(270px, 1fr); gap: 16px; margin-top: 15px; }
+    .adams_panel { border: 1px solid var(--adams-line); border-radius: 13px; background: #fff; min-width: 0; overflow: hidden; box-shadow: 0 3px 14px #26334105; }
+    .adams_panel_head { padding: 19px 20px 0; display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+    .adams_panel_head h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
+    .adams_panel_head p { font-size: 12px; margin: 0; color: var(--adams-sub); }
+    .adams_panel_head .btn-link { color: var(--adams-green); white-space: nowrap; padding: 0; }
+    .adams_chart_legend { display: flex; flex-wrap: wrap; gap: 15px; margin: 14px 20px 0; font-size: 11px; color: var(--adams-sub); }
+    .adams_chart_legend span { display: flex; align-items: center; gap: 6px; }
+    .adams_chart_legend i { width: 7px; height: 7px; border-radius: 2px; }
+    .revenue { background: #318771; } .gross_profit { background: #82bca8; } .profit { background: #9066a1; }
+    .adams_chart_empty { min-height: 300px; padding: 35px; display: grid; place-items: center; text-align: center; color: #687c8e; font-size: 12px; background: repeating-linear-gradient(to top, transparent 0, transparent 59px, #edf1f5 60px); margin: 22px 24px; }
+    .adams_profit_chart { display: flex; gap: 24px; padding: 15px 25px 25px; min-height: 305px; overflow-x: auto; }
+    .adams_chart_month { flex: 1; min-width: 72px; text-align: center; font-size: 11px; color: var(--adams-sub); }
+    .adams_chart_bars { position: relative; display: flex; justify-content: center; gap: 5px; height: 250px; border-bottom: 1px solid var(--adams-line); margin-bottom: 8px; background: linear-gradient(transparent 49.7%, #9cacb9 50%, transparent 50.3%); }
+    .adams_chart_bar { position: absolute; width: 22%; min-height: 1px; border: 0; border-radius: 3px; }
+    .adams_chart_bar.revenue { inset-inline-start: 12%; } .adams_chart_bar.gross_profit { inset-inline-start: 39%; } .adams_chart_bar.profit { inset-inline-start: 66%; }
+    .adams_chart_table { border-top: 1px solid var(--adams-line); padding: 13px 18px; font-size: 12px; }
+    .adams_chart_table summary { color: #326c59; }
+    .adams_context_row { margin: 0 20px; padding: 20px 0; border-bottom: 1px solid var(--adams-line); }
+    .adams_context_row > span { display: block; font-size: 12px; color: var(--adams-sub); margin-bottom: 7px; }
+    .adams_context_row > strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -.4px; }
+    .adams_context_row p { font-size: 11px; color: var(--adams-sub); margin: 7px 0 0; line-height: 1.55; }
+    .adams_text_link { display: block; margin: 16px 20px 20px; color: var(--adams-green); font-size: 12px; font-weight: 600; text-decoration: none; }
+    .adams_analysis { padding: 20px; border-color: var(--adams-line); box-shadow: 0 3px 14px #26334105; }
+    .adams_analysis h3 { font-size: 17px; font-weight: 650; }
+    .adams_analysis p { font-size: 12px; }
+    .adams_trust { padding: 18px 20px; background: #fff; border: 1px solid var(--adams-line); border-radius: 11px; font-size: 12px; }
+    .adams_trust summary { color: var(--adams-green); font-weight: 600; }
+    #adams-crm .adams_grid, #adams-inventory .adams_grid, #adams-procurement .adams_grid, #adams-hr .adams_grid { grid-template-columns: minmax(0, 1fr); }
+    @media (max-width: 1280px) { grid-template-columns: 192px minmax(0, 1fr); .adams_content { padding: 25px 24px; } .adams_brand { margin-inline: 4px; gap: 8px; } .adams_card { padding-inline: 13px; } .adams_metric_foot { margin-inline: -13px; } }
+    @media (max-width: 1080px) { .adams_profit_grid { grid-template-columns: 1fr; } .adams_grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .adams_grid_three { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 760px) {
+        display: block;
+        .adams_sidebar { display: none; }
+        .adams_sidebar.is-open { display: flex; position: fixed; top: 48px; inset-inline-start: 0; width: 230px; height: calc(100vh - 48px); z-index: 10; box-shadow: 5px 0 25px #17263133; }
+        .adams_content { padding: 22px 16px; }
+        .adams_mobile_menu { display: grid; place-items: center; }
+        .adams_mobile_only { display: block; }
+        h1 { font-size: 28px; }
+        .adams_header p { font-size: 12px; }
+        .adams_filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; padding: 13px; }
+        .adams_filters label:first-child { grid-column: 1 / -1; }
+        .adams_filters button { width: 100%; }
+        .adams_nav { padding: 8px 0; margin-bottom: 24px; }
+        .adams_nav button, .adams_nav a { font-size: 11px; padding: 8px 10px; }
+        .adams_nav .adams_trust_link { display: none; }
+        .adams_section_heading { gap: 9px; }
+        .adams_section_heading h2 { font-size: 22px; }
+        .adams_group_heading { align-items: start; }
+        .adams_period_chip { display: none; }
+        .adams_grid, .adams_grid_three { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .adams_card { padding: 14px 12px 0; min-height: 176px; }
+        .adams_card_top { gap: 6px; }
+        .adams_card h3 { font-size: 11px; }
+        .adams_metric_icon { width: 25px; height: 25px; }
+        .adams_metric_arrow { min-width: 20px; }
+        .adams_value, .adams_available .adams_value { font-size: 24px; }
+        .adams_card:not(.adams_available) .adams_value { font-size: 15px; }
+        .adams_metric_foot { margin-inline: -12px; padding: 7px 10px; }
+        .adams_profit_grid { gap: 14px; }
+        .adams_panel_head { padding: 16px 15px 0; }
+        .adams_panel_head h3 { font-size: 15px; }
+        .adams_chart_empty { min-height: 220px; }
+    }
+    @media (max-width: 370px) { .adams_content { padding-inline: 12px; } .adams_grid, .adams_grid_three { grid-template-columns: 1fr; } .adams_section_heading h2 { font-size: 20px; } .adams_section_number { display: none; } }
+}

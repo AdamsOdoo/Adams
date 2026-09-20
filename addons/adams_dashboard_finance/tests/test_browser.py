@@ -54,11 +54,17 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const root = document.querySelector('.o_adams_dashboard');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    const profitability = root.querySelector('#adams-group-profitability > .adams_grid');
+                    if (profitability.children.length !== 4) throw new Error('Reference requires four primary profitability cards');
+                    if (root.querySelectorAll('.adams_nav button').length !== 6) throw new Error('Reference requires six department tabs');
+                    const columns = getComputedStyle(profitability).gridTemplateColumns.split(' ').length;
+                    if ((WIDTH === 390 && columns !== 2) || (WIDTH === 320 && columns !== 1) || (WIDTH >= 1440 && columns !== 4)) throw new Error('Incorrect reference KPI column count');
+                    if (!root.querySelector('.adams_profit_grid .adams_performance')) throw new Error('Missing reference performance-context panel');
                     const filter = root.querySelector('.adams_filters button');
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');
                     if (WIDTH === 1440 && DIRECTION === 'ltr') {
-                        const open = [...card.querySelectorAll('button')].find(node => node.textContent.includes('Open native report'));
+                        const open = card.querySelector('button[aria-label="Open native report"]');
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');

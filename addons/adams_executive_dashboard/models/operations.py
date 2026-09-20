@@ -140,3 +140,50 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         action = scoped.env['ir.actions.actions']._for_xml_id('hr.open_view_employee_list')
         action.update(domain=domain, context=dict(scoped.env.context))
         return action
+
+    def _procurement_scope(self, kind):
+        if kind not in ('approvals', 'late') or 'purchase.order' not in self.env:
+            raise ValidationError(_('This native list is not configured.'))
+        if not self.env.user.has_group('purchase.group_purchase_user'):
+            raise AccessError(_('Purchase reporting access is required.'))
+        orders = self.env['purchase.order']
+        orders.check_access('read')
+        orders.check_field_access_rights('read', ['company_id', 'state', 'is_late'])
+        domain = [('company_id', '=', self.env.company.id)]
+        domain += [('state', '=', 'to approve')] if kind == 'approvals' else [('state', '=', 'purchase'), ('is_late', '=', True)]
+        return orders, domain
+
+    @api.model
+    def get_procurement(self, options, offset=0, kind='late'):
+        scoped, dates = self._scope(options)
+        if type(offset) is not int or not 0 <= offset <= 100000:
+            raise ValidationError(_('Invalid page.'))
+        if 'purchase.order' not in scoped.env:
+            return {'status': 'not_installed', 'rows': [], 'mode': kind}
+        orders, domain = scoped._procurement_scope(kind)
+        columns = ['name', 'partner_id', 'date_order', 'date_planned', 'amount_untaxed', 'currency_id', 'state']
+        orders.check_field_access_rights('read', columns)
+        records = orders.search(domain, order='date_planned, id', offset=offset, limit=26)
+        rows = records[:25].read(columns)
+        for row, order in zip(rows, records[:25]):
+            row.update(currency=order.currency_id.name, digits=order.currency_id.decimal_places,
+                       date_label=fields.Datetime.context_timestamp(order, order.date_planned).strftime('%Y-%m-%d %H:%M') if order.date_planned else False)
+        return {'status': 'ready' if rows else 'empty', 'rows': rows, 'mode': kind,
+                'has_more': len(records) > 25, 'total': orders.search_count(domain), 'date_basis': 'current',
+                'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
+                'provenance': {'model': 'purchase.order', 'source_kind': 'operational_records',
+                               'domain': domain, 'context': dict(scoped.env.context)}}
+
+    @api.model
+    def open_procurement(self, options, kind='late', record_id=None):
+        scoped, dates = self._scope(options)
+        orders, domain = scoped._procurement_scope(kind)
+        action = scoped.env['ir.actions.actions']._for_xml_id('purchase.purchase_form_action')
+        action.update(domain=domain, context=dict(scoped.env.context))
+        if record_id is not None:
+            if type(record_id) is not int or record_id < 1:
+                raise ValidationError(_('Invalid purchase record.'))
+            if not orders.search([*domain, ('id', '=', record_id)], limit=1):
+                raise AccessError(_('The record is unavailable in the selected scope.'))
+            action.update(res_id=record_id, views=[(False, 'form')], view_mode='form')
+        return action

@@ -16,9 +16,12 @@ export class ExecutiveDashboard extends Component {
         this.generation = 0;
         this.alive = true;
         this.sections = [
-            { key: 'finance', name: _t('Finance'), description: _t('Profitability, liquidity and working capital') },
-            { key: 'sales', name: _t('Sales'), description: _t('Invoiced sales and confirmed orders') },
-            { key: 'operations', name: _t('Operations'), description: _t('Purchasing, inventory, CRM and people') },
+            { key: 'finance', name: _t('Accounting & Finance'), short: _t('Finance'), icon: 'bank', number: '01', description: _t('Your financial position, explained and traceable.') },
+            { key: 'sales', name: _t('Sales'), short: _t('Sales'), icon: 'sales', number: '02', description: _t('Commercial performance and fulfillment.') },
+            { key: 'crm', name: _t('CRM'), short: _t('CRM'), icon: 'target', number: '03', description: _t('Your pipeline at a glance.') },
+            { key: 'inventory', name: _t('Inventory'), short: _t('Inventory'), icon: 'box', number: '04', description: _t('Stock, value and availability.') },
+            { key: 'procurement', name: _t('Procurement'), short: _t('Procurement'), icon: 'truck', number: '05', description: _t('Commitments and supplier follow-up.') },
+            { key: 'hr', name: _t('Human Resources'), short: _t('HR'), icon: 'people', number: '06', description: _t('Workforce and approved leave.') },
         ];
         this.labels = {
             revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'),
@@ -27,7 +30,7 @@ export class ExecutiveDashboard extends Component {
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
             assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
             standard_forecast: _t('Native short-term cash forecast'),
-            invoiced_sales: _t('Net invoiced sales'), confirmed_sales: _t('Confirmed sales'),
+            invoiced_sales: _t('Net invoiced sales'), invoiced_margin: _t('Native invoiced commercial margin'), confirmed_sales: _t('Confirmed sales'),
             orders: _t('Distinct sales orders'), quotations: _t('Draft and sent quotations'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (native signed)'),
         };
@@ -40,12 +43,12 @@ export class ExecutiveDashboard extends Component {
         };
         this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
             vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };
-        this.dimensions = { invoiced_sales: ['customer', 'salesperson', 'product'], confirmed_sales: ['customer', 'salesperson', 'product'],
+        this.dimensions = { invoiced_margin: ['salesperson', 'customer', 'product'], invoiced_sales: ['customer', 'salesperson', 'product'], confirmed_sales: ['customer', 'salesperson', 'product'],
             quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
         this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { operations: true }, detail: null, directory: null, inventory: null, workforce: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, inventory: null, workforce: null, procurement: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -86,7 +89,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
-            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
+            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
     async restoreNavigation(saved) {
@@ -102,6 +105,7 @@ export class ExecutiveDashboard extends Component {
         }
         if (saved.directory) { jobs.push(this.loadDirectory('cash', saved.directory.offset)); }
         if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
+        if (saved.procurement) { jobs.push(this.loadDirectory('procurement', saved.procurement.offset, saved.procurement.mode)); }
         if (saved.workforce) { jobs.push(this.loadDirectory('workforce', saved.workforce.offset)); }
         if (saved.inventory) { jobs.push(this.loadDirectory('inventory', saved.inventory.offset, saved.inventory.mode || 'current')); }
         for (const section of this.sections) {
@@ -152,14 +156,16 @@ export class ExecutiveDashboard extends Component {
         this.state.directory = null;
         this.state.inventory = null;
         this.state.workforce = null;
+        this.state.procurement = null;
         this.state.financialTrends = {};
         this.state.fulfillment = null;
         this.state.recent = null;
         this.detailGeneration++;
         this.state.error = '';
         // Immediately remove previous-company values, including during failures.
-        this.state.sections = Object.fromEntries(this.sections.map(s => [s.key, { status: 'loading', items: [] }]));
-        await Promise.all(this.sections.map(async ({ key }) => {
+        const sources = ['finance', 'sales', 'operations'];
+        this.state.sections = Object.fromEntries(sources.map(key => [key, { status: 'loading', items: [] }]));
+        await Promise.all(sources.map(async key => {
             try {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
                 if (this.alive && generation === this.generation) {
@@ -171,6 +177,62 @@ export class ExecutiveDashboard extends Component {
                 }
             }
         }));
+    }
+
+    sectionResult(section) {
+        const source = this.state.sections[['finance', 'sales'].includes(section.key) ? section.key : 'operations'];
+        if (!source || ['finance', 'sales'].includes(section.key)) { return source; }
+        const key = section.key === 'procurement' ? 'purchases' : section.key;
+        return { ...source, items: source.items.filter(item => item.key === key) };
+    }
+
+    metricGroups(section, result) {
+        const select = keys => keys.map(key => result.items.find(item => item.key === key)).filter(Boolean);
+        if (section.key === 'finance') {
+            return [
+                { key: 'profitability', name: _t('Profitability'), description: _t('Performance during the selected financial period.'), items: select(['revenue', 'gross_profit', 'profit', 'operating_expenses']) },
+                { key: 'liquidity', name: _t('Liquidity'), description: _t('Recorded cash and a separately labelled native forecast.'), items: select(['cash', 'standard_forecast']) },
+                { key: 'working-capital', name: _t('Working capital'), description: _t('Receivables and payables at the selected balance cutoff.'), items: select(['receivables', 'payables']) },
+                { key: 'financial-position', name: _t('Financial position'), description: _t('Native Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
+            ];
+        }
+        return [{ key: section.key, name: '', description: '', items: result.items }];
+    }
+
+    metricIcon(key) {
+        return { revenue: 'chart', gross_profit: 'trend', profit: 'coins', operating_expenses: 'wallet',
+            cash: 'bank', standard_forecast: 'calendar', receivables: 'invoice', payables: 'invoice',
+            invoiced_sales: 'invoice', invoiced_margin: 'trend', confirmed_sales: 'sales', orders: 'box',
+            quotations: 'invoice', purchases: 'truck', inventory: 'box', crm: 'target', hr: 'people' }[key] || 'chart';
+    }
+
+    financeMetric(key) {
+        return this.state.sections.finance?.items.find(item => item.key === key);
+    }
+
+    navigateSection(key) {
+        this.state.activeSection = key;
+        this.state.collapsed[key] = false;
+        this.state.sidebarOpen = false;
+        requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    }
+
+    async loadProfitabilityChart() {
+        await Promise.all(['revenue', 'gross_profit', 'profit'].map(key => this.loadFinancialTrend(key)));
+    }
+
+    profitabilityChart() {
+        const keys = ['revenue', 'gross_profit', 'profit'];
+        const data = keys.map(key => this.state.financialTrends[key]);
+        if (data.some(value => value?.status === 'loading')) { return { status: 'loading', rows: [] }; }
+        if (!data.some(Boolean)) { return { status: 'idle', rows: [] }; }
+        if (data.some(value => value?.status !== 'ready')) { return { status: 'unavailable', rows: [] }; }
+        const labels = [...new Set(data.flatMap(value => value.rows.map(row => row.label)))];
+        const maximum = Math.max(1, ...data.flatMap(value => value.rows.map(row => Math.abs(row.value || 0))));
+        return { status: 'ready', rows: labels.map(label => ({ label, series: keys.map((key, index) => {
+            const row = data[index].rows.find(value => value.label === label);
+            return { ...row, key, height: Math.abs(row?.value || 0) / maximum * 100 };
+        }) })) };
     }
 
     formatted(item, section) {
@@ -246,14 +308,14 @@ export class ExecutiveDashboard extends Component {
     async loadDirectory(kind, offset = 0, mode = null) {
         const generation = this.generation;
         const stateKey = kind === 'cash' ? 'directory' : kind;
-        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment', workforce: 'get_workforce' }[kind];
+        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment', workforce: 'get_workforce', procurement: 'get_procurement' }[kind];
         const request = (this[`${stateKey}Request`] || 0) + 1;
         this[`${stateKey}Request`] = request;
-        mode = mode || this.state[stateKey]?.mode || 'current';
+        mode = mode || this.state[stateKey]?.mode || (kind === 'procurement' ? 'late' : 'current');
         this.state[stateKey] = { status: 'loading', rows: [], offset, mode };
         try {
             const args = [{ ...this.state.applied }, offset];
-            if (kind === 'inventory') { args.push(mode); }
+            if (['inventory', 'procurement'].includes(kind)) { args.push(mode); }
             const data = await this.orm.call('adams.executive.dashboard', method, args);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
                 this.state[stateKey] = { ...data, offset };
@@ -287,9 +349,10 @@ export class ExecutiveDashboard extends Component {
         const generation = this.generation;
         this.state.opening = true;
         try {
-            const isDirectory = ['inventory', 'fulfillment', 'workforce', 'inventory_product'].includes(key);
+            const isDirectory = ['inventory', 'fulfillment', 'workforce', 'inventory_product', 'procurement'].includes(key);
             const args = isDirectory ? [{ ...this.state.applied }] : [key, { ...this.state.applied }, dimension, groupId];
             if (key === 'inventory') { args.push(this.state.inventory?.mode || 'current'); }
+            if (key === 'procurement') { args.push(this.state.procurement?.mode || 'late', groupId); }
             if (key === 'workforce') { args.push(groupId); }
             if (key === 'inventory_product') { args.push(groupId, dimension); }
             const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);

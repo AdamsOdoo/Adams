@@ -306,3 +306,25 @@ Native integration results for this candidate must be recorded before qualificat
 Full v4 UAT is still not qualified: remaining features, full parity/security/upgrade,
 responsive/bilingual browser matrix, representative performance and owner-approved
 business definitions/configuration are tracked in the UAT checklist.
+
+## Source 4f50789 native acceptance and visual correction
+
+Odoo.sh build **38344984**, source `4f50789de48d901c3789cb77cde5219464c7df0b`,
+completed **48 tests, zero failures/errors**. The corrected native historical stock
+fixture confirms quantity 12/value 120 at the August cutoff and current quantity 8;
+company/route/archived-product checks and current workforce restrictions pass.
+Signed monthly finance results and clipped period drilldown also pass. The native
+HttpCase browser fixture passed English and Arabic at widths 320, 390, 768, 1024,
+1440 and 1920, including known revenue 100, RTL/LTR direction, page reflow, focus,
+and one native report drilldown. This is bounded functional browser acceptance,
+not pixel fidelity, full accessibility, performance, upgrade or customer UAT.
+
+The user identified a material visual mismatch with UX v2. This is an implementation
+defect, not a permitted consequence of report-first data assurance. The next
+candidate restores the reference workspace rail, six department navigation tabs,
+four-card profitability hierarchy, chart/context composition, dark cash card,
+vector icons, typography/spacing and mobile two-column cards (single-column below
+370px). Native data adapters and permission checks remain authoritative. No
+fictional prototype amounts, identities, scenario controls or trust badges are
+imported. Visual comparison against the supplied Finance/Sales/Mobile references
+is now a separate blocking acceptance gate. Do not call the current work UAT-ready.

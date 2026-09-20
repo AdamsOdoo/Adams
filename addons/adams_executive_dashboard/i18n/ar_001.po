@@ -1197,3 +1197,385 @@ msgstr "يُقيّم كل شهر بواسطة التقرير القياسي ال
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Load monthly values"
 msgstr "تحميل القيم الشهرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Accounting & Finance"
+msgstr "المحاسبة والمالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Commercial performance and fulfillment."
+msgstr "الأداء التجاري وتنفيذ الطلبات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Your pipeline at a glance."
+msgstr "لمحة عن فرص المبيعات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock, value and availability."
+msgstr "المخزون والقيمة والتوفر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Commitments and supplier follow-up."
+msgstr "الالتزامات ومتابعة الموردين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Workforce and approved leave."
+msgstr "القوى العاملة والإجازات المعتمدة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Human Resources"
+msgstr "الموارد البشرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "HR"
+msgstr "الموارد البشرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Procurement"
+msgstr "المشتريات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Your financial position, explained and traceable."
+msgstr "مركزك المالي، واضح وقابل للتتبع."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Performance during the selected financial period."
+msgstr "الأداء خلال الفترة المالية المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recorded cash and a separately labelled native forecast."
+msgstr "النقد المسجل والتوقع القياسي المعروض بشكل منفصل."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Receivables and payables at the selected balance cutoff."
+msgstr "الذمم المدينة والدائنة في تاريخ الرصيد المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Financial position"
+msgstr "المركز المالي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native Balance Sheet at the selected cutoff."
+msgstr "الميزانية العمومية القياسية في تاريخ القطع المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Executive workspace"
+msgstr "مساحة العمل التنفيذية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "EXECUTIVE"
+msgstr "الإدارة التنفيذية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "WORKSPACE"
+msgstr "مساحة العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Owner workspace"
+msgstr "مساحة عمل المالك"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Workspace"
+msgstr "مساحة العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Data & definitions"
+msgstr "البيانات والتعريفات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Connected Odoo workspace"
+msgstr "مساحة عمل أودو المتصلة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Values follow your native reports and current access. Unavailable definitions stay visible."
+msgstr "تتبع القيم تقاريرك القياسية وصلاحياتك الحالية. تبقى التعريفات غير المتاحة ظاهرة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "THE OWNER’S VIEW"
+msgstr "رؤية المالك"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Executive overview"
+msgstr "النظرة التنفيذية العامة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Financial health. Sales performance."
+msgstr "السلامة المالية. أداء المبيعات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "What needs your attention."
+msgstr "ما يتطلب اهتمامك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open workspace navigation"
+msgstr "فتح التنقل في مساحة العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Data & trust ↗"
+msgstr "البيانات والموثوقية ↗"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Data & trust"
+msgstr "البيانات والموثوقية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Source & definition"
+msgstr "المصدر والتعريف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "% margin"
+msgstr "٪ هامش"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue & profitability"
+msgstr "الإيرادات والربحية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native monthly values within the selected period"
+msgstr "القيم الشهرية القياسية خلال الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load chart →"
+msgstr "تحميل الرسم ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue"
+msgstr "الإيرادات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load the approved native report values to view this chart."
+msgstr "حمّل قيم التقرير القياسي المعتمد لعرض هذا الرسم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Chart unavailable. Review native report access and approved definitions."
+msgstr "الرسم غير متاح. راجع صلاحيات التقرير القياسي والتعريفات المعتمدة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Signed monthly revenue, gross profit and net profit. Exact values are available in the table below."
+msgstr "الإيرادات الشهرية ومجمل الربح وصافي الربح مع الاحتفاظ بالإشارات. القيم الدقيقة متاحة في الجدول أدناه."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View chart as a table"
+msgstr "عرض الرسم كجدول"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Performance context"
+msgstr "سياق الأداء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Actuals, targets and comparability"
+msgstr "القيم الفعلية والأهداف وقابلية المقارنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue against target"
+msgstr "الإيرادات مقابل الهدف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native budget: "
+msgstr "الموازنة القياسية: "
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No approved budget available for this scope."
+msgstr "لا توجد موازنة معتمدة متاحة لهذا النطاق."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparability"
+msgstr "قابلية المقارنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Selected-period actuals"
+msgstr "القيم الفعلية للفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Monthly values retain signs. Partial periods and changed definitions need review before comparison."
+msgstr "تحتفظ القيم الشهرية بإشاراتها. تحتاج الفترات الجزئية والتعريفات المعدلة إلى المراجعة قبل المقارنة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Accounting completeness"
+msgstr "اكتمال البيانات المحاسبية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Not assessed"
+msgstr "لم يُقيّم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "A report match does not confirm period close or source completeness."
+msgstr "تطابق التقرير لا يؤكد إغلاق الفترة أو اكتمال بيانات المصدر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "See calculation and source rules →"
+msgstr "راجع قواعد الحساب والمصدر ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "This workspace uses native Odoo reports and authorized operational records. Financial mappings require approval for each company. Missing access, definitions and data are never replaced with estimated totals."
+msgstr "تستخدم مساحة العمل تقارير أودو القياسية والسجلات التشغيلية المصرح بها. تتطلب التعريفات المالية اعتماداً لكل شركة. لا تُستبدل الصلاحيات أو التعريفات أو البيانات المفقودة بإجماليات تقديرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Report agreement does not verify source completeness or financial close. Open each metric’s source definition and native report for supporting records and full exports."
+msgstr "توافق التقارير لا يثبت اكتمال المصدر أو الإغلاق المالي. افتح تعريف مصدر كل مؤشر وتقريره القياسي للوصول إلى السجلات الداعمة والتصدير الكامل."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native invoiced commercial margin"
+msgstr "الهامش التجاري القياسي للفواتير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native Invoice Analysis margin uses current product cost and native currency treatment. It is distinct from posted P&L gross profit and may change when product cost changes."
+msgstr "يستخدم هامش تحليل الفواتير القياسي تكلفة المنتج الحالية ومعالجة العملة القياسية. وهو مستقل عن مجمل الربح المحاسبي المرحّل وقد يتغير عند تغير تكلفة المنتج."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Purchases awaiting approval"
+msgstr "مشتريات بانتظار الاعتماد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native late receipts"
+msgstr "الاستلامات المتأخرة القياسية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current native purchase worklist. Period and balance cutoff do not apply. Late receipts follow Odoo's current planned-date and unreceived-quantity rule, not an original-promise performance rate. Opening a record does not approve it."
+msgstr "قائمة المشتريات القياسية الحالية. لا تنطبق الفترة أو تاريخ الرصيد. تتبع الاستلامات المتأخرة قاعدة أودو للتاريخ المخطط الحالي والكمية غير المستلمة، وليست نسبة أداء وفق الوعد الأصلي. فتح السجل لا يعتمده."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Purchase worklist unavailable. Check your access and retry."
+msgstr "قائمة المشتريات غير متاحة. تحقق من صلاحياتك وأعد المحاولة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Matching orders: "
+msgstr "الطلبات المطابقة: "
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Planned receipt"
+msgstr "الاستلام المخطط"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Purchase reporting access is required."
+msgstr "يلزم إذن الوصول إلى تقارير المشتريات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid purchase record."
+msgstr "سجل الشراء غير صالح."

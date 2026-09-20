@@ -16,6 +16,9 @@ SOURCES = {
     'invoiced_sales': ('account.invoice.report', 'invoice_date',
                        [('state', '=', 'posted'), ('move_type', 'in', ['out_invoice', 'out_refund'])],
                        'price_subtotal:sum', 'account.action_account_invoice_report_all'),
+    'invoiced_margin': ('account.invoice.report', 'invoice_date',
+                       [('state', '=', 'posted'), ('move_type', 'in', ['out_invoice', 'out_refund'])],
+                       'price_margin:sum', 'account.action_account_invoice_report_all'),
     'confirmed_sales': ('sale.report', 'date', [('state', '=', 'sale')],
                         'price_subtotal:sum', 'sale.action_order_report_all'),
     'quotations': ('sale.report', 'date', [('state', 'in', ['draft', 'sent'])],
@@ -32,6 +35,7 @@ SOURCES = {
 }
 DIMENSIONS = {
     'invoiced_sales': {'customer': 'commercial_partner_id', 'salesperson': 'invoice_user_id', 'product': 'product_id'},
+    'invoiced_margin': {'customer': 'commercial_partner_id', 'salesperson': 'invoice_user_id', 'product': 'product_id'},
     'confirmed_sales': {'customer': 'commercial_partner_id', 'salesperson': 'user_id', 'product': 'product_id'},
     'quotations': {'customer': 'commercial_partner_id', 'salesperson': 'user_id', 'product': 'product_id'},
     'orders': {'customer': 'commercial_partner_id', 'salesperson': 'user_id'},
@@ -41,7 +45,7 @@ DIMENSIONS = {
 }
 SECTIONS = {
     'finance': ['revenue', 'profit', 'cash', 'receivables', 'payables'],
-    'sales': ['invoiced_sales', 'confirmed_sales', 'orders', 'quotations'],
+    'sales': ['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'orders', 'quotations'],
     'operations': ['purchases', 'inventory', 'crm', 'hr'],
 }
 
