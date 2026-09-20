@@ -88,6 +88,22 @@
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
                             <p t-if="item.key === 'standard_forecast'" class="adams_hint">Native Executive Summary forecast at period end: receivables plus signed payables. This is not a dated receipt/payment plan or a guaranteed cash balance.</p>
                             <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                            <details t-if="item.status === 'ready' &amp;&amp; ['revenue', 'gross_profit', 'profit', 'operating_expenses', 'gross_margin', 'net_margin'].includes(item.key)">
+                                <summary>Monthly financial trend</summary>
+                                <p>Each month is evaluated by the approved native report. First and last months use the selected period boundaries. Signs are preserved; these are not closed-period or like-for-like assurances.</p>
+                                <button class="btn btn-link" t-on-click="() => this.loadFinancialTrend(item.key)">Load monthly values</button>
+                                <t t-if="state.financialTrends[item.key]">
+                                    <t t-set="trend" t-value="state.financialTrends[item.key]"/>
+                                    <p t-if="trend.status === 'loading'" role="status">Loading native reports…</p>
+                                    <p t-elif="trend.status !== 'ready'" role="alert" t-esc="statusLabels[trend.status]"/>
+                                    <div t-else="" class="adams_table_wrap"><table class="table"><thead><tr><th scope="col">Month</th><th scope="col">Value</th></tr></thead><tbody>
+                                        <tr t-foreach="trend.rows" t-as="month" t-key="month.label"><td><button class="btn btn-link" t-on-click="() => this.openFinancialPeriod(item.key, month.label)" t-esc="month.label"/></td>
+                                            <td><bdi t-esc="formatted(month, trend)"/> <t t-esc="trend.unit === 'percentage' ? '%' : trend.currency"/>
+                                                <p t-if="month.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                                            </td></tr>
+                                    </tbody></table></div>
+                                </t>
+                            </details>
                             <details t-if="item.budget">
                                 <summary>Native budget</summary>
                                 <p t-if="item.budget.status !== 'ready'" t-esc="statusLabels[item.budget.status]"/>

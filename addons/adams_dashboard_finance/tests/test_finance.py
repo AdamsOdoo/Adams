@@ -421,3 +421,19 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         # An explicit native zero target is different from absent period items.
         budget.item_ids.filtered(lambda line: str(line.date) == '2026-08-01').amount = 0
         self.assertEqual(self._item()['budget']['value'], 0)
+
+    def test_financial_trend_native_signed_months_and_clipped_drilldown(self):
+        from odoo.exceptions import ValidationError
+        self._mapping('revenue')
+        self._invoice(100, invoice_date='2026-07-20')
+        self._invoice(25, move_type='out_refund', invoice_date='2026-08-15')
+        options = dict(self.options, date_from='2026-07-15', date_to='2026-09-10')
+        trend = self.dashboard.get_financial_trend('revenue', options)
+        self.assertEqual([r['value'] for r in trend['rows']], [100, -25, 0])
+        self.assertEqual(trend['rows'][0]['date_from'], '2026-07-15')
+        self.assertEqual(trend['rows'][-1]['date_to'], '2026-09-10')
+        action = self.dashboard.open_financial_period('revenue', options, '2026-09')
+        self.assertEqual(action['params']['options']['date']['date_to'], '2026-09-10')
+        self.assertEqual(action['params']['options']['date']['date_from'], '2026-09-01')
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_financial_period('revenue', options, '2026-10')

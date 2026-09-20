@@ -244,7 +244,7 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         for quantity, source, dest, day in [(12, supplier, stock, '2026-08-10 12:00:00'),
                                             (4, stock, customer, '2026-09-10 12:00:00')]:
             move = self.env['stock.move'].create({
-                'name': 'Dated inventory fixture', 'product_id': product.id,
+                'product_id': product.id,
                 'product_uom_qty': quantity, 'product_uom': product.uom_id.id,
                 'location_id': source.id, 'location_dest_id': dest.id,
                 'company_id': self.env.company.id,

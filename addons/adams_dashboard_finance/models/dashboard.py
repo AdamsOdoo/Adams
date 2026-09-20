@@ -1,4 +1,7 @@
 """Thin adapter over the installed Enterprise report engine; no ledger arithmetic."""
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
+
 import hashlib
 import json
 import logging
@@ -171,6 +174,64 @@ class ExecutiveDashboard(models.AbstractModel):
                 _logger.warning('Financial dashboard metric=%s category=%s', key, type(error).__name__)
         result['cash_flow'] = scoped._cash_flow_data(dates)
         return result
+
+    def _financial_periods(self, dates):
+        start, end = dates[:2]
+        periods = []
+        while start <= end:
+            next_month = start.replace(day=1) + relativedelta(months=1)
+            stop = min(end, next_month - timedelta(days=1))
+            periods.append((start, stop))
+            start = next_month
+        return periods
+
+    @api.model
+    def get_financial_trend(self, key, options):
+        scoped, dates = self._scope(options)
+        scoped._finance_access()
+        if key not in BUDGET_KEYS | RATIO_KEYS:
+            raise ValidationError(_('This financial trend is not configured.'))
+        mapping = scoped._financial_mapping(key)
+        if not scoped._mapping_ready(mapping):
+            return {'status': 'not_configured', 'rows': []}
+        report = mapping.report_id
+        rows = []
+        for start, stop in scoped._financial_periods(dates):
+            prepared = scoped._financial_options(report, key, [start, stop, dates[2]])
+            info = report.get_report_information(prepared)
+            group = next(iter(prepared['column_groups']))
+            totals = info['column_groups_totals'].get(group, {})
+            value = totals.get(mapping.expression_id.id, {}).get('value')
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValidationError(_('The native report returned an unsupported scope.'))
+            status = 'ready'
+            if key in RATIO_KEYS:
+                denominator = totals.get(mapping.denominator_expression_id.id, {}).get('value')
+                if type(denominator) not in (int, float) or not math.isfinite(denominator):
+                    raise ValidationError(_('The native report returned an unsupported scope.'))
+                if denominator == 0:
+                    value, status = None, 'undefined_ratio'
+            rows.append({'label': start.strftime('%Y-%m'), 'date_from': start.isoformat(),
+                         'date_to': stop.isoformat(), 'value': value, 'status': status,
+                         'has_warnings': bool(info.get('warnings'))})
+        currency = scoped.env.company.currency_id
+        return {'status': 'ready', 'rows': rows, 'currency': currency.name,
+                'digits': currency.decimal_places, 'unit': 'percentage' if key in RATIO_KEYS else 'currency',
+                'source_kind': 'native_report', 'report_id': report.id,
+                'expression_id': mapping.expression_id.id, 'mapping_version': mapping.definition_fingerprint,
+                'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
+
+    @api.model
+    def open_financial_period(self, key, options, period):
+        scoped, dates = self._scope(options)
+        scoped._finance_access()
+        if key not in BUDGET_KEYS | RATIO_KEYS:
+            raise ValidationError(_('This financial trend is not configured.'))
+        selected = next(((start, end) for start, end in scoped._financial_periods(dates)
+                         if start.strftime('%Y-%m') == period), None)
+        if not selected:
+            raise ValidationError(_('Invalid financial period.'))
+        return self.open_report(key, dict(options, date_from=selected[0].isoformat(), date_to=selected[1].isoformat()))
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):

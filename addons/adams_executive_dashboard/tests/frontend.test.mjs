@@ -180,3 +180,16 @@ test('historical inventory mode survives paging, navigation and drilldown', asyn
     pending[2].resolve({});
     await open;
 });
+
+test('company changes clear and suppress a pending financial trend', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const loading = controller.loadFinancialTrend('revenue');
+    controller.state.draft.company_id = 2;
+    const refresh = controller.refresh();
+    pending[0].resolve({ status: 'ready', rows: [{ value: 999 }] });
+    await loading;
+    for (const request of pending.slice(1)) { request.resolve(data(0)); }
+    await refresh;
+    assert.equal(controller.state.financialTrends.revenue, undefined);
+});

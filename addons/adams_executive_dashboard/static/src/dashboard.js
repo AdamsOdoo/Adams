@@ -45,7 +45,7 @@ export class ExecutiveDashboard extends Component {
         this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { operations: true }, detail: null, directory: null, inventory: null, workforce: null, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { operations: true }, detail: null, directory: null, inventory: null, workforce: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -152,6 +152,7 @@ export class ExecutiveDashboard extends Component {
         this.state.directory = null;
         this.state.inventory = null;
         this.state.workforce = null;
+        this.state.financialTrends = {};
         this.state.fulfillment = null;
         this.state.recent = null;
         this.detailGeneration++;
@@ -210,6 +211,36 @@ export class ExecutiveDashboard extends Component {
     barWidth(value, rows) {
         const maximum = Math.max(...rows.map(row => Math.abs(row.value)), 1);
         return `${Math.abs(value) / maximum * 100}%`;
+    }
+
+    async loadFinancialTrend(key) {
+        const generation = this.generation;
+        const marker = {};
+        this.financialTrendRequests ||= {};
+        this.financialTrendRequests[key] = marker;
+        this.state.financialTrends[key] = { status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_financial_trend', [key, { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && this.financialTrendRequests[key] === marker) {
+                this.state.financialTrends[key] = data;
+            }
+        } catch {
+            if (this.alive && generation === this.generation && this.financialTrendRequests[key] === marker) {
+                this.state.financialTrends[key] = { status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async openFinancialPeriod(key, period) {
+        if (this.state.opening) { return; }
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_financial_period', [key, { ...this.state.applied }, period]);
+            if (this.alive && generation === this.generation) { await this.action.doAction(action); }
+        } catch {
+            if (this.alive) { this.notification.add(_t('The native report could not be opened. Check your access.'), { type: 'warning' }); }
+        } finally { if (this.alive) { this.state.opening = false; } }
     }
 
     async loadDirectory(kind, offset = 0, mode = null) {

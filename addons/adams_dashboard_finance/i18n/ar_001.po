@@ -269,3 +269,13 @@ msgstr "اختر موازنة أصلية للشركة نفسها ضمن تقري
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
 msgid "The native budget is unavailable for this scope."
 msgstr "الموازنة الأصلية غير متاحة لهذا النطاق."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "This financial trend is not configured."
+msgstr "هذا الاتجاه المالي غير مهيأ."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Invalid financial period."
+msgstr "الفترة المالية غير صالحة."

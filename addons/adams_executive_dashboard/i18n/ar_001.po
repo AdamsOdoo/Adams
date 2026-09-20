@@ -1179,3 +1179,21 @@ msgstr "الموظفون النشطون: "
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Employees"
 msgstr "الموظفون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Monthly financial trend"
+msgstr "الاتجاه المالي الشهري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Each month is evaluated by the approved native report. First and last months use the selected period boundaries. Signs are preserved; these are not closed-period or like-for-like assurances."
+msgstr "يُقيّم كل شهر بواسطة التقرير القياسي المعتمد. يلتزم الشهران الأول والأخير بحدود الفترة المحددة. تُحفظ الإشارات؛ ولا يعني ذلك إغلاق الفترات أو ضمان قابلية المقارنة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load monthly values"
+msgstr "تحميل القيم الشهرية"
