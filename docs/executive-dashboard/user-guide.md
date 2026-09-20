@@ -1,7 +1,7 @@
 # Executive Dashboard — user and administrator guide
 
-This guide describes implemented behavior. Owner report definitions and the
-additional measures in [owner-decisions.md](owner-decisions.md) remain pending.
+This guide describes the scope approved in [owner-decisions.md](owner-decisions.md).
+Company configuration and deployment qualification are recorded in the implementation status.
 The dashboard uses native Odoo reports; a successful calculation is not confirmation
 that the accounts are complete or the period is closed.
 
@@ -29,6 +29,13 @@ Profitability uses approved P&L/ratio definitions. Cash movement uses native CFS
 rows; cash account balances use native GL. Their compositions can differ. The
 standard short-term forecast is not a daily cash plan. Aging uses the selected
 historical cutoff and native maturity buckets, not today's invoice residuals.
+
+Supplier payment cards show outstanding posted bill installments at the balance
+cutoff: overdue, due today, days 1–7 and days 1–30. The 30-day window includes
+the first seven days. Standalone credits and unapplied payments remain in native
+aging; the cards do not invent cross-bill netting. Open each card for the same
+fixed due-date window in native Aged Payable. Missing budgets show **No target
+configured**; report errors and restricted access remain distinct states.
 
 Search bank/cash accounts by name or code. The matching count covers the complete
 authorized directory; pages contain at most 25 rows. Archived and zero-balance

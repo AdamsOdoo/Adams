@@ -106,17 +106,17 @@
         </div><details class="adams_chart_table"><summary>View chart as a table</summary><div class="adams_table_wrap"><table class="table"><thead><tr><th>Month</th><th>Revenue</th><th>Gross profit</th><th>Net profit</th></tr></thead><tbody><tr t-foreach="chart.rows" t-as="month" t-key="month.label"><th t-esc="month.label"/><td t-foreach="month.series" t-as="series" t-key="series.key" t-esc="formatted(series, result)"/></tr></tbody></table></div></details></t>
     </section>
     <section class="adams_panel adams_performance"><header class="adams_panel_head"><div><h3>Performance context</h3><p>Actuals, targets and comparability</p></div></header>
-        <div class="adams_context_row"><span>Revenue against target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Native budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-else="">No target configured.</p></div>
+        <div class="adams_context_row"><span>Revenue against target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Native budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-elif="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status !== 'not_configured'" t-esc="statusLabels[revenue.budget.status]"/><p t-else="">No target configured.</p></div>
         <div class="adams_context_row"><span>Comparability</span><strong>Selected-period actuals</strong><p>Monthly values retain signs. Partial periods and changed definitions need review before comparison.</p></div>
         <div class="adams_context_row"><span>Accounting completeness</span><strong>Not assessed</strong><p>A report match does not confirm period close or source completeness.</p></div>
         <a href="#adams-trust" class="adams_text_link">See calculation and source rules →</a>
     </section>
 </div><t t-if="group.key === 'liquidity'" t-call="adams_executive_dashboard.Liquidity"/><section t-if="group.key === 'working-capital' &amp;&amp; result.supplier_windows?.length" class="adams_panel adams_supplier_windows">
 <header class="adams_panel_head"><div><h3>Supplier payment schedule</h3><p>Outstanding posted bill installments at the balance cutoff</p></div></header>
-<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="window" t-key="window.key" class="adams_card">
-<div class="adams_card_top"><h3 t-esc="window.label"/><button t-if="window.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(window.key)" aria-label="Open native report">→</button></div>
-<div class="adams_amount"><span t-if="window.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(window, result)" t-esc="headline(window, result)"/></div>
-<p t-if="window.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="paymentWindow" t-key="paymentWindow.key" class="adams_card">
+<div class="adams_card_top"><h3 t-esc="paymentWindow.label"/><button t-if="paymentWindow.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(paymentWindow.key)" aria-label="Open native report">→</button></div>
+<div class="adams_amount"><span t-if="paymentWindow.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(paymentWindow, result)" t-esc="headline(paymentWindow, result)"/></div>
+<p t-if="paymentWindow.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
 <p class="adams_card_date" dir="ltr" t-esc="state.applied.as_of"/>
 </article></div><p class="adams_hint">Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging.</p>
 </section></div></t></div>

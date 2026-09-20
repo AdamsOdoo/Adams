@@ -38,7 +38,7 @@ locally per user. Native drilldown/back now preserves applied filters, selected 
 | HR | Only authorized native approved-request hours appear, retaining negative native signs and start-date semantics | Native signed leave and current workforce/department/access fixtures passed; full browser journey pending |
 | Authorization | Finance, sales-only, no-dashboard, export-disabled and separate-company users cannot obtain unauthorized values through UI or direct RPC | Bounded automated coverage; full role matrix pending |
 | Recent orders/quotations | Paged native records and draft/sent quotation values use the selected period/company; individual amounts keep document currencies; wrong-company/state/period record IDs cannot be opened | Native recent-list fixtures passed; browser acceptance pending |
-| Delivery quantities | Native Sales Analysis ordered/delivered/remaining quantities by product/UoM, with current-data/order-date-cohort semantics and matching drilldown scope | Native signed-value fixture passed; backlog value/on-time completion and browser acceptance remain pending |
+| Delivery quantities | Native Sales Analysis ordered/delivered/remaining quantities by product/UoM, with current-data/order-date-cohort semantics and matching drilldown scope | Native signed-value fixture passed; browser acceptance remains pending; backlog value and on-time percentage are excluded by approved owner decisions |
 | Navigation and exports | Row drilldown preserves group scope; back restores context; CSV includes all groups or directs large datasets to native export | Server/controller checks only; browser pending |
 | Arabic/English UX | Desktop/mobile RTL, long names, signs, keyboard, focus, error/retry and independent loading work at agreed widths | Native HttpCase EN/AR at six widths passes on 9e097f5; Finance screenshot visually reviewed. Reference Sales/mobile comparison and full interaction matrix still open |
 | Performance | Measure usable Finance and filter-refresh p95 against representative data | Pending completed financial adapter and source-matched build |
@@ -103,4 +103,4 @@ through the link in implementation-status.md. English/Arabic guidance is deliver
 The older journey rows retain broad customer acceptance requirements; they must
 not be read as undoing these completed bounded checks. Owner policy is deferred,
 not approved. Customer-scale concurrency, full reference/business signoff and
-custom metric development following approved definitions remain open.
+qualification of the approved supplier-payment windows and staging verification remain open.

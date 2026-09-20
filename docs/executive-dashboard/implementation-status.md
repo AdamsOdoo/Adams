@@ -1,9 +1,20 @@
 # Executive dashboard — implementation and verification
 
-**Current engineering candidate: 67a6d655. Business acceptance is pending.**
-The user deferred owner decisions until engineering work is completed. Those
-choices remain proposed in [owner decisions](owner-decisions.md); no customer
-policy or reduced scope has been approved. Main, staging and production are untouched.
+**Current implementation candidate: 8b623a21; native qualification running.**
+Owner decisions 1–10 are approved in [owner decisions](owner-decisions.md).
+Adams For Men staging is authorized for UAT; production and main are excluded.
+Staging access and the neutralized company have been verified. Deployment and
+customer-data verification are not yet completed.
+
+This candidate adds four posted supplier-bill installment windows (overdue,
+due today, days 1–7 and days 1–30) using native historical Aged Payable results.
+The native report initializer retains the same fixed scope on drilldown.
+Full native AR/AP aging remains available. Native-only operational scope and
+explicit missing budget targets follow the approved decisions.
+New native boundary, installment, historical settlement and browser navigation
+checks are awaiting the Odoo.sh result. Local Python/XML/catalog checks pass;
+17 controller tests pass. The pinned harness and unchanged recorded qualification
+are reused. The checkpoint below applies to its named source, not this change.
 
 ## Verified checkpoint — 20 September 2026
 
@@ -58,16 +69,17 @@ current Finance and Sales desktop screens were captured after the module update.
 
 The implemented report-first workspace is available for developer/owner review.
 Full v4 business UAT cannot be declared complete merely because native tests pass.
-Remaining work after owner choices: configure the chosen company/report variants,
-implement and test approved extra measures (daily cash plan, future payment
-windows, valued backlog/on-time completion, management thresholds and stock
-aging/shortage policy), and execute customer-data parity/complete business journeys.
+Remaining work: qualify the approved supplier-payment windows, configure and
+verify Adams For Men's native report mappings in staging, execute the customer-data
+parity/navigation checks and retain current visual evidence. The custom daily cash
+plan, minimum balance, valued backlog, on-time percentage, management thresholds,
+stock aging and shortage exposure are explicitly excluded by owner decisions.
 No unavailable card is counted as delivery of a custom measure.
 
 Representative customer volume/concurrency, full visual signoff against all
 reference states, the complete financial edge-case/export matrix and independent
 review are not claimed by the bounded automated evidence. The acceptance plan
-retains those gates. Owner decisions can stay deferred without losing this work.
+retains those gates. Business UAT signoff remains the owner’s decision after engineering verification.
 
 Historical sections below describe their original candidates and may contain
 then-pending items now resolved above. They are not the current status.
