@@ -297,3 +297,22 @@ test('restoring a view reloads authorized values and clears former results immed
     await restore;
     assert.equal(controller.state.sections.finance.items[0].value, 20);
 });
+
+
+test('reference chart preserves negative values and distinguishes missing observations from zero', () => {
+    const { controller } = fixture();
+    controller.state.financialTrends = {
+        revenue: { status: 'ready', rows: [{ label: '2026-08', value: 100 }, { label: '2026-09', value: 0 }] },
+        gross_profit: { status: 'ready', rows: [{ label: '2026-08', value: 30 }] },
+        profit: { status: 'ready', rows: [{ label: '2026-08', value: -20 }] },
+    };
+    const chart = controller.profitabilityChart();
+    const positive = chart.rows[0].series[0];
+    const negative = chart.rows[0].series[2];
+    assert.equal(negative.value, -20);
+    assert.equal(negative.y, chart.zero);
+    assert.ok(positive.y < chart.zero);
+    assert.equal(chart.rows[1].series[0].value, 0);
+    assert.equal(chart.rows[1].series[1].value, null);
+    assert.equal(chart.rows[1].series[1].height, 0);
+});

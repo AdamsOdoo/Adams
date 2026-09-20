@@ -100,7 +100,7 @@
     .btn { border-radius: 7px; font-size: 12px; min-height: 35px; font-weight: 600; }
     .adams_scope { font-size: 11px; color: var(--adams-sub); overflow-wrap: anywhere; margin: 10px 0 16px; }
     .adams_nav { position: sticky; top: 0; z-index: 3; background: var(--adams-bg); backdrop-filter: blur(10px); align-items: center; gap: 5px; padding: 11px 0; margin: 0 0 24px; overflow-x: auto; border-color: var(--adams-line); }
-    .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: var(--adams-sub); font-weight: 600; border-radius: 7px; var(--adams-paper)-space: nowrap; text-decoration: none; }
+    .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: var(--adams-sub); font-weight: 600; border-radius: 7px; white-space: nowrap; text-decoration: none; }
     .adams_nav .active { background: var(--adams-purple-soft); color: var(--adams-purple); }
     .adams_nav .adams_trust_link { background: var(--adams-paper); border: 1px solid var(--adams-line); color: var(--adams-green); margin-inline-start: auto; }
     .adams_section { margin: 0 0 32px; scroll-margin-top: 76px; }
@@ -148,7 +148,7 @@
     .adams_panel_head { padding: 19px 20px 0; display: flex; justify-content: space-between; align-items: start; gap: 10px; }
     .adams_panel_head h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
     .adams_panel_head p { font-size: 12px; margin: 0; color: var(--adams-sub); }
-    .adams_panel_head .btn-link { color: var(--adams-green); var(--adams-paper)-space: nowrap; padding: 0; }
+    .adams_panel_head .btn-link { color: var(--adams-green); white-space: nowrap; padding: 0; }
     .adams_chart_legend { display: flex; flex-wrap: wrap; gap: 15px; margin: 14px 20px 0; font-size: 11px; color: var(--adams-sub); }
     .adams_chart_legend span { display: flex; align-items: center; gap: 6px; }
     .adams_chart_legend i { width: 7px; height: 7px; border-radius: 2px; }
@@ -243,7 +243,7 @@
 .o_adams_dashboard {
     .adams_metric_foot { display: flex; justify-content: space-between; align-items: center; gap: 5px; min-height: 44px; color: var(--adams-sub); }
     .adams_source_button { border: 0; background: transparent; padding: 5px 0; color: var(--adams-green); font: inherit; text-align: end; min-height: 30px; }
-    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: min(980px, calc(100% - 24px)); max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: var(--adams-paper); color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
+    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: Min(980px, calc(100% - 24px)); max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: var(--adams-paper); color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
     .adams_source_dialog::backdrop { background: #17263166; }
     .adams_source_dialog > .adams_panel_head { position: sticky; top: 0; background: var(--adams-paper); padding-bottom: 18px; border-bottom: 1px solid var(--adams-line); z-index: 1; }
     .adams_source_dialog h2 { font-size: 25px; margin-bottom: 4px; }
@@ -258,7 +258,7 @@
     .adams_recent_panel .adams_list_scope p { margin: 10px 0; }
     .adams_recent_panel td small { display: block; margin-top: 5px; color: var(--adams-sub); font-size: 10px; }
     .adams_recent_panel td { vertical-align: top; }
-    .adams_state_badge { display: inline-block; border-radius: 4px; padding: 3px 7px; background: var(--adams-purple-soft); color: var(--adams-purple); font-size: 10px; var(--adams-paper)-space: nowrap; }
+    .adams_state_badge { display: inline-block; border-radius: 4px; padding: 3px 7px; background: var(--adams-purple-soft); color: var(--adams-purple); font-size: 10px; white-space: nowrap; }
     .adams_sales_lower > .adams_analysis { margin-top: 0; }
     .adams_customers_panel .adams_rank_list { margin-top: 14px; }
     #adams-analysis-title { scroll-margin-top: 85px; }
@@ -346,5 +346,40 @@
         .adams_value, .adams_available .adams_value { font-size: 25px; }
         .adams_section_heading h2 { font-size: 23px; }
         .adams_source_dialog { width: 100%; }
+    }
+}
+
+.o_adams_dashboard {
+    .adams_profit_chart { padding: 20px 14px 0; min-height: 0; display: block; }
+    .adams_chart_svg { width: 100%; min-width: 340px; height: auto; display: block; direction: ltr; }
+    .adams_chart_svg text { fill: var(--adams-sub); font-size: 11px; }
+    .adams_chart_gridline { stroke: var(--adams-line); }
+    .adams_chart_zero { stroke: var(--adams-sub); stroke-width: 1.2; }
+    .adams_chart_column.revenue { fill: #337f69; }
+    .adams_chart_column.gross_profit { fill: #87bba8; }
+    .adams_chart_column.profit { fill: #90649e; }
+    .adams_chart_point { cursor: pointer; }
+    .adams_chart_point:hover .adams_chart_column { opacity: .8; }
+    .adams_chart_point:focus-visible { outline: 2px solid var(--adams-focus); }
+}
+
+.o_adams_dashboard {
+    --adams-attention: #fffaf3; --adams-attention-line: #e8ded0;
+    @if $o-webclient-color-scheme == dark { --adams-attention: #352f27; --adams-attention-line: #625341; }
+    .adams_attention { display: grid; grid-template-columns: 130px minmax(0, 1fr); border: 1px solid var(--adams-attention-line); background: var(--adams-attention); border-radius: 12px; margin: 0 0 20px; scroll-margin-top: 76px; }
+    .adams_attention_title { display: flex; align-items: center; padding: 14px; font-size: 12px; }
+    .adams_attention_toggle { display: none; }
+    .adams_attention_items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .adams_attention_item { padding: 14px 16px; border-inline-start: 1px solid var(--adams-attention-line); font-size: 12px; min-width: 0; }
+    .adams_attention_item > strong, .adams_attention_item > bdi { display: block; margin-bottom: 5px; }
+    .adams_attention_item > bdi { font-size: 17px; font-weight: 650; }
+    .adams_attention_item .btn { padding: 3px 0; text-align: start; color: var(--adams-green); font-size: 11px; display: block; }
+    @media (max-width: 1080px) { .adams_attention { grid-template-columns: 1fr; } .adams_attention_title { border-bottom: 1px solid var(--adams-attention-line); } .adams_attention_item:first-child { border-inline-start: 0; } }
+    @media (max-width: 760px) {
+        .adams_attention_title { border: 0; padding-block: 10px; justify-content: space-between; }
+        .adams_attention_toggle { display: block; font-size: 11px; color: var(--adams-ink); }
+        .adams_attention:not(.expanded) .adams_attention_items { display: none; }
+        .adams_attention_items { grid-template-columns: 1fr; }
+        .adams_attention_item { border-inline-start: 0; border-top: 1px solid var(--adams-attention-line); }
     }
 }

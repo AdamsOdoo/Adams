@@ -52,7 +52,7 @@ export class ExecutiveDashboard extends Component {
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.sourceDialog.el;
             if (!dialog) return;
@@ -282,6 +282,24 @@ export class ExecutiveDashboard extends Component {
         requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
     }
 
+    supplierWindow(key) {
+        return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
+    }
+
+    switchTabs(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const buttons = [...event.currentTarget.querySelectorAll('button')];
+        const current = buttons.indexOf(event.target);
+        if (current < 0) return;
+        event.preventDefault();
+        const rtl = document.documentElement.dir === 'rtl';
+        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
+            (current + delta + buttons.length) % buttons.length;
+        buttons[next].focus();
+        buttons[next].click();
+    }
+
     navigateGroup(key) {
         this.root.el?.querySelector(`#adams-group-${key}`)?.scrollIntoView({ block: 'start',
             behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -393,11 +411,36 @@ export class ExecutiveDashboard extends Component {
         if (!data.some(Boolean)) { return { status: 'idle', rows: [] }; }
         if (data.some(value => value?.status !== 'ready')) { return { status: 'unavailable', rows: [] }; }
         const labels = [...new Set(data.flatMap(value => value.rows.map(row => row.label)))];
-        const maximum = Math.max(1, ...data.flatMap(value => value.rows.map(row => Math.abs(row.value || 0))));
-        return { status: 'ready', rows: labels.map(label => ({ label, series: keys.map((key, index) => {
-            const row = data[index].rows.find(value => value.label === label);
-            return { ...row, key, height: Math.abs(row?.value || 0) / maximum * 100 };
-        }) })) };
+        const values = data.flatMap(value => value.rows.map(row => row.value)).filter(Number.isFinite);
+        const peak = Math.max(1, ...values.map(Math.abs));
+        const step = 10 ** Math.floor(Math.log10(peak)) / 2;
+        const maximum = Math.ceil(Math.max(0, ...values) * 1.1 / step) * step || 1;
+        const minimum = Math.floor(Math.min(0, ...values) * 1.1 / step) * step;
+        const scale = value => 19 + (maximum - value) / (maximum - minimum) * 174;
+        const zero = scale(0);
+        const width = Math.max(680, labels.length * 104);
+        const number = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {
+            notation: 'compact', maximumFractionDigits: 1 }).format(value);
+        return { status: 'ready', zero, width, ticks: Array.from({ length: 5 }, (_, index) => {
+            const value = minimum + (maximum - minimum) * index / 4;
+            return { label: number(value), y: scale(value) };
+        }), rows: labels.sort().map((label, monthIndex) => ({ label,
+            x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
+            series: keys.map((key, index) => {
+                const row = data[index].rows.find(value => value.label === label);
+                const value = Number.isFinite(row?.value) ? row.value : null;
+                return { ...row, key, value,
+                    x: 67 + (width - 82) / labels.length * (monthIndex + 0.5) + (index - 1) * 29 - 12,
+                    y: value === null ? zero : Math.min(scale(value), zero),
+                    height: value === null ? 0 : Math.max(1, Math.abs(scale(value) - zero)) };
+            }) })) };
+    }
+
+    chartKeydown(event, key, month) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            void this.openFinancialPeriod(key, month);
+        }
     }
 
     formatted(item, section) {
