@@ -19,6 +19,9 @@
                     <group><field name="company_id"/><field name="metric"/>
                         <field name="report_id" options="{'no_create': True}"/>
                         <field name="expression_id" domain="[('report_line_id.report_id', '=', report_id)]" options="{'no_create': True}"/>
+                        <field name="denominator_expression_id" invisible="metric not in ['gross_margin', 'net_margin']"
+                            required="metric in ['gross_margin', 'net_margin']"
+                            domain="[('report_line_id.report_id', '=', report_id)]" options="{'no_create': True}"/>
                         <field name="definition_note"/><field name="active"/>
                     </group>
                     <group><field name="approved_by"/><field name="approved_at"/></group>

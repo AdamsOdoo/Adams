@@ -19,11 +19,12 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         cls.pnl = cls.env.ref('account_reports.profit_and_loss')
         cls.revenue_expression = cls.env.ref('account_reports.account_financial_report_revenue0_balance')
 
-    def _mapping(self, key='revenue', report=None, expression=None, approve=True):
+    def _mapping(self, key='revenue', report=None, expression=None, approve=True, denominator=None):
         mapping = self.mapping_model.create({
             'company_id': self.env.company.id, 'metric': key,
             'report_id': (report or self.pnl).id,
             'expression_id': (expression or self.revenue_expression).id,
+            'denominator_expression_id': denominator.id if denominator else False,
             'definition_note': 'Disposable test approval of the exact standard report definition.',
         })
         if approve:
@@ -83,6 +84,23 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self._invoice(100)
         self._invoice(125, 'out_refund')
         self.assertAlmostEqual(self._item()['value'], -25)
+
+    def test_native_margin_units_zero_denominator_and_dependency_drift(self):
+        summary = self.env.ref('account_reports.executive_summary')
+        expression = self.env.ref('account_reports.account_financial_report_executivesummary_gpmargin0_balance')
+        denominator = self.env.ref('account_reports.account_financial_report_executivesummary_gpmargin0_opinc')
+        self._mapping('gross_margin', report=summary, expression=expression, denominator=denominator)
+        empty = self._item('gross_margin')
+        self.assertEqual(empty['status'], 'undefined_ratio', empty)
+        self.assertIsNone(empty['value'])
+        self._invoice(100)
+        actual = self._item('gross_margin')
+        self.assertEqual(actual['status'], 'ready', actual)
+        self.assertEqual(actual['unit'], 'percentage')
+        self.assertAlmostEqual(actual['value'], 100)
+        # A change in the referenced P&L invalidates approval of the ratio too.
+        self.revenue_expression.subformula = 'sum'
+        self.assertEqual(self._item('gross_margin')['status'], 'not_configured')
 
     def test_unapproved_changed_or_archived_mapping_withholds_value(self):
         mapping = self._mapping(approve=False)

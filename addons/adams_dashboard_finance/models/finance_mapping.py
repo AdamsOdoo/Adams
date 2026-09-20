@@ -1,6 +1,7 @@
 """Explicit company policy; report definitions and arithmetic remain in Odoo."""
 import hashlib
 import json
+import re
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
@@ -29,6 +30,8 @@ class FinanceMapping(models.Model):
     metric = fields.Selection(METRICS, required=True)
     report_id = fields.Many2one('account.report', required=True, ondelete='restrict')
     expression_id = fields.Many2one('account.report.expression', required=True, ondelete='restrict')
+    denominator_expression_id = fields.Many2one('account.report.expression', ondelete='restrict',
+        help='Native denominator result used only to detect an undefined ratio; the native engine calculates the percentage.')
     definition_note = fields.Text(required=True, help='Explain the chosen native definition, variant, currency and reporting policy.')
     approved_by = fields.Many2one('res.users', readonly=True, copy=False)
     approved_at = fields.Datetime(readonly=True, copy=False)
@@ -37,11 +40,15 @@ class FinanceMapping(models.Model):
 
     _metric_company_unique = models.Constraint('unique(company_id, metric)', 'Map each metric only once per company.')
 
-    @api.constrains('expression_id', 'report_id', 'company_id', 'metric')
+    @api.constrains('expression_id', 'denominator_expression_id', 'report_id', 'company_id', 'metric')
     def _check_definition(self):
         for mapping in self:
             if mapping.expression_id.report_line_id.report_id != mapping.report_id:
                 raise ValidationError(_('Select an expression belonging to the chosen report.'))
+            if mapping.metric in RATIO_KEYS and (
+                    not mapping.denominator_expression_id
+                    or mapping.denominator_expression_id.report_line_id.report_id != mapping.report_id):
+                raise ValidationError(_('Select the native denominator expression for this ratio.'))
             if mapping.report_id.use_sections:
                 raise ValidationError(_('Select the specific report section, not its composite parent.'))
             if mapping.report_id.filter_date_range != (mapping.metric in PERIOD_KEYS):
@@ -57,15 +64,27 @@ class FinanceMapping(models.Model):
         report = self.report_id
         # Changes to native accounting data flow through on refresh. Changes to
         # report definitions require explicit review, including dependent lines.
+        reports = report
+        pending = report
+        while pending:
+            dependencies = self.env['account.report']
+            for expression in pending.line_ids.expression_ids:
+                for reference in re.findall(r'cross_report\(([^)]+)\)', expression.subformula or ''):
+                    dependency = self.env.ref(reference, raise_if_not_found=False)
+                    if not dependency or dependency._name != 'account.report':
+                        raise ValidationError(_('A dependent native report could not be resolved.'))
+                    dependencies |= dependency
+            pending = dependencies - reports
+            reports |= pending
         definitions = [
             (expression.id, expression.report_line_id.code, expression.label,
              expression.engine, expression.formula, expression.subformula,
              expression.date_scope, expression.figure_type)
-            for expression in report.line_ids.expression_ids.sorted('id')
+            for expression in reports.line_ids.expression_ids.sorted('id')
         ]
         value = [self.company_id.id, self.metric, report.id, self.expression_id.id,
                  report.root_report_id.id, report.country_id.id, report.filter_date_range,
-                 self.definition_note, definitions,
+                 self.definition_note, self.denominator_expression_id.id, definitions,
                  [(c.id, c.expression_label, c.figure_type) for c in report.column_ids.sorted('id')]]
         return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 

@@ -35,6 +35,7 @@ export class ExecutiveDashboard extends Component {
             not_configured: _t('Not configured'), not_installed: _t('App not installed'),
             restricted: _t('Access restricted'), empty: _t('No matching records'),
             unsupported_scope: _t('Unsupported report scope'), error: _t('Report unavailable'),
+            undefined_ratio: _t('Undefined ratio: zero denominator'),
         };
         this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
             vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };

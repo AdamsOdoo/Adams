@@ -967,3 +967,9 @@ msgstr "التقرير غير متاح"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "The native report has warnings. Open it before interpreting this result."
 msgstr "يتضمن التقرير الأصلي تنبيهات. افتحه قبل تفسير هذه النتيجة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Undefined ratio: zero denominator"
+msgstr "النسبة غير معرّفة: المقام صفر"

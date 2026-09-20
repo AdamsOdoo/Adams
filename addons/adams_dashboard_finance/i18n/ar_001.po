@@ -184,3 +184,18 @@ msgstr "الذمم المدينة"
 #: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__payables
 msgid "Payables"
 msgstr "الذمم الدائنة"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__denominator_expression_id
+msgid "Denominator Expression"
+msgstr "تعبير المقام"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select the native denominator expression for this ratio."
+msgstr "اختر تعبير المقام الأصلي لهذه النسبة."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "A dependent native report could not be resolved."
+msgstr "تعذر تحديد أحد التقارير الأصلية المعتمَد عليها."

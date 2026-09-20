@@ -106,6 +106,13 @@ class ExecutiveDashboard(models.AbstractModel):
                 value = expression_result.get('value')
                 if type(value) not in (int, float) or not math.isfinite(value):
                     raise UnsupportedFinancialScope()
+                if key in RATIO_KEYS:
+                    denominator = totals.get(mapping.denominator_expression_id.id, {}).get('value')
+                    if type(denominator) not in (int, float) or not math.isfinite(denominator):
+                        raise UnsupportedFinancialScope()
+                    if denominator == 0:
+                        item['status'] = 'undefined_ratio'
+                        continue
                 provenance = {
                     'model': 'account.report', 'report_id': report.id,
                     'expression_id': mapping.expression_id.id,
