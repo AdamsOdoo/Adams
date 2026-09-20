@@ -1,0 +1,9 @@
+<odoo>
+    <record id="action_dashboard" model="ir.actions.client">
+        <field name="name">Executive Dashboard</field>
+        <field name="tag">adams_executive_dashboard.dashboard</field>
+    </record>
+    <menuitem id="menu_dashboard" name="Executive Dashboard" sequence="15"
+              action="action_dashboard"
+              groups="adams_executive_dashboard.group_dashboard_user,base.group_system"/>
+</odoo>

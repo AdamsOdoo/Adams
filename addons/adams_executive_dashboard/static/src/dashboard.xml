@@ -1,0 +1,348 @@
+<templates xml:space="preserve">
+    <t t-name="adams_executive_dashboard.Dashboard">
+        <main class="o_adams_dashboard" t-ref="root" t-on-keydown="workspaceKeydown">
+            <aside t-ref="workspaceMenu" id="adams-workspace-menu" class="adams_sidebar" t-att-class="{'is-open': state.sidebarOpen}" aria-label="Executive workspace">
+    <button class="adams_workspace_close btn" t-on-click="closeWorkspace" aria-label="Close workspace navigation">×</button>
+    <div class="adams_brand"><span class="adams_wordmark"><b>o</b>doo</span><span>EXECUTIVE<br/>WORKSPACE</span></div>
+    <p class="adams_nav_label">Owner workspace</p>
+    <nav><button t-foreach="sections" t-as="entry" t-key="entry.key" class="adams_side_link" t-att-class="{'active': state.activeSection === entry.key}" t-on-click="() =&gt; this.navigateSection(entry.key)"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="entry.icon"/></t><span t-esc="entry.name"/><i class="adams_nav_dot"/></button></nav>
+    <p class="adams_nav_label">Workspace</p>
+    <a class="adams_side_link" href="#adams-trust"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'book'"/></t><span>Data &amp; definitions</span></a>
+    <div class="adams_sidebar_bottom"><strong>Connected Odoo workspace</strong><p>Values follow your native reports and current access. Unavailable definitions stay visible.</p><span t-if="state.applied" t-esc="state.companies.find(company =&gt; company.id === state.applied.company_id)?.name"/></div>
+</aside><div class="adams_content"><header class="adams_header"><div><span class="adams_eyebrow">THE OWNER’S VIEW</span><h1>Executive overview</h1><p>Financial health. Sales performance.<br class="adams_mobile_only"/> What needs your attention.</p></div><button class="adams_mobile_menu btn" t-ref="workspaceToggle" aria-controls="adams-workspace-menu" t-on-click="() =&gt; state.sidebarOpen = !state.sidebarOpen" t-att-aria-expanded="state.sidebarOpen ? 'true' : 'false'" aria-label="Open workspace navigation"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'menu'"/></t></button></header><div t-if="state.error" class="alert alert-warning" role="alert"><t t-esc="state.error"/></div>
+            <t t-if="state.companies.length">
+                <form class="adams_filters" t-on-submit.prevent="refresh">
+                    <label>Company<select t-model="state.draft.company_id" class="form-select" required="required">
+                        <option t-foreach="state.companies" t-as="company" t-key="company.id" t-att-value="company.id"><t t-esc="company.name"/></option>
+                    </select></label>
+                    <label>From<input class="form-control" type="date" t-model="state.draft.date_from" required="required"/></label>
+                    <label>To<input class="form-control" type="date" t-model="state.draft.date_to" required="required"/></label>
+                    <label>Balance as of<input class="form-control" type="date" t-model="state.draft.as_of" required="required"/></label>
+                    <button class="btn btn-primary" type="submit">Apply filters</button>
+                </form>
+                <p class="adams_scope" t-if="state.applied">
+                    Applied period: <bdi t-esc="state.applied.date_from"/> — <bdi t-esc="state.applied.date_to"/>
+                    <span> · Balance cutoff: <bdi t-esc="state.applied.as_of"/></span>
+                </p>
+                <nav class="adams_nav" aria-label="Dashboard sections"><button t-foreach="sections" t-as="entry" t-key="entry.key" t-att-class="{'active': state.activeSection === entry.key}" t-on-click="() =&gt; this.navigateSection(entry.key)"><span t-if="entry.key === 'finance' || entry.key === 'sales'" t-esc="entry.number + ' '"/><t t-esc="entry.short"/></button><a class="adams_trust_link" href="#adams-trust">Data &amp; trust ↗</a></nav><t t-if="state.detail">
+                    <t t-set="detail" t-value="state.detail"/>
+                    <section class="adams_analysis" aria-labelledby="adams-analysis-title" aria-live="polite">
+                        <div class="adams_analysis_heading"><h2 id="adams-analysis-title" t-esc="labels[detail.key]"/>
+                            <button class="btn btn-outline-secondary" t-on-click="closeDetail">Close analysis</button></div>
+                        <label>Group by <select class="form-select" t-on-change="(event) =&gt; this.inspect(detail.key, event.target.value)">
+                            <option t-foreach="dimensions[detail.key]" t-as="dimension" t-key="dimension" t-att-value="dimension" t-att-selected="dimension === detail.dimension" t-esc="dimensionLabels[dimension]"/>
+                        </select></label>
+                        <p t-if="detail.status === 'loading'" role="status">Loading native reports…</p>
+                        <p t-elif="detail.status === 'error'" role="alert">Analysis unavailable. Check your access and retry.</p>
+                        <t t-else="">
+                            <p t-if="!detail.rows.length">No matching records</p>
+                            <div class="adams_analysis_columns">
+                                <div class="adams_table_wrap"><table class="table">
+                                    <caption>Native grouped values. Pages do not define the headline total.</caption>
+                                    <thead><tr><th scope="col" t-esc="dimensionLabels[detail.dimension]"/><th scope="col">Value</th></tr></thead>
+                                    <tbody><tr t-foreach="detail.rows" t-as="row" t-key="row.id || 'unassigned'">
+                                        <td><button class="btn btn-link" t-on-click="() =&gt; this.openReport(detail.key, detail.dimension, row.id)" t-esc="row.label"/></td>
+                                        <td><bdi t-esc="formatted({value: row.value, key: detail.key}, detail)"/> <t t-esc="detail.unit === 'currency' ? detail.currency : detail.unit"/></td>
+                                    </tr></tbody>
+                                </table>
+                                <div class="adams_page_controls">
+                                    <button class="btn btn-outline-secondary" t-att-disabled="detail.offset === 0" t-on-click="() =&gt; this.inspect(detail.key, detail.dimension, detail.offset - 25)">Previous</button>
+                                    <button class="btn btn-outline-secondary" t-att-disabled="!detail.has_more" t-on-click="() =&gt; this.inspect(detail.key, detail.dimension, detail.offset + 25)">Next</button>
+                                    <button class="btn btn-outline-primary" t-att-disabled="state.exporting" t-on-click="exportDetail">Export all groups</button>
+                                </div></div>
+                                <div class="adams_table_wrap"><table class="table adams_trend">
+                                    <caption>Monthly native values. Bar length shows magnitude; negative amounts retain their sign. Months without records are omitted.</caption>
+                                    <thead><tr><th scope="col">Month</th><th scope="col">Value</th></tr></thead>
+                                    <tbody><tr t-foreach="detail.trend" t-as="row" t-key="row.label">
+                                        <th scope="row"><bdi t-esc="row.label"/></th>
+                                        <td><bdi t-esc="formatted({value: row.value, key: detail.key}, detail)"/>
+                                            <div class="adams_bar_track" aria-hidden="true"><span t-att-class="{'negative': row.value &lt; 0}" t-att-style="'width:' + barWidth(row.value, detail.trend)"/></div></td>
+                                    </tr></tbody>
+                                </table></div>
+                            </div>
+                            <details t-if="detail.provenance"><summary>Source and scope</summary>
+                                <p><code t-esc="detail.provenance.model"/> · <code t-esc="detail.provenance.measure"/></p>
+                                <p>Scope fingerprint: <code t-esc="detail.provenance.fingerprint"/></p>
+                            </details>
+                        </t>
+                    </section>
+                </t>
+                <section t-foreach="sections" t-as="section" t-key="section.key" t-att-id="'adams-' + section.key" class="adams_section" t-att-aria-labelledby="'title-' + section.key">
+                    <header class="adams_section_heading"><div class="adams_section_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="section.icon"/></t></div><div><h2 t-att-id="'title-' + section.key"><span class="adams_section_number" t-esc="section.number"/><t t-esc="section.name"/></h2><p t-esc="section.description"/></div><button class="adams_section_toggle" t-att-aria-expanded="state.collapsed[section.key] ? 'false' : 'true'" t-att-aria-label="section.name" t-on-click="() =&gt; this.toggleSection(section.key)"><span aria-hidden="true" t-esc="state.collapsed[section.key] ? '⌄' : '⌃'"/></button></header><t t-if="!state.collapsed[section.key]">
+                    <t t-set="result" t-value="sectionResult(section)"/>
+                    <div t-if="!result || result.status === 'loading'" class="adams_message" role="status">Loading native reports…</div>
+                    <div t-elif="result.status === 'error'" class="adams_message" role="alert">
+                        This section could not be loaded. Check the filters and your access, then apply filters to retry.
+                    </div>
+                    <div t-else="" class="adams_metric_groups">
+                        <t t-foreach="metricGroups(section, result)" t-as="group" t-key="group.key"><div class="adams_metric_group" t-att-id="'adams-group-' + group.key"><header t-if="group.name" class="adams_group_heading"><div><h3 t-esc="group.name"/><p t-esc="group.description"/></div><span class="adams_period_chip" dir="ltr" t-if="state.applied" t-esc="['profitability', 'commercial'].includes(group.key) ? state.applied.date_from + ' — ' + state.applied.date_to : state.applied.as_of"/></header><div class="adams_grid" t-att-class="{'adams_grid_three': ['financial-position', 'commercial', 'liquidity'].includes(group.key), 'adams_grid_two': group.key === 'working-capital'}"><t t-foreach="group.items" t-as="item" t-key="item.key">
+                        <article class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready', 'adams_cash_card': item.key === 'cash' }">
+                            <div class="adams_card_top"><span class="adams_metric_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="metricIcon(item.key)"/></t></span><h3 t-esc="labels[item.key]"/>
+                            <button t-if="item.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key)" aria-label="Open native report">→</button></div><div class="adams_amount"><span t-if="item.value !== null &amp;&amp; item.unit === 'currency'" class="adams_currency" t-esc="result.currency"/>
+                            <div class="adams_value" t-att-title="formatted(item, result)" t-esc="headline(item, result)"/>
+                            </div><p class="adams_margin_note" t-if="item.key === 'gross_profit' || item.key === 'profit'"><t t-set="margin" t-value="financeMetric(item.key === 'gross_profit' ? 'gross_margin' : 'net_margin')"/><t t-if="margin &amp;&amp; margin.status === 'ready'"><strong t-esc="formatted(margin, result)"/><span t-if="margin.status === 'ready'">% margin</span></t></p><p t-if="item.key === 'confirmed_sales'" class="adams_margin_note"><t t-set="orders" t-value="result.items.find(metric =&gt; metric.key === 'orders')"/><t t-if="orders &amp;&amp; orders.status === 'ready'"><strong t-esc="formatted(orders, result)"/> <span>distinct confirmed orders</span></t></p><span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
+                            <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
+                            <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
+                            <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                            <div t-if="item.status === 'ready' &amp;&amp; item.aging_buckets?.length" class="adams_aging_list">
+    <p class="adams_hint">Native due-date aging · signed balances</p>
+    <div t-foreach="item.aging_buckets" t-as="bucket" t-key="bucket.key" class="adams_aging_row">
+        <span t-esc="bucket.label"/><span class="adams_aging_track" aria-hidden="true"><i t-att-class="{'negative': bucket.value &lt; 0}" t-att-style="'width:' + barWidth(bucket.value, item.aging_buckets)"/></span><bdi t-esc="formatted(bucket, result)"/>
+    </div><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key)">Open full native aging</button>
+</div>
+                            <p class="adams_card_date" dir="ltr" t-if="state.applied" t-esc="(item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)) ? state.applied.as_of : state.applied.date_from + ' — ' + state.applied.date_to"/><footer class="adams_metric_foot">
+                                <span t-if="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)">As of balance</span><span t-else="">Period actual</span>
+                                <button type="button" class="adams_source_button" t-on-click="() =&gt; this.openSource(item, result)">Source &amp; definition ⓘ</button>
+                            </footer>
+                        </article>
+                        </t>
+                    </div><div t-if="group.key === 'profitability'" class="adams_profit_grid">
+    <section class="adams_panel"><header class="adams_panel_head"><div><h3>Revenue &amp; profitability</h3><p>Native monthly values within the selected period</p></div><button class="btn btn-link" t-on-click="loadProfitabilityChart">Load chart →</button></header>
+        <div class="adams_chart_legend"><span><i class="revenue"/>Revenue</span><span><i class="gross_profit"/>Gross profit</span><span><i class="profit"/>Net profit</span></div>
+        <t t-set="chart" t-value="profitabilityChart()"/>
+        <div t-if="chart.status !== 'ready'" class="adams_chart_empty"><span t-if="chart.status === 'loading'">Loading native reports…</span><span t-elif="chart.status === 'idle'">Load the approved native report values to view this chart.</span><span t-else="">Chart unavailable. Review native report access and approved definitions.</span></div>
+        <t t-else=""><div class="adams_profit_chart" role="group" aria-label="Signed monthly revenue, gross profit and net profit. Exact values are available in the table below.">
+            <div t-foreach="chart.rows" t-as="month" t-key="month.label" class="adams_chart_month"><div class="adams_chart_bars"><button t-foreach="month.series" t-as="series" t-key="series.key" class="adams_chart_bar" t-att-class="series.key" t-att-style="'height:' + (series.height * 0.45) + '%; ' + (series.value &lt; 0 ? 'top:50%' : 'bottom:50%')" t-att-title="labels[series.key] + ': ' + formatted(series, result)" t-on-click="() =&gt; this.openFinancialPeriod(series.key, month.label)"/></div><span t-esc="month.label"/></div>
+        </div><details class="adams_chart_table"><summary>View chart as a table</summary><div class="adams_table_wrap"><table class="table"><thead><tr><th>Month</th><th>Revenue</th><th>Gross profit</th><th>Net profit</th></tr></thead><tbody><tr t-foreach="chart.rows" t-as="month" t-key="month.label"><th t-esc="month.label"/><td t-foreach="month.series" t-as="series" t-key="series.key" t-esc="formatted(series, result)"/></tr></tbody></table></div></details></t>
+    </section>
+    <section class="adams_panel adams_performance"><header class="adams_panel_head"><div><h3>Performance context</h3><p>Actuals, targets and comparability</p></div></header>
+        <div class="adams_context_row"><span>Revenue against target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Native budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-elif="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status !== 'not_configured'" t-esc="statusLabels[revenue.budget.status]"/><p t-else="">No target configured.</p></div>
+        <div class="adams_context_row"><span>Comparability</span><strong>Selected-period actuals</strong><p>Monthly values retain signs. Partial periods and changed definitions need review before comparison.</p></div>
+        <div class="adams_context_row"><span>Accounting completeness</span><strong>Not assessed</strong><p>A report match does not confirm period close or source completeness.</p></div>
+        <a href="#adams-trust" class="adams_text_link">See calculation and source rules →</a>
+    </section>
+</div><t t-if="group.key === 'liquidity'" t-call="adams_executive_dashboard.Liquidity"/><section t-if="group.key === 'working-capital' &amp;&amp; result.supplier_windows?.length" class="adams_panel adams_supplier_windows">
+<header class="adams_panel_head"><div><h3>Supplier payment schedule</h3><p>Outstanding posted bill installments at the balance cutoff</p></div></header>
+<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="paymentWindow" t-key="paymentWindow.key" class="adams_card">
+<div class="adams_card_top"><h3 t-esc="paymentWindow.label"/><button t-if="paymentWindow.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(paymentWindow.key)" aria-label="Open native report">→</button></div>
+<div class="adams_amount"><span t-if="paymentWindow.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(paymentWindow, result)" t-esc="headline(paymentWindow, result)"/></div>
+<p t-if="paymentWindow.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+<p class="adams_card_date" dir="ltr" t-esc="state.applied.as_of"/>
+</article></div><p class="adams_hint">Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging.</p>
+</section></div></t></div>
+                    <p t-if="result &amp;&amp; result.generated_at" class="adams_scope">Fetched at <bdi t-esc="result.generated_at"/> UTC. Source completeness has not been assessed.</p>
+                    <t t-if="section.key === 'sales'">
+                        <div class="adams_sales_workspace"><section class="adams_panel adams_recent_panel"><header class="adams_panel_head"><div><h3>Recent orders &amp; quotations</h3><p>Open a document to inspect it.</p></div></header><div class="adams_recent_tabs">
+                            <button class="btn" t-att-class="{'active': !state.recent || state.recent.kind === 'orders'}" t-on-click="() =&gt; this.loadRecent('orders')">Recent orders</button>
+                            <button class="btn" t-att-class="{'active': state.recent?.kind === 'quotations'}" t-on-click="() =&gt; this.loadRecent('quotations')">Recent quotations</button>
+                        </div>
+                        <p t-if="!state.recent" class="adams_empty_note">Choose orders or quotations to load authorized records.</p><section t-if="state.recent" class="adams_analysis" aria-live="polite">
+                            <t t-set="recent" t-value="state.recent"/>
+                            <details class="adams_list_scope"><summary>Dates, amounts &amp; scope</summary><p>Selected period, newest first. Native order date is the confirmation date for orders and creation date for quotations. Untaxed values use each document's currency; no mixed-currency total.</p></details>
+                            <p t-if="recent.timezone">Dates shown in <bdi t-esc="recent.timezone"/></p>
+                            <p t-if="recent.status === 'loading'" role="status">Loading…</p>
+                            <p t-elif="recent.status === 'error'" role="alert">Sales list unavailable. Check your access and retry.</p>
+                            <p t-elif="recent.status === 'not_installed'">App not installed</p>
+                            <p t-elif="recent.status === 'empty'">No matching records</p>
+                            <div class="adams_table_wrap"><table t-if="recent.rows.length" class="table">
+                                <thead><tr><th scope="col">Order / date</th><th scope="col">Customer / salesperson</th><th scope="col">Untaxed amount</th><th scope="col">Status</th></tr></thead>
+                                <tbody><tr t-foreach="recent.rows" t-as="row" t-key="row.id">
+                                    <td><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openRecent(row.id)" t-esc="row.name"/><small><bdi t-esc="row.date_label"/></small></td>
+                                    <td><span t-esc="row.partner_id[1]"/><small t-esc="row.user_id ? row.user_id[1] : '—'"/></td>
+                                    <td><bdi t-esc="formatted({value: row.amount_untaxed}, row)"/> <bdi t-esc="row.currency"/></td>
+                                    <td><span class="adams_state_badge" t-esc="row.delivery_label || row.state_label"/><small t-if="recent.kind === 'quotations' &amp;&amp; row.validity_date">Expires <bdi t-esc="row.validity_date"/></small></td>
+                                </tr></tbody>
+                            </table></div>
+                            <div class="adams_page_controls">
+                                <button class="btn btn-outline-secondary" t-att-disabled="recent.offset === 0 || recent.status === 'loading'" t-on-click="() =&gt; this.loadRecent(recent.kind, recent.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!recent.has_more" t-on-click="() =&gt; this.loadRecent(recent.kind, recent.offset + 25)">Next</button>
+                                <button t-if="recent.status === 'ready' || recent.status === 'empty'" class="btn btn-outline-primary" t-att-disabled="state.opening" t-on-click="() =&gt; this.openRecent()">Open native list</button>
+                            </div>
+                        </section>
+                    </section><section class="adams_panel adams_rank_panel"><header class="adams_panel_head"><div><h3>Salesperson ranking</h3><p>Top five authorized native report groups</p></div><button class="btn btn-link" t-on-click="() =&gt; this.inspect(state.ranking?.key || 'invoiced_sales', 'salesperson')">Full ranking →</button></header>
+    <div class="adams_rank_tabs"><button t-att-class="{'active': !state.ranking || state.ranking.key === 'invoiced_sales'}" t-on-click="() =&gt; this.loadRanking('invoiced_sales')">Invoiced sales</button><button t-att-class="{'active': state.ranking?.key === 'invoiced_margin'}" t-on-click="() =&gt; this.loadRanking('invoiced_margin')">Commercial margin</button></div>
+    <p t-if="!state.ranking" class="adams_empty_note">Choose a native measure to load the ranking.</p>
+    <t t-else=""><p t-if="state.ranking.status === 'loading'" class="adams_empty_note" role="status">Loading…</p><p t-elif="state.ranking.status === 'error'" class="adams_empty_note" role="alert">Analysis unavailable. Check your access and retry.</p><p t-elif="!state.ranking.rows.length" class="adams_empty_note">No matching records</p>
+    <div t-else="" class="adams_rank_list"><button t-foreach="state.ranking.rows" t-as="row" t-key="row.id || 'unassigned'" class="adams_rank_row" t-on-click="() =&gt; this.openReport(state.ranking.key, 'salesperson', row.id)"><span class="adams_rank_index" t-esc="row_index + 1"/><span class="adams_rank_avatar" t-esc="row.label.slice(0, 2)"/><span class="adams_rank_person"><span class="adams_rank_top"><strong t-esc="row.label"/><bdi t-esc="formatted({value: row.value}, state.ranking)"/></span><span class="adams_rank_track"><span t-att-style="'width:' + barWidth(row.value, state.ranking.rows)" t-att-class="{'negative': row.value &lt; 0}"/></span></span></button></div></t>
+    <p class="adams_rank_foot">Native values retain signs. Bars show relative magnitude, not target attainment. Commercial margin uses current product cost.</p>
+</section></div></t>
+                    <div t-if="section.key === 'sales'" class="adams_sales_workspace adams_sales_lower"><section class="adams_analysis">
+                        <h3>Fulfillment</h3>
+                        <p>Current native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. The balance cutoff does not apply. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>
+                        <button class="btn btn-outline-secondary" t-on-click="() =&gt; this.loadDirectory('fulfillment')">Explore delivery quantities</button>
+                        <p class="adams_hint">Native ordered, delivered and remaining quantities are shown by product and unit.</p>
+                        <t t-if="state.fulfillment">
+                            <t t-set="delivery" t-value="state.fulfillment"/>
+                            <p t-if="delivery.status === 'loading'" role="status">Loading…</p>
+                            <p t-elif="delivery.status === 'error'" role="alert">Delivery quantities unavailable. Check your access and retry.</p>
+                            <p t-elif="delivery.status === 'not_installed'">App not installed</p>
+                            <p t-elif="delivery.status === 'empty'">No matching records</p>
+                            <div class="adams_table_wrap"><table t-if="delivery.rows.length" class="table">
+                                <thead><tr><th scope="col">Product</th><th scope="col">Unit</th><th scope="col">Ordered</th><th scope="col">Delivered</th><th scope="col">Remaining</th></tr></thead>
+                                <tbody><tr t-foreach="delivery.rows" t-as="row" t-key="row.id">
+                                    <td t-esc="row.name"/><td t-esc="row.unit"/><td><bdi t-esc="row.ordered"/></td><td><bdi t-esc="row.delivered"/></td><td><bdi t-esc="row.remaining"/></td>
+                                </tr></tbody>
+                            </table></div>
+                            <div class="adams_page_controls">
+                                <button class="btn btn-outline-secondary" t-att-disabled="delivery.offset === 0 || delivery.status === 'loading'" t-on-click="() =&gt; this.loadDirectory('fulfillment', delivery.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!delivery.has_more" t-on-click="() =&gt; this.loadDirectory('fulfillment', delivery.offset + 25)">Next</button>
+                                <button t-if="delivery.status === 'ready' || delivery.status === 'empty'" class="btn btn-outline-primary" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('fulfillment')">Open native report</button>
+                            </div>
+                        </t>
+                    </section><section class="adams_panel adams_customers_panel"><header class="adams_panel_head"><div><h3>Top customers</h3><p>Net invoiced sales by commercial customer</p></div><button class="btn btn-link" t-on-click="() =&gt; this.inspect('invoiced_sales', 'customer')">Full ranking →</button></header>
+                    <button t-if="!state.customers" class="btn btn-link" t-on-click="loadCustomers">Load customers</button><p t-elif="state.customers.status === 'loading'" class="adams_empty_note" role="status">Loading…</p>
+                    <div t-elif="state.customers.status === 'error'" class="adams_empty_note" role="alert"><p>Analysis unavailable. Check your access and retry.</p><button class="btn btn-outline-secondary" t-on-click="loadCustomers">Retry</button></div>
+                    <p t-elif="!state.customers.rows.length" class="adams_empty_note">No matching records</p>
+                    <div t-else="" class="adams_rank_list"><button t-foreach="state.customers.rows" t-as="row" t-key="row.id || 'unassigned'" class="adams_rank_row" t-on-click="() =&gt; this.openReport('invoiced_sales', 'customer', row.id)"><span class="adams_rank_index" t-esc="row_index + 1"/><span class="adams_rank_person"><span class="adams_rank_top"><strong t-esc="row.label"/><bdi t-esc="formatted({value: row.value}, state.customers)"/></span><span class="adams_rank_track"><span t-att-style="'width:' + barWidth(row.value, state.customers.rows)" t-att-class="{'negative': row.value &lt; 0}"/></span></span></button></div>
+                    <p t-if="state.customers?.currency" class="adams_rank_foot"><bdi t-esc="state.customers.currency"/> · <span>Posted invoices and credit notes in the selected period.</span></p>
+                    </section></div>
+                    <t t-if="!['finance', 'sales'].includes(section.key)">
+                        <t t-if="section.key === 'procurement'"><button class="btn btn-outline-secondary mt-3" t-on-click="() =&gt; this.loadDirectory('procurement', 0, 'approvals')">Purchases awaiting approval</button>
+                        </t><t t-if="section.key === 'procurement'"><button class="btn btn-outline-secondary mt-3" t-on-click="() =&gt; this.loadDirectory('procurement', 0, 'late')">Native late receipts</button>
+                        </t><t t-if="section.key === 'procurement'"><div t-if="state.procurement" class="adams_analysis">
+                            <h3 t-if="state.procurement.mode === 'approvals'">Purchases awaiting approval</h3><h3 t-else="">Native late receipts</h3>
+                            <p>Current native purchase worklist. Period and balance cutoff do not apply. Late receipts follow Odoo's current planned-date and unreceived-quantity rule, not an original-promise performance rate. Opening a record does not approve it.</p>
+                            <p t-if="state.procurement.status === 'loading'" role="status">Loading…</p>
+                            <p t-if="state.procurement.status === 'error'" role="alert">Purchase worklist unavailable. Check your access and retry.</p>
+                            <p t-if="state.procurement.status === 'not_installed'">App not installed</p>
+                            <p t-if="state.procurement.status === 'empty'">No matching records</p>
+                            <t t-if="state.procurement.status === 'ready' || state.procurement.status === 'empty'">
+                                <p><span>Matching orders: </span><t t-esc="state.procurement.total"/></p>
+                                <div class="adams_table_wrap"><table class="table"><thead><tr><th scope="col">Reference</th><th scope="col">Vendor</th><th scope="col">Planned receipt</th><th scope="col">Untaxed amount</th></tr></thead><tbody>
+                                    <tr t-foreach="state.procurement.rows" t-as="row" t-key="row.id"><td><button class="btn btn-link" t-on-click="() =&gt; this.openReport('procurement', null, row.id)" t-esc="row.name"/></td>
+                                    <td t-esc="row.partner_id[1]"/><td><bdi t-esc="row.date_label || '—'"/></td><td><bdi t-esc="formatted({value: row.amount_untaxed}, row)"/> <bdi t-esc="row.currency"/></td></tr>
+                                </tbody></table></div>
+                                <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.procurement.offset === 0" t-on-click="() =&gt; this.loadDirectory('procurement', state.procurement.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!state.procurement.has_more" t-on-click="() =&gt; this.loadDirectory('procurement', state.procurement.offset + 25)">Next</button>
+                                <button class="btn btn-outline-primary" t-on-click="() =&gt; this.openReport('procurement')">Open native report</button></div>
+                            </t>
+                        </div>
+                        </t><t t-if="section.key === 'inventory'"><button class="btn btn-outline-secondary mt-3" t-on-click="() =&gt; this.loadDirectory('inventory', 0, 'current')">Explore current stock</button>
+                        </t><t t-if="section.key === 'inventory'"><button class="btn btn-outline-secondary mt-3" t-on-click="() =&gt; this.loadDirectory('inventory', 0, 'historical')">Stock at balance cutoff</button>
+                        </t><t t-if="section.key === 'hr'"><button class="btn btn-outline-secondary mt-3" t-on-click="() =&gt; this.loadDirectory('workforce')">Explore workforce</button>
+                        </t><t t-if="section.key === 'inventory'"><div t-if="state.inventory" class="adams_analysis">
+                            <h3>Native stock by product</h3>
+                            <p t-if="state.inventory.mode === 'current'">Current native Stock report quantities, in each product's unit. Period and balance cutoff do not apply. Quantities are not added across different units.</p>
+                            <p t-else="">Native on-hand quantity and operational valuation at the balance cutoff, end of day in your timezone. Current reservations and forecasts are omitted.</p>
+                            <p>Operational valuation uses the native stock costing service. It is separate from accounting valuation. Archived products are included. Use the native report for full export.</p>
+                            <p t-if="state.inventory.value_status &amp;&amp; state.inventory.value_status !== 'ready'"><span>Valuation: </span><t t-esc="statusLabels[state.inventory.value_status]"/></p>
+                            <p t-if="state.inventory.status === 'loading'" role="status">Loading…</p>
+                            <p t-if="state.inventory.status === 'error'" role="alert">Inventory unavailable. Check your access and retry.</p>
+                            <p t-if="state.inventory.status === 'not_installed'">App not installed</p>
+                            <p t-if="state.inventory.status === 'empty'">No matching records</p>
+                            <div class="adams_table_wrap"><table t-if="state.inventory.rows.length" class="table">
+                                <thead><tr><th scope="col">Product</th><th scope="col">Unit</th><th scope="col">On hand</th><th t-if="state.inventory.mode === 'current'" scope="col">Free to use</th><th t-if="state.inventory.mode === 'current'" scope="col">Forecasted</th><th scope="col"><span>Native stock value</span> <bdi t-esc="state.inventory.currency"/></th><th scope="col">Supporting views</th></tr></thead>
+                                <tbody><tr t-foreach="state.inventory.rows" t-as="row" t-key="row.id">
+                                    <td t-esc="row.display_name"/><td t-esc="row.uom_id[1]"/><td t-esc="row.qty_available"/><td t-if="state.inventory.mode === 'current'" t-esc="row.free_qty"/><td t-if="state.inventory.mode === 'current'" t-esc="row.virtual_available"/>
+                                    <td><t t-if="state.inventory.value_status === 'ready'" t-esc="formatted({value: row.total_value}, state.inventory)"/><t t-else="">—</t></td>
+                                    <td><details><summary>Current supporting views</summary><div class="adams_page_controls">
+                                        <button class="btn btn-link" t-on-click="() =&gt; this.openReport('inventory_product', 'forecast', row.id)">Forecast</button>
+                                        <button class="btn btn-link" t-on-click="() =&gt; this.openReport('inventory_product', 'history', row.id)">Move history</button>
+                                        <button class="btn btn-link" t-on-click="() =&gt; this.openReport('inventory_product', 'locations', row.id)">Locations</button>
+                                        <button class="btn btn-link" t-on-click="() =&gt; this.openReport('inventory_product', 'replenishment', row.id)">Replenishment rules</button>
+                                    </div></details></td>
+                                </tr></tbody>
+                            </table></div>
+                            <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.inventory.offset === 0" t-on-click="() =&gt; this.loadDirectory('inventory', state.inventory.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!state.inventory.has_more" t-on-click="() =&gt; this.loadDirectory('inventory', state.inventory.offset + 25)">Next</button>
+                                <button t-if="state.inventory.status === 'ready' || state.inventory.status === 'empty'" class="btn btn-outline-primary" t-on-click="() =&gt; this.openReport('inventory')">Open native report</button></div>
+                        </div>
+                        </t><t t-if="section.key === 'hr'"><div t-if="state.workforce" class="adams_analysis">
+                            <h3>Current workforce by department</h3>
+                            <p>Active employee records in the selected company, grouped by their current department. Period and balance cutoff do not apply. No private employee fields are returned.</p>
+                            <p t-if="state.workforce.status === 'loading'" role="status">Loading…</p>
+                            <p t-if="state.workforce.status === 'error'" role="alert">Workforce unavailable. HR reporting access is required.</p>
+                            <p t-if="state.workforce.status === 'not_installed'">App not installed</p>
+                            <t t-if="state.workforce.status === 'ready' || state.workforce.status === 'empty'">
+                                <p><span>Active employees: </span><strong t-esc="state.workforce.total"/></p>
+                                <div class="adams_table_wrap"><table class="table"><thead><tr><th scope="col">Department</th><th scope="col">Employees</th></tr></thead><tbody>
+                                    <tr t-foreach="state.workforce.rows" t-as="row" t-key="row.id || 'unassigned'"><td><button class="btn btn-link" t-on-click="() =&gt; this.openReport('workforce', null, row.id)" t-esc="row.name"/></td><td t-esc="row.count"/></tr>
+                                </tbody></table></div>
+                                <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.workforce.offset === 0" t-on-click="() =&gt; this.loadDirectory('workforce', state.workforce.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!state.workforce.has_more" t-on-click="() =&gt; this.loadDirectory('workforce', state.workforce.offset + 25)">Next</button>
+                                <button class="btn btn-outline-primary" t-on-click="() =&gt; this.openReport('workforce')">Open native report</button></div>
+                            </t>
+                        </div>
+                    </t></t>
+                    </t>
+                </section>
+                <details id="adams-trust" class="adams_trust"><summary>Data &amp; trust</summary><p>This workspace uses native Odoo reports and authorized operational records. Financial mappings require approval for each company. Missing access, definitions and data are never replaced with estimated totals.</p><p>Report agreement does not verify source completeness or financial close. Open each metric’s source definition and native report for supporting records and full exports.</p></details></t>
+        </div><dialog class="adams_source_dialog" t-ref="sourceDialog" t-on-cancel.prevent="closeSource" aria-labelledby="adams-source-title">
+    <t t-if="state.source"><t t-set="item" t-value="state.source.item"/><t t-set="result" t-value="state.source.result"/>
+    <header class="adams_panel_head"><div><h2 id="adams-source-title" t-esc="labels[item.key]"/><p>Source &amp; definition</p></div><button class="btn btn-outline-secondary" t-on-click="closeSource" autofocus="autofocus">Close</button></header>
+    <div class="adams_source_body"><p class="adams_source_value"><bdi t-esc="formatted(item, result)"/> <t t-esc="item.unit === 'currency' ? result.currency : item.unit === 'percentage' ? '%' : ''"/></p>
+    <p t-if="item.status !== 'ready'" t-esc="statusLabels[item.status]"/>
+
+                                    <p t-esc="item.source"/><code t-esc="item.measure"/>
+                                    <p t-if="item.source_line" t-esc="item.source_line"/>
+                                    <p t-if="item.definition" t-esc="item.definition"/>
+                                    <p>Date basis: <code t-esc="item.date_field"/></p>
+                                    <p>One company · native report currency · current access rules</p>
+                                <p t-if="item.key === 'invoiced_margin'" class="adams_hint">Native Invoice Analysis margin uses current product cost and native currency treatment. It is distinct from posted P&amp;L gross profit and may change when product cost changes.</p>
+                            <p t-if="item.key === 'standard_forecast'" class="adams_hint">Native Executive Summary forecast at period end: receivables plus signed payables. This is not a dated receipt/payment plan or a guaranteed cash balance.</p>
+                            <details t-if="item.status === 'ready' &amp;&amp; ['revenue', 'gross_profit', 'profit', 'operating_expenses', 'gross_margin', 'net_margin'].includes(item.key)">
+                                <summary>Monthly financial trend</summary>
+                                <p>Each month is evaluated by the approved native report. First and last months use the selected period boundaries. Signs are preserved; these are not closed-period or like-for-like assurances.</p>
+                                <button class="btn btn-link" t-on-click="() =&gt; this.loadFinancialTrend(item.key)">Load monthly values</button>
+                                <t t-if="state.financialTrends[item.key]">
+                                    <t t-set="trend" t-value="state.financialTrends[item.key]"/>
+                                    <p t-if="trend.status === 'loading'" role="status">Loading native reports…</p>
+                                    <p t-elif="trend.status !== 'ready'" role="alert" t-esc="statusLabels[trend.status]"/>
+                                    <div t-else="" class="adams_table_wrap"><table class="table"><thead><tr><th scope="col">Month</th><th scope="col">Value</th></tr></thead><tbody>
+                                        <tr t-foreach="trend.rows" t-as="month" t-key="month.label"><td><button class="btn btn-link" t-on-click="() =&gt; this.openFinancialPeriod(item.key, month.label)" t-esc="month.label"/></td>
+                                            <td><bdi t-esc="formatted(month, trend)"/> <t t-esc="trend.unit === 'percentage' ? '%' : trend.currency"/>
+                                                <p t-if="month.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                                            </td></tr>
+                                    </tbody></table></div>
+                                </t>
+                            </details>
+                            <details t-if="item.budget">
+                                <summary>Native budget</summary>
+                                <p t-if="item.budget.status !== 'ready'" t-esc="statusLabels[item.budget.status]"/>
+                                <t t-else="">
+                                    <p t-esc="item.budget.name"/>
+                                    <p><bdi t-esc="formatted(item.budget, result)"/> <t t-esc="result.currency"/></p>
+                                    <p>Native dated budget items for the selected period. No daily target proration is applied.</p>
+                                    <p t-if="item.budget.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                                    <button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('budget_' + item.key)">Open native report <span aria-hidden="true">↗</span></button>
+                                </t>
+                            </details>
+                            <details t-if="item.aging_buckets &amp;&amp; item.aging_buckets.length">
+                                <summary>Native due-date aging</summary>
+                                <table class="table"><caption>Native 30-day buckets at the selected balance cutoff. Signed credits are retained.</caption>
+                                    <thead><tr><th scope="col">Period</th><th scope="col">Balance</th></tr></thead>
+                                    <tbody><tr t-foreach="item.aging_buckets" t-as="bucket" t-key="bucket.key">
+                                        <th scope="row" t-esc="bucket.label"/>
+                                        <td><bdi t-esc="formatted(bucket, result)"/> <t t-esc="result.currency"/></td>
+                                    </tr></tbody>
+                                </table>
+                            </details>
+                            <p t-if="item.key === 'invoiced_sales'" class="adams_hint">Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue.</p>
+                            <p t-if="item.key === 'confirmed_sales' || item.key === 'orders'" class="adams_hint">Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales.</p>
+                            <p t-if="item.key === 'quotations'" class="adams_hint">Draft and sent quotations by native order date, untaxed. Expired quotations remain included while their native state is draft or sent.</p>
+                            <p t-if="item.key === 'purchases'" class="adams_hint">Confirmed purchase orders by order date, untaxed. This is not an outstanding balance.</p>
+                            <p t-if="item.key === 'crm'" class="adams_hint">Active open opportunities created in the period. Native probability-weighted revenue, not a cash forecast. Company-unassigned opportunities are excluded.</p>
+                            <p t-if="item.key === 'hr'" class="adams_hint">Approved requests starting in the period, for active employees. Native report hours are negative for leave taken. Not period-prorated capacity.</p>
+                                <t t-if="item.partner_ledger">
+                                    <p>Partner activity uses the selected period, separately from the aging balance cutoff. Customer and vendor roles remain separate.</p>
+                                    <button type="button" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('partner_' + item.key)">Open Partner Ledger <span aria-hidden="true">↗</span></button>
+                                </t>
+                                <button t-if="dimensions[item.key]" type="button" class="btn btn-link" t-on-click="() =&gt; this.inspect(item.key)">Explore breakdown and trend</button>
+
+    <button t-if="item.drilldown" class="btn btn-primary" t-on-click="() =&gt; this.openReport(item.key)">Open native report</button>
+    <p t-if="result.generated_at" class="adams_hint">Fetched at <bdi t-esc="result.generated_at"/> UTC.</p>
+    </div></t></dialog></main>
+    </t>
+
+<t t-name="adams_executive_dashboard.Liquidity">
+<div class="adams_liquidity_grid">
+    <section class="adams_panel adams_cash_flow_panel"><header class="adams_panel_head"><div><h3>Cash Flow Statement</h3><p>Recorded cash movements during the selected period</p></div><button t-if="result.cash_flow?.status === 'ready'" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('cash_flow')">Open native report ↗</button></header>
+        <div class="adams_finance_panel_body"><p t-if="!result.cash_flow || result.cash_flow.status !== 'ready'" t-esc="statusLabels[result.cash_flow?.status || 'not_installed']"/>
+        <t t-else=""><p t-if="result.cash_flow.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+            <div class="adams_cash_bridge"><div t-foreach="['opening_balance', 'net_increase', 'closing_balance']" t-as="key" t-key="key"><span t-esc="result.cash_flow.bridge[key].label"/><strong><bdi t-esc="formatted(result.cash_flow.bridge[key], result)"/></strong><small t-esc="result.currency"/></div></div>
+            <details class="adams_cash_details"><summary>Activities and unclassified movements</summary><div class="adams_table_wrap"><table class="table"><thead><tr><th>Activity</th><th>Value</th></tr></thead><tbody><tr t-foreach="result.cash_flow.rows" t-as="row" t-key="row.key"><th t-esc="row.label"/><td><bdi t-esc="formatted(row, result)"/> <t t-esc="result.currency"/></td></tr></tbody></table></div></details>
+        </t><p class="adams_hint">Cash composition follows the native Cash Flow Statement and may differ from the Balance Sheet or account directory.</p>
+        <div class="adams_forecast_note"><h4>Cash flow outlook</h4><p>The standard native short-term forecast is shown above; it is separate from recorded cash movements.</p></div></div>
+    </section>
+    <section class="adams_panel adams_bank_panel"><header class="adams_panel_head"><div><h3>Bank &amp; cash accounts</h3><p>Native balances at the selected cutoff</p></div><button class="btn btn-link" t-on-click="() =&gt; this.loadDirectory('cash')">Refresh accounts</button></header>
+        <div class="adams_finance_panel_body"><form class="adams_account_search" t-on-submit.prevent="() =&gt; this.loadDirectory('cash', 0, null, state.cashSearch)"><label>Find account<input class="form-control" type="search" maxlength="100" t-model="state.cashSearch" placeholder="Account name or code"/></label><button class="btn btn-outline-secondary" type="submit">Search</button></form><p t-if="!state.directory">Load the authorized account directory to inspect balances.</p><t t-else="">
+        <p t-if="state.directory.status === 'loading'" role="status">Loading…</p><p t-elif="state.directory.status === 'error'" role="alert">Directory unavailable. Check your access and retry.</p><p t-elif="!state.directory.rows.length" t-esc="statusLabels[state.directory.status] || statusLabels.empty"/>
+        <p t-if="state.directory.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+        <p t-if="state.directory.total_count !== undefined" class="adams_directory_count"><span>Showing</span> <bdi t-esc="state.directory.rows.length ? state.directory.offset + 1 : 0"/>–<bdi t-esc="state.directory.rows.length ? state.directory.offset + state.directory.rows.length : 0"/> <span>of</span> <bdi t-esc="state.directory.total_count"/> <span>matching accounts</span></p><div class="adams_bank_list"><div t-foreach="state.directory.rows" t-as="row" t-key="row.id" class="adams_bank_row"><span class="adams_bank_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'bank'"/></t></span><div class="adams_bank_identity"><strong><bdi t-esc="row.code"/> · <t t-esc="row.name"/></strong><small><t t-esc="row.journals.join(', ') || '—'"/> <span t-if="!row.active">(Archived)</span></small></div><div class="adams_bank_amount"><button t-if="row.drilldown" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('cash_account', null, row.id)"><bdi t-esc="formatted({value: row.balance, status: row.balance_status}, {digits: row.balance_digits})"/></button><span t-else="" t-esc="formatted({value: row.balance, status: row.balance_status}, {digits: row.balance_digits})"/><small t-if="row.balance !== null" t-esc="row.balance_currency"/></div></div></div>
+        <div t-if="state.directory.rows.length || state.directory.offset" class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="!state.directory.offset || state.directory.status === 'loading'" t-on-click="() =&gt; this.loadDirectory('cash', state.directory.offset - 25)">Previous</button><button class="btn btn-outline-secondary" t-att-disabled="!state.directory.has_more || state.directory.status === 'loading'" t-on-click="() =&gt; this.loadDirectory('cash', state.directory.offset + 25)">Next</button></div>
+        <details class="adams_cash_details"><summary>Account scope and currencies</summary><p t-esc="state.directory.definition"/><p>Archived accounts are included. Account currency is separate from the report balance currency. Statement reconciliation is not assessed.</p><div t-foreach="state.directory.rows" t-as="row" t-key="row.id"><bdi t-esc="row.code"/> · <t t-esc="row.currency"/></div></details>
+        </t></div>
+    </section>
+</div>
+</t>
+<t t-name="adams_executive_dashboard.Icon"><svg class="adams_icon" viewBox="0 0 24 24" aria-hidden="true"><g t-if="iconName === 'bank'"><path d="m3 8 9-5 9 5H3Zm1 13h16M6 10v8M10 10v8M14 10v8M18 10v8M3 18h18"/></g><g t-if="iconName === 'sales'"><path d="M3 3h2l3 12h10l3-9H6M9 20h.01M17 20h.01"/><circle cx="9" cy="20" r="1"/><circle cx="17" cy="20" r="1"/></g><g t-if="iconName === 'target'"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 20 4m-4 0h4v4"/></g><g t-if="iconName === 'box'"><path d="m3 7 9-5 9 5v10l-9 5-9-5V7Zm0 0 9 5 9-5M12 12v10M7.5 4.5l9 5"/></g><g t-if="iconName === 'truck'"><path d="M2 5h12v13H2V5Zm12 5h4l4 4v4h-8M16 10v5h6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></g><g t-if="iconName === 'people'"><circle cx="9" cy="8" r="3"/><path d="M3 20v-3a6 6 0 0 1 12 0v3M17 5a3 3 0 0 1 0 6M18 14a5 5 0 0 1 3 5v1"/></g><g t-if="iconName === 'chart'"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-8h4v8"/></g><g t-if="iconName === 'trend'"><path d="m3 17 6-6 4 3 8-9m-6 0h6v6"/></g><g t-if="iconName === 'coins'"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 10v5c0 1.7 3.6 3 8 3s8-1.3 8-3v-5M4 15v4c0 1.7 3.6 3 8 3s8-1.3 8-3v-4"/></g><g t-if="iconName === 'wallet'"><path d="M20 8V5H5a2 2 0 0 0 0 4h15v11H5a2 2 0 0 1-2-2V7M20 12h-5v5h5"/><path d="M17 14.5h.01"/></g><g t-if="iconName === 'calendar'"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></g><g t-if="iconName === 'invoice'"><path d="M6 3h9l4 4v14H5V3h1Zm8 0v5h5M8 12h8M8 16h6"/></g><g t-if="iconName === 'book'"><path d="M3 3h7a3 3 0 0 1 3 3v16a4 4 0 0 0-4-2H3V3Zm18 0h-5a3 3 0 0 0-3 3v16a4 4 0 0 1 4-2h4V3Z"/></g><g t-if="iconName === 'alert'"><path d="m12 3 10 18H2L12 3ZM12 9v5M12 17h.01"/></g><g t-if="iconName === 'menu'"><path d="M3 6h18M3 12h18M3 18h18"/></g><g t-if="iconName === 'refresh'"><path d="M20 10a8 8 0 0 0-14-5L3 8m0-5v5h5M4 14a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></g></svg></t></templates>
