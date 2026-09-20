@@ -8,13 +8,13 @@ from time import perf_counter
 
 from odoo import Command
 from odoo.tests import tagged
-from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 _logger = logging.getLogger(__name__)
 
 
 @tagged('post_install', '-at_install')
-class TestDashboardPerformance(AccountTestInvoicingCommon):
+class TestDashboardPerformance(AccountTestInvoicingHttpCommon):
     def test_native_finance_synthetic_load_baseline(self):
         partners = self.env['res.partner'].create([
             {'name': f'Dashboard load fixture {index:03d}'} for index in range(100)])
@@ -76,3 +76,45 @@ class TestDashboardPerformance(AccountTestInvoicingCommon):
         }, sort_keys=True))
         self.assertLessEqual(samples[0], 3, 'Synthetic first native Finance evaluation exceeds 3s')
         self.assertLessEqual(p95, 2, 'Synthetic native Finance refresh p95 exceeds 2s')
+        self.browser_size = '1440x900'
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        self.browser_js(f'/odoo/action-{action.id}', '''
+        (async () => {
+            const wait = async (test, message) => {
+                for (let attempt = 0; attempt < 1000; attempt++) {
+                    if (test()) return;
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                throw new Error(message);
+            };
+            await wait(() => document.querySelector('#adams-finance .adams_metric_groups'), 'Finance did not become usable');
+            const first = performance.now();
+            const root = document.querySelector('.o_adams_dashboard');
+            const inputs = [...root.querySelectorAll('.adams_filters input')];
+            const dates = ['2026-08-01','2026-08-31','2026-08-31'];
+            const expected = new Intl.NumberFormat(document.documentElement.lang || 'en',
+                {minimumFractionDigits:2, maximumFractionDigits:2}).format(100000);
+            const samples = [];
+            for (let index = 0; index < 20; index++) {
+                dates[0] = index % 2 ? '2026-08-01' : '2026-08-02';
+                inputs.forEach((input, i) => {
+                    input.value = dates[i]; input.dispatchEvent(new Event('input', {bubbles:true}));
+                    input.dispatchEvent(new Event('change', {bubbles:true}));
+                });
+                const started = performance.now();
+                root.querySelector('.adams_filters button').click();
+                await wait(() => root.querySelector('#adams-finance > .adams_message[role="status"]'), 'Refresh must clear old Finance values');
+                await wait(() => root.querySelector('#adams-finance .adams_value')?.title === expected,
+                    'Refreshed native revenue must equal 100000');
+                samples.push((performance.now() - started) / 1000);
+            }
+            const p95 = [...samples].sort((a,b) => a-b)[18];
+            console.log('DASHBOARD_BROWSER_PERFORMANCE ' + JSON.stringify({
+                scope:'1440px native browser, 1000 invoices/100 partners, four configured metrics',
+                first_navigation_seconds:first / 1000, refresh_p95_seconds:p95, samples_seconds:samples,
+                customer_volume_qualified:false, concurrent_load_qualified:false}));
+            if (first > 3000) throw new Error('Synthetic usable Finance navigation exceeds 3s');
+            if (p95 > 2) throw new Error('Synthetic rendered Finance refresh p95 exceeds 2s');
+            console.log('test successful');
+        })().catch(error => console.error(error));
+        ''', login=self.env.user.login, timeout=120)
