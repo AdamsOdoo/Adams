@@ -561,6 +561,7 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
             self.assertEqual(rebuilt['forced_domain'], action['params']['options']['forced_domain'])
             self.assertFalse(report.get_options(rebuilt).get('forced_domain'))
+            self.assertFalse(report.get_options(rebuilt).get('report_title'))
             # RPC and native export serialize tuple domains to JSON lists.
             serialized = json.loads(json.dumps(rebuilt))
             native = report.get_report_information(serialized)
@@ -569,6 +570,10 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             self.assertIn(windows[key]['label'], native['report']['name'])
             self.assertIn(windows[key]['label'], report.get_default_report_filename(rebuilt, 'xlsx'))
             self.assertIn('2026-08-31', report.get_default_report_filename(rebuilt, 'xlsx'))
+            printable = report.get_options(dict(serialized, export_mode='print'))
+            html = report._get_pdf_export_html(printable, report._get_lines(printable))
+            self.assertIn(windows[key]['label'], str(html))
+            self.assertIn('2026-08-31', str(html))
             exported = report.export_to_xlsx(serialized)
             with zipfile.ZipFile(io.BytesIO(exported['file_content'])) as archive:
                 strings = archive.read('xl/sharedStrings.xml').decode()

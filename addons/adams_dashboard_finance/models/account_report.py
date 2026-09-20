@@ -14,6 +14,8 @@ class AccountReport(models.Model):
         if not window and (previous_options or {}).get('export_mode') == 'print':
             window = previous_options.get('adams_supplier_window')
         if not window:
+            if (previous_options or {}).get('adams_supplier_window'):
+                options.pop('report_title', None)
             return options
         dashboard = self.env['adams.executive.dashboard']
         dashboard._finance_access()
@@ -29,6 +31,7 @@ class AccountReport(models.Model):
         cutoff = fields.Date.to_date(options['date']['date_to'])
         options['forced_domain'] = dashboard._supplier_window_domain(cutoff, window)
         options['adams_supplier_window'] = window
+        options['report_title'] = '%s — %s' % (self.name, self._adams_supplier_caption(options))
         return options
 
     def _adams_supplier_caption(self, options):
