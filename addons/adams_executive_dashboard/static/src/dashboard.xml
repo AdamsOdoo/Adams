@@ -86,7 +86,19 @@
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
+                            <p t-if="item.key === 'standard_forecast'" class="adams_hint">Native Executive Summary forecast at period end: receivables plus signed payables. This is not a dated receipt/payment plan or a guaranteed cash balance.</p>
                             <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                            <details t-if="item.budget">
+                                <summary>Native budget</summary>
+                                <p t-if="item.budget.status !== 'ready'" t-esc="statusLabels[item.budget.status]"/>
+                                <t t-else="">
+                                    <p t-esc="item.budget.name"/>
+                                    <p><bdi t-esc="formatted(item.budget, result)"/> <t t-esc="result.currency"/></p>
+                                    <p>Native dated budget items for the selected period. No daily target proration is applied.</p>
+                                    <p t-if="item.budget.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                                    <button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openReport('budget_' + item.key)">Open native report <span aria-hidden="true">↗</span></button>
+                                </t>
+                            </details>
                             <details t-if="item.aging_buckets &amp;&amp; item.aging_buckets.length">
                                 <summary>Native due-date aging</summary>
                                 <table class="table"><caption>Native 30-day buckets at the selected balance cutoff. Signed credits are retained.</caption>

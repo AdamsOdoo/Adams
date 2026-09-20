@@ -1027,3 +1027,27 @@ msgstr "تستخدم حركة الشريك الفترة المحددة بشكل 
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Open Partner Ledger"
 msgstr "فتح دفتر أستاذ الشريك"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Native short-term cash forecast"
+msgstr "التوقع النقدي الأصلي قصير الأجل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native Executive Summary forecast at period end: receivables plus signed payables. This is not a dated receipt/payment plan or a guaranteed cash balance."
+msgstr "توقع الملخص التنفيذي الأصلي في نهاية الفترة: الذمم المدينة مضافًا إليها الذمم الدائنة بإشارتها. لا يمثل خطة تحصيل وسداد مؤرخة أو رصيدًا نقديًا مضمونًا."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native budget"
+msgstr "الموازنة الأصلية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native dated budget items for the selected period. No daily target proration is applied."
+msgstr "بنود الموازنة الأصلية المؤرخة للفترة المحددة. لا يتم توزيع الأهداف تناسبيًا على الأيام."

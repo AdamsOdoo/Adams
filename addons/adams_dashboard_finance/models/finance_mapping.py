@@ -14,10 +14,12 @@ METRICS = [
     ('gross_margin', 'Gross margin'), ('net_margin', 'Net margin'),
     ('cash', 'Bank and cash'), ('assets', 'Assets'),
     ('liabilities', 'Liabilities'), ('equity', 'Equity'),
+    ('standard_forecast', 'Native short-term cash forecast'),
     ('receivables', 'Receivables'), ('payables', 'Payables'),
 ]
-PERIOD_KEYS = {'revenue', 'gross_profit', 'profit', 'operating_expenses', 'gross_margin', 'net_margin'}
+PERIOD_KEYS = {'revenue', 'gross_profit', 'profit', 'operating_expenses', 'gross_margin', 'net_margin', 'standard_forecast'}
 RATIO_KEYS = {'gross_margin', 'net_margin'}
+BUDGET_KEYS = {'revenue', 'gross_profit', 'profit', 'operating_expenses'}
 
 
 class FinanceMapping(models.Model):
@@ -36,6 +38,7 @@ class FinanceMapping(models.Model):
     cash_detail_expression_id = fields.Many2one('account.report.expression', ondelete='restrict')
     cash_flow_report_id = fields.Many2one('account.report', ondelete='restrict')
     partner_ledger_report_id = fields.Many2one('account.report', ondelete='restrict')
+    budget_id = fields.Many2one('account.report.budget', ondelete='restrict', check_company=True)
     definition_note = fields.Text(required=True, help='Explain the chosen native definition, variant, currency and reporting policy.')
     approved_by = fields.Many2one('res.users', readonly=True, copy=False)
     approved_at = fields.Datetime(readonly=True, copy=False)
@@ -45,11 +48,17 @@ class FinanceMapping(models.Model):
     _metric_company_unique = models.Constraint('unique(company_id, metric)', 'Map each metric only once per company.')
 
     @api.constrains('expression_id', 'denominator_expression_id', 'report_id', 'company_id', 'metric',
-                    'cash_detail_report_id', 'cash_detail_expression_id', 'cash_flow_report_id', 'partner_ledger_report_id')
+                    'cash_detail_report_id', 'cash_detail_expression_id', 'cash_flow_report_id', 'partner_ledger_report_id', 'budget_id')
     def _check_definition(self):
         for mapping in self:
             if mapping.expression_id.report_line_id.report_id != mapping.report_id:
                 raise ValidationError(_('Select an expression belonging to the chosen report.'))
+            if mapping.metric == 'standard_forecast' and mapping.expression_id != self.env.ref(
+                    'account_reports.account_financial_report_executivesummary_st_cash_forecast0_balance'):
+                raise ValidationError(_('Select the native Executive Summary short-term cash forecast expression.'))
+            if mapping.budget_id and (mapping.metric not in BUDGET_KEYS or not mapping.report_id.filter_budgets
+                                      or mapping.budget_id.company_id != mapping.company_id):
+                raise ValidationError(_('Select a same-company native budget for a supported profitability report.'))
             if mapping.metric in RATIO_KEYS and (
                     not mapping.denominator_expression_id
                     or mapping.denominator_expression_id.report_line_id.report_id != mapping.report_id):
@@ -105,9 +114,9 @@ class FinanceMapping(models.Model):
                  report.root_report_id.id, report.country_id.id, report.filter_date_range,
                  self.definition_note, self.denominator_expression_id.id,
                  self.cash_detail_report_id.id, self.cash_detail_expression_id.id,
-                 self.cash_flow_report_id.id, self.partner_ledger_report_id.id, definitions,
+                 self.cash_flow_report_id.id, self.partner_ledger_report_id.id, self.budget_id.id, definitions,
                  [(r.id, r.root_report_id.id, r.country_id.id, r.filter_date_range,
-                   r.filter_multi_company, r.filter_account_type, r.only_tax_exigible,
+                   r.filter_multi_company, r.filter_account_type, r.filter_budgets, r.only_tax_exigible,
                    r.custom_handler_model_id.id,
                    [(c.id, c.expression_label, c.figure_type) for c in r.column_ids.sorted('id')])
                   for r in reports.sorted('id')]]

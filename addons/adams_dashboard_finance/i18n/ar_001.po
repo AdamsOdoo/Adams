@@ -244,3 +244,28 @@ msgstr "تقرير دفتر أستاذ الشريك"
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
 msgid "Select the native Partner Ledger for a receivable or payable mapping."
 msgstr "اختر دفتر أستاذ الشريك الأصلي لربط الذمم المدينة أو الدائنة."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__standard_forecast
+msgid "Native short-term cash forecast"
+msgstr "التوقع النقدي الأصلي قصير الأجل"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select the native Executive Summary short-term cash forecast expression."
+msgstr "اختر تعبير التوقع النقدي الأصلي قصير الأجل في الملخص التنفيذي."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__budget_id
+msgid "Budget"
+msgstr "الموازنة"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select a same-company native budget for a supported profitability report."
+msgstr "اختر موازنة أصلية للشركة نفسها ضمن تقرير ربحية مدعوم."
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "The native budget is unavailable for this scope."
+msgstr "الموازنة الأصلية غير متاحة لهذا النطاق."

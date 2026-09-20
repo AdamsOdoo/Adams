@@ -381,3 +381,43 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
 
     def _financial_mapping_for_test(self, metric):
         return self.mapping_model.search([('company_id', '=', self.env.company.id), ('metric', '=', metric)])
+
+    def test_native_short_term_forecast_retains_its_actual_definition(self):
+        self._mapping('standard_forecast', report=self.env.ref('account_reports.executive_summary'),
+                      expression=self.env.ref('account_reports.account_financial_report_executivesummary_st_cash_forecast0_balance'))
+        self._invoice(50, invoice_date='2026-07-01')
+        self._invoice(100)
+        self._invoice(200, 'in_invoice')
+        self._invoice(999, invoice_date='2026-09-01')
+        item = self._item('standard_forecast')
+        self.assertEqual(item['status'], 'ready', item)
+        self.assertEqual(item['source_kind'], 'forecast')
+        self.assertEqual(item['value'], -50)
+        self._cash_entry(self.company_data['default_journal_bank'].default_account_id, 1000, '2026-08-10')
+        self.assertEqual(self._item('standard_forecast')['value'], -50)
+
+    def test_native_budget_uses_selected_version_and_dates_without_proration(self):
+        mapping = self._mapping(approve=False)
+        budget = self.env['account.report.budget'].create({
+            'name': 'Approved August fixture', 'company_id': self.env.company.id,
+            'item_ids': [Command.create({'account_id': self.company_data['default_account_revenue'].id,
+                                        'date': '2026-08-01', 'amount': -120}),
+                         Command.create({'account_id': self.company_data['default_account_revenue'].id,
+                                        'date': '2026-09-01', 'amount': -999})],
+        })
+        mapping.budget_id = budget
+        mapping.action_approve()
+        self._invoice(100)
+        item = self._item()
+        self.assertEqual(item['value'], 100)
+        self.assertEqual(item['budget']['status'], 'ready', item['budget'])
+        self.assertEqual(item['budget']['value'], 120)
+        self.assertEqual(item['budget']['budget_id'], budget.id)
+        action = self.dashboard.open_report('budget_revenue', self.options)
+        self.assertEqual(action['params']['options'], item['budget']['options'])
+        partial = self._item(options=dict(self.options, date_from='2026-08-15'))
+        self.assertEqual(partial['budget']['status'], 'not_configured')
+        self.assertIsNone(partial['budget']['value'])
+        # An explicit native zero target is different from absent period items.
+        budget.item_ids.filtered(lambda line: str(line.date) == '2026-08-01').amount = 0
+        self.assertEqual(self._item()['budget']['value'], 0)

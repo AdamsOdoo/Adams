@@ -7,7 +7,7 @@ import math
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
-from .finance_mapping import METRICS, PERIOD_KEYS, RATIO_KEYS
+from .finance_mapping import METRICS, PERIOD_KEYS, RATIO_KEYS, BUDGET_KEYS
 
 _logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class ExecutiveDashboard(models.AbstractModel):
         self.env['account.report'].check_access('read')
         self.env['account.move.line'].check_access('read')
 
-    def _financial_options(self, report, key, dates, previous_extra=None):
+    def _financial_options(self, report, key, dates, previous_extra=None, budget_id=None):
         report.check_access('read')
         if not report.active or report.use_sections:
             raise UnsupportedFinancialScope()
@@ -46,13 +46,15 @@ class ExecutiveDashboard(models.AbstractModel):
             previous.update(aging_based_on='base_on_maturity_date', aging_interval=30)
         if previous_extra:
             previous.update(previous_extra)
+        if budget_id:
+            previous['budgets'] = [{'id': budget_id, 'selected': True}]
         options = report.get_options(previous)
         if (options.get('report_id') != report.id
                 or options.get('date', {}).get('date_to') != cutoff.isoformat()
                 or options.get('all_entries')
                 or {company['id'] for company in options.get('companies', [])} != {self.env.company.id}
                 or (period and options['date'].get('date_from') != dates[0].isoformat())
-                or len(options.get('column_groups', {})) != 1):
+                or len(options.get('column_groups', {})) != (3 if budget_id else 1)):
             raise UnsupportedFinancialScope()
         if key in {'receivables', 'payables'} and (
                 options.get('aging_based_on') != 'base_on_maturity_date'
@@ -147,6 +149,7 @@ class ExecutiveDashboard(models.AbstractModel):
                     if not buckets:
                         raise UnsupportedFinancialScope()
                 item.update(status='ready', value=value, unit='percentage' if key in RATIO_KEYS else 'currency',
+                            source_kind='forecast' if key == 'standard_forecast' else 'native_report',
                             source=report.display_name,
                             source_line=mapping.expression_id.report_line_id.display_name,
                             measure=mapping.expression_id.label,
@@ -155,6 +158,7 @@ class ExecutiveDashboard(models.AbstractModel):
                             has_warnings=bool(information.get('warnings')),
                             aging_buckets=buckets,
                             partner_ledger=bool(mapping.partner_ledger_report_id),
+                            budget=scoped._budget_data(mapping, dates, evaluations) if key in BUDGET_KEYS else False,
                             definition=mapping.definition_note)
             except AccessError:
                 item['status'] = 'restricted'
@@ -170,6 +174,21 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key in {'budget_' + metric for metric in BUDGET_KEYS}:
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if dimension is not None or group_id is not None:
+                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            mapping = scoped._financial_mapping(key.removeprefix('budget_'))
+            if not scoped._mapping_ready(mapping):
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            budget = scoped._budget_data(mapping, dates, {})
+            if budget['status'] != 'ready':
+                raise ValidationError(_('The native budget is unavailable for this scope.'))
+            return {'type': 'ir.actions.client', 'tag': 'account_report', 'name': mapping.report_id.display_name,
+                    'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=mapping.report_id.id),
+                    'params': {'options': budget['options'], 'ignore_session': True}}
         if key in {'partner_receivables', 'partner_payables'}:
             scoped, dates = self._scope(options)
             scoped._finance_access()
@@ -285,6 +304,41 @@ class ExecutiveDashboard(models.AbstractModel):
             status = 'restricted' if isinstance(error, AccessError) else 'unsupported_scope' if isinstance(error, UnsupportedFinancialScope) else 'error'
             for row in result['rows']:
                 row.update(balance=None, balance_status=status, drilldown=False)
+        return result
+
+    def _budget_data(self, mapping, dates, evaluations):
+        result = {'status': 'not_configured', 'value': None}
+        try:
+            budget = mapping.budget_id
+            if not budget:
+                return result
+            budget.check_access('read')
+            if budget.company_id != self.env.company:
+                raise AccessError(_('Accounting report access is required.'))
+            # Native budgets are dated items. Missing period coverage must not
+            # turn into an invented zero target or linear daily proration.
+            if not self.env['account.report.budget.item'].search_count([
+                    ('budget_id', '=', budget.id), ('date', '>=', dates[0]), ('date', '<=', dates[1])]):
+                return result
+            cache_key = ('budget', mapping.report_id.id, budget.id)
+            if cache_key not in evaluations:
+                options = self._financial_options(mapping.report_id, mapping.metric, dates, budget_id=budget.id)
+                selected = {item['id'] for item in options.get('budgets', []) if item.get('selected')}
+                if selected != {budget.id}:
+                    raise UnsupportedFinancialScope()
+                evaluations[cache_key] = (options, mapping.report_id.get_report_information(options))
+            options, information = evaluations[cache_key]
+            groups = [key for key, group in options['column_groups'].items()
+                      if group['forced_options'].get('compute_budget') == budget.id]
+            if len(groups) != 1:
+                raise UnsupportedFinancialScope()
+            value = information['column_groups_totals'][groups[0]][mapping.expression_id.id]['value']
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise UnsupportedFinancialScope()
+            result.update(status='ready', value=value, name=budget.name, budget_id=budget.id,
+                          options=options, has_warnings=bool(information.get('warnings')))
+        except (AccessError, UnsupportedFinancialScope, UserError, KeyError, TypeError, ValueError) as error:
+            result['status'] = 'restricted' if isinstance(error, AccessError) else 'unsupported_scope' if isinstance(error, UnsupportedFinancialScope) else 'error'
         return result
 
     def _open_cash_account(self, options, account_id):

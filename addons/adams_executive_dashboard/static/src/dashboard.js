@@ -26,6 +26,7 @@ export class ExecutiveDashboard extends Component {
             gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
             assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
+            standard_forecast: _t('Native short-term cash forecast'),
             invoiced_sales: _t('Net invoiced sales'), confirmed_sales: _t('Confirmed sales'),
             orders: _t('Distinct sales orders'), quotations: _t('Draft and sent quotations'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (native signed)'),

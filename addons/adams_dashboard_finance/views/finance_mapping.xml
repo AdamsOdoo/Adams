@@ -28,6 +28,8 @@
                             domain="[('report_line_id.report_id', '=', cash_detail_report_id)]" options="{'no_create': True}"/>
                         <field name="cash_flow_report_id" invisible="metric != 'cash'" options="{'no_create': True}"/>
                         <field name="partner_ledger_report_id" invisible="metric not in ['receivables', 'payables']" options="{'no_create': True}"/>
+                        <field name="budget_id" invisible="metric not in ['revenue', 'gross_profit', 'profit', 'operating_expenses']"
+                            domain="[('company_id', '=', company_id)]" options="{'no_create': True}"/>
                     </group>
                     <group><field name="approved_by"/><field name="approved_at"/></group>
                 </sheet>
