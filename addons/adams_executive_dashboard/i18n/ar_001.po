@@ -1015,3 +1015,15 @@ msgstr "حركات النقدية الأصلية خلال الفترة. قد ي�
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Activity"
 msgstr "النشاط"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Partner activity uses the selected period, separately from the aging balance cutoff. Customer and vendor roles remain separate."
+msgstr "تستخدم حركة الشريك الفترة المحددة بشكل منفصل عن تاريخ قطع تقادم الأرصدة. يظل دور العميل منفصلًا عن دور المورد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open Partner Ledger"
+msgstr "فتح دفتر أستاذ الشريك"

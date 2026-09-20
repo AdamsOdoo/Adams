@@ -28,7 +28,7 @@ class ExecutiveDashboard(models.AbstractModel):
         self.env['account.report'].check_access('read')
         self.env['account.move.line'].check_access('read')
 
-    def _financial_options(self, report, key, dates):
+    def _financial_options(self, report, key, dates, previous_extra=None):
         report.check_access('read')
         if not report.active or report.use_sections:
             raise UnsupportedFinancialScope()
@@ -44,6 +44,8 @@ class ExecutiveDashboard(models.AbstractModel):
         }
         if key in {'receivables', 'payables'}:
             previous.update(aging_based_on='base_on_maturity_date', aging_interval=30)
+        if previous_extra:
+            previous.update(previous_extra)
         options = report.get_options(previous)
         if (options.get('report_id') != report.id
                 or options.get('date', {}).get('date_to') != cutoff.isoformat()
@@ -152,6 +154,7 @@ class ExecutiveDashboard(models.AbstractModel):
                             drilldown=True, provenance=provenance,
                             has_warnings=bool(information.get('warnings')),
                             aging_buckets=buckets,
+                            partner_ledger=bool(mapping.partner_ledger_report_id),
                             definition=mapping.definition_note)
             except AccessError:
                 item['status'] = 'restricted'
@@ -167,6 +170,28 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key in {'partner_receivables', 'partner_payables'}:
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if dimension is not None or group_id is not None:
+                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            metric = key.removeprefix('partner_')
+            mapping = scoped._financial_mapping(metric)
+            if not scoped._mapping_ready(mapping) or not mapping.partner_ledger_report_id:
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            aging_options = scoped._financial_options(mapping.report_id, metric, dates)
+            report = mapping.partner_ledger_report_id
+            prepared = scoped._financial_options(report, 'revenue', dates, {
+                'account_type': aging_options['account_type'], 'unreconciled': False, 'partner_ids': [],
+            })
+            expected = {item['id'] for item in aging_options['account_type'] if item.get('selected')}
+            actual = {item['id'] for item in prepared.get('account_type', []) if item.get('selected')}
+            if actual != expected or prepared.get('unreconciled') or prepared.get('partner_ids'):
+                raise ValidationError(_('The native report returned an unsupported scope.'))
+            return {'type': 'ir.actions.client', 'tag': 'account_report', 'name': report.display_name,
+                    'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=report.id),
+                    'params': {'options': prepared, 'ignore_session': True}}
         if key == 'cash_flow':
             scoped, dates = self._scope(options)
             scoped._finance_access()

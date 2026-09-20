@@ -112,6 +112,10 @@
                                     <p>One company · native report currency · current access rules</p>
                                 </details>
                                 <button t-if="item.drilldown" type="button" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openReport(item.key)">Open native report <span aria-hidden="true">↗</span></button>
+                                <t t-if="item.partner_ledger">
+                                    <p>Partner activity uses the selected period, separately from the aging balance cutoff. Customer and vendor roles remain separate.</p>
+                                    <button type="button" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openReport('partner_' + item.key)">Open Partner Ledger <span aria-hidden="true">↗</span></button>
+                                </t>
                                 <button t-if="dimensions[item.key]" type="button" class="btn btn-link" t-on-click="() => this.inspect(item.key)">Explore breakdown and trend</button>
                             </footer>
                         </article>

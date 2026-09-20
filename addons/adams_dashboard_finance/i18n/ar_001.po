@@ -234,3 +234,13 @@ msgstr "تقرير التدفقات النقدية"
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
 msgid "Select the native Cash Flow Statement for the cash mapping."
 msgstr "اختر قائمة التدفقات النقدية الأصلية لربط النقدية."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__partner_ledger_report_id
+msgid "Partner Ledger Report"
+msgstr "تقرير دفتر أستاذ الشريك"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select the native Partner Ledger for a receivable or payable mapping."
+msgstr "اختر دفتر أستاذ الشريك الأصلي لربط الذمم المدينة أو الدائنة."

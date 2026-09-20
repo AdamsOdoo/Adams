@@ -35,6 +35,7 @@ class FinanceMapping(models.Model):
     cash_detail_report_id = fields.Many2one('account.report', ondelete='restrict')
     cash_detail_expression_id = fields.Many2one('account.report.expression', ondelete='restrict')
     cash_flow_report_id = fields.Many2one('account.report', ondelete='restrict')
+    partner_ledger_report_id = fields.Many2one('account.report', ondelete='restrict')
     definition_note = fields.Text(required=True, help='Explain the chosen native definition, variant, currency and reporting policy.')
     approved_by = fields.Many2one('res.users', readonly=True, copy=False)
     approved_at = fields.Datetime(readonly=True, copy=False)
@@ -44,7 +45,7 @@ class FinanceMapping(models.Model):
     _metric_company_unique = models.Constraint('unique(company_id, metric)', 'Map each metric only once per company.')
 
     @api.constrains('expression_id', 'denominator_expression_id', 'report_id', 'company_id', 'metric',
-                    'cash_detail_report_id', 'cash_detail_expression_id', 'cash_flow_report_id')
+                    'cash_detail_report_id', 'cash_detail_expression_id', 'cash_flow_report_id', 'partner_ledger_report_id')
     def _check_definition(self):
         for mapping in self:
             if mapping.expression_id.report_line_id.report_id != mapping.report_id:
@@ -72,13 +73,16 @@ class FinanceMapping(models.Model):
             if mapping.cash_flow_report_id and (mapping.metric != 'cash' or
                     mapping.cash_flow_report_id != self.env.ref('account_reports.cash_flow_report')):
                 raise ValidationError(_('Select the native Cash Flow Statement for the cash mapping.'))
+            if mapping.partner_ledger_report_id and (mapping.metric not in {'receivables', 'payables'} or
+                    mapping.partner_ledger_report_id != self.env.ref('account_reports.partner_ledger_report')):
+                raise ValidationError(_('Select the native Partner Ledger for a receivable or payable mapping.'))
 
     def _fingerprint(self):
         self.ensure_one()
         report = self.report_id
         # Changes to native accounting data flow through on refresh. Changes to
         # report definitions require explicit review, including dependent lines.
-        reports = report | self.cash_detail_report_id | self.cash_flow_report_id
+        reports = report | self.cash_detail_report_id | self.cash_flow_report_id | self.partner_ledger_report_id
         pending = reports
         while pending:
             dependencies = self.env['account.report']
@@ -96,12 +100,17 @@ class FinanceMapping(models.Model):
              expression.date_scope, expression.figure_type)
             for expression in reports.line_ids.expression_ids.sorted('id')
         ]
-        value = [self.company_id.id, self.metric, report.id, self.expression_id.id,
+        value = [self.company_id.id, self.company_id.currency_id.id,
+                 self.company_id.account_fiscal_country_id.id, self.metric, report.id, self.expression_id.id,
                  report.root_report_id.id, report.country_id.id, report.filter_date_range,
                  self.definition_note, self.denominator_expression_id.id,
                  self.cash_detail_report_id.id, self.cash_detail_expression_id.id,
-                 self.cash_flow_report_id.id, definitions,
-                 [(c.id, c.expression_label, c.figure_type) for c in report.column_ids.sorted('id')]]
+                 self.cash_flow_report_id.id, self.partner_ledger_report_id.id, definitions,
+                 [(r.id, r.root_report_id.id, r.country_id.id, r.filter_date_range,
+                   r.filter_multi_company, r.filter_account_type, r.only_tax_exigible,
+                   r.custom_handler_model_id.id,
+                   [(c.id, c.expression_label, c.figure_type) for c in r.column_ids.sorted('id')])
+                  for r in reports.sorted('id')]]
         return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
     @api.model_create_multi

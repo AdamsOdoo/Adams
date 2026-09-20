@@ -346,3 +346,38 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         action = self.dashboard.open_report('cash_flow', self.options)
         self.assertEqual(action['params']['options'], result['options'])
         self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+
+    def test_native_partner_ledger_keeps_dual_role_balances_separate(self):
+        ledger = self.env.ref('account_reports.partner_ledger_report')
+        for metric, prefix in [('receivables', 'aged_receivable'), ('payables', 'aged_payable')]:
+            mapping = self._mapping(metric, report=self.env.ref(f'account_reports.{prefix}_report'),
+                                    expression=self.env.ref(f'account_reports.{prefix}_line_total'), approve=False)
+            mapping.partner_ledger_report_id = ledger
+            mapping.action_approve()
+        self._invoice(100)
+        self._invoice(200, 'in_invoice')
+        for metric, expected_role, expected_debit, expected_credit, expected_balance in [
+            ('receivables', 'trade_receivable', 100, 0, 100),
+            ('payables', 'trade_payable', 0, 200, -200),
+        ]:
+            action = self.dashboard.open_report('partner_' + metric, self.options)
+            options = action['params']['options']
+            self.assertEqual({item['id'] for item in options['account_type'] if item['selected']}, {expected_role})
+            self.assertEqual(options['date']['date_from'], '2026-08-01')
+            self.assertEqual(options['date']['date_to'], '2026-08-31')
+            self.assertFalse(options['all_entries'])
+            native = ledger.with_context(action['context']).get_report_information(options)
+            line = next(row for row in native['lines']
+                        if ledger._get_model_info_from_id(row['id']) == ('res.partner', self.partner_a.id))
+            columns = {column['expression_label']: value['no_format']
+                       for column, value in zip(options['columns'], line['columns'])}
+            self.assertEqual(columns['debit'], expected_debit)
+            self.assertEqual(columns['credit'], expected_credit)
+            self.assertEqual(columns['balance'], expected_balance)
+        mapping = self._financial_mapping_for_test('receivables')
+        mapping.write({'definition_note': 'Needs a renewed review'})
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_report('partner_receivables', self.options)
+
+    def _financial_mapping_for_test(self, metric):
+        return self.mapping_model.search([('company_id', '=', self.env.company.id), ('metric', '=', metric)])
