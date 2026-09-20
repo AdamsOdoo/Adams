@@ -1,5 +1,6 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import Command, fields
@@ -76,6 +77,18 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 'tax_ids': [Command.clear()],
             })],
         }).action_post()
+        for amount, days in [(129.45, 1), (999, 31)]:
+            self.env['account.move'].create({
+                'move_type': 'in_invoice', 'partner_id': self.partner_a.id,
+                'invoice_date': today, 'date': today, 'invoice_payment_term_id': False,
+                'invoice_date_due': today + timedelta(days=days),
+                'journal_id': self.company_data['default_journal_purchase'].id,
+                'invoice_line_ids': [Command.create({
+                    'name': 'Browser supplier installment fixture', 'quantity': 1,
+                    'price_unit': amount, 'account_id': self.company_data['default_account_expense'].id,
+                    'tax_ids': [Command.clear()],
+                })],
+            }).action_post()
         mapping = self.env['adams.dashboard.finance.mapping'].create({
             'company_id': self.env.company.id, 'metric': 'revenue',
             'report_id': self.env.ref('account_reports.profit_and_loss').id,
@@ -156,6 +169,12 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const aging = root.querySelector('#adams-group-working-capital');
                     if (aging.querySelectorAll('.adams_aging_list').length !== 2) throw new Error('Both native aging panels must be visible');
                     if (!aging.querySelector('.adams_aging_list').innerText.includes(expected)) throw new Error('Native receivable bucket must contain the invoice value');
+                    const windows = aging.querySelectorAll('.adams_supplier_windows .adams_card');
+                    if (windows.length !== 4) throw new Error('Four approved supplier windows must render');
+                    const paymentValue = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(129.45);
+                    if (windows[2].querySelector('.adams_value').textContent.trim() !== paymentValue ||
+                        windows[3].querySelector('.adams_value').textContent.trim() !== paymentValue)
+                        throw new Error('Native supplier window must show 129.45 excluding day 31');
                     for (const date of root.querySelectorAll('.adams_card_date')) {
                         if (getComputedStyle(date).direction !== 'ltr') throw new Error('ISO date ranges must preserve order in RTL');
                     }
@@ -192,6 +211,17 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const restoredDates = [...restored.querySelectorAll('.adams_filters input')].map(input => input.value);
                         if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
                             throw new Error('Financial report return changed applied dates');
+                        restored.querySelectorAll('.adams_supplier_windows .adams_card')[2]
+                            .querySelector('button').click();
+                        await wait(() => !document.querySelector('.o_adams_dashboard') &&
+                            document.body.innerText.includes('129.45'), 'Scoped native payment report must render 129.45');
+                        if (document.body.innerText.includes('1,128.45'))
+                            throw new Error('Native payment drilldown lost its due-window filter');
+                        const paymentBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                            'Payment report must expose dashboard breadcrumb');
+                        paymentBack.click();
+                        await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card').length === 4,
+                            'Payment return must restore the supplier windows');
                     }
                     if (WIDTH === 768 || WIDTH === 1024) liquidity.scrollIntoView({block: 'start'});
                     console.log('test successful');

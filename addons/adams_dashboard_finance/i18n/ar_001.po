@@ -279,3 +279,39 @@ msgstr "هذا الاتجاه المالي غير مهيأ."
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
 msgid "Invalid financial period."
 msgstr "الفترة المالية غير صالحة."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Overdue supplier bills"
+msgstr "فواتير الموردين المتأخرة"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Supplier bills due today"
+msgstr "فواتير الموردين المستحقة اليوم"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Supplier bills due in 7 days"
+msgstr "فواتير الموردين المستحقة خلال ٧ أيام"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Supplier bills due in 30 days"
+msgstr "فواتير الموردين المستحقة خلال ٣٠ يومًا"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Unknown supplier payment window."
+msgstr "فترة مدفوعات الموردين غير معروفة."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Posted supplier-bill installments outstanding at the balance cutoff. The 30-day window includes the first 7 days. Standalone credits and unapplied payments remain in full native aging."
+msgstr "أقساط فواتير الموردين المرحلة والمستحقة عند تاريخ الرصيد. تشمل فترة الثلاثين يومًا أول سبعة أيام. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."

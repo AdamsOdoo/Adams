@@ -530,3 +530,79 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self.assertEqual(self._item()['value'], 57)
         sales = self.dashboard.get_section('sales', self.options)
         self.assertEqual(next(item for item in sales['items'] if item['key'] == 'invoiced_sales')['value'], 50)
+
+    def test_supplier_windows_boundaries_posted_bill_scope_and_native_actions(self):
+        report = self.env.ref('account_reports.aged_payable_report')
+        expression = self.env.ref('account_reports.aged_payable_line_total')
+        self._mapping('payables', report=report, expression=expression)
+        for amount, due in [(40, '2026-08-30'), (50, '2026-08-31'),
+                            (10, '2026-09-01'), (70, '2026-09-07'),
+                            (80, '2026-09-08'), (300, '2026-09-30'),
+                            (310, '2026-10-01')]:
+            self._invoice(amount, 'in_invoice', due_date=due)
+        self._invoice(999, 'in_invoice', due_date='2026-09-01', posted=False)
+        self._invoice(777, 'in_invoice', invoice_date='2026-09-01', due_date='2026-09-01')
+        self._invoice(25, 'in_refund', due_date='2026-09-01')
+        self._invoice(555, 'out_invoice', due_date='2026-09-01')
+        self.env.flush_all()
+        result = self.dashboard.get_section('finance', self.options)
+        windows = {item['key']: item for item in result['supplier_windows']}
+        expected = {'supplier_overdue': 40, 'supplier_today': 50,
+                    'supplier_due_7': 80, 'supplier_due_30': 460}
+        for key, value in expected.items():
+            self.assertEqual(windows[key]['status'], 'ready', windows[key])
+            self.assertEqual(windows[key]['value'], value)
+            action = self.dashboard.open_report(key, self.options)
+            self.assertEqual(action['params']['options'], windows[key]['provenance']['options'])
+            rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
+            self.assertEqual(rebuilt['forced_domain'], action['params']['options']['forced_domain'])
+            self.assertFalse(report.get_options(rebuilt).get('forced_domain'))
+            native = report.get_report_information(rebuilt)
+            group = next(iter(rebuilt['column_groups']))
+            self.assertEqual(native['column_groups_totals'][group][expression.id]['value'], value)
+            self.assertTrue(action['params']['ignore_session'])
+        # Full native AP preserves standalone credit notes; window cards do not
+        # silently use them to net unrelated supplier bills.
+        self.assertEqual(next(i for i in result['items'] if i['key'] == 'payables')['value'], 835)
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_report('supplier_due_7', self.options, 'invented')
+        reader = new_test_user(self.env, login='payment_window_denied',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user')
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).open_report('supplier_due_7', self.options)
+        other = self.env['res.company'].create({'name': 'Other payment window company'})
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).get_section('finance', dict(self.options, company_id=other.id))
+
+    def test_supplier_windows_installments_and_historical_settlement(self):
+        self._mapping('payables', report=self.env.ref('account_reports.aged_payable_report'),
+                      expression=self.env.ref('account_reports.aged_payable_line_total'))
+        terms = self.env['account.payment.term'].create({
+            'name': 'Payment windows 40 percent now and 60 after 30 days',
+            'line_ids': [Command.clear(),
+                         Command.create({'value': 'percent', 'value_amount': 40, 'nb_days': 0}),
+                         Command.create({'value': 'percent', 'value_amount': 60, 'nb_days': 30})],
+        })
+        bill = self._invoice(100, 'in_invoice', invoice_date='2026-08-31', posted=False)
+        bill.invoice_payment_term_id = terms
+        bill.action_post()
+        payable = bill.line_ids.filtered(lambda line: line.account_id.account_type == 'liability_payable')
+        self.assertEqual(sorted((str(line.date_maturity), line.balance) for line in payable),
+                         [('2026-08-31', -40), ('2026-09-30', -60)])
+        settlement = self.env['account.move'].create({
+            'date': '2026-09-10', 'journal_id': self.company_data['default_journal_misc'].id,
+            'line_ids': [Command.create({'partner_id': self.partner_a.id,
+                'account_id': payable.account_id.id, 'debit': 40, 'date_maturity': '2026-09-10'}),
+                Command.create({'account_id': self.company_data['default_account_assets'].id, 'credit': 40})],
+        })
+        settlement.action_post()
+        (payable.filtered(lambda line: line.balance == -40) +
+         settlement.line_ids.filtered(lambda line: line.account_id == payable.account_id)).reconcile()
+        self.assertEqual(bill.amount_residual, 60)
+        windows = {i['key']: i['value'] for i in self.dashboard.get_section('finance', self.options)['supplier_windows']}
+        self.assertEqual(windows, {'supplier_overdue': 0, 'supplier_today': 40,
+                                  'supplier_due_7': 0, 'supplier_due_30': 60})
+        after = {i['key']: i['value'] for i in self.dashboard.get_section(
+            'finance', dict(self.options, as_of='2026-09-30'))['supplier_windows']}
+        self.assertEqual(after, {'supplier_overdue': 0, 'supplier_today': 60,
+                                'supplier_due_7': 0, 'supplier_due_30': 0})

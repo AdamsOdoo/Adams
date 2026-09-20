@@ -106,12 +106,20 @@
         </div><details class="adams_chart_table"><summary>View chart as a table</summary><div class="adams_table_wrap"><table class="table"><thead><tr><th>Month</th><th>Revenue</th><th>Gross profit</th><th>Net profit</th></tr></thead><tbody><tr t-foreach="chart.rows" t-as="month" t-key="month.label"><th t-esc="month.label"/><td t-foreach="month.series" t-as="series" t-key="series.key" t-esc="formatted(series, result)"/></tr></tbody></table></div></details></t>
     </section>
     <section class="adams_panel adams_performance"><header class="adams_panel_head"><div><h3>Performance context</h3><p>Actuals, targets and comparability</p></div></header>
-        <div class="adams_context_row"><span>Revenue against target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Native budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-else="">No approved budget available for this scope.</p></div>
+        <div class="adams_context_row"><span>Revenue against target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Native budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-else="">No target configured.</p></div>
         <div class="adams_context_row"><span>Comparability</span><strong>Selected-period actuals</strong><p>Monthly values retain signs. Partial periods and changed definitions need review before comparison.</p></div>
         <div class="adams_context_row"><span>Accounting completeness</span><strong>Not assessed</strong><p>A report match does not confirm period close or source completeness.</p></div>
         <a href="#adams-trust" class="adams_text_link">See calculation and source rules →</a>
     </section>
-</div><t t-if="group.key === 'liquidity'" t-call="adams_executive_dashboard.Liquidity"/></div></t></div>
+</div><t t-if="group.key === 'liquidity'" t-call="adams_executive_dashboard.Liquidity"/><section t-if="group.key === 'working-capital' &amp;&amp; result.supplier_windows?.length" class="adams_panel adams_supplier_windows">
+<header class="adams_panel_head"><div><h3>Supplier payment schedule</h3><p>Outstanding posted bill installments at the balance cutoff</p></div></header>
+<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="window" t-key="window.key" class="adams_card">
+<div class="adams_card_top"><h3 t-esc="window.label"/><button t-if="window.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(window.key)" aria-label="Open native report">→</button></div>
+<div class="adams_amount"><span t-if="window.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(window, result)" t-esc="headline(window, result)"/></div>
+<p t-if="window.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+<p class="adams_card_date" dir="ltr" t-esc="state.applied.as_of"/>
+</article></div><p class="adams_hint">Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging.</p>
+</section></div></t></div>
                     <p t-if="result &amp;&amp; result.generated_at" class="adams_scope">Fetched at <bdi t-esc="result.generated_at"/> UTC. Source completeness has not been assessed.</p>
                     <t t-if="section.key === 'sales'">
                         <div class="adams_sales_workspace"><section class="adams_panel adams_recent_panel"><header class="adams_panel_head"><div><h3>Recent orders &amp; quotations</h3><p>Open a document to inspect it.</p></div></header><div class="adams_recent_tabs">
@@ -152,7 +160,7 @@
                         <h3>Fulfillment</h3>
                         <p>Current native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. The balance cutoff does not apply. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>
                         <button class="btn btn-outline-secondary" t-on-click="() =&gt; this.loadDirectory('fulfillment')">Explore delivery quantities</button>
-                        <p class="adams_hint">Backlog value and on-time completion are not configured. Partial deliveries, returns and commitment-date rules require verified definitions.</p>
+                        <p class="adams_hint">Native ordered, delivered and remaining quantities are shown by product and unit.</p>
                         <t t-if="state.fulfillment">
                             <t t-set="delivery" t-value="state.fulfillment"/>
                             <p t-if="delivery.status === 'loading'" role="status">Loading…</p>
@@ -324,7 +332,7 @@
             <div class="adams_cash_bridge"><div t-foreach="['opening_balance', 'net_increase', 'closing_balance']" t-as="key" t-key="key"><span t-esc="result.cash_flow.bridge[key].label"/><strong><bdi t-esc="formatted(result.cash_flow.bridge[key], result)"/></strong><small t-esc="result.currency"/></div></div>
             <details class="adams_cash_details"><summary>Activities and unclassified movements</summary><div class="adams_table_wrap"><table class="table"><thead><tr><th>Activity</th><th>Value</th></tr></thead><tbody><tr t-foreach="result.cash_flow.rows" t-as="row" t-key="row.key"><th t-esc="row.label"/><td><bdi t-esc="formatted(row, result)"/> <t t-esc="result.currency"/></td></tr></tbody></table></div></details>
         </t><p class="adams_hint">Cash composition follows the native Cash Flow Statement and may differ from the Balance Sheet or account directory.</p>
-        <div class="adams_forecast_note"><h4>Cash flow outlook</h4><p>The standard short-term forecast is shown above. A daily cash plan and minimum projected balance require an approved definition.</p></div></div>
+        <div class="adams_forecast_note"><h4>Cash flow outlook</h4><p>The standard native short-term forecast is shown above; it is separate from recorded cash movements.</p></div></div>
     </section>
     <section class="adams_panel adams_bank_panel"><header class="adams_panel_head"><div><h3>Bank &amp; cash accounts</h3><p>Native balances at the selected cutoff</p></div><button class="btn btn-link" t-on-click="() =&gt; this.loadDirectory('cash')">Refresh accounts</button></header>
         <div class="adams_finance_panel_body"><form class="adams_account_search" t-on-submit.prevent="() =&gt; this.loadDirectory('cash', 0, null, state.cashSearch)"><label>Find account<input class="form-control" type="search" maxlength="100" t-model="state.cashSearch" placeholder="Account name or code"/></label><button class="btn btn-outline-secondary" type="submit">Search</button></form><p t-if="!state.directory">Load the authorized account directory to inspect balances.</p><t t-else="">

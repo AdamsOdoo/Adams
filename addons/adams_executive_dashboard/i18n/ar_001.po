@@ -1896,3 +1896,39 @@ msgstr "حسابات مطابقة"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Close workspace navigation"
 msgstr "إغلاق تنقل مساحة العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No target configured."
+msgstr "لم يتم إعداد هدف."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native ordered, delivered and remaining quantities are shown by product and unit."
+msgstr "تُعرض الكميات المطلوبة والمسلّمة والمتبقية من أودو حسب المنتج ووحدة القياس."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "The standard native short-term forecast is shown above; it is separate from recorded cash movements."
+msgstr "يُعرض توقع أودو القياسي قصير الأجل أعلاه بصورة منفصلة عن الحركات النقدية المسجلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Supplier payment schedule"
+msgstr "جدول مدفوعات الموردين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Outstanding posted bill installments at the balance cutoff"
+msgstr "أقساط فواتير الموردين المرحلة والمستحقة عند تاريخ الرصيد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging."
+msgstr "تشمل الثلاثون يومًا القادمة أول سبعة أيام. تُعرض المستحقات اليوم والمتأخرات بصورة منفصلة. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."

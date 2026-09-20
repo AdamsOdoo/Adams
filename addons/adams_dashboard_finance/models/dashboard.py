@@ -34,7 +34,7 @@ class ExecutiveDashboard(models.AbstractModel):
         # restrictions as well as its accounting group and model permissions.
         self.env['account.move.line'].check_field_access_rights('read', [
             'balance', 'debit', 'credit', 'amount_currency', 'account_id',
-            'date', 'company_id', 'partner_id', 'date_maturity',
+            'date', 'company_id', 'partner_id', 'date_maturity', 'move_id',
         ])
 
     def _financial_options(self, report, key, dates, previous_extra=None, budget_id=None):
@@ -86,7 +86,7 @@ class ExecutiveDashboard(models.AbstractModel):
             return super().get_section(section, options)
         scoped, dates = self._scope(options)
         currency = scoped.env.company.currency_id
-        result = {'items': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
+        result = {'items': [], 'supplier_windows': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
                   'currency': currency.name, 'digits': currency.decimal_places,
                   'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
         try:
@@ -179,7 +179,70 @@ class ExecutiveDashboard(models.AbstractModel):
                 item['status'] = 'error'
                 _logger.warning('Financial dashboard metric=%s category=%s', key, type(error).__name__)
         result['cash_flow'] = scoped._cash_flow_data(dates)
+        result['supplier_windows'] = scoped._supplier_payment_windows(dates)
         return result
+
+    def _supplier_window_domain(self, cutoff, window):
+        # Fixed approved windows; no caller-supplied domain or arithmetic.
+        domains = {
+            'supplier_overdue': [('date_maturity', '<', cutoff.isoformat())],
+            'supplier_today': [('date_maturity', '=', cutoff.isoformat())],
+            'supplier_due_7': [('date_maturity', '>', cutoff.isoformat()),
+                               ('date_maturity', '<=', (cutoff + timedelta(days=7)).isoformat())],
+            'supplier_due_30': [('date_maturity', '>', cutoff.isoformat()),
+                                ('date_maturity', '<=', (cutoff + timedelta(days=30)).isoformat())],
+        }
+        if window not in domains:
+            raise ValidationError(_('Unknown supplier payment window.'))
+        return [('move_id.move_type', '=', 'in_invoice')] + domains[window]
+
+    def _supplier_window_options(self, mapping, dates, window):
+        prepared = self._financial_options(mapping.report_id, 'payables', dates)
+        # Native aging handles historical settlement, currency and rounding.
+        # Standalone vendor credits/payments remain in full native AP aging;
+        # only their reconciled effects on the bill enter these bill-only cards.
+        prepared['forced_domain'] = self._supplier_window_domain(dates[2], window)
+        return prepared
+
+    def _supplier_payment_windows(self, dates):
+        labels = [('supplier_overdue', _('Overdue supplier bills')),
+                  ('supplier_today', _('Supplier bills due today')),
+                  ('supplier_due_7', _('Supplier bills due in 7 days')),
+                  ('supplier_due_30', _('Supplier bills due in 30 days'))]
+        mapping = self._financial_mapping('payables')
+        rows = []
+        for key, label in labels:
+            item = {'key': key, 'label': label, 'status': 'not_configured', 'value': None,
+                    'unit': 'currency', 'date_field': 'as_of'}
+            rows.append(item)
+            if not self._mapping_ready(mapping):
+                continue
+            try:
+                prepared = self._supplier_window_options(mapping, dates, key)
+                information = mapping.report_id.get_report_information(prepared)
+                group = next(iter(prepared['column_groups']))
+                value = information['column_groups_totals'].get(group, {}).get(
+                    mapping.expression_id.id, {}).get('value')
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise UnsupportedFinancialScope()
+                item.update(status='ready', value=value, drilldown=True,
+                            has_warnings=bool(information.get('warnings')),
+                            source=mapping.report_id.display_name,
+                            definition=_('Posted supplier-bill installments outstanding at the balance cutoff. '
+                                         'The 30-day window includes the first 7 days. '
+                                         'Standalone credits and unapplied payments remain in full native aging.'),
+                            provenance={'model': 'account.report', 'report_id': mapping.report_id.id,
+                                        'expression_id': mapping.expression_id.id, 'options': prepared,
+                                        'company_id': self.env.company.id,
+                                        'mapping_version': mapping.definition_fingerprint})
+            except AccessError:
+                item['status'] = 'restricted'
+            except UnsupportedFinancialScope:
+                item['status'] = 'unsupported_scope'
+            except (UserError, KeyError, TypeError, ValueError) as error:
+                item['status'] = 'error'
+                _logger.warning('Supplier payment window=%s category=%s', key, type(error).__name__)
+        return rows
 
     def _financial_periods(self, dates):
         start, end = dates[:2]
@@ -241,6 +304,21 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key in {'supplier_overdue', 'supplier_today', 'supplier_due_7', 'supplier_due_30'}:
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if dimension is not None or group_id is not None:
+                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            mapping = scoped._financial_mapping('payables')
+            if not scoped._mapping_ready(mapping):
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            prepared = scoped._supplier_window_options(mapping, dates, key)
+            return {'type': 'ir.actions.client', 'tag': 'account_report',
+                    'name': mapping.report_id.display_name,
+                    'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=mapping.report_id.id,
+                                    adams_supplier_window=key),
+                    'params': {'options': prepared, 'ignore_session': True}}
         if key in {'budget_' + metric for metric in BUDGET_KEYS}:
             scoped, dates = self._scope(options)
             scoped._finance_access()
