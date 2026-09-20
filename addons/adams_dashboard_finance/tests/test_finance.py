@@ -1,3 +1,6 @@
+import io
+import zipfile
+import json
 """Known amounts evaluated by installed native reports, not mock report totals."""
 from unittest.mock import patch
 
@@ -557,9 +560,19 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
             self.assertEqual(rebuilt['forced_domain'], action['params']['options']['forced_domain'])
             self.assertFalse(report.get_options(rebuilt).get('forced_domain'))
-            native = report.get_report_information(rebuilt)
+            # RPC and native export serialize tuple domains to JSON lists.
+            serialized = json.loads(json.dumps(rebuilt))
+            native = report.get_report_information(serialized)
             group = next(iter(rebuilt['column_groups']))
             self.assertEqual(native['column_groups_totals'][group][expression.id]['value'], value)
+            self.assertIn(windows[key]['label'], native['report']['name'])
+            self.assertIn(windows[key]['label'], report.get_default_report_filename(rebuilt, 'xlsx'))
+            self.assertIn('2026-08-31', report.get_default_report_filename(rebuilt, 'xlsx'))
+            exported = report.export_to_xlsx(serialized)
+            with zipfile.ZipFile(io.BytesIO(exported['file_content'])) as archive:
+                strings = archive.read('xl/sharedStrings.xml').decode()
+            self.assertIn(windows[key]['label'], strings)
+            self.assertIn('2026-08-31', strings)
             self.assertTrue(action['params']['ignore_session'])
         # Full native AP preserves standalone credit notes; window cards do not
         # silently use them to net unrelated supplier bills.
