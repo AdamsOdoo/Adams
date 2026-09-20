@@ -87,6 +87,16 @@
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
                             <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                            <details t-if="item.aging_buckets &amp;&amp; item.aging_buckets.length">
+                                <summary>Native due-date aging</summary>
+                                <table class="table"><caption>Native 30-day buckets at the selected balance cutoff. Signed credits are retained.</caption>
+                                    <thead><tr><th scope="col">Period</th><th scope="col">Balance</th></tr></thead>
+                                    <tbody><tr t-foreach="item.aging_buckets" t-as="bucket" t-key="bucket.key">
+                                        <th scope="row" t-esc="bucket.label"/>
+                                        <td><bdi t-esc="formatted(bucket, result)"/> <t t-esc="result.currency"/></td>
+                                    </tr></tbody>
+                                </table>
+                            </details>
                             <p t-if="item.key === 'invoiced_sales'" class="adams_hint">Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue.</p>
                             <p t-if="item.key === 'confirmed_sales' || item.key === 'orders'" class="adams_hint">Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales.</p>
                             <p t-if="item.key === 'quotations'" class="adams_hint">Draft and sent quotations by native order date, untaxed. Expired quotations remain included while their native state is draft or sent.</p>

@@ -87,7 +87,7 @@ class FinanceMapping(models.Model):
             pending = dependencies - reports
             reports |= pending
         definitions = [
-            (expression.id, expression.report_line_id.code, expression.label,
+            (expression.id, expression.report_line_id.code, expression.report_line_id.groupby, expression.label,
              expression.engine, expression.formula, expression.subformula,
              expression.date_scope, expression.figure_type)
             for expression in reports.line_ids.expression_ids.sorted('id')

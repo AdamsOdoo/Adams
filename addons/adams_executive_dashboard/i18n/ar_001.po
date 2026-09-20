@@ -979,3 +979,21 @@ msgstr "النسبة غير معرّفة: المقام صفر"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Native General Ledger closing balances at the selected cutoff, in company currency. Account currencies are shown separately. Archived accounts are included; credit-card liabilities are excluded."
 msgstr "أرصدة الإقفال من دفتر الأستاذ العام الأصلي حتى التاريخ المحدد بعملة الشركة. تظهر عملات الحسابات بشكل منفصل. تشمل الحسابات المؤرشفة وتستثني التزامات بطاقات الائتمان."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native due-date aging"
+msgstr "تقادم الأرصدة الأصلي حسب تاريخ الاستحقاق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native 30-day buckets at the selected balance cutoff. Signed credits are retained."
+msgstr "شرائح التقرير الأصلية كل 30 يومًا حتى تاريخ الرصيد المحدد، مع الاحتفاظ بإشارات الأرصدة الدائنة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Period"
+msgstr "الفترة"

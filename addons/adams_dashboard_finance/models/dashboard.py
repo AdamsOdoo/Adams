@@ -42,6 +42,8 @@ class ExecutiveDashboard(models.AbstractModel):
             'all_entries': False, 'unfold_all': False, 'unfolded_lines': [],
             'comparison': {'filter': 'no_comparison', 'number_period': 0},
         }
+        if key in {'receivables', 'payables'}:
+            previous.update(aging_based_on='base_on_maturity_date', aging_interval=30)
         options = report.get_options(previous)
         if (options.get('report_id') != report.id
                 or options.get('date', {}).get('date_to') != cutoff.isoformat()
@@ -49,6 +51,10 @@ class ExecutiveDashboard(models.AbstractModel):
                 or {company['id'] for company in options.get('companies', [])} != {self.env.company.id}
                 or (period and options['date'].get('date_from') != dates[0].isoformat())
                 or len(options.get('column_groups', {})) != 1):
+            raise UnsupportedFinancialScope()
+        if key in {'receivables', 'payables'} and (
+                options.get('aging_based_on') != 'base_on_maturity_date'
+                or options.get('aging_interval') != 30):
             raise UnsupportedFinancialScope()
         return options
 
@@ -123,6 +129,20 @@ class ExecutiveDashboard(models.AbstractModel):
                 }
                 provenance['fingerprint'] = hashlib.sha256(
                     json.dumps(provenance, sort_keys=True, default=str).encode()).hexdigest()
+                buckets = []
+                if key in {'receivables', 'payables'}:
+                    expressions = {expr.label: expr for expr in mapping.expression_id.report_line_id.expression_ids}
+                    for column in prepared['columns']:
+                        label = column['expression_label']
+                        if not (label.startswith('period') and label[6:].isdigit()):
+                            continue
+                        expression = expressions.get(label)
+                        bucket = totals.get(expression.id if expression else None, {}).get('value')
+                        if type(bucket) not in (int, float) or not math.isfinite(bucket):
+                            raise UnsupportedFinancialScope()
+                        buckets.append({'key': label, 'label': column['name'], 'value': bucket})
+                    if not buckets:
+                        raise UnsupportedFinancialScope()
                 item.update(status='ready', value=value, unit='percentage' if key in RATIO_KEYS else 'currency',
                             source=report.display_name,
                             source_line=mapping.expression_id.report_line_id.display_name,
@@ -130,6 +150,7 @@ class ExecutiveDashboard(models.AbstractModel):
                             date_field='period' if key in PERIOD_KEYS else 'as_of',
                             drilldown=True, provenance=provenance,
                             has_warnings=bool(information.get('warnings')),
+                            aging_buckets=buckets,
                             definition=mapping.definition_note)
             except AccessError:
                 item['status'] = 'restricted'

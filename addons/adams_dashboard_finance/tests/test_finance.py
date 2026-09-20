@@ -31,14 +31,15 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             mapping.action_approve()
         return mapping
 
-    def _invoice(self, amount, move_type='out_invoice', invoice_date='2026-08-10', posted=True):
+    def _invoice(self, amount, move_type='out_invoice', invoice_date='2026-08-10', posted=True, due_date=None):
+        purchase = move_type.startswith('in_')
         move = self.env['account.move'].create({
             'move_type': move_type, 'partner_id': self.partner_a.id,
-            'invoice_date': invoice_date, 'date': invoice_date,
-            'journal_id': self.company_data['default_journal_sale'].id,
+            'invoice_date': invoice_date, 'date': invoice_date, 'invoice_date_due': due_date or invoice_date,
+            'journal_id': self.company_data['default_journal_purchase' if purchase else 'default_journal_sale'].id,
             'invoice_line_ids': [Command.create({
                 'name': 'Financial dashboard fixture', 'quantity': 1, 'price_unit': amount,
-                'account_id': self.company_data['default_account_revenue'].id,
+                'account_id': self.company_data['default_account_expense' if purchase else 'default_account_revenue'].id,
                 'tax_ids': [Command.clear()],
             })],
         })
@@ -271,9 +272,12 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
 
     def test_cash_action_rejects_wrong_type_and_company(self):
         self._cash_mapping()
-        for account_id in (True, '1', self.company_data['default_account_assets'].id):
-            with self.assertRaises((AccessError, ValidationError)):
+        for account_id in (True, '1'):
+            with self.assertRaises(ValidationError):
                 self.dashboard.open_report('cash_account', self.options, group_id=account_id)
+        with self.assertRaises(AccessError):
+            self.dashboard.open_report('cash_account', self.options,
+                                       group_id=self.company_data['default_account_assets'].id)
         foreign = self.env['res.company'].create({'name': 'Foreign cash fixture'})
         foreign_account = self.env['account.account'].create({
             'name': 'Other company cash', 'code': '990085', 'account_type': 'asset_cash',
@@ -281,3 +285,31 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         })
         with self.assertRaises(AccessError):
             self.dashboard.open_report('cash_account', self.options, group_id=foreign_account.id)
+
+    def test_native_aging_due_today_boundary_and_signed_credits(self):
+        self._mapping('receivables', report=self.env.ref('account_reports.aged_receivable_report'),
+                      expression=self.env.ref('account_reports.aged_receivable_line_total'))
+        self._invoice(100, invoice_date='2026-08-01', due_date='2026-08-31')
+        self._invoice(60, invoice_date='2026-08-01', due_date='2026-08-30')
+        self._invoice(25, 'out_refund', invoice_date='2026-08-01', due_date='2026-08-30')
+        item = self._item('receivables')
+        self.assertEqual(item['status'], 'ready', item)
+        self.assertEqual(item['value'], 135)
+        buckets = {bucket['key']: bucket['value'] for bucket in item['aging_buckets']}
+        self.assertEqual(buckets['period0'], 100)
+        self.assertEqual(buckets['period1'], 35)
+        self.assertEqual(item['provenance']['options']['aging_based_on'], 'base_on_maturity_date')
+        action = self.dashboard.open_report('receivables', self.options)
+        self.assertEqual(action['params']['options']['aging_interval'], 30)
+
+    def test_native_payable_buckets_preserve_supplier_refunds(self):
+        self._mapping('payables', report=self.env.ref('account_reports.aged_payable_report'),
+                      expression=self.env.ref('account_reports.aged_payable_line_total'))
+        self._invoice(200, 'in_invoice', due_date='2026-08-31')
+        self._invoice(50, 'in_refund', due_date='2026-08-31')
+        item = self._item('payables')
+        self.assertEqual(item['status'], 'ready', item)
+        self.assertEqual(item['value'], 150)
+        buckets = {bucket['key']: bucket['value'] for bucket in item['aging_buckets']}
+        self.assertEqual(buckets['period0'], 150)
+        self.assertEqual(buckets['period1'], 0)
