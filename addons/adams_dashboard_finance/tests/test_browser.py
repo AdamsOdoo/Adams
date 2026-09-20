@@ -3,13 +3,67 @@ import json
 from unittest.mock import patch
 
 from odoo import Command, fields
-from odoo.tests import tagged
+from odoo.tests import new_test_user, tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 
 @tagged('post_install', '-at_install')
 class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
+    def test_browser_roles_and_direct_rpc_boundaries(self):
+        company = self.env.company
+        foreign = self.env['res.company'].create({'name': 'Browser unauthorized company'})
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        roles = [
+            ('finance', 'account.group_account_readonly,adams_executive_dashboard.group_dashboard_user'),
+            ('sales', 'sales_team.group_sale_salesman,adams_executive_dashboard.group_dashboard_user'),
+            ('dashboard_only', 'adams_executive_dashboard.group_dashboard_user'),
+            ('no_dashboard', 'account.group_account_readonly'),
+        ]
+        today = fields.Date.today().isoformat()
+        options = {'company_id': company.id, 'date_from': today, 'date_to': today, 'as_of': today}
+        for role, groups in roles:
+            user = new_test_user(self.env, login='dashboard_browser_' + role,
+                groups='base.group_user,' + groups, company_id=company.id,
+                company_ids=[Command.set(company.ids)])
+            user.group_ids -= self.env.ref('base.group_allow_export')
+            code = '''
+            (async () => {
+                const call = async (method, args) => {
+                    const response = await fetch('/web/dataset/call_kw/adams.executive.dashboard/' + method, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({jsonrpc:'2.0', method:'call', id:1,
+                            params:{model:'adams.executive.dashboard', method, args,
+                                kwargs:{context:{allowed_company_ids:[OPTIONS.company_id]}}}})
+                    });
+                    return response.json();
+                };
+                const bootstrap = await call('get_bootstrap', []);
+                if (ROLE === 'no_dashboard') {
+                    if (!bootstrap.error) throw new Error('Direct dashboard RPC must deny no-dashboard user');
+                } else {
+                    if (bootstrap.error) throw new Error('Authorized dashboard user must load bootstrap');
+                    const finance = await call('get_section', ['finance', OPTIONS]);
+                    if (finance.error) throw new Error('Finance must expose an explicit availability state');
+                    const expected = ROLE === 'finance' ? 'not_configured' : 'restricted';
+                    if (!finance.result.items.every(item => item.value === null && item.status === expected))
+                        throw new Error('Role must not receive unauthorized or invented financial values');
+                    for (let attempt = 0; attempt < 200; attempt++) {
+                        if (document.querySelector('.adams_card .adams_source_button')) break;
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    if (!document.querySelector('.adams_card .adams_source_button'))
+                        throw new Error('Authorized role dashboard did not render');
+                }
+                const deniedCompany = await call('get_section', ['finance', {...OPTIONS, company_id:FOREIGN}]);
+                if (!deniedCompany.error) throw new Error('Wrong company RPC must be rejected');
+                const exported = await call('export_breakdown', ['invoiced_sales','customer',OPTIONS]);
+                if (!exported.error) throw new Error('Export-disabled user must be rejected by direct RPC');
+                console.log('test successful');
+            })().catch(error => console.error(error));
+            '''.replace('OPTIONS', json.dumps(options)).replace('ROLE', json.dumps(role)).replace('FOREIGN', str(foreign.id))
+            self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=60)
+
     def test_bilingual_finance_reflow_and_native_drilldown(self):
         today = fields.Date.today()
         self.env['account.move'].create({
@@ -130,11 +184,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
+                        const back = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                            'Native financial report must expose dashboard breadcrumb');
+                        back.click();
+                        const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === expected
+                            && document.querySelector('.o_adams_dashboard'), 'Financial report return must reload the known native value');
+                        const restoredDates = [...restored.querySelectorAll('.adams_filters input')].map(input => input.value);
+                        if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
+                            throw new Error('Financial report return changed applied dates');
                     }
                     if (WIDTH === 768 || WIDTH === 1024) liquidity.scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width))
+                '''.replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):

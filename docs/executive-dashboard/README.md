@@ -1,13 +1,16 @@
 # Executive dashboard — ED-001
 
-Status: **Development in progress; expanded native analytical/operational implementation. Not ready for business UAT. Enterprise source/build access and deployed browser acceptance remain blocked.**
+Status: **Engineering closure in progress. Owner decisions remain deferred.**
 
-Latest implementation and evidence: [implementation status](implementation-status.md).
-Native source findings and definition decisions: [native gaps](native-gaps.md).
-Business acceptance preparation: [UAT checklist](uat-checklist.md).
-The owner authorized Odoo.sh development access and subsequently deferred login.
-A later access check found GitHub device verification still pending; no new
-permission approval is required. The feature remains on draft PR #214.
+Access and licensed native report integration are available. Current results,
+source/build identities and remaining limits are in [implementation status](implementation-status.md).
+Read the [user and administrator guide](user-guide.md) for actual behavior and setup,
+the [acceptance plan](acceptance-plan.md) for qualification, and
+[owner decisions](owner-decisions.md) for the later business choices. The feature
+remains on development PR #214; no production or main-branch deployment is authorized.
+
+Historical development notes below describe their original implementation slices.
+Use the current status/evidence instead of interpreting old blocked items as current.
 
 ## Authority and scope
 
