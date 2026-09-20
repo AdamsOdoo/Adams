@@ -225,7 +225,7 @@
 .o_adams_dashboard {
     .adams_metric_foot { display: flex; justify-content: space-between; align-items: center; gap: 5px; min-height: 44px; color: var(--adams-sub); }
     .adams_source_button { border: 0; background: transparent; padding: 5px 0; color: var(--adams-green); font: inherit; text-align: end; min-height: 30px; }
-    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: min(520px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: #fff; color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
+    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: 520px; max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: #fff; color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
     .adams_source_dialog::backdrop { background: #17263166; }
     .adams_source_dialog > .adams_panel_head { position: sticky; top: 0; background: #fff; padding-bottom: 18px; border-bottom: 1px solid var(--adams-line); z-index: 1; }
     .adams_source_dialog h2 { font-size: 22px; margin-bottom: 4px; }

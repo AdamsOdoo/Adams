@@ -354,3 +354,10 @@ include retrieval UTC, definition version and scope fingerprint.
 Sixteen focused controller tests pass locally. Expanded native browser checks
 exercise drawer opening, focus, viewport fit, exact value and closing in EN/AR.
 Native candidate execution is pending; do not reuse the prior candidate's result.
+
+The first drawer candidate 63f9823/build 38346314 found a Sass compatibility
+error: Odoo's compiler evaluated CSS min(520px,100vw) as incompatible units.
+The 390px layout failure followed the failed stylesheet. The correction uses
+width plus max-width with identical intended layout. Browser evidence capture
+is instrumented after successful assertions using Odoo's native screenshot helper.
+No calculation, rendering or pass condition is mocked.

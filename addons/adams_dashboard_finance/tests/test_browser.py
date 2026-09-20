@@ -1,8 +1,10 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
 import json
+from unittest.mock import patch
 
 from odoo import Command, fields
 from odoo.tests import tagged
+from odoo.tests.common import ChromeBrowser
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 
@@ -80,4 +82,14 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     console.log('test successful');
                 })().catch(error => console.error(error));
                 '''.replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width))
-                self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=90)
+                original_wait = ChromeBrowser._wait_code_ok
+
+                def capture_success(browser, *args, **kwargs):
+                    result = original_wait(browser, *args, **kwargs)
+                    # Instrument only evidence capture after the real browser assertions.
+                    # Business data, rendering and test success are never mocked.
+                    browser.take_screenshot(prefix=f'dashboard_{lang}_{width}_').result(timeout=20)
+                    return result
+
+                with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
+                    self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=90)
