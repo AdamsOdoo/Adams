@@ -224,3 +224,13 @@ msgstr "حساب نقدي غير صالح."
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
 msgid "Cash account access is required."
 msgstr "يلزم توفر صلاحية الوصول إلى الحساب النقدي."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__cash_flow_report_id
+msgid "Cash Flow Report"
+msgstr "تقرير التدفقات النقدية"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select the native Cash Flow Statement for the cash mapping."
+msgstr "اختر قائمة التدفقات النقدية الأصلية لربط النقدية."

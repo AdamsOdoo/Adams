@@ -997,3 +997,21 @@ msgstr "شرائح التقرير الأصلية كل 30 يومًا حتى تا�
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Period"
 msgstr "الفترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Cash Flow Statement"
+msgstr "قائمة التدفقات النقدية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native period cash movements. This report's cash composition may differ from the Balance Sheet and account directory."
+msgstr "حركات النقدية الأصلية خلال الفترة. قد يختلف نطاق النقدية في هذا التقرير عن الميزانية العمومية ودليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Activity"
+msgstr "النشاط"

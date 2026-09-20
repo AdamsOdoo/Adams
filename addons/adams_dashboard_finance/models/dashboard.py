@@ -73,13 +73,14 @@ class ExecutiveDashboard(models.AbstractModel):
             return super().get_section(section, options)
         scoped, dates = self._scope(options)
         currency = scoped.env.company.currency_id
-        result = {'items': [], 'company_id': scoped.env.company.id,
+        result = {'items': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
                   'currency': currency.name, 'digits': currency.decimal_places,
                   'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
         try:
             scoped._finance_access()
         except AccessError:
             result['items'] = [{'key': key, 'status': 'restricted', 'value': None} for key, _label in METRICS]
+            result['cash_flow']['status'] = 'restricted'
             return result
 
         evaluations = {}
@@ -161,10 +162,25 @@ class ExecutiveDashboard(models.AbstractModel):
                 # them with independent sums or a fabricated zero.
                 item['status'] = 'error'
                 _logger.warning('Financial dashboard metric=%s category=%s', key, type(error).__name__)
+        result['cash_flow'] = scoped._cash_flow_data(dates)
         return result
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key == 'cash_flow':
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if dimension is not None or group_id is not None:
+                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            mapping = scoped._financial_mapping('cash')
+            if not scoped._mapping_ready(mapping) or not mapping.cash_flow_report_id:
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            prepared = scoped._financial_options(mapping.cash_flow_report_id, 'revenue', dates)
+            return {'type': 'ir.actions.client', 'tag': 'account_report',
+                    'name': mapping.cash_flow_report_id.display_name,
+                    'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=mapping.cash_flow_report_id.id),
+                    'params': {'options': prepared, 'ignore_session': True}}
         if key == 'cash_account':
             if dimension is not None:
                 raise ValidationError(_('Use the native financial report filters for further analysis.'))
@@ -268,3 +284,38 @@ class ExecutiveDashboard(models.AbstractModel):
         action['context'] = dict(action.get('context', {}), **scoped.env.context)
         action['keep_journal_groups_options'] = True
         return action
+
+    def _cash_flow_data(self, dates):
+        result = {'status': 'not_configured', 'rows': []}
+        try:
+            mapping = self._financial_mapping('cash')
+            if not self._mapping_ready(mapping) or not mapping.cash_flow_report_id:
+                return result
+            report = mapping.cash_flow_report_id
+            prepared = self._financial_options(report, 'revenue', dates)
+            information = report.get_report_information(prepared)
+            indices = [index for index, column in enumerate(prepared['columns'])
+                       if column['expression_label'] == 'balance' and column['figure_type'] == 'monetary']
+            if len(indices) != 1:
+                raise UnsupportedFinancialScope()
+            rows = []
+            for line in information['lines']:
+                model, _record_id = report._get_model_info_from_id(line['id'])
+                if model is not None:
+                    continue  # Native account details remain in the native action.
+                value = line['columns'][indices[0]]['no_format']
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise UnsupportedFinancialScope()
+                rows.append({'key': line['id'], 'label': line['name'], 'value': value,
+                             'level': line.get('level', 0)})
+            required = {report._get_generic_line_id(None, None, markup=key)
+                        for key in ('opening_balance', 'net_increase', 'closing_balance')}
+            if not required.issubset({row['key'] for row in rows}) or len(rows) > 100:
+                raise UnsupportedFinancialScope()
+            difference = report._get_generic_line_id(None, None, markup='unexplained_difference')
+            result.update(status='ready', rows=rows, source=report.display_name,
+                          has_warnings=bool(information.get('warnings')) or any(row['key'] == difference for row in rows),
+                          options=prepared, mapping_version=mapping.definition_fingerprint)
+        except (AccessError, UnsupportedFinancialScope, UserError, KeyError, TypeError, ValueError) as error:
+            result['status'] = 'restricted' if isinstance(error, AccessError) else 'unsupported_scope' if isinstance(error, UnsupportedFinancialScope) else 'error'
+        return result

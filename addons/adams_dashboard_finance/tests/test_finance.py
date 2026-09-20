@@ -35,6 +35,7 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         purchase = move_type.startswith('in_')
         move = self.env['account.move'].create({
             'move_type': move_type, 'partner_id': self.partner_a.id,
+            'invoice_payment_term_id': False,
             'invoice_date': invoice_date, 'date': invoice_date, 'invoice_date_due': due_date or invoice_date,
             'journal_id': self.company_data['default_journal_purchase' if purchase else 'default_journal_sale'].id,
             'invoice_line_ids': [Command.create({
@@ -43,8 +44,13 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
                 'tax_ids': [Command.clear()],
             })],
         })
+        maturity = due_date or invoice_date
+        payment_lines = move.line_ids.filtered(
+            lambda line: line.account_id.account_type in ('asset_receivable', 'liability_payable'))
+        payment_lines.write({'date_maturity': maturity})
         if posted:
             move.action_post()
+            self.assertEqual({str(line.date_maturity) for line in payment_lines}, {maturity})
         return move
 
     def _item(self, key='revenue', options=None, dashboard=None):
@@ -206,6 +212,7 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         mapping.write({
             'cash_detail_report_id': self.env.ref('account_reports.general_ledger_report').id,
             'cash_detail_expression_id': self.env.ref('account_reports.general_ledger_line_balance').id,
+            'cash_flow_report_id': self.env.ref('account_reports.cash_flow_report').id,
         })
         mapping.action_approve()
         return mapping
@@ -313,3 +320,29 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         buckets = {bucket['key']: bucket['value'] for bucket in item['aging_buckets']}
         self.assertEqual(buckets['period0'], 150)
         self.assertEqual(buckets['period1'], 0)
+
+    def test_native_cash_flow_bridge_and_internal_transfer(self):
+        self._cash_mapping()
+        bank = self.company_data['default_journal_bank'].default_account_id
+        other_cash = self.company_data['default_journal_cash'].default_account_id
+        self._cash_entry(bank, 50, '2026-07-01')
+        self._cash_entry(bank, 100, '2026-08-10')
+        self._cash_entry(bank, -20, '2026-08-20')
+        self._cash_entry(bank, -40, '2026-09-10')
+        transfer = self.env['account.move'].create({
+            'date': '2026-08-21', 'journal_id': self.company_data['default_journal_misc'].id,
+            'line_ids': [Command.create({'account_id': bank.id, 'credit': 30}),
+                         Command.create({'account_id': other_cash.id, 'debit': 30})],
+        })
+        transfer.action_post()
+        result = self.dashboard.get_section('finance', self.options)['cash_flow']
+        self.assertEqual(result['status'], 'ready', result)
+        report = self.env.ref('account_reports.cash_flow_report')
+        values = {row['key']: row['value'] for row in result['rows']}
+        for key, expected in [('opening_balance', 50), ('net_increase', 80), ('closing_balance', 130)]:
+            self.assertEqual(values[report._get_generic_line_id(None, None, markup=key)], expected)
+        # Unclassified activity is shown, not discarded to force a bridge.
+        self.assertIn(report._get_generic_line_id(None, None, markup='unclassified_activities'), values)
+        action = self.dashboard.open_report('cash_flow', self.options)
+        self.assertEqual(action['params']['options'], result['options'])
+        self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])

@@ -119,6 +119,23 @@
                     </div>
                     <p t-if="result &amp;&amp; result.generated_at" class="adams_scope">Fetched at <bdi t-esc="result.generated_at"/> UTC. Source completeness has not been assessed.</p>
                     <t t-if="section.key === 'finance'">
+                        <section t-if="result &amp;&amp; result.cash_flow" class="adams_analysis">
+                            <h3>Cash Flow Statement</h3>
+                            <p>Native period cash movements. This report's cash composition may differ from the Balance Sheet and account directory.</p>
+                            <p t-if="result.cash_flow.status !== 'ready'" t-esc="statusLabels[result.cash_flow.status]"/>
+                            <t t-else="">
+                                <p t-if="result.cash_flow.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                                <div class="adams_table_wrap"><table class="table">
+                                    <caption t-esc="result.cash_flow.source"/>
+                                    <thead><tr><th scope="col">Activity</th><th scope="col">Value</th></tr></thead>
+                                    <tbody><tr t-foreach="result.cash_flow.rows" t-as="row" t-key="row.key">
+                                        <th scope="row" t-att-style="'padding-inline-start:' + (row.level * 0.5 + 0.5) + 'rem'" t-esc="row.label"/>
+                                        <td><bdi t-esc="formatted(row, result)"/> <t t-esc="result.currency"/></td>
+                                    </tr></tbody>
+                                </table></div>
+                                <button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() => this.openReport('cash_flow')">Open native report <span aria-hidden="true">↗</span></button>
+                            </t>
+                        </section>
                         <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('cash')">Discover bank and cash accounts</button>
                         <div t-if="state.directory" class="adams_analysis">
                             <h3>Bank and cash directory</h3>
