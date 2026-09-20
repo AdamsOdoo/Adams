@@ -46,7 +46,10 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         return move
 
     def _item(self, key='revenue', options=None, dashboard=None):
-        result = (dashboard or self.dashboard).get_section('finance', options or self.options)
+        # Abstract model recordsets are empty/falsy even with a different user.
+        # Preserve the supplied environment so permission tests exercise it.
+        target = self.dashboard if dashboard is None else dashboard
+        result = target.get_section('finance', self.options if options is None else options)
         return next(item for item in result['items'] if item['key'] == key)
 
     def test_native_pnl_known_refund_and_batch_evaluation(self):
