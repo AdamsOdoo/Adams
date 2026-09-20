@@ -9,6 +9,10 @@ class AccountReport(models.Model):
     def get_options(self, previous_options):
         options = super().get_options(previous_options)
         window = self.env.context.get('adams_supplier_window')
+        # Native PDF/XLSX rebuild options with export_mode=print, without the
+        # client action context. Preserve only this explicitly marked export.
+        if not window and (previous_options or {}).get('export_mode') == 'print':
+            window = previous_options.get('adams_supplier_window')
         if not window:
             return options
         dashboard = self.env['adams.executive.dashboard']
