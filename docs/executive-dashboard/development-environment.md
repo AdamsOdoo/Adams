@@ -1,5 +1,33 @@
 # ED-001 — authorized Enterprise database inspection
 
+## Current feature environment — 20 September 2026
+
+Signed-in access was verified in the feature branch, as Mitchell Admin in its
+disposable demo database. Dashboard route:
+https://adamsmen-feature-executive-dashboard-report-first-38327805.dev.odoo.com/odoo/action-497
+
+Odoo.sh branch Settings reports:
+
+- Application: `c6586cba771fec8a9c5a0901980486d98dce44ec` (build history).
+- Community: `7bbce824a1897a912441a7f0511ffec505cbe1d5`.
+- Enterprise: `c874ba3aab567f9b3c6a86dedabf7e76ceb8cef7`.
+- Themes: `19fef81cdb35d44a2ad435c0e2996376708b1693`.
+
+These build identities differ from the pinned disposable Community harness
+campaign; both sets of evidence retain their original scope. Branch settings
+install all repository modules with tests and demo data. Arabic was absent and
+was added with the native wizard; the first Arabic browser check found missing
+dashboard catalogue markers, now corrected in source pending fresh-build QA.
+
+Enterprise `account_reports/models/account_report.py` is readable through the
+authorized editor. Its `get_options(previous_options)` initializes report
+selection and can reroute to a variant/section. A safe adapter must respect that
+selection; merely calling a root report is not sufficient. Detailed mapping,
+dated balances and independent parity fixtures remain pending. No proprietary
+source was copied into this repository.
+
+## Earlier onboarding environment (historical)
+
 Observed 19 September 2026. This updates the initial environment blocker in [README](README.md); it does not qualify a dashboard implementation.
 
 ## Verified access and changes

@@ -1,8 +1,31 @@
-# Executive dashboard — latest pre-login development
+# Executive dashboard — development and live verification
 
 **Status: development continues; full dashboard is NOT ready for business UAT.**
-Login remains deferred as requested. No Odoo.sh authentication retry, main merge,
-production change or Shopify work was performed in this continuation.
+Access was restored on 20 September 2026. The feature build and dashboard opened
+successfully. No main merge, production change or Shopify work was performed.
+
+## Live findings, 20 September
+
+- Odoo.sh build `38327805` runs application `c6586cba771fec8a9c5a0901980486d98dce44ec`.
+  Its install log reports **one failure, zero errors, 25 tests**: only
+  `TestAdamsOnboarding.test_english_and_arabic_loaded` failed. The 22 dashboard
+  tests passed. Settings confirmed just one active language.
+- Arabic was installed through the native language wizard in this disposable
+  development database. The first Arabic dashboard check exposed untranslated
+  dashboard labels despite translated native menus.
+- Root cause: browser catalogue entries lacked Odoo 19's `odoo-javascript`
+  extraction comment. The catalogue now supplies it. A regression exercises
+  Odoo's actual web translation loader instead of checking only PO syntax.
+- The disposable native-test addon now installs inactive English/Arabic languages
+  via Odoo's language wizard before post-install tests, preserving existing terms.
+  Customer addon installation does not change language configuration. The original
+  onboarding assertions remain unchanged. Fresh-build verification is pending.
+- Odoo.sh's editor can read the authorized Enterprise source. The separate Shell
+  page redirects repeatedly and the editor terminal has not connected. Finance
+  mapping and parity remain pending; source access alone is not acceptance.
+
+The previous exact-source harness results below remain valid for their recorded
+candidate. They are not relabelled as evidence for these new localization changes.
 
 ## Latest implementation
 

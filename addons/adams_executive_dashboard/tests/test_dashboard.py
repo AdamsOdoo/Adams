@@ -2,12 +2,24 @@ from odoo import Command
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import new_test_user, tagged
 from odoo.tools import file_open
+from odoo.tools.translate import code_translations
 import sass
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
 
 @tagged('post_install', '-at_install')
 class TestExecutiveDashboard(AccountTestInvoicingCommon):
+    def test_arabic_web_catalog_is_loaded_by_odoo(self):
+        messages = code_translations.get_web_translations('adams_executive_dashboard', 'ar_001')['messages']
+        translations = {message['id']: message['string'] for message in messages}
+        # Exercise Odoo's actual loader: syntactically valid PO files without
+        # odoo-javascript markers silently produced an English dashboard.
+        for source in ('Finance', 'Business overview', 'Apply filters', 'Recent orders',
+                       'Explore delivery quantities', 'Not configured'):
+            with self.subTest(source=source):
+                self.assertTrue(translations.get(source))
+                self.assertNotEqual(translations[source], source)
+
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

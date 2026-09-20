@@ -4,6 +4,7 @@
     'license': 'LGPL-3',
     'depends': ['adams_executive_dashboard', 'sale_management', 'purchase', 'stock', 'crm', 'hr_holidays'],
     'data': [],
+    'post_init_hook': 'post_init_hook',
     'installable': True,
     'application': False,
 }
