@@ -318,7 +318,9 @@ class ExecutiveDashboard(models.AbstractModel):
                 raise ValidationError(_('Review and approve this financial mapping first.'))
             prepared = scoped._supplier_window_options(mapping, dates, key)
             return {'type': 'ir.actions.client', 'tag': 'account_report',
-                    'name': mapping.report_id.display_name,
+                    'name': '%s — %s — %s' % (mapping.report_id.display_name,
+                                               dict(scoped._supplier_window_labels())[key],
+                                               dates[2].isoformat()),
                     'keep_journal_groups_options': True,
                     'context': dict(scoped.env.context, report_id=mapping.report_id.id,
                                     adams_supplier_window=key),
