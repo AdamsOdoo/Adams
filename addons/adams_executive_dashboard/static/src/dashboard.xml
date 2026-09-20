@@ -74,12 +74,12 @@
                         This section could not be loaded. Check the filters and your access, then apply filters to retry.
                     </div>
                     <div t-else="" class="adams_metric_groups">
-                        <t t-foreach="metricGroups(section, result)" t-as="group" t-key="group.key"><div class="adams_metric_group" t-att-id="'adams-group-' + group.key"><header t-if="group.name" class="adams_group_heading"><div><h3 t-esc="group.name"/><p t-esc="group.description"/></div><span class="adams_period_chip" t-if="state.applied" t-esc="group.key === 'profitability' ? state.applied.date_from + ' — ' + state.applied.date_to : state.applied.as_of"/></header><div class="adams_grid" t-att-class="{'adams_grid_three': group.key === 'financial-position', 'adams_grid_two': ['liquidity', 'working-capital'].includes(group.key)}"><t t-foreach="group.items" t-as="item" t-key="item.key">
+                        <t t-foreach="metricGroups(section, result)" t-as="group" t-key="group.key"><div class="adams_metric_group" t-att-id="'adams-group-' + group.key"><header t-if="group.name" class="adams_group_heading"><div><h3 t-esc="group.name"/><p t-esc="group.description"/></div><span class="adams_period_chip" t-if="state.applied" t-esc="group.key === 'profitability' ? state.applied.date_from + ' — ' + state.applied.date_to : state.applied.as_of"/></header><div class="adams_grid" t-att-class="{'adams_grid_three': ['financial-position', 'commercial'].includes(group.key), 'adams_grid_two': ['liquidity', 'working-capital'].includes(group.key)}"><t t-foreach="group.items" t-as="item" t-key="item.key">
                         <article class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready', 'adams_cash_card': item.key === 'cash' }">
                             <div class="adams_card_top"><span class="adams_metric_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="metricIcon(item.key)"/></t></span><h3 t-esc="labels[item.key]"/>
                             <button t-if="item.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key)" aria-label="Open native report">→</button></div><div class="adams_amount"><span t-if="item.value !== null &amp;&amp; item.unit === 'currency'" class="adams_currency" t-esc="result.currency"/>
                             <div class="adams_value" t-esc="formatted(item, result)"/>
-                            </div><p class="adams_margin_note" t-if="item.key === 'gross_profit' || item.key === 'profit'"><t t-set="margin" t-value="financeMetric(item.key === 'gross_profit' ? 'gross_margin' : 'net_margin')"/><t t-if="margin"><strong t-esc="formatted(margin, result)"/><span t-if="margin.status === 'ready'">% margin</span></t></p><span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
+                            </div><p class="adams_margin_note" t-if="item.key === 'gross_profit' || item.key === 'profit'"><t t-set="margin" t-value="financeMetric(item.key === 'gross_profit' ? 'gross_margin' : 'net_margin')"/><t t-if="margin"><strong t-esc="formatted(margin, result)"/><span t-if="margin.status === 'ready'">% margin</span></t></p><p t-if="item.key === 'confirmed_sales'" class="adams_margin_note"><t t-set="orders" t-value="result.items.find(metric =&gt; metric.key === 'orders')"/><t t-if="orders &amp;&amp; orders.status === 'ready'"><strong t-esc="formatted(orders, result)"/> <span>distinct confirmed orders</span></t></p><span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
                             <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
@@ -206,11 +206,11 @@
                         </div>
                     </t>
                     <t t-if="section.key === 'sales'">
-                        <div class="adams_page_controls mt-3">
+                        <div class="adams_sales_workspace"><section class="adams_panel adams_recent_panel"><header class="adams_panel_head"><div><h3>Recent orders &amp; quotations</h3><p>Open a document to inspect it.</p></div></header><div class="adams_page_controls mt-3">
                             <button class="btn btn-outline-secondary" t-on-click="() =&gt; this.loadRecent('orders')">Recent orders</button>
                             <button class="btn btn-outline-secondary" t-on-click="() =&gt; this.loadRecent('quotations')">Recent quotations</button>
                         </div>
-                        <section t-if="state.recent" class="adams_analysis" aria-live="polite">
+                        <p t-if="!state.recent" class="adams_empty_note">Choose orders or quotations to load authorized records.</p><section t-if="state.recent" class="adams_analysis" aria-live="polite">
                             <t t-set="recent" t-value="state.recent"/>
                             <h3 t-if="recent.kind === 'orders'">Recent orders</h3><h3 t-else="">Recent quotations</h3>
                             <p>Selected period, newest first. Native order date is the confirmation date for orders and creation date for quotations. Untaxed values use each document's currency; no mixed-currency total.</p>
@@ -233,7 +233,13 @@
                                 <button t-if="recent.status === 'ready' || recent.status === 'empty'" class="btn btn-outline-primary" t-att-disabled="state.opening" t-on-click="() =&gt; this.openRecent()">Open native list</button>
                             </div>
                         </section>
-                    </t>
+                    </section><section class="adams_panel adams_rank_panel"><header class="adams_panel_head"><div><h3>Salesperson ranking</h3><p>Top five authorized native report groups</p></div><button class="btn btn-link" t-on-click="() =&gt; this.inspect(state.ranking?.key || 'invoiced_sales', 'salesperson')">Full ranking →</button></header>
+    <div class="adams_rank_tabs"><button t-att-class="{'active': !state.ranking || state.ranking.key === 'invoiced_sales'}" t-on-click="() =&gt; this.loadRanking('invoiced_sales')">Invoiced sales</button><button t-att-class="{'active': state.ranking?.key === 'invoiced_margin'}" t-on-click="() =&gt; this.loadRanking('invoiced_margin')">Commercial margin</button></div>
+    <p t-if="!state.ranking" class="adams_empty_note">Choose a native measure to load the ranking.</p>
+    <t t-else=""><p t-if="state.ranking.status === 'loading'" class="adams_empty_note" role="status">Loading…</p><p t-elif="state.ranking.status === 'error'" class="adams_empty_note" role="alert">Analysis unavailable. Check your access and retry.</p><p t-elif="!state.ranking.rows.length" class="adams_empty_note">No matching records</p>
+    <div t-else="" class="adams_rank_list"><button t-foreach="state.ranking.rows" t-as="row" t-key="row.id || 'unassigned'" class="adams_rank_row" t-on-click="() =&gt; this.openReport(state.ranking.key, 'salesperson', row.id)"><span class="adams_rank_index" t-esc="row_index + 1"/><span class="adams_rank_avatar" t-esc="row.label.slice(0, 2)"/><span class="adams_rank_person"><span class="adams_rank_top"><strong t-esc="row.label"/><bdi t-esc="formatted({value: row.value}, state.ranking)"/></span><span class="adams_rank_track"><span t-att-style="'width:' + barWidth(row.value, state.ranking.rows)" t-att-class="{'negative': row.value &lt; 0}"/></span></span></button></div></t>
+    <p class="adams_rank_foot">Native values retain signs. Bars show relative magnitude, not target attainment. Commercial margin uses current product cost.</p>
+</section></div></t>
                     <section t-if="section.key === 'sales'" class="adams_analysis">
                         <h3>Fulfillment</h3>
                         <p>Current native ordered, delivered and remaining quantities for confirmed orders in the selected order-date period. The balance cutoff does not apply. Each product uses its own unit. Signed values are retained; quantities are not combined across units.</p>

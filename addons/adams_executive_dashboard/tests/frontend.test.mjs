@@ -193,3 +193,27 @@ test('company changes clear and suppress a pending financial trend', async () =>
     await refresh;
     assert.equal(controller.state.financialTrends.revenue, undefined);
 });
+
+
+test('reference layout separates four finance cards and three sales cards', () => {
+    const { controller } = fixture();
+    const items = ['revenue', 'gross_profit', 'gross_margin', 'profit', 'net_margin', 'operating_expenses', 'cash', 'standard_forecast', 'receivables', 'payables', 'assets', 'liabilities', 'equity', 'invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'orders', 'quotations'].map(key => ({ key }));
+    const finance = controller.metricGroups({ key: 'finance' }, { items });
+    assert.equal(finance[0].items.map(item => item.key).join(','), 'revenue,gross_profit,profit,operating_expenses');
+    const sales = controller.metricGroups({ key: 'sales' }, { items });
+    assert.equal(sales[0].items.map(item => item.key).join(','), 'invoiced_sales,confirmed_sales,quotations');
+    assert.equal(controller.sections.length, 6);
+});
+
+test('old salesperson ranking cannot survive a company change', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const ranking = controller.loadRanking('invoiced_sales');
+    controller.state.draft.company_id = 2;
+    const refresh = controller.refresh();
+    pending[0].resolve({ rows: [{ id: 1, value: 999 }], status: 'ready' });
+    await ranking;
+    for (const request of pending.slice(1)) { request.resolve(data(0)); }
+    await refresh;
+    assert.equal(controller.state.ranking, null);
+});

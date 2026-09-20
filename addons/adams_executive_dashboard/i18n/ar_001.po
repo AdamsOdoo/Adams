@@ -1579,3 +1579,75 @@ msgstr "يلزم إذن الوصول إلى تقارير المشتريات."
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Invalid purchase record."
 msgstr "سجل الشراء غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invoiced sales, order intake and quotations are different measures."
+msgstr "المبيعات المفوترة والطلبات الواردة وعروض الأسعار مقاييس مختلفة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "distinct confirmed orders"
+msgstr "طلبات مؤكدة مميزة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recent orders & quotations"
+msgstr "الطلبات وعروض الأسعار الأخيرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open a document to inspect it."
+msgstr "افتح مستنداً لفحصه."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Choose orders or quotations to load authorized records."
+msgstr "اختر الطلبات أو عروض الأسعار لتحميل السجلات المصرح بها."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Salesperson ranking"
+msgstr "ترتيب مندوبي المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Top five authorized native report groups"
+msgstr "أعلى خمس مجموعات مصرح بها من التقرير القياسي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Full ranking →"
+msgstr "الترتيب الكامل ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invoiced sales"
+msgstr "المبيعات المفوترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Commercial margin"
+msgstr "الهامش التجاري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Choose a native measure to load the ranking."
+msgstr "اختر مقياساً قياسياً لتحميل الترتيب."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native values retain signs. Bars show relative magnitude, not target attainment. Commercial margin uses current product cost."
+msgstr "تحتفظ القيم القياسية بإشاراتها. تُظهر الأشرطة الحجم النسبي وليس تحقيق الهدف. يستخدم الهامش التجاري تكلفة المنتج الحالية."

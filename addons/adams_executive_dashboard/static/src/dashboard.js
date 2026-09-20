@@ -48,7 +48,7 @@ export class ExecutiveDashboard extends Component {
         this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, inventory: null, workforce: null, procurement: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, inventory: null, workforce: null, procurement: null, ranking: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -157,6 +157,7 @@ export class ExecutiveDashboard extends Component {
         this.state.inventory = null;
         this.state.workforce = null;
         this.state.procurement = null;
+        this.state.ranking = null;
         this.state.financialTrends = {};
         this.state.fulfillment = null;
         this.state.recent = null;
@@ -170,6 +171,8 @@ export class ExecutiveDashboard extends Component {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
                 if (this.alive && generation === this.generation) {
                     this.state.sections[key] = { ...data, status: 'ready' };
+                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { void this.loadRecent('orders'); void this.loadRanking('invoiced_sales'); }
+                    if (key === 'finance' && ['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) { void this.loadProfitabilityChart(); }
                 }
             } catch {
                 if (this.alive && generation === this.generation) {
@@ -196,6 +199,7 @@ export class ExecutiveDashboard extends Component {
                 { key: 'financial-position', name: _t('Financial position'), description: _t('Native Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
             ];
         }
+        if (section.key === 'sales') { return [{ key: 'commercial', name: _t('Commercial performance'), description: _t('Invoiced sales, order intake and quotations are different measures.'), items: select(['invoiced_sales', 'confirmed_sales', 'quotations']) }]; }
         return [{ key: section.key, name: '', description: '', items: result.items }];
     }
 
@@ -273,6 +277,23 @@ export class ExecutiveDashboard extends Component {
     barWidth(value, rows) {
         const maximum = Math.max(...rows.map(row => Math.abs(row.value)), 1);
         return `${Math.abs(value) / maximum * 100}%`;
+    }
+
+    async loadRanking(key) {
+        const generation = this.generation;
+        const request = (this.rankingRequest || 0) + 1;
+        this.rankingRequest = request;
+        this.state.ranking = { key, status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, 'salesperson', { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && request === this.rankingRequest) {
+                this.state.ranking = { ...data, key, rows: data.rows.slice(0, 5) };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && request === this.rankingRequest) {
+                this.state.ranking = { key, status: 'error', rows: [] };
+            }
+        }
     }
 
     async loadFinancialTrend(key) {
