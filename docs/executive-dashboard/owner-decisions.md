@@ -1,7 +1,7 @@
 # Decisions needed to finish the full v4 scope
 
-Status: Decisions 1–5 approved below; remaining proposals are unapproved. This records the material business choices required
-by sections 2.2 and 2.5 of the supplied v4 contract. Only the explicit scope choice in Decision 4 changes the requested delivery scope.
+Status: Decisions 1–10 approved below. This records the material business choices required
+by sections 2.2 and 2.5 of the supplied v4 contract. Explicit exclusions in Decisions 4 and 6–9 amend the delivery scope; all remaining accuracy, design and acceptance requirements remain applicable.
 Developer configuration/testing and owner acceptance remain separate.
 
 ## Decision 1 — approved UAT company and environment
@@ -64,18 +64,50 @@ native currency behavior. Treatment of standalone credits/unapplied payments and
 non-supplier obligations is not newly approved by this decision; retain native
 aging semantics and expose any additional definition choice before custom netting.
 
-## Additional measures
+## Decision 6 — approved delivery quantities only
 
-| Requested outcome | Current native source and gap | Decision / remaining choice |
-|---|---|---|
-| Daily cash outlook / minimum cash | Standard Executive Summary short-term forecast is available; it is not a dated receipt/payment schedule | Approved Decision 4: standard native forecast only; custom daily plan and minimum projected balance excluded from this delivery. |
-| Payments due in 7 / 30 days | Native aging has maturity buckets but the requested exact forward windows have not been qualified | Approved Decision 5: posted supplier-bill installments, overlapping days 1–7/1–30; due today and overdue separate. Keep native AR/AP totals, overdue and aging buckets. Technical parity remains to be implemented/qualified. |
-| Remaining backlog value | Native ordered/delivered/remaining quantities are implemented; there is no approved value/history rule | Define goods-only versus services/kits, returns/overdelivery/cancellations, discounted untaxed price, native currency and current versus historical cutoff. Native quantity views remain available. |
-| On-time completion | Native first-delivery date is not final completion; original-promise coverage is unverified | Choose transfer/order/line denominator, dispatch versus customer receipt, original deadline and timezone/grace period, partials/returns and missing-history treatment. Show coverage and N/A for no denominator. |
-| Management attention | Native purchase approval/late-receipt worklists are implemented; executive materiality/owner rules are undefined | Identify thresholds, responsible role and actionable native route per alert. Do not invent red/green risk badges from sample data. |
-| Stock aging / shortage exposure | Native dated valuation and current forecast routes are implemented; aging/nonmovement and exposure definitions are not equivalent | Choose receipt age versus last movement; owned versus consigned stock; product/warehouse scope; physical versus projected shortage and forecast horizon. Reuse the native report where the definition matches. |
-| Targets and historical comparisons | Native financial budgets and signed monthly trends are implemented | Select approved budgets and explicit comparable dates. Missing commercial targets or original historical events remain unavailable, never inferred from actuals. |
+Show native **ordered, delivered and remaining quantities**. Monetary undelivered
+order/backlog value is excluded from this delivery. Retain native product/UoM
+semantics and signed quantities; do not add incompatible units into one total.
 
-The owner may approve explicit definitions or defer named extra measures from the
-first UAT scope. Until that decision is recorded, the full v4 requirement remains
-open. A deferral must be explicit; an unavailable widget is not completed scope.
+## Decision 7 — approved native delivery status only
+
+Use native delivery status and quantities. A custom on-time delivery percentage
+is excluded from this delivery. No new original-promise/completion calculation
+is required for the agreed scope.
+
+## Decision 8 — approved native management worklists
+
+Management attention uses existing native worklists only: purchase orders awaiting
+approval and late receipts, alongside separately displayed overdue receivables and
+payables. Custom materiality thresholds, custom alerts and escalation rules are
+excluded. Preserve native permissions and document routes.
+
+## Decision 9 — approved native inventory views
+
+Include native stock quantities, valuation, forecast and replenishment views.
+Custom stock-aging and shortage-exposure metrics are excluded from this delivery.
+Retain the native current/historical distinctions and authorized stock scope.
+
+## Decision 10 — approved existing budgets and explicit missing targets
+
+Use existing Odoo financial budgets **where configured**. Otherwise display
+**No target configured**; never invent targets or derive them from actuals.
+Verify the applicable native budget, company, period and report mapping in staging.
+The decision does not select an arbitrary budget when several are applicable,
+approve invented sales targets or waive comparison-scope validation.
+
+## Resulting delivery scope and engineering follow-through
+
+All ten choices in the one-by-one owner decision round are now recorded.
+The approved scope is a native-report-first workspace, supplemented by the
+approved supplier-bill maturity windows in Decision 5. No custom daily cash plan,
+minimum projected cash, valued backlog, on-time percentage, alert rules, stock
+aging or shortage-exposure measure is required for this delivery.
+
+These are business decisions, not evidence of completed implementation or UAT.
+Next engineering work must reconcile UI/guidance with these choices, implement
+and qualify Decision 5, inspect and configure Adams for Men in authorized staging,
+and complete the remaining relevant financial, visual, access, export and
+representative-performance acceptance checks. Preserve prior exact-source
+evidence and reuse unchanged harness qualification. Production remains prohibited.
