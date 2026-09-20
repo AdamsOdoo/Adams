@@ -276,3 +276,33 @@ acceptance, performance checks and owner UAT. No main merge or release approval.
 
 Login is deferred at the owner's request. No prototype balance calculations,
 production/staging changes or old Shopify development are part of this work.
+
+## Native finance expansion — verified 20 September 2026
+
+Source `fd3fd714039f473ab9025351250b9276fe009898`, tree
+`2d90751c33a4ff9f27806bbe0a202dc049209297`, Odoo.sh build **38344123**:
+**44 tests, zero failures/errors** (Odoo.sh reports Test: Warning).
+This supersedes the earlier 35-test finance checkpoint for the implemented code.
+
+Additional verified features: native GL dated cash-account balances (including
+unlinked, archived, zero, negative and foreign-currency accounts); due-date aging
+buckets; native Cash Flow Statement with unclassified lines; separately scoped
+customer/vendor Partner Ledger actions; native Executive Summary short-term cash
+forecast; approved native financial budget selection, preserving explicit zero
+and distinguishing a period with no budget entries. No customer mappings were
+approved automatically. Accounting-authorized browser parity remains open.
+
+### Operational expansion candidate (validation pending)
+
+Adds native Odoo 19 product stock valuation, current/historical inventory modes,
+scoped stock forecast/history/location/orderpoint actions, and current HR workforce
+counts by department. Historical quantities use the native stock computation with
+a timezone-correct cutoff; current reservations and forecasts are not described as
+historical. Valuation uses `product.product.total_value`, not journal-entry sums or
+an obsolete valuation-layer model. Workforce requires HR officer access; no private
+employee fields are returned. EN/Arabic strings and 11 controller tests pass locally.
+Native integration results for this candidate must be recorded before qualification.
+
+Full v4 UAT is still not qualified: remaining features, full parity/security/upgrade,
+responsive/bilingual browser matrix, representative performance and owner-approved
+business definitions/configuration are tracked in the UAT checklist.

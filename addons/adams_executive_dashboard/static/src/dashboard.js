@@ -45,7 +45,7 @@ export class ExecutiveDashboard extends Component {
         this.root = useRef('root');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { operations: true }, detail: null, directory: null, inventory: null, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { operations: true }, detail: null, directory: null, inventory: null, workforce: null, fulfillment: null, recent: null, exporting: false, restored: false });
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -86,7 +86,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
-            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
+            directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
     async restoreNavigation(saved) {
@@ -102,7 +102,8 @@ export class ExecutiveDashboard extends Component {
         }
         if (saved.directory) { jobs.push(this.loadDirectory('cash', saved.directory.offset)); }
         if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
-        if (saved.inventory) { jobs.push(this.loadDirectory('inventory', saved.inventory.offset)); }
+        if (saved.workforce) { jobs.push(this.loadDirectory('workforce', saved.workforce.offset)); }
+        if (saved.inventory) { jobs.push(this.loadDirectory('inventory', saved.inventory.offset, saved.inventory.mode || 'current')); }
         for (const section of this.sections) {
             if (typeof saved.collapsed?.[section.key] === 'boolean') { this.state.collapsed[section.key] = saved.collapsed[section.key]; }
         }
@@ -150,6 +151,7 @@ export class ExecutiveDashboard extends Component {
         this.state.detail = null;
         this.state.directory = null;
         this.state.inventory = null;
+        this.state.workforce = null;
         this.state.fulfillment = null;
         this.state.recent = null;
         this.detailGeneration++;
@@ -210,21 +212,24 @@ export class ExecutiveDashboard extends Component {
         return `${Math.abs(value) / maximum * 100}%`;
     }
 
-    async loadDirectory(kind, offset = 0) {
+    async loadDirectory(kind, offset = 0, mode = null) {
         const generation = this.generation;
         const stateKey = kind === 'cash' ? 'directory' : kind;
-        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment' }[kind];
+        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment', workforce: 'get_workforce' }[kind];
         const request = (this[`${stateKey}Request`] || 0) + 1;
         this[`${stateKey}Request`] = request;
-        this.state[stateKey] = { status: 'loading', rows: [], offset };
+        mode = mode || this.state[stateKey]?.mode || 'current';
+        this.state[stateKey] = { status: 'loading', rows: [], offset, mode };
         try {
-            const data = await this.orm.call('adams.executive.dashboard', method, [{ ...this.state.applied }, offset]);
+            const args = [{ ...this.state.applied }, offset];
+            if (kind === 'inventory') { args.push(mode); }
+            const data = await this.orm.call('adams.executive.dashboard', method, args);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
                 this.state[stateKey] = { ...data, offset };
             }
         } catch {
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
-                this.state[stateKey] = { status: 'error', rows: [], offset };
+                this.state[stateKey] = { status: 'error', rows: [], offset, mode };
             }
         }
     }
@@ -251,8 +256,11 @@ export class ExecutiveDashboard extends Component {
         const generation = this.generation;
         this.state.opening = true;
         try {
-            const isDirectory = ['inventory', 'fulfillment'].includes(key);
+            const isDirectory = ['inventory', 'fulfillment', 'workforce', 'inventory_product'].includes(key);
             const args = isDirectory ? [{ ...this.state.applied }] : [key, { ...this.state.applied }, dimension, groupId];
+            if (key === 'inventory') { args.push(this.state.inventory?.mode || 'current'); }
+            if (key === 'workforce') { args.push(groupId); }
+            if (key === 'inventory_product') { args.push(groupId, dimension); }
             const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);
             if (this.alive && generation === this.generation) { await this.action.doAction(action); }
         } catch {

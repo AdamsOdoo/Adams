@@ -160,3 +160,23 @@ test('new filters during return prevent old analysis from reopening', async () =
     assert.equal(controller.state.detail, null);
     assert.equal(controller.state.applied.company_id, 2);
 });
+
+
+test('historical inventory mode survives paging, navigation and drilldown', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const historical = controller.loadDirectory('inventory', 0, 'historical');
+    assert.equal(pending[0].args[2], 'historical');
+    pending[0].resolve({ status: 'ready', rows: [], mode: 'historical' });
+    await historical;
+    const next = controller.loadDirectory('inventory', 25);
+    assert.equal(pending[1].args[2], 'historical');
+    pending[1].resolve({ status: 'ready', rows: [], mode: 'historical' });
+    await next;
+    assert.equal(controller.navigationState().inventory.mode, 'historical');
+    const open = controller.openReport('inventory');
+    assert.equal(pending[2].method, 'open_inventory');
+    assert.equal(pending[2].args[1], 'historical');
+    pending[2].resolve({});
+    await open;
+});

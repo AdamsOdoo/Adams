@@ -26,3 +26,22 @@ formula is enabled by this document.
 - [Stock forecast range](https://github.com/odoo/odoo/blob/82f4b92eaf3f2014eb1667e4845e80c377dbfb4f/addons/stock/report/report_stock_quantity.py)
 - [Purchase report definitions](https://github.com/odoo/odoo/blob/82f4b92eaf3f2014eb1667e4845e80c377dbfb4f/addons/purchase/report/purchase_report.py)
 - [Native action state hook](https://github.com/odoo/odoo/blob/82f4b92eaf3f2014eb1667e4845e80c377dbfb4f/addons/web/static/src/search/action_hook.js)
+
+## Installed Odoo 19 inventory and workforce inspection — 20 September
+
+Accessible primary source at installed Community revision
+`7bbce824a1897a912441a7f0511ffec505cbe1d5`:
+- [Native stock quantities and actions](https://github.com/odoo/odoo/blob/7bbce824a1897a912441a7f0511ffec505cbe1d5/addons/stock/models/product.py)
+- [Native valuation service](https://github.com/odoo/odoo/blob/7bbce824a1897a912441a7f0511ffec505cbe1d5/addons/stock_account/models/product.py)
+- [Native stock valuation view](https://github.com/odoo/odoo/blob/7bbce824a1897a912441a7f0511ffec505cbe1d5/addons/stock_account/views/product_views.xml)
+- [Inventory at Date contract](https://github.com/odoo/odoo/blob/7bbce824a1897a912441a7f0511ffec505cbe1d5/addons/stock/wizard/stock_quantity_history.py)
+- [Employee report and action](https://github.com/odoo/odoo/blob/7bbce824a1897a912441a7f0511ffec505cbe1d5/addons/hr/views/hr_employee_views.xml)
+
+Fact: product `qty_available` supports native historical `to_date`. Current
+`free_qty` subtracts present reservations, so the historical dashboard omits it.
+Odoo 19 `total_value` delegates standard/average/FIFO and lot valuation to native
+services and supports `to_date`; the dashboard does not recreate these formulas.
+The native report exposes the same field. Current workforce counts are native
+employee aggregates, explicitly not historical headcount. Stock aging, company
+warehouse/location selectors, full owner-scope fidelity and historical HR definitions
+remain open acceptance work; they are not implied by this bounded implementation.

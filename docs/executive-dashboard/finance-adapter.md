@@ -59,3 +59,26 @@ company mappings. Automated test mappings exist only inside rolled-back fixtures
 These tests do not qualify all currency/aging/cash-flow/ledger/budget cases. Full UAT readiness
 still requires the remaining acceptance-plan gates and business-definition
 decisions for genuine native-report gaps.
+
+## Native budgets, cash and partner reporting (20 September)
+
+The approved cash mapping can additionally select the native General Ledger and
+Cash Flow Statement. The cash account directory reads the native GL balance
+expression with account grouping and the selected cutoff. Native CFS lines are
+presented unchanged, including unclassified and reconciliation-difference lines;
+its account membership may differ from the Balance Sheet or account directory.
+AR/AP mappings can select the native Partner Ledger, preserving separate trade and
+non-trade receivable/payable roles. Ledger activity uses the selected period;
+aging uses its independent cutoff. No roles are silently netted.
+
+Profitability mappings can select a same-company `account.report.budget` when the
+native report supports budgets. Values come from the native budget column group;
+no independent daily/monthly prorating occurs. A period with no dated budget items
+is unavailable, while an explicit zero budget remains zero. The native Executive
+Summary forecast is receivables plus signed payables at period end, separate from
+bank cash and any enhanced dated cash plan. It is not guaranteed future liquidity.
+
+All selected report definitions/columns/handlers/linked reports and budget identity
+participate in mapping approval fingerprints. Business-record changes flow through;
+report definition changes invalidate approval. Native fixtures passed in build
+38344123 at source fd3fd714 (44 total tests, zero failures/errors).

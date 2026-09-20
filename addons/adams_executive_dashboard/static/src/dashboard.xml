@@ -233,22 +233,51 @@
                         </t>
                     </section>
                     <t t-if="section.key === 'operations'">
-                        <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('inventory')">Explore current stock</button>
+                        <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('inventory', 0, 'current')">Explore current stock</button>
+                        <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('inventory', 0, 'historical')">Stock at balance cutoff</button>
+                        <button class="btn btn-outline-secondary mt-3" t-on-click="() => this.loadDirectory('workforce')">Explore workforce</button>
                         <div t-if="state.inventory" class="adams_analysis">
-                            <h3>Current stock by product</h3><p>Current native Stock report quantities, in each product's unit. Period and balance cutoff do not apply. Quantities are not added across different units.</p>
+                            <h3>Native stock by product</h3>
+                            <p t-if="state.inventory.mode === 'current'">Current native Stock report quantities, in each product's unit. Period and balance cutoff do not apply. Quantities are not added across different units.</p>
+                            <p t-else="">Native on-hand quantity and operational valuation at the balance cutoff, end of day in your timezone. Current reservations and forecasts are omitted.</p>
+                            <p>Operational valuation uses the native stock costing service. It is separate from accounting valuation. Archived products are included. Use the native report for full export.</p>
+                            <p t-if="state.inventory.value_status &amp;&amp; state.inventory.value_status !== 'ready'"><span>Valuation: </span><t t-esc="statusLabels[state.inventory.value_status]"/></p>
                             <p t-if="state.inventory.status === 'loading'" role="status">Loading…</p>
                             <p t-if="state.inventory.status === 'error'" role="alert">Inventory unavailable. Check your access and retry.</p>
                             <p t-if="state.inventory.status === 'not_installed'">App not installed</p>
                             <p t-if="state.inventory.status === 'empty'">No matching records</p>
                             <div class="adams_table_wrap"><table t-if="state.inventory.rows.length" class="table">
-                                <thead><tr><th scope="col">Product</th><th scope="col">Unit</th><th scope="col">On hand</th><th scope="col">Free to use</th><th scope="col">Forecasted</th></tr></thead>
+                                <thead><tr><th scope="col">Product</th><th scope="col">Unit</th><th scope="col">On hand</th><th t-if="state.inventory.mode === 'current'" scope="col">Free to use</th><th t-if="state.inventory.mode === 'current'" scope="col">Forecasted</th><th scope="col"><span>Native stock value</span> <bdi t-esc="state.inventory.currency"/></th><th scope="col">Supporting views</th></tr></thead>
                                 <tbody><tr t-foreach="state.inventory.rows" t-as="row" t-key="row.id">
-                                    <td t-esc="row.display_name"/><td t-esc="row.uom_id[1]"/><td t-esc="row.qty_available"/><td t-esc="row.free_qty"/><td t-esc="row.virtual_available"/>
+                                    <td t-esc="row.display_name"/><td t-esc="row.uom_id[1]"/><td t-esc="row.qty_available"/><td t-if="state.inventory.mode === 'current'" t-esc="row.free_qty"/><td t-if="state.inventory.mode === 'current'" t-esc="row.virtual_available"/>
+                                    <td><t t-if="state.inventory.value_status === 'ready'" t-esc="formatted({value: row.total_value}, state.inventory)"/><t t-else="">—</t></td>
+                                    <td><details><summary>Current supporting views</summary><div class="adams_page_controls">
+                                        <button class="btn btn-link" t-on-click="() => this.openReport('inventory_product', 'forecast', row.id)">Forecast</button>
+                                        <button class="btn btn-link" t-on-click="() => this.openReport('inventory_product', 'history', row.id)">Move history</button>
+                                        <button class="btn btn-link" t-on-click="() => this.openReport('inventory_product', 'locations', row.id)">Locations</button>
+                                        <button class="btn btn-link" t-on-click="() => this.openReport('inventory_product', 'replenishment', row.id)">Replenishment rules</button>
+                                    </div></details></td>
                                 </tr></tbody>
                             </table></div>
                             <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.inventory.offset === 0" t-on-click="() => this.loadDirectory('inventory', state.inventory.offset - 25)">Previous</button>
                                 <button class="btn btn-outline-secondary" t-att-disabled="!state.inventory.has_more" t-on-click="() => this.loadDirectory('inventory', state.inventory.offset + 25)">Next</button>
                                 <button t-if="state.inventory.status === 'ready' || state.inventory.status === 'empty'" class="btn btn-outline-primary" t-on-click="() => this.openReport('inventory')">Open native report</button></div>
+                        </div>
+                        <div t-if="state.workforce" class="adams_analysis">
+                            <h3>Current workforce by department</h3>
+                            <p>Active employee records in the selected company, grouped by their current department. Period and balance cutoff do not apply. No private employee fields are returned.</p>
+                            <p t-if="state.workforce.status === 'loading'" role="status">Loading…</p>
+                            <p t-if="state.workforce.status === 'error'" role="alert">Workforce unavailable. HR reporting access is required.</p>
+                            <p t-if="state.workforce.status === 'not_installed'">App not installed</p>
+                            <t t-if="state.workforce.status === 'ready' || state.workforce.status === 'empty'">
+                                <p><span>Active employees: </span><strong t-esc="state.workforce.total"/></p>
+                                <div class="adams_table_wrap"><table class="table"><thead><tr><th scope="col">Department</th><th scope="col">Employees</th></tr></thead><tbody>
+                                    <tr t-foreach="state.workforce.rows" t-as="row" t-key="row.id || 'unassigned'"><td><button class="btn btn-link" t-on-click="() => this.openReport('workforce', null, row.id)" t-esc="row.name"/></td><td t-esc="row.count"/></tr>
+                                </tbody></table></div>
+                                <div class="adams_page_controls"><button class="btn btn-outline-secondary" t-att-disabled="state.workforce.offset === 0" t-on-click="() => this.loadDirectory('workforce', state.workforce.offset - 25)">Previous</button>
+                                <button class="btn btn-outline-secondary" t-att-disabled="!state.workforce.has_more" t-on-click="() => this.loadDirectory('workforce', state.workforce.offset + 25)">Next</button>
+                                <button class="btn btn-outline-primary" t-on-click="() => this.openReport('workforce')">Open native report</button></div>
+                            </t>
                         </div>
                     </t>
                     </t>

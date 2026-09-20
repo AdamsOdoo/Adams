@@ -231,3 +231,90 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         order.order_line.qty_delivered = 7
         self.env.flush_all()
         self.assertEqual(self.dashboard.get_fulfillment(self.options)['rows'][0]['remaining'], -2)
+
+    def test_historical_stock_native_value_routes_and_scope(self):
+        from odoo.exceptions import AccessError, ValidationError
+        product = self.env['product.product'].create({
+            'name': 'Dated stock fixture', 'is_storable': True, 'standard_price': 10,
+            'company_id': self.env.company.id,
+        })
+        stock = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1).lot_stock_id
+        supplier = self.env.ref('stock.stock_location_suppliers')
+        customer = self.env.ref('stock.stock_location_customers')
+        for quantity, source, dest, day in [(12, supplier, stock, '2026-08-10 12:00:00'),
+                                            (4, stock, customer, '2026-09-10 12:00:00')]:
+            move = self.env['stock.move'].create({
+                'name': 'Dated inventory fixture', 'product_id': product.id,
+                'product_uom_qty': quantity, 'product_uom': product.uom_id.id,
+                'location_id': source.id, 'location_dest_id': dest.id,
+                'company_id': self.env.company.id,
+            })
+            move._action_confirm()
+            move.quantity = quantity
+            move.picked = True
+            move._action_done()
+            move.date = day
+            move.move_line_ids.date = day
+        self.env.flush_all()
+        def row(mode):
+            offset = 0
+            while True:
+                page = self.dashboard.get_inventory(self.options, offset, mode)
+                found = next((r for r in page['rows'] if r['id'] == product.id), None)
+                if found:
+                    return found, page
+                self.assertTrue(page['has_more'])
+                offset += 25
+        current, _ = row('current')
+        past, page = row('historical')
+        self.assertEqual(current['qty_available'], 8)
+        self.assertEqual(past['qty_available'], 12)
+        self.assertEqual(past['total_value'], 120)
+        self.assertNotIn('free_qty', past)
+        self.assertNotIn('virtual_available', past)
+        self.assertEqual(page['value_status'], 'ready')
+        action = self.dashboard.open_inventory(self.options, 'historical')
+        native = product.with_context(action['context'])
+        self.assertEqual(native.qty_available, 12)
+        self.assertEqual(native.total_value, 120)
+        self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+        for route in ('forecast', 'history', 'locations', 'replenishment'):
+            action = self.dashboard.open_inventory_product(self.options, product.id, route)
+            self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+        product.active = False
+        self.assertEqual(row('historical')[0]['qty_available'], 12)
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_inventory_product(self.options, True, 'forecast')
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_inventory(self.options, 0, 'invented')
+        foreign = self.env['product.product'].with_company(self.company_data_2['company']).create({
+            'name': 'Other company product', 'is_storable': True,
+            'company_id': self.company_data_2['company'].id,
+        })
+        with self.assertRaises(AccessError):
+            self.dashboard.open_inventory_product(self.options, foreign.id, 'forecast')
+
+    def test_workforce_current_native_departments_and_restrictions(self):
+        from odoo.exceptions import AccessError
+        from odoo.tests import new_test_user
+        self.env.user.group_ids |= self.env.ref('hr.group_hr_manager')
+        department = self.env['hr.department'].create({'name': 'Dashboard workforce', 'company_id': self.env.company.id})
+        employees = self.env['hr.employee'].create([
+            {'name': 'Workforce one', 'company_id': self.env.company.id, 'department_id': department.id},
+            {'name': 'Workforce two', 'company_id': self.env.company.id, 'department_id': department.id},
+            {'name': 'Former workforce', 'company_id': self.env.company.id, 'department_id': department.id, 'active': False},
+        ])
+        page = self.dashboard.get_workforce(self.options)
+        row = next(r for r in page['rows'] if r['id'] == department.id)
+        self.assertEqual(row['count'], 2)
+        self.assertEqual(set(row), {'id', 'name', 'count'})
+        action = self.dashboard.open_workforce(self.options, department.id)
+        self.assertEqual(self.env['hr.employee'].search(action['domain']), employees[:2])
+        self.assertEqual(page['date_basis'], 'current')
+        reader = new_test_user(self.env, login='dashboard_ops_restricted',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user')
+        for method, args in [('get_workforce', [self.options]), ('open_workforce', [self.options]),
+                             ('get_inventory', [self.options]),
+                             ('open_inventory_product', [self.options, self.product_a.id, 'forecast'])]:
+            with self.assertRaises(AccessError):
+                getattr(self.dashboard.with_user(reader), method)(*args)

@@ -1051,3 +1051,131 @@ msgstr "الموازنة الأصلية"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Native dated budget items for the selected period. No daily target proration is applied."
 msgstr "بنود الموازنة الأصلية المؤرخة للفترة المحددة. لا يتم توزيع الأهداف تناسبيًا على الأيام."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid inventory mode."
+msgstr "وضع المخزون غير صالح."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Historical inventory requires a cutoff no later than today."
+msgstr "يتطلب المخزون التاريخي تاريخ قطع لا يتجاوز اليوم."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid inventory route."
+msgstr "مسار المخزون غير صالح."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "HR reporting access is required."
+msgstr "يلزم إذن الوصول إلى تقارير الموارد البشرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock at balance cutoff"
+msgstr "المخزون في تاريخ الرصيد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Explore workforce"
+msgstr "استعراض القوى العاملة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native stock by product"
+msgstr "المخزون القياسي حسب المنتج"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native on-hand quantity and operational valuation at the balance cutoff, end of day in your timezone. Current reservations and forecasts are omitted."
+msgstr "الكمية المتاحة والتقييم التشغيلي القياسيان في نهاية يوم تاريخ الرصيد وفق منطقتك الزمنية. لا تُعرض الحجوزات والتوقعات الحالية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Operational valuation uses the native stock costing service. It is separate from accounting valuation. Archived products are included. Use the native report for full export."
+msgstr "يستخدم التقييم التشغيلي خدمة تكلفة المخزون القياسية، وهو مستقل عن التقييم المحاسبي. يشمل المنتجات المؤرشفة. استخدم التقرير القياسي للتصدير الكامل."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Valuation: "
+msgstr "التقييم: "
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native stock value"
+msgstr "قيمة المخزون القياسية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Supporting views"
+msgstr "العروض الداعمة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current supporting views"
+msgstr "العروض الداعمة الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Forecast"
+msgstr "التوقعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Move history"
+msgstr "سجل الحركات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Locations"
+msgstr "المواقع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Replenishment rules"
+msgstr "قواعد تجديد المخزون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current workforce by department"
+msgstr "القوى العاملة الحالية حسب القسم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active employee records in the selected company, grouped by their current department. Period and balance cutoff do not apply. No private employee fields are returned."
+msgstr "سجلات الموظفين النشطين في الشركة المحددة، مجمعة حسب قسمهم الحالي. لا تنطبق الفترة أو تاريخ الرصيد. لا تُعرض حقول الموظفين الخاصة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Workforce unavailable. HR reporting access is required."
+msgstr "القوى العاملة غير متاحة. يلزم إذن تقارير الموارد البشرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active employees: "
+msgstr "الموظفون النشطون: "
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employees"
+msgstr "الموظفون"
