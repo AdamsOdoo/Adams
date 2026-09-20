@@ -1,8 +1,22 @@
 # Decisions needed to finish the full v4 scope
 
-Status: proposed, not approved. This records the material business choices required
+Status: Decision 1 approved below; all other proposals remain unapproved. This records the material business choices required
 by sections 2.2 and 2.5 of the supplied v4 contract. It does not narrow acceptance.
 Developer configuration/testing and owner acceptance remain separate.
+
+## Decision 1 — approved UAT company and environment
+
+The owner selected **Adams for Men**, using a test copy of the actual business
+company for UAT, and explicitly authorized deployment to **staging**.
+**No production actions are authorized.** This supersedes the earlier
+development-only / staging-excluded boundary for this dashboard's UAT work.
+It does not authorize a main/production merge or approve financial definitions.
+
+Staging deployment is authorized but has not yet been performed. Preserve existing
+staging work and verify the selected company's identity, native currency,
+localization, reports and permissions before treating its figures as UAT evidence.
+The US/USD demo company is not the chosen business UAT company.
+The owner requested the remaining decisions one at a time.
 
 ## Financial report policy
 
