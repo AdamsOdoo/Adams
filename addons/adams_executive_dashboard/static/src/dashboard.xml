@@ -9,7 +9,7 @@
     <p class="adams_nav_label">Workspace</p>
     <a class="adams_side_link" href="#adams-trust"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'book'"/></t><span>Data &amp; definitions</span></a>
     <div class="adams_sidebar_bottom"><strong>Connected Odoo workspace</strong><p>Values follow your native reports and current access. Unavailable definitions stay visible.</p><span t-if="state.applied" t-esc="state.companies.find(company =&gt; company.id === state.applied.company_id)?.name"/></div>
-</aside><div class="adams_content"><header class="adams_header"><div><span class="adams_eyebrow">THE OWNER’S VIEW</span><h1>Executive overview</h1><p>Financial health. Sales performance.<br class="adams_mobile_only"/> What needs your attention.</p></div><button class="adams_mobile_menu btn" t-ref="workspaceToggle" aria-controls="adams-workspace-menu" t-on-click="() =&gt; state.sidebarOpen = !state.sidebarOpen" t-att-aria-expanded="state.sidebarOpen ? 'true' : 'false'" aria-label="Open workspace navigation"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'menu'"/></t></button></header><div t-if="state.error" class="alert alert-warning" role="alert"><t t-esc="state.error"/></div>
+</aside><div class="adams_content"><header class="adams_header"><div><span class="adams_eyebrow">THE OWNER’S VIEW</span><h1>Executive overview</h1><p>Financial health. Sales performance.<br class="adams_mobile_only"/> What needs your attention.</p></div><div class="adams_header_actions"><button class="btn" t-on-click="saveView" t-att-disabled="!state.applied">Save view</button><button class="btn" t-on-click="restoreView" t-att-disabled="!state.savedView">Restore view</button><button class="btn" t-on-click="resetView" t-att-disabled="!state.applied">Reset view</button></div><button class="adams_mobile_menu btn" t-ref="workspaceToggle" aria-controls="adams-workspace-menu" t-on-click="() =&gt; state.sidebarOpen = !state.sidebarOpen" t-att-aria-expanded="state.sidebarOpen ? 'true' : 'false'" aria-label="Open workspace navigation"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'menu'"/></t></button></header><div t-if="state.error" class="alert alert-warning" role="alert"><t t-esc="state.error"/></div>
             <t t-if="state.companies.length">
                 <form class="adams_filters" t-on-submit.prevent="refresh">
                     <label>Company<select t-model="state.draft.company_id" class="form-select" required="required">
@@ -24,7 +24,7 @@
                     Applied period: <bdi t-esc="state.applied.date_from"/> — <bdi t-esc="state.applied.date_to"/>
                     <span> · Balance cutoff: <bdi t-esc="state.applied.as_of"/></span>
                 </p>
-                <nav class="adams_nav" aria-label="Dashboard sections"><button t-foreach="sections" t-as="entry" t-key="entry.key" t-att-class="{'active': state.activeSection === entry.key}" t-on-click="() =&gt; this.navigateSection(entry.key)"><span t-if="entry.key === 'finance' || entry.key === 'sales'" t-esc="entry.number + ' '"/><t t-esc="entry.short"/></button><a class="adams_trust_link" href="#adams-trust">Data &amp; trust ↗</a></nav><t t-if="state.detail">
+                <nav class="adams_nav" aria-label="Dashboard sections"><button t-foreach="sections" t-as="entry" t-key="entry.key" t-att-class="{'active': state.activeSection === entry.key}" t-on-click="() =&gt; this.navigateSection(entry.key)"><span t-if="entry.key === 'finance' || entry.key === 'sales'" t-esc="entry.number + ' '"/><t t-esc="entry.short"/></button><a class="adams_trust_link" href="#adams-trust">Data &amp; trust ↗</a></nav><dialog class="adams_source_dialog adams_analysis_dialog" t-ref="analysisDialog" t-on-cancel.prevent="closeDetail" aria-labelledby="adams-analysis-title"><t t-if="state.detail">
                     <t t-set="detail" t-value="state.detail"/>
                     <section class="adams_analysis" aria-labelledby="adams-analysis-title" aria-live="polite">
                         <div class="adams_analysis_heading"><h2 id="adams-analysis-title" t-esc="labels[detail.key]"/>
@@ -67,7 +67,7 @@
                         </t>
                     </section>
                 </t>
-                <section t-foreach="sections" t-as="section" t-key="section.key" t-att-id="'adams-' + section.key" class="adams_section" t-att-aria-labelledby="'title-' + section.key">
+                </dialog><section t-foreach="sections" t-as="section" t-key="section.key" t-att-id="'adams-' + section.key" class="adams_section" t-att-aria-labelledby="'title-' + section.key">
                     <header class="adams_section_heading"><div class="adams_section_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="section.icon"/></t></div><div><h2 t-att-id="'title-' + section.key"><span class="adams_section_number" t-esc="section.number"/><t t-esc="section.name"/></h2><p t-esc="section.description"/></div><button class="adams_section_toggle" t-att-aria-expanded="state.collapsed[section.key] ? 'false' : 'true'" t-att-aria-label="section.name" t-on-click="() =&gt; this.toggleSection(section.key)"><span aria-hidden="true" t-esc="state.collapsed[section.key] ? '⌄' : '⌃'"/></button></header><t t-if="!state.collapsed[section.key]">
                     <t t-set="result" t-value="sectionResult(section)"/>
                     <div t-if="!result || result.status === 'loading'" class="adams_message" role="status">Loading native reports…</div>
@@ -75,6 +75,8 @@
                         This section could not be loaded. Check the filters and your access, then apply filters to retry.
                     </div>
                     <div t-else="" class="adams_metric_groups">
+                        <div t-if="section.key === 'finance'" class="adams_group_nav" aria-label="Finance groups"><button t-foreach="metricGroups(section, result)" t-as="jump" t-key="jump.key" class="btn" t-on-click="() =&gt; this.navigateGroup(jump.key)" t-esc="jump.name"/></div>
+                        <p t-if="section.key === 'finance' &amp;&amp; hasFinanceWarnings" class="alert alert-warning adams_warning" role="status">The native report has warnings. Open it before interpreting this result.</p>
                         <t t-foreach="metricGroups(section, result)" t-as="group" t-key="group.key"><div class="adams_metric_group" t-att-id="'adams-group-' + group.key"><header t-if="group.name" class="adams_group_heading"><div><h3 t-esc="group.name"/><p t-esc="group.description"/></div><span class="adams_period_chip" dir="ltr" t-if="state.applied" t-esc="['profitability', 'commercial'].includes(group.key) ? state.applied.date_from + ' — ' + state.applied.date_to : state.applied.as_of"/></header><div class="adams_grid" t-att-class="{'adams_grid_three': ['financial-position', 'commercial', 'liquidity'].includes(group.key), 'adams_grid_two': group.key === 'working-capital'}"><t t-foreach="group.items" t-as="item" t-key="item.key">
                         <article class="adams_card" t-att-class="{ 'adams_available': item.status === 'ready', 'adams_cash_card': item.key === 'cash' }">
                             <div class="adams_card_top"><span class="adams_metric_icon"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="metricIcon(item.key)"/></t></span><h3 t-esc="labels[item.key]"/>
@@ -83,7 +85,7 @@
                             </div><p class="adams_margin_note" t-if="item.key === 'gross_profit' || item.key === 'profit'"><t t-set="margin" t-value="financeMetric(item.key === 'gross_profit' ? 'gross_margin' : 'net_margin')"/><t t-if="margin &amp;&amp; margin.status === 'ready'"><strong t-esc="formatted(margin, result)"/><span t-if="margin.status === 'ready'">% margin</span></t></p><p t-if="item.key === 'confirmed_sales'" class="adams_margin_note"><t t-set="orders" t-value="result.items.find(metric =&gt; metric.key === 'orders')"/><t t-if="orders &amp;&amp; orders.status === 'ready'"><strong t-esc="formatted(orders, result)"/> <span>distinct confirmed orders</span></t></p><span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
-                            <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
+                            <p t-if="item.has_warnings" class="adams_warning_marker" role="status">Native report warning</p>
                             <div t-if="item.status === 'ready' &amp;&amp; item.aging_buckets?.length" class="adams_aging_list">
     <p class="adams_hint">Native due-date aging · signed balances</p>
     <div t-foreach="item.aging_buckets" t-as="bucket" t-key="bucket.key" class="adams_aging_row">
@@ -113,10 +115,10 @@
     </section>
 </div><t t-if="group.key === 'liquidity'" t-call="adams_executive_dashboard.Liquidity"/><section t-if="group.key === 'working-capital' &amp;&amp; result.supplier_windows?.length" class="adams_panel adams_supplier_windows">
 <header class="adams_panel_head"><div><h3>Supplier payment schedule</h3><p>Outstanding posted bill installments at the balance cutoff</p></div></header>
-<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="paymentWindow" t-key="paymentWindow.key" class="adams_card">
+<div class="adams_grid"><article t-foreach="result.supplier_windows" t-as="paymentWindow" t-key="paymentWindow.key" class="adams_card" t-att-class="{'adams_available': paymentWindow.status === 'ready'}">
 <div class="adams_card_top"><h3 t-esc="paymentWindow.label"/><button t-if="paymentWindow.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(paymentWindow.key)" aria-label="Open native report">→</button></div>
 <div class="adams_amount"><span t-if="paymentWindow.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(paymentWindow, result)" t-esc="headline(paymentWindow, result)"/></div>
-<p t-if="paymentWindow.has_warnings" role="status">The native report has warnings. Open it before interpreting this result.</p>
+<p t-if="paymentWindow.has_warnings" class="adams_warning_marker" role="status">Native report warning</p>
 <p class="adams_card_date" dir="ltr" t-esc="state.applied.as_of"/>
 </article></div><p class="adams_hint">Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging.</p>
 </section></div></t></div>

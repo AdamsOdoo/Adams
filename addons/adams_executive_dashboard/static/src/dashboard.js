@@ -47,11 +47,12 @@ export class ExecutiveDashboard extends Component {
             quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
         this.root = useRef('root');
         this.sourceDialog = useRef('sourceDialog');
+        this.analysisDialog = useRef('analysisDialog');
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false });
         useEffect(() => {
             const dialog = this.sourceDialog.el;
             if (!dialog) return;
@@ -61,6 +62,34 @@ export class ExecutiveDashboard extends Component {
         useEffect(() => {
             if (this.state.sidebarOpen) this.workspaceMenu.el?.querySelector('button')?.focus();
         }, () => [this.state.sidebarOpen]);
+        useEffect(() => {
+            const dialog = this.analysisDialog.el;
+            if (!dialog) return;
+            if (this.state.detail && !dialog.open) dialog.showModal();
+            if (!this.state.detail && dialog.open) dialog.close();
+        }, () => [this.state.detail]);
+        useEffect(() => {
+            const root = this.root.el;
+            if (!root) return;
+            let scheduled = false;
+            const onScroll = () => {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(() => {
+                    scheduled = false;
+                    if (!this.alive) return;
+                    const top = root.getBoundingClientRect().top + 110;
+                    let active = this.sections[0].key;
+                    for (const section of this.sections) {
+                        const node = root.querySelector(`#adams-${section.key}`);
+                        if (node && node.getBoundingClientRect().top <= top) active = section.key;
+                    }
+                    this.state.activeSection = active;
+                });
+            };
+            root.addEventListener('scroll', onScroll, { passive: true });
+            return () => root.removeEventListener('scroll', onScroll);
+        }, () => []);
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -74,12 +103,15 @@ export class ExecutiveDashboard extends Component {
                 if (!this.alive) { return; }
                 this.state.companies = data.companies;
                 this.userId = data.user_id;
+                this.defaultOptions = { ...data.options };
                 const savedNavigation = this.props.state?.dashboard;
                 const restore = savedNavigation?.userId === data.user_id &&
                     data.companies.some(company => company.id === savedNavigation.applied?.company_id)
                     ? savedNavigation : null;
                 this.state.draft = restore ? { ...restore.applied } : data.options;
                 this.preferenceKey = `adams-dashboard-v1-${data.user_id}`;
+                this.viewKey = `adams-dashboard-view-v1-${data.user_id}`;
+                this.state.savedView = Boolean(this.readSavedView());
                 try {
                     const saved = JSON.parse(window.localStorage.getItem(this.preferenceKey) || '{}');
                     for (const section of this.sections) {
@@ -247,7 +279,65 @@ export class ExecutiveDashboard extends Component {
         this.state.activeSection = key;
         this.state.collapsed[key] = false;
         this.state.sidebarOpen = false;
-        requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+        requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+    }
+
+    navigateGroup(key) {
+        this.root.el?.querySelector(`#adams-group-${key}`)?.scrollIntoView({ block: 'start',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+
+    get hasFinanceWarnings() {
+        const finance = this.state.sections.finance;
+        return Boolean(finance?.items?.some(item => item.has_warnings) ||
+            finance?.cash_flow?.has_warnings || finance?.supplier_windows?.some(item => item.has_warnings));
+    }
+
+    readSavedView() {
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(this.viewKey) || 'null');
+            const dates = ['date_from', 'date_to', 'as_of'];
+            if (saved?.userId !== this.userId || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
+                !dates.every(key => /^\d{4}-\d{2}-\d{2}$/.test(saved.applied?.[key] || '')) ||
+                saved.applied.date_from > saved.applied.date_to) return null;
+            return saved;
+        } catch { return null; }
+    }
+
+    saveView() {
+        if (!this.state.applied) return;
+        // Store selections only, never amounts, records, permissions or theme.
+        const applied = Object.fromEntries(['company_id', 'date_from', 'date_to', 'as_of']
+            .map(key => [key, this.state.applied[key]]));
+        try {
+            window.localStorage.setItem(this.viewKey, JSON.stringify({ userId: this.userId, applied,
+                collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection }));
+            this.state.savedView = true;
+            this.notification.add(_t('View saved in this browser.'), { type: 'success' });
+        } catch {
+            this.notification.add(_t('Browser storage is unavailable. The view could not be saved.'), { type: 'warning' });
+        }
+    }
+
+    async restoreView() {
+        const saved = this.readSavedView();
+        if (!saved) {
+            this.state.savedView = false;
+            this.notification.add(_t('The saved view is unavailable for your current access.'), { type: 'warning' });
+            return;
+        }
+        this.state.draft = { ...saved.applied };
+        await this.restoreNavigation(saved);
+    }
+
+    async resetView() {
+        if (!this.defaultOptions) return;
+        this.state.draft = { ...this.defaultOptions };
+        this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
+        this.state.activeSection = 'finance';
+        this.state.sidebarOpen = false;
+        await this.refresh();
+        this.root.el?.scrollTo({ top: 0 });
     }
 
     closeWorkspace() {
@@ -329,7 +419,6 @@ export class ExecutiveDashboard extends Component {
         dimension ||= this.dimensions[key][0];
         this.closeSource();
         this.state.detail = { key, dimension, offset, status: 'loading', rows: [], trend: [] };
-        requestAnimationFrame(() => this.root.el?.querySelector('#adams-analysis-title')?.scrollIntoView({ block: 'start' }));
         try {
             const [groups, trend] = await Promise.all([
                 this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, dimension, { ...this.state.applied }, offset]),

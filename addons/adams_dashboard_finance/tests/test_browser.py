@@ -1,5 +1,6 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
 import json
+from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -122,7 +123,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
         for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
             self.env.user.lang = lang
-            for width in (320, 390, 768, 1024, 1440, 1920):
+            for theme, width in product(('light', 'dark'), (320, 390, 768, 1024, 1440, 1920)):
+                self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x900'
                 # No mocked reports or browser RPCs: interact with rendered Odoo UI.
                 code = '''
@@ -141,6 +143,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             node.querySelector('.adams_value')?.textContent.trim() === expected),
                         'Native revenue fixture must render 100.00 in the selected language');
                     const root = document.querySelector('.o_adams_dashboard');
+                    if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
+                    const surface = getComputedStyle(card).backgroundColor;
+                    if (surface !== (THEME === 'dark' ? 'rgb(38, 42, 54)' : 'rgb(255, 255, 255)')) throw new Error('Card has incorrect theme surface');
+                    if (root.querySelectorAll('.adams_header_actions button').length !== 3) throw new Error('Reference view controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
                     if (WIDTH < 760) {
@@ -229,14 +235,14 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (WIDTH === 768 || WIDTH === 1024) liquidity.scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
+                '''.replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):
                     result = original_wait(browser, *args, **kwargs)
                     # Instrument only evidence capture after the real browser assertions.
                     # Business data, rendering and test success are never mocked.
-                    browser.take_screenshot(prefix=f'dashboard_{lang}_{width}_').result(timeout=20)
+                    browser.take_screenshot(prefix=f'dashboard_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):

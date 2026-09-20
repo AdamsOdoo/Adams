@@ -1,126 +1,140 @@
+// Odoo compiles this asset in its native light/dark bundles. No independent
+// dashboard theme preference: System, Light and Dark remain Odoo's authority.
 .o_adams_dashboard {
-    height: 100%; overflow: auto; background: #f5f6f8; padding: clamp(16px, 3vw, 40px);
-    color: #202b36;
+    color-scheme: light;
+    --adams-paper: #fff; --adams-bg: #f4f6f8; --adams-ink: #172631;
+    --adams-sub: #586777; --adams-line: #dfe6ec; --adams-soft: #f8fafb;
+    --adams-purple: #77516f; --adams-purple-soft: #f2ecf3;
+    --adams-green: #176d59; --adams-green-soft: #eaf5ef; --adams-focus: #77516f;
+    @if $o-webclient-color-scheme == dark {
+        color-scheme: dark;
+        --adams-paper: #262a36; --adams-bg: #1b1d26; --adams-ink: #edf0f5;
+        --adams-sub: #b8c1d0; --adams-line: #424858; --adams-soft: #2c3140;
+        --adams-purple: #dfb4d6; --adams-purple-soft: #423347;
+        --adams-green: #90d7bd; --adams-green-soft: #253e37; --adams-focus: #dfb4d6;
+    }
+}
+
+.o_adams_dashboard {
+    height: 100%; overflow: auto; background: var(--adams-bg); padding: clamp(16px, 3vw, 40px);
+    color: var(--adams-ink);
     .adams_header { display: flex; justify-content: space-between; gap: 16px; align-items: start; flex-wrap: wrap; }
-    .adams_eyebrow { font-size: 11px; letter-spacing: .09em; color: #667180; font-weight: 600; }
+    .adams_eyebrow { font-size: 11px; letter-spacing: .09em; color: var(--adams-sub); font-weight: 600; }
     h1 { font-size: clamp(24px, 3vw, 34px); margin: 8px 0; font-weight: 650; }
     h2 { font-size: 23px; margin-bottom: 6px; }
-    p { color: #667180; }
-    .adams_preview { background: #eee8f1; color: #674a73; padding: 7px 12px; border-radius: 20px; }
-    .adams_filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; background: white; padding: 18px; border: 1px solid #e2e6eb; border-radius: 12px; margin-top: 20px; }
+    p { color: var(--adams-sub); }
+    .adams_preview { background: var(--adams-purple-soft); color: var(--adams-purple); padding: 7px 12px; border-radius: 20px; }
+    .adams_filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; background: var(--adams-paper); padding: 18px; border: 1px solid var(--adams-line); border-radius: 12px; margin-top: 20px; }
     .adams_filters label { flex: 1 1 150px; display: grid; gap: 6px; font-size: 12px; font-weight: 600; }
     .adams_filters label:first-child { flex-grow: 2; }
     .adams_filters input, .adams_filters select { min-height: 40px; min-width: 0; width: 100%; }
     .adams_filters button { min-height: 40px; }
     .adams_scope { font-size: 12px; margin: 12px 0 20px; }
-    .adams_nav { display: flex; gap: 24px; border-bottom: 1px solid #dce1e7; margin: 20px 0; }
-    .adams_nav a { color: #674a73; padding: 10px 0; font-weight: 600; }
+    .adams_nav { display: flex; gap: 24px; border-bottom: 1px solid var(--adams-line); margin: 20px 0; }
+    .adams_nav a { color: var(--adams-purple); padding: 10px 0; font-weight: 600; }
     .adams_section { margin: 28px 0; scroll-margin-top: 16px; }
     .adams_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
-    .adams_group_heading { grid-column: 1 / -1; font-size: 16px; margin: 12px 0 0; color: #39584f; }
-    #adams-sales .adams_group_heading { color: #674a73; }
-    .adams_card { background: white; border: 1px solid #e2e6eb; border-radius: 14px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
-    .adams_card h3 { font-size: 14px; font-weight: 600; color: #596574; margin-bottom: 18px; }
+    .adams_group_heading { grid-column: 1 / -1; font-size: 16px; margin: 12px 0 0; color: var(--adams-green); }
+    #adams-sales .adams_group_heading { color: var(--adams-purple); }
+    .adams_card { background: var(--adams-paper); border: 1px solid var(--adams-line); border-radius: 14px; padding: 22px; min-width: 0; display: flex; flex-direction: column; }
+    .adams_card h3 { font-size: 14px; font-weight: 600; color: var(--adams-sub); margin-bottom: 18px; }
     .adams_value { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
-    .adams_available .adams_value { font-size: 29px; color: #177b64; }
-    .adams_currency { color: #667180; font-size: 12px; margin-top: 5px; }
+    .adams_available .adams_value { font-size: 29px; color: var(--adams-green); }
+    .adams_currency { color: var(--adams-sub); font-size: 12px; margin-top: 5px; }
     .adams_hint { font-size: 12px; line-height: 1.6; margin-top: 14px; }
-    footer { border-top: 1px solid #edf0f3; padding-top: 14px; margin-top: auto; font-size: 12px; }
+    footer { border-top: 1px solid var(--adams-line); padding-top: 14px; margin-top: auto; font-size: 12px; }
     footer .btn { padding-inline-start: 0; font-size: 12px; }
     details p { margin: 8px 0; }
-    summary { cursor: pointer; color: #596574; }
-    .adams_message { padding: 24px; border-radius: 12px; background: white; }
+    summary { cursor: pointer; color: var(--adams-sub); }
+    .adams_message { padding: 24px; border-radius: 12px; background: var(--adams-paper); }
     .adams_section_toggle { border: 0; background: transparent; padding: 0; color: inherit; font: inherit; display: flex; gap: 16px; align-items: center; }
-    .adams_analysis { background: white; border: 1px solid #e2e6eb; border-radius: 14px; padding: 20px; margin-top: 20px; }
+    .adams_analysis { background: var(--adams-paper); border: 1px solid var(--adams-line); border-radius: 14px; padding: 20px; margin-top: 20px; }
     .adams_analysis_heading, .adams_page_controls { display: flex; gap: 12px; justify-content: space-between; flex-wrap: wrap; align-items: center; }
     .adams_analysis_columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 18px; }
     .adams_analysis label { display: grid; gap: 8px; max-width: 280px; }
     .adams_table_wrap { overflow-x: auto; min-width: 0; }
     .adams_table_wrap td, .adams_table_wrap th { padding: 12px 8px; vertical-align: middle; }
     .adams_table_wrap .btn-link { text-align: start; padding-inline: 0; }
-    .adams_bar_track { width: 100%; min-width: 100px; height: 5px; background: #f0f2f4; margin-top: 6px; }
+    .adams_bar_track { width: 100%; min-width: 100px; height: 5px; background: var(--adams-soft); margin-top: 6px; }
     .adams_bar_track span { display: block; height: 100%; background: #218970; }
     .adams_bar_track .negative { background: #ac493c; }
     .adams_analysis code { overflow-wrap: anywhere; }
     @media (max-width: 900px) { .adams_analysis_columns { grid-template-columns: 1fr; } }
-    :focus-visible { outline: 3px solid #795789; outline-offset: 3px; }
+    :focus-visible { outline: 3px solid var(--adams-focus); outline-offset: 3px; }
     @media (max-width: 480px) { .adams_grid { grid-template-columns: 1fr; } .adams_filters button { width: 100%; } .adams_card { padding: 18px; } }
 }
 
 // UX v2 reference: workspace rail, compact metrics, four-column profitability,
 // chart/context composition and two-column mobile cards. Odoo retains its shell.
 .o_adams_dashboard {
-    --adams-paper: #fff; --adams-ink: #172631; --adams-sub: #526476;
-    --adams-line: #e1e7ee; --adams-purple: #77516f; --adams-green: #176d59;
     padding: 0; display: grid; grid-template-columns: 222px minmax(0, 1fr);
-    align-items: start; background: #f4f6f8; color: var(--adams-ink);
+    align-items: start; background: var(--adams-bg); color: var(--adams-ink);
     font-family: Inter, "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums;
-    // The reference workspace keeps a light paper surface inside either Odoo theme.
     h1, h2, h3, h4, h5, h6 { color: var(--adams-ink); }
     .adams_icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
     .adams_workspace_close { display: none; }
-    .adams_sidebar { position: sticky; top: 0; height: calc(100vh - 48px); min-height: 540px; background: #fff; border-inline-end: 1px solid var(--adams-line); padding: 24px 14px; display: flex; flex-direction: column; }
+    .adams_sidebar { position: sticky; top: 0; height: calc(100vh - 48px); min-height: 540px; background: var(--adams-paper); border-inline-end: 1px solid var(--adams-line); padding: 24px 14px; display: flex; flex-direction: column; }
     .adams_brand { display: flex; align-items: center; gap: 12px; margin: 0 13px 28px; }
-    .adams_wordmark { font-size: 36px; line-height: 1; font-weight: 650; letter-spacing: -2.8px; color: #89929e; }
+    .adams_wordmark { font-size: 36px; line-height: 1; font-weight: 650; letter-spacing: -2.8px; color: var(--adams-sub); }
     .adams_wordmark b { color: var(--adams-purple); }
-    .adams_brand > span:last-child { font-size: 10px; line-height: 1.6; color: #8a939d; letter-spacing: .8px; border-inline-start: 1px solid var(--adams-line); padding-inline-start: 12px; }
-    .adams_nav_label { margin: 12px 13px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: #8995a5; text-transform: uppercase; }
-    .adams_side_link { display: flex; width: 100%; align-items: center; gap: 11px; min-height: 46px; border: 0; background: transparent; padding: 11px 13px; margin-bottom: 4px; border-radius: 9px; text-align: start; color: #526476; text-decoration: none; font-size: 13px; font-weight: 550; }
-    .adams_side_link.active { background: #f2ecf3; color: var(--adams-purple); font-weight: 700; }
-    .adams_side_link:hover { background: #f6f7f9; }
+    .adams_brand > span:last-child { font-size: 10px; line-height: 1.6; color: var(--adams-sub); letter-spacing: .8px; border-inline-start: 1px solid var(--adams-line); padding-inline-start: 12px; }
+    .adams_nav_label { margin: 12px 13px 8px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; color: var(--adams-sub); text-transform: uppercase; }
+    .adams_side_link { display: flex; width: 100%; align-items: center; gap: 11px; min-height: 46px; border: 0; background: transparent; padding: 11px 13px; margin-bottom: 4px; border-radius: 9px; text-align: start; color: var(--adams-sub); text-decoration: none; font-size: 13px; font-weight: 550; }
+    .adams_side_link.active { background: var(--adams-purple-soft); color: var(--adams-purple); font-weight: 700; }
+    .adams_side_link:hover { background: var(--adams-soft); }
     .adams_nav_dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-inline-start: auto; opacity: 0; }
     .adams_side_link.active .adams_nav_dot { opacity: 1; }
-    .adams_sidebar_bottom { margin-top: auto; padding: 16px; border: 1px solid var(--adams-line); border-radius: 11px; background: #f8f9fb; font-size: 11px; color: var(--adams-sub); }
+    .adams_sidebar_bottom { margin-top: auto; padding: 16px; border: 1px solid var(--adams-line); border-radius: 11px; background: var(--adams-soft); font-size: 11px; color: var(--adams-sub); }
     .adams_sidebar_bottom strong { display: block; font-size: 12px; margin-bottom: 6px; }
     .adams_sidebar_bottom p { font-size: 11px; margin: 0 0 12px; line-height: 1.6; }
     .adams_content { width: 100%; max-width: 1580px; padding: 28px 32px 34px; margin-inline: auto; min-width: 0; }
     .adams_header { align-items: center; margin-bottom: 20px; }
-    .adams_eyebrow { font-size: 11px; font-weight: 700; color: #8b7590; letter-spacing: 1.8px; }
+    .adams_eyebrow { font-size: 11px; font-weight: 700; color: var(--adams-purple); letter-spacing: 1.8px; }
     h1 { font-size: 32px; line-height: 1.2; letter-spacing: -.9px; margin: 6px 0; font-weight: 650; }
     .adams_header p { font-size: 14px; line-height: 1.55; margin: 0; color: var(--adams-sub); }
     .adams_mobile_menu, .adams_mobile_only { display: none; }
     .adams_filters { margin-top: 0; padding: 13px 17px; gap: 14px; border-color: var(--adams-line); border-radius: 11px; box-shadow: 0 3px 14px #26334105; }
     .adams_filters label { flex: 1 1 120px; gap: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--adams-sub); min-width: 0; }
-    .adams_filters input, .adams_filters select { background-color: transparent; border-color: transparent; padding-inline: 0; font-size: 12px; font-weight: 600; color: #394755; min-height: 32px; }
+    .adams_filters input, .adams_filters select { background-color: transparent; border-color: transparent; padding-inline: 0; font-size: 12px; font-weight: 600; color: var(--adams-ink); min-height: 32px; }
     .btn-primary { background: var(--adams-purple); border-color: var(--adams-purple); }
     .btn { border-radius: 7px; font-size: 12px; min-height: 35px; font-weight: 600; }
-    .adams_scope { font-size: 11px; color: #65778a; overflow-wrap: anywhere; margin: 10px 0 16px; }
-    .adams_nav { position: sticky; top: 0; z-index: 3; background: #f4f6f8f7; backdrop-filter: blur(10px); align-items: center; gap: 5px; padding: 11px 0; margin: 0 0 24px; overflow-x: auto; border-color: #dce3e9; }
-    .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: #526476; font-weight: 600; border-radius: 7px; white-space: nowrap; text-decoration: none; }
-    .adams_nav .active { background: #ece4ef; color: #724b76; }
-    .adams_nav .adams_trust_link { background: #fff; border: 1px solid #d9e1e8; color: #326c59; margin-inline-start: auto; }
+    .adams_scope { font-size: 11px; color: var(--adams-sub); overflow-wrap: anywhere; margin: 10px 0 16px; }
+    .adams_nav { position: sticky; top: 0; z-index: 3; background: var(--adams-bg); backdrop-filter: blur(10px); align-items: center; gap: 5px; padding: 11px 0; margin: 0 0 24px; overflow-x: auto; border-color: var(--adams-line); }
+    .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: var(--adams-sub); font-weight: 600; border-radius: 7px; var(--adams-paper)-space: nowrap; text-decoration: none; }
+    .adams_nav .active { background: var(--adams-purple-soft); color: var(--adams-purple); }
+    .adams_nav .adams_trust_link { background: var(--adams-paper); border: 1px solid var(--adams-line); color: var(--adams-green); margin-inline-start: auto; }
     .adams_section { margin: 0 0 32px; scroll-margin-top: 76px; }
     .adams_section_heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
-    .adams_section_icon { width: 41px; height: 41px; border-radius: 11px; display: grid; place-items: center; background: #eaf5ef; color: var(--adams-green); flex-shrink: 0; }
-    #adams-sales .adams_section_icon { background: #f2ecf3; color: var(--adams-purple); }
-    .adams_section_heading h2 { font-size: 24px; font-weight: 650; letter-spacing: -.45px; margin: 0 0 4px; line-height: 1.2; }
-    .adams_section_heading p { font-size: 12px; color: var(--adams-sub); margin: 0; }
+    .adams_section_icon { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center; background: var(--adams-green-soft); color: var(--adams-green); flex-shrink: 0; }
+    #adams-sales .adams_section_icon { background: var(--adams-purple-soft); color: var(--adams-purple); }
+    .adams_section_heading h2 { font-size: 25px; font-weight: 650; letter-spacing: -.45px; margin: 0 0 4px; line-height: 1.2; }
+    .adams_section_heading p { font-size: 13px; color: var(--adams-sub); margin: 0; }
     .adams_section_number { font-size: 10px; letter-spacing: 1.3px; margin-inline-end: 8px; color: var(--adams-green); }
-    .adams_section_toggle { margin-inline-start: auto; border: 1px solid var(--adams-line); border-radius: 8px; width: 35px; height: 35px; flex-shrink: 0; display: grid; place-items: center; background: #fff; font-size: 18px; }
+    .adams_section_toggle { margin-inline-start: auto; border: 1px solid var(--adams-line); border-radius: 8px; width: 35px; height: 35px; flex-shrink: 0; display: grid; place-items: center; background: var(--adams-paper); font-size: 18px; }
     .adams_metric_group { margin-bottom: 24px; scroll-margin-top: 76px; }
     .adams_group_heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-inline-start: 3px solid var(--adams-green); padding-inline-start: 12px; margin: 0 0 14px; }
     .adams_group_heading h3 { font-size: 18px; font-weight: 650; margin: 0 0 3px; color: var(--adams-ink); }
     .adams_group_heading p { font-size: 12px; margin: 0; color: var(--adams-sub); }
-    .adams_period_chip { font-size: 10px; font-weight: 600; color: #53697b; background: #edf2f5; padding: 4px 8px; border-radius: 5px; flex-shrink: 0; }
+    .adams_period_chip { font-size: 10px; font-weight: 600; color: var(--adams-sub); background: var(--adams-soft); padding: 4px 8px; border-radius: 5px; flex-shrink: 0; }
     .adams_grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; }
     .adams_grid_three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .adams_grid_two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .adams_card { border-radius: 13px; border-color: var(--adams-line); padding: 17px 17px 0; box-shadow: 0 3px 14px #26334105; min-height: 184px; overflow: hidden; }
     .adams_card_top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-    .adams_metric_icon { width: 28px; height: 28px; display: grid; place-items: center; color: var(--adams-green); background: #eaf5ef; border-radius: 7px; flex-shrink: 0; }
+    .adams_metric_icon { width: 28px; height: 28px; display: grid; place-items: center; color: var(--adams-green); background: var(--adams-green-soft); border-radius: 7px; flex-shrink: 0; }
     .adams_metric_icon .adams_icon { width: 15px; height: 15px; }
-    .adams_card h3 { margin: 0; color: #495d70; font-size: 12px; font-weight: 600; line-height: 1.4; }
-    .adams_metric_arrow { margin-inline-start: auto; color: #8595a5; border: 0; background: transparent; min-width: 24px; min-height: 28px; padding: 0; }
+    .adams_card h3 { margin: 0; color: var(--adams-sub); font-size: 12px; font-weight: 600; line-height: 1.4; }
+    .adams_metric_arrow { margin-inline-start: auto; color: var(--adams-sub); border: 0; background: transparent; min-width: 24px; min-height: 28px; padding: 0; }
     .adams_amount { display: flex; gap: 5px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
-    .adams_currency { font-size: 10px; letter-spacing: .4px; color: #536f7e; margin: 0; }
-    .adams_value, .adams_available .adams_value { font-size: clamp(20px, 1.9vw, 29px); color: var(--adams-ink); line-height: 1.15; letter-spacing: -.6px; font-weight: 650; }
-    .adams_card:not(.adams_available) .adams_value { font-size: 17px; color: #667585; line-height: 1.35; }
-    .adams_margin_note { font-size: 11px; margin: 12px 0 0; color: #526476; }
+    .adams_currency { font-size: 10px; letter-spacing: .4px; color: var(--adams-sub); margin: 0; }
+    .adams_value, .adams_available .adams_value { font-size: 27px; color: var(--adams-ink); line-height: 1.15; letter-spacing: -.6px; font-weight: 650; }
+    .adams_card:not(.adams_available) .adams_value { font-size: 17px; color: var(--adams-sub); line-height: 1.35; }
+    .adams_margin_note { font-size: 11px; margin: 12px 0 0; color: var(--adams-sub); }
     .adams_margin_note strong { color: var(--adams-green); margin-inline-end: 4px; }
     .adams_hint { font-size: 11px; margin: 9px 0; }
-    .adams_card_date { color: #61778a; font-size: 10px; margin: auto 0 12px; padding-top: 14px; }
-    .adams_metric_foot { background: #f8fafb; margin-inline: -17px; padding: 8px 12px; border-top: 1px solid var(--adams-line); margin-top: 0; font-size: 10px; }
-    .adams_metric_foot summary { color: #326c59; font-size: 10px; min-height: 24px; display: list-item; }
+    .adams_card_date { color: var(--adams-sub); font-size: 10px; margin: auto 0 12px; padding-top: 14px; }
+    .adams_metric_foot { background: var(--adams-soft); margin-inline: -17px; padding: 8px 12px; border-top: 1px solid var(--adams-line); margin-top: 0; font-size: 10px; }
+    .adams_metric_foot summary { color: var(--adams-green); font-size: 10px; min-height: 24px; display: list-item; }
     .adams_metric_foot .btn { font-size: 10px; min-height: 26px; }
     .adams_metric_foot code { overflow-wrap: anywhere; }
     .adams_metric_foot details[open] { padding-block: 5px; }
@@ -130,23 +144,23 @@
     .adams_cash_card .adams_metric_icon { background: #ffffff15; color: #b9d6ca; }
     .adams_cash_card .adams_hint { color: #c3d8cf; }
     .adams_profit_grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(270px, 1fr); gap: 16px; margin-top: 15px; }
-    .adams_panel { border: 1px solid var(--adams-line); border-radius: 13px; background: #fff; min-width: 0; overflow: hidden; box-shadow: 0 3px 14px #26334105; }
+    .adams_panel { border: 1px solid var(--adams-line); border-radius: 13px; background: var(--adams-paper); min-width: 0; overflow: hidden; box-shadow: 0 3px 14px #26334105; }
     .adams_panel_head { padding: 19px 20px 0; display: flex; justify-content: space-between; align-items: start; gap: 10px; }
     .adams_panel_head h3 { font-size: 16px; font-weight: 650; margin: 0 0 4px; }
     .adams_panel_head p { font-size: 12px; margin: 0; color: var(--adams-sub); }
-    .adams_panel_head .btn-link { color: var(--adams-green); white-space: nowrap; padding: 0; }
+    .adams_panel_head .btn-link { color: var(--adams-green); var(--adams-paper)-space: nowrap; padding: 0; }
     .adams_chart_legend { display: flex; flex-wrap: wrap; gap: 15px; margin: 14px 20px 0; font-size: 11px; color: var(--adams-sub); }
     .adams_chart_legend span { display: flex; align-items: center; gap: 6px; }
     .adams_chart_legend i { width: 7px; height: 7px; border-radius: 2px; }
     .revenue { background: #318771; } .gross_profit { background: #82bca8; } .profit { background: #9066a1; }
-    .adams_chart_empty { min-height: 300px; padding: 35px; display: grid; place-items: center; text-align: center; color: #687c8e; font-size: 12px; background: repeating-linear-gradient(to top, transparent 0, transparent 59px, #edf1f5 60px); margin: 22px 24px; }
+    .adams_chart_empty { min-height: 300px; padding: 35px; display: grid; place-items: center; text-align: center; color: var(--adams-sub); font-size: 12px; background: repeating-linear-gradient(to top, transparent 0, transparent 59px, var(--adams-soft) 60px); margin: 22px 24px; }
     .adams_profit_chart { display: flex; gap: 24px; padding: 15px 25px 25px; min-height: 305px; overflow-x: auto; }
     .adams_chart_month { flex: 1; min-width: 72px; text-align: center; font-size: 11px; color: var(--adams-sub); }
     .adams_chart_bars { position: relative; display: flex; justify-content: center; gap: 5px; height: 250px; border-bottom: 1px solid var(--adams-line); margin-bottom: 8px; background: linear-gradient(transparent 49.7%, #9cacb9 50%, transparent 50.3%); }
     .adams_chart_bar { position: absolute; width: 22%; min-height: 1px; border: 0; border-radius: 3px; }
     .adams_chart_bar.revenue { inset-inline-start: 12%; } .adams_chart_bar.gross_profit { inset-inline-start: 39%; } .adams_chart_bar.profit { inset-inline-start: 66%; }
     .adams_chart_table { border-top: 1px solid var(--adams-line); padding: 13px 18px; font-size: 12px; }
-    .adams_chart_table summary { color: #326c59; }
+    .adams_chart_table summary { color: var(--adams-green); }
     .adams_context_row { margin: 0 20px; padding: 20px 0; border-bottom: 1px solid var(--adams-line); }
     .adams_context_row > span { display: block; font-size: 12px; color: var(--adams-sub); margin-bottom: 7px; }
     .adams_context_row > strong { display: block; font-size: 21px; font-weight: 650; letter-spacing: -.4px; }
@@ -155,7 +169,7 @@
     .adams_analysis { padding: 20px; border-color: var(--adams-line); box-shadow: 0 3px 14px #26334105; }
     .adams_analysis h3 { font-size: 17px; font-weight: 650; }
     .adams_analysis p { font-size: 12px; }
-    .adams_trust { padding: 18px 20px; background: #fff; border: 1px solid var(--adams-line); border-radius: 11px; font-size: 12px; }
+    .adams_trust { padding: 18px 20px; background: var(--adams-paper); border: 1px solid var(--adams-line); border-radius: 11px; font-size: 12px; }
     .adams_trust summary { color: var(--adams-green); font-weight: 600; }
     #adams-crm .adams_grid, #adams-inventory .adams_grid, #adams-procurement .adams_grid, #adams-hr .adams_grid { grid-template-columns: minmax(0, 1fr); }
     @media (max-width: 1280px) { grid-template-columns: 192px minmax(0, 1fr); .adams_content { padding: 25px 24px; } .adams_brand { margin-inline: 4px; gap: 8px; } .adams_card { padding-inline: 13px; } .adams_metric_foot { margin-inline: -13px; } }
@@ -198,53 +212,53 @@
 }
 .o_adams_dashboard {
     #adams-group-commercial > .adams_group_heading { border-color: var(--adams-purple); }
-    #adams-sales .adams_metric_icon { color: var(--adams-purple); background: #f2ecf3; }
+    #adams-sales .adams_metric_icon { color: var(--adams-purple); background: var(--adams-purple-soft); }
     .adams_sales_workspace { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(270px, 1fr); gap: 16px; margin-top: 16px; }
     .adams_recent_panel > .btn { margin: 16px 0 0 16px; }
     .adams_recent_panel .adams_analysis { border: 0; box-shadow: none; margin: 0; padding: 14px 0 0; }
     .adams_recent_panel .adams_analysis > h3, .adams_recent_panel .adams_analysis > p { margin-inline: 18px; }
     .adams_recent_panel .adams_page_controls { padding: 12px 18px; }
-    .adams_recent_panel th { background: #f8f9fb; font-size: 11px; }
-    .adams_recent_panel td { font-size: 12px; border-color: #edf0f4; padding-block: 15px; }
+    .adams_recent_panel th { background: var(--adams-soft); font-size: 11px; }
+    .adams_recent_panel td { font-size: 12px; border-color: var(--adams-line); padding-block: 15px; }
     .adams_recent_panel td .btn { color: var(--adams-purple); }
-    .adams_rank_tabs { display: flex; gap: 4px; margin: 18px 19px 5px; padding: 3px; background: #f4f5f8; border-radius: 7px; }
+    .adams_rank_tabs { display: flex; gap: 4px; margin: 18px 19px 5px; padding: 3px; background: var(--adams-soft); border-radius: 7px; }
     .adams_rank_tabs button { flex: 1; border: 0; background: transparent; padding: 8px 5px; font-size: 12px; border-radius: 5px; color: var(--adams-sub); }
-    .adams_rank_tabs .active { background: #fff; color: var(--adams-purple); font-weight: 600; box-shadow: 0 1px 3px #2030500c; }
+    .adams_rank_tabs .active { background: var(--adams-paper); color: var(--adams-purple); font-weight: 600; box-shadow: 0 1px 3px #2030500c; }
     .adams_rank_list { padding: 0 19px 10px; }
-    .adams_rank_row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 15px 0; border: 0; border-bottom: 1px solid #edf0f4; background: transparent; text-align: start; }
-    .adams_rank_index { font-size: 11px; color: #92a1b0; width: 12px; }
-    .adams_rank_avatar { display: grid; place-items: center; width: 33px; height: 33px; border-radius: 50%; color: #85618c; background: #f0ebf4; flex-shrink: 0; font-size: 10px; font-weight: 650; }
+    .adams_rank_row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 15px 0; border: 0; border-bottom: 1px solid var(--adams-line); background: transparent; text-align: start; }
+    .adams_rank_index { font-size: 11px; color: var(--adams-sub); width: 12px; }
+    .adams_rank_avatar { display: grid; place-items: center; width: 33px; height: 33px; border-radius: 50%; color: var(--adams-purple); background: var(--adams-purple-soft); flex-shrink: 0; font-size: 10px; font-weight: 650; }
     .adams_rank_person { flex: 1; min-width: 0; }
     .adams_rank_top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 7px; }
-    .adams_rank_top strong { color: #3e4d5d; font-weight: 600; overflow-wrap: anywhere; }
+    .adams_rank_top strong { color: var(--adams-ink); font-weight: 600; overflow-wrap: anywhere; }
     .adams_rank_top bdi { font-weight: 650; }
-    .adams_rank_track { display: block; height: 5px; background: #f1f3f6; border-radius: 4px; }
+    .adams_rank_track { display: block; height: 5px; background: var(--adams-soft); border-radius: 4px; }
     .adams_rank_track > span { display: block; height: 100%; border-radius: 4px; background: #9066a1; }
     .adams_rank_track > .negative { background: #bf4d51; }
-    .adams_rank_foot { padding: 13px 19px; margin: 0; border-top: 1px solid var(--adams-line); background: #fdfdfe; font-size: 10px; color: var(--adams-sub); line-height: 1.5; }
-    .adams_empty_note { padding: 25px 20px; color: #65778a; font-size: 12px; }
+    .adams_rank_foot { padding: 13px 19px; margin: 0; border-top: 1px solid var(--adams-line); background: var(--adams-soft); font-size: 10px; color: var(--adams-sub); line-height: 1.5; }
+    .adams_empty_note { padding: 25px 20px; color: var(--adams-sub); font-size: 12px; }
     @media (max-width: 1080px) { .adams_sales_workspace { grid-template-columns: 1fr; } }
 }
 
 .o_adams_dashboard {
     .adams_metric_foot { display: flex; justify-content: space-between; align-items: center; gap: 5px; min-height: 44px; color: var(--adams-sub); }
     .adams_source_button { border: 0; background: transparent; padding: 5px 0; color: var(--adams-green); font: inherit; text-align: end; min-height: 30px; }
-    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: 520px; max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: #fff; color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
+    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: min(980px, calc(100% - 24px)); max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: var(--adams-paper); color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
     .adams_source_dialog::backdrop { background: #17263166; }
-    .adams_source_dialog > .adams_panel_head { position: sticky; top: 0; background: #fff; padding-bottom: 18px; border-bottom: 1px solid var(--adams-line); z-index: 1; }
-    .adams_source_dialog h2 { font-size: 22px; margin-bottom: 4px; }
+    .adams_source_dialog > .adams_panel_head { position: sticky; top: 0; background: var(--adams-paper); padding-bottom: 18px; border-bottom: 1px solid var(--adams-line); z-index: 1; }
+    .adams_source_dialog h2 { font-size: 25px; margin-bottom: 4px; }
     .adams_source_body { padding: 22px; font-size: 13px; line-height: 1.6; }
     .adams_source_body code { overflow-wrap: anywhere; }
     .adams_source_body .adams_source_value { font-size: 26px; font-weight: 650; color: var(--adams-ink); }
     .adams_source_body details { padding-block: 12px; border-top: 1px solid var(--adams-line); }
     .adams_recent_tabs { display: flex; justify-content: start; gap: 5px; padding: 14px 18px 0; }
     .adams_recent_tabs .btn { color: var(--adams-sub); border: 0; }
-    .adams_recent_tabs .active { background: #f2ecf3; color: var(--adams-purple); }
+    .adams_recent_tabs .active { background: var(--adams-purple-soft); color: var(--adams-purple); }
     .adams_recent_panel .adams_list_scope { margin: 0 18px 8px; font-size: 11px; }
     .adams_recent_panel .adams_list_scope p { margin: 10px 0; }
-    .adams_recent_panel td small { display: block; margin-top: 5px; color: #61778a; font-size: 10px; }
+    .adams_recent_panel td small { display: block; margin-top: 5px; color: var(--adams-sub); font-size: 10px; }
     .adams_recent_panel td { vertical-align: top; }
-    .adams_state_badge { display: inline-block; border-radius: 4px; padding: 3px 7px; background: #f2ecf3; color: var(--adams-purple); font-size: 10px; white-space: nowrap; }
+    .adams_state_badge { display: inline-block; border-radius: 4px; padding: 3px 7px; background: var(--adams-purple-soft); color: var(--adams-purple); font-size: 10px; var(--adams-paper)-space: nowrap; }
     .adams_sales_lower > .adams_analysis { margin-top: 0; }
     .adams_customers_panel .adams_rank_list { margin-top: 14px; }
     #adams-analysis-title { scroll-margin-top: 85px; }
@@ -269,7 +283,7 @@
     .adams_forecast_note h4 { font-size: 14px; font-weight: 600; }
     .adams_bank_list { max-height: 340px; overflow-y: auto; }
     .adams_bank_row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--adams-line); padding-block: 15px; }
-    .adams_bank_icon { display: grid; place-items: center; width: 32px; height: 32px; background: #eef4f2; color: var(--adams-green); border-radius: 8px; flex-shrink: 0; }
+    .adams_bank_icon { display: grid; place-items: center; width: 32px; height: 32px; background: var(--adams-green-soft); color: var(--adams-green); border-radius: 8px; flex-shrink: 0; }
     .adams_bank_identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .adams_bank_identity strong { font-size: 12px; }
     .adams_bank_identity small, .adams_bank_amount small { display: block; font-size: 10px; color: var(--adams-sub); margin-top: 4px; }
@@ -278,7 +292,7 @@
     .adams_aging_list { margin-block: 12px; }
     .adams_aging_row { display: grid; grid-template-columns: minmax(60px, 1fr) minmax(25px, 1fr) minmax(55px, 1fr); align-items: center; gap: 12px; margin-block: 13px; font-size: 11px; }
     .adams_aging_row bdi { text-align: end; overflow-wrap: anywhere; }
-    .adams_aging_track { height: 5px; background: #edf2f2; border-radius: 5px; overflow: hidden; }
+    .adams_aging_track { height: 5px; background: var(--adams-soft); border-radius: 5px; overflow: hidden; }
     .adams_aging_track i { display: block; height: 100%; background: #70a995; }
     .adams_aging_track i.negative { background: #b65054; }
     #adams-group-working-capital > .adams_grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -295,4 +309,42 @@
     .adams_account_search label { flex: 1; min-width: 0; font-size: 11px; }
     .adams_account_search input { width: 100%; min-width: 0; margin-top: 4px; font-size: 12px; }
     .adams_directory_count { font-size: 11px; margin-block: 12px; }
+}
+
+// Reference interactions and focus: a card opens its native report; explicit
+// source and aging controls retain their independent, accessible hit targets.
+.o_adams_dashboard {
+    .btn-primary { color: #fff; background: #77516f; border-color: #77516f; }
+    .btn-primary:hover { background: #63415c; border-color: #63415c; }
+    .adams_card { position: relative; border-radius: 12px; }
+    .adams_card:has(.adams_metric_arrow:not(:disabled)):hover { border-color: var(--adams-purple); }
+    .adams_metric_arrow::after { content: ''; position: absolute; inset: 0; cursor: pointer; }
+    .adams_metric_arrow:disabled::after { cursor: wait; }
+    .adams_metric_arrow:focus-visible::after { outline: 3px solid var(--adams-focus); outline-offset: -3px; border-radius: 12px; }
+    .adams_metric_foot, .adams_aging_list { position: relative; z-index: 1; }
+    .adams_cash_card .adams_metric_foot { background: #214a40; border-color: #315c50; color: #bdd6ca; }
+    .adams_cash_card .adams_source_button, .adams_cash_card .adams_metric_arrow { color: #d8e9e0; }
+    .adams_cash_card:hover { border-color: #90d7bd; }
+    .adams_supplier_windows { padding: 0 17px 12px; }
+    .adams_supplier_windows > .adams_panel_head { padding-inline: 0; padding-bottom: 16px; }
+    .adams_warning { margin: 0 0 18px; font-size: 12px; line-height: 1.6; }
+    .adams_warning_marker { font-size: 10px; margin: 8px 0 0; color: var(--adams-sub); }
+    .adams_header_actions, .adams_group_nav { display: flex; gap: 8px; flex-wrap: wrap; }
+    .adams_header_actions .btn, .adams_group_nav .btn { background: var(--adams-paper); border: 1px solid var(--adams-line); color: var(--adams-sub); }
+    .adams_group_nav { margin: -6px 0 20px; }
+    .adams_group_nav .btn { min-height: 32px; font-size: 11px; }
+    .adams_analysis_dialog .adams_analysis { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+    .adams_analysis_dialog .adams_analysis_heading { position: sticky; top: 0; background: var(--adams-paper); z-index: 2; padding-block: 5px 18px; }
+    .adams_source_dialog { overscroll-behavior: contain; }
+    .adams_source_body { line-height: 1.8; }
+    .adams_filters select option { background: var(--adams-paper); color: var(--adams-ink); }
+    .adams_rank_row { color: var(--adams-ink); }
+    @media (max-width: 760px) {
+        .adams_header_actions { width: 100%; }
+        .adams_header_actions .btn { flex: 1; }
+        .adams_grid_three > .adams_card:last-child { grid-column: 1 / -1; }
+        .adams_value, .adams_available .adams_value { font-size: 25px; }
+        .adams_section_heading h2 { font-size: 23px; }
+        .adams_source_dialog { width: 100%; }
+    }
 }
