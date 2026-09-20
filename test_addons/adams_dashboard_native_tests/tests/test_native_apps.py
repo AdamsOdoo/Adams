@@ -287,9 +287,10 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
             self.dashboard.open_inventory_product(self.options, True, 'forecast')
         with self.assertRaises(ValidationError):
             self.dashboard.get_inventory(self.options, 0, 'invented')
-        foreign = self.env['product.product'].with_company(self.company_data_2['company']).create({
+        other_company = self.env['res.company'].create({'name': 'Other inventory company'})
+        foreign = self.env['product.product'].with_company(other_company).create({
             'name': 'Other company product', 'is_storable': True,
-            'company_id': self.company_data_2['company'].id,
+            'company_id': other_company.id,
         })
         with self.assertRaises(AccessError):
             self.dashboard.open_inventory_product(self.options, foreign.id, 'forecast')
