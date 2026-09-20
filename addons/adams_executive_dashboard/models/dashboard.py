@@ -330,18 +330,24 @@ class ExecutiveDashboard(models.AbstractModel):
                 'row_count': len(rows), 'generated_at': generated_at, 'provenance': provenance}
 
     @api.model
-    def get_cash_directory(self, options, offset=0):
+    def get_cash_directory(self, options, offset=0, search=""):
         scoped, dates = self._scope(options)
         if type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid page.'))
+        if not isinstance(search, str) or len(search) > 100:
+            raise ValidationError(_('Invalid account search.'))
+        search = search.strip()
         accounts = scoped.env['account.account'].with_context(active_test=False)
         journals = scoped.env['account.journal'].with_context(active_test=False)
         accounts.check_access('read')
         journals.check_access('read')
         accounts.check_field_access_rights('read', ['name', 'code', 'active', 'currency_id', 'account_type', 'company_ids'])
         journals.check_field_access_rights('read', ['name', 'default_account_id', 'type', 'company_id'])
-        records = accounts.search([('company_ids', 'in', [scoped.env.company.id]),
-                                   ('account_type', '=', 'asset_cash')], order='id', limit=26, offset=offset)
+        domain = [('company_ids', 'in', [scoped.env.company.id]), ('account_type', '=', 'asset_cash')]
+        if search:
+            domain += ['|', ('name', 'ilike', search), ('code', 'ilike', search)]
+        total_count = accounts.search_count(domain)
+        records = accounts.search(domain, order='id', limit=26, offset=offset)
         linked = journals.search([('company_id', '=', scoped.env.company.id),
                                    ('type', 'in', ['bank', 'cash']),
                                    ('default_account_id', 'in', records[:25].ids)])
@@ -351,7 +357,7 @@ class ExecutiveDashboard(models.AbstractModel):
                           'currency': (account.currency_id or scoped.env.company.currency_id).name,
                           'journals': linked.filtered(lambda j: j.default_account_id == account).mapped('name'),
                           'balance': None, 'balance_status': 'not_configured'} for account in records[:25]],
-                'as_of': dates[2].isoformat()}
+                'as_of': dates[2].isoformat(), 'total_count': total_count, 'search': search}
 
     @api.model
     def get_inventory(self, options, offset=0):

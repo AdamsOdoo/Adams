@@ -241,3 +241,21 @@ test('large headline abbreviation retains exact detail formatting and native sig
     assert.equal(controller.headline({value: 0}, {digits: 2}), '0.00');
     assert.equal(controller.headline({value: null, status: 'restricted'}, {digits: 2}), 'Access restricted');
 });
+
+test('cash search rejects stale results and retains applied query on pagination', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const old = controller.loadDirectory('cash', 0, null, 'Old bank');
+    const fresh = controller.loadDirectory('cash', 0, null, 'New bank');
+    pending[1].resolve({status: 'ready', search: 'New bank', rows: [{id: 2}], total_count: 27, has_more: true});
+    await fresh;
+    pending[0].resolve({status: 'ready', search: 'Old bank', rows: [{id: 1}]});
+    await old;
+    assert.equal(controller.state.directory.search, 'New bank');
+    controller.state.cashSearch = 'Unapplied edit';
+    const page = controller.loadDirectory('cash', 25);
+    assert.equal(pending[2].args[2], 'New bank');
+    pending[2].resolve({status: 'ready', search: 'New bank', rows: [{id: 27}], total_count: 27});
+    await page;
+    assert.equal(controller.navigationState().directory.search, 'New bank');
+});

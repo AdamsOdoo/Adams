@@ -49,7 +49,7 @@ export class ExecutiveDashboard extends Component {
         this.sourceDialog = useRef('sourceDialog');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
         useEffect(() => {
             const dialog = this.sourceDialog.el;
             if (!dialog) return;
@@ -96,7 +96,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
-            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
+            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
     async restoreNavigation(saved) {
@@ -111,7 +111,7 @@ export class ExecutiveDashboard extends Component {
         if (saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
         }
-        if (saved.directory) { jobs.push(this.loadDirectory('cash', saved.directory.offset)); }
+        if (saved.directory) { this.state.cashSearch = saved.directory.search || ''; jobs.push(this.loadDirectory('cash', saved.directory.offset, null, this.state.cashSearch)); }
         if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
         if (saved.procurement) { jobs.push(this.loadDirectory('procurement', saved.procurement.offset, saved.procurement.mode)); }
         if (saved.workforce) { jobs.push(this.loadDirectory('workforce', saved.workforce.offset)); }
@@ -162,6 +162,7 @@ export class ExecutiveDashboard extends Component {
         this.state.applied = options;
         this.state.detail = null;
         this.state.directory = null;
+        this.state.cashSearch = '';
         this.state.inventory = null;
         this.state.workforce = null;
         this.state.procurement = null;
@@ -378,16 +379,18 @@ export class ExecutiveDashboard extends Component {
         } finally { if (this.alive) { this.state.opening = false; } }
     }
 
-    async loadDirectory(kind, offset = 0, mode = null) {
+    async loadDirectory(kind, offset = 0, mode = null, search = null) {
         const generation = this.generation;
         const stateKey = kind === 'cash' ? 'directory' : kind;
         const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment', workforce: 'get_workforce', procurement: 'get_procurement' }[kind];
         const request = (this[`${stateKey}Request`] || 0) + 1;
         this[`${stateKey}Request`] = request;
         mode = mode || this.state[stateKey]?.mode || (kind === 'procurement' ? 'late' : 'current');
-        this.state[stateKey] = { status: 'loading', rows: [], offset, mode };
+        search = kind === 'cash' ? (search ?? this.state.directory?.search ?? '') : null;
+        this.state[stateKey] = { status: 'loading', rows: [], offset, mode, search };
         try {
             const args = [{ ...this.state.applied }, offset];
+            if (kind === 'cash') { args.push(search); }
             if (['inventory', 'procurement'].includes(kind)) { args.push(mode); }
             const data = await this.orm.call('adams.executive.dashboard', method, args);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
@@ -395,7 +398,7 @@ export class ExecutiveDashboard extends Component {
             }
         } catch {
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
-                this.state[stateKey] = { status: 'error', rows: [], offset, mode };
+                this.state[stateKey] = { status: 'error', rows: [], offset, mode, search };
             }
         }
     }

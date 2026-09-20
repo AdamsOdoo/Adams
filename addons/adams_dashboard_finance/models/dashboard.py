@@ -322,8 +322,8 @@ class ExecutiveDashboard(models.AbstractModel):
                                        (dates[2], dates[2], dates[2]))
 
     @api.model
-    def get_cash_directory(self, options, offset=0):
-        result = super().get_cash_directory(options, offset)
+    def get_cash_directory(self, options, offset=0, search=""):
+        result = super().get_cash_directory(options, offset, search)
         scoped, dates = self._scope(options)
         if not result['rows']:
             return result

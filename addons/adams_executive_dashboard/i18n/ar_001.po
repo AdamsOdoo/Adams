@@ -1841,3 +1841,52 @@ msgstr "نطاق الحسابات والعملات"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Archived accounts are included. Account currency is separate from the report balance currency. Statement reconciliation is not assessed."
 msgstr "تشمل القائمة الحسابات المؤرشفة. عملة الحساب منفصلة عن عملة رصيد التقرير. لم يتم تقييم مطابقة كشوف الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid account search."
+msgstr "بحث الحساب غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Find account"
+msgstr "البحث عن حساب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Account name or code"
+msgstr "اسم الحساب أو رمزه"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Search"
+msgstr "بحث"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Showing"
+msgstr "عرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "of"
+msgstr "من"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "matching accounts"
+msgstr "حسابات مطابقة"

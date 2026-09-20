@@ -285,3 +285,10 @@
         .adams_finance_panel_body { padding-inline: 15px; }
     }
 }
+
+.o_adams_dashboard {
+    .adams_account_search { display: flex; gap: 8px; align-items: end; margin-bottom: 12px; }
+    .adams_account_search label { flex: 1; min-width: 0; font-size: 11px; }
+    .adams_account_search input { width: 100%; min-width: 0; margin-top: 4px; font-size: 12px; }
+    .adams_directory_count { font-size: 11px; margin-block: 12px; }
+}

@@ -257,6 +257,9 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self.assertEqual(rows[cash.id]['name'], 'Renamed archived cash fixture')
         self.assertFalse(rows[cash.id]['active'])
         self.assertEqual(rows[cash.id]['journals'], [])
+        filtered = self.dashboard.get_cash_directory(self.options, 0, 'Renamed archived cash fixture')
+        self.assertEqual(filtered['total_count'], 1)
+        self.assertEqual(filtered['rows'][0]['balance'], 150)
         later = self.dashboard.get_cash_directory(dict(self.options, as_of='2026-09-30'))
         self.assertEqual(next(row for row in later['rows'] if row['id'] == cash.id)['balance'], 110)
         action = self.dashboard.open_report('cash_account', self.options, group_id=cash.id)
@@ -438,3 +441,73 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self.assertEqual(action['params']['options']['date']['date_from'], '2026-09-01')
         with self.assertRaises(ValidationError):
             self.dashboard.open_financial_period('revenue', options, '2026-10')
+
+    def test_native_aging_installments_and_later_settlement(self):
+        self._mapping('receivables', report=self.env.ref('account_reports.aged_receivable_report'),
+                      expression=self.env.ref('account_reports.aged_receivable_line_total'))
+        terms = self.env['account.payment.term'].create({
+            'name': 'Dashboard fixture 40 percent now, 60 after 60 days',
+            'line_ids': [Command.clear(),
+                         Command.create({'value': 'percent', 'value_amount': 40, 'nb_days': 0}),
+                         Command.create({'value': 'percent', 'value_amount': 60, 'nb_days': 60})],
+        })
+        invoice = self._invoice(100, invoice_date='2026-08-01', posted=False)
+        invoice.invoice_payment_term_id = terms
+        invoice.action_post()
+        receivable = invoice.line_ids.filtered(lambda line: line.account_id.account_type == 'asset_receivable')
+        self.assertEqual(sorted((str(line.date_maturity), line.balance) for line in receivable),
+                         [('2026-08-01', 40), ('2026-09-30', 60)])
+        historical = self._item('receivables')
+        buckets = {bucket['key']: bucket['value'] for bucket in historical['aging_buckets']}
+        self.assertEqual(historical['value'], 100)
+        self.assertEqual(buckets['period0'], 60)
+        self.assertEqual(buckets['period1'], 40)
+        settlement = self.env['account.move'].create({
+            'date': '2026-09-10', 'journal_id': self.company_data['default_journal_misc'].id,
+            'line_ids': [Command.create({'partner_id': self.partner_a.id,
+                'account_id': receivable.account_id.id, 'credit': 40, 'date_maturity': '2026-09-10'}),
+                Command.create({'account_id': self.company_data['default_account_assets'].id, 'debit': 40})],
+        })
+        settlement.action_post()
+        (receivable.filtered(lambda line: line.balance == 40) +
+         settlement.line_ids.filtered(lambda line: line.account_id == receivable.account_id)).reconcile()
+        self.assertEqual(invoice.amount_residual, 60)
+        after_settlement = self._item('receivables')
+        self.assertEqual(after_settlement['value'], 100)
+        self.assertEqual({bucket['key']: bucket['value'] for bucket in after_settlement['aging_buckets']}, buckets)
+        current = self._item('receivables', dict(self.options, as_of='2026-09-30'))
+        self.assertEqual(current['value'], 60)
+        self.assertEqual(current['aging_buckets'][0]['value'], 60)
+
+    def test_native_foreign_invoice_currency_and_backdated_recognition(self):
+        self._mapping()
+        currency = self.env.ref('base.EUR')
+        currency.active = True
+        self.assertNotEqual(currency, self.env.company.currency_id)
+        rates = self.env['res.currency.rate']
+        for target, rate in [(self.env.company.currency_id, 1), (currency, 2)]:
+            domain = [('currency_id', '=', target.id), ('company_id', '=', self.env.company.id),
+                      ('name', '=', '2026-08-01')]
+            existing = rates.search(domain)
+            if existing:
+                existing.rate = rate
+            else:
+                rates.create({'currency_id': target.id, 'company_id': self.env.company.id,
+                              'name': '2026-08-01', 'rate': rate})
+        invoice = self._invoice(100, posted=False)
+        invoice.currency_id = currency
+        invoice.action_post()
+        self.assertEqual(invoice.amount_total, 100)
+        self.assertEqual(invoice.amount_total_signed, 50)
+        self.assertEqual(self._item()['value'], 50)
+        # A general journal recognition adjustment changes accounting revenue,
+        # independently of the posted invoice analysis measure.
+        adjustment = self.env['account.move'].create({
+            'date': '2026-08-05', 'journal_id': self.company_data['default_journal_misc'].id,
+            'line_ids': [Command.create({'account_id': self.company_data['default_account_revenue'].id, 'credit': 7}),
+                         Command.create({'account_id': self.company_data['default_account_assets'].id, 'debit': 7})],
+        })
+        adjustment.action_post()
+        self.assertEqual(self._item()['value'], 57)
+        sales = self.dashboard.get_section('sales', self.options)
+        self.assertEqual(next(item for item in sales['items'] if item['key'] == 'invoiced_sales')['value'], 50)

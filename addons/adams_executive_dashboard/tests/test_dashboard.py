@@ -173,3 +173,24 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         with file_open('adams_executive_dashboard/static/src/dashboard.scss') as source:
             compiled = sass.compile(string=source.read())
         self.assertIn('.o_adams_dashboard', compiled)
+
+    def test_cash_directory_search_counts_pages_and_archived_records(self):
+        accounts = self.env['account.account'].create([{
+            'name': f'Searchable dashboard cash {index:02}', 'code': f'992{index:03}',
+            'account_type': 'asset_cash', 'company_ids': [Command.set(self.env.company.ids)],
+        } for index in range(27)])
+        accounts[-1].active = False
+        first = self.dashboard.get_cash_directory(self.options, 0, 'Searchable dashboard cash')
+        second = self.dashboard.get_cash_directory(self.options, 25, 'Searchable dashboard cash')
+        self.assertEqual(first['total_count'], 27)
+        self.assertEqual(len(first['rows']), 25)
+        self.assertTrue(first['has_more'])
+        self.assertEqual({row['id'] for row in first['rows'] + second['rows']}, set(accounts.ids))
+        self.assertFalse(second['has_more'])
+        self.assertFalse(second['rows'][-1]['active'])
+        exact = self.dashboard.get_cash_directory(self.options, 0, accounts[-1].code)
+        self.assertEqual(exact['total_count'], 1)
+        self.assertEqual(exact['rows'][0]['id'], accounts[-1].id)
+        for invalid in (None, {}, ['cash'], 'x' * 101):
+            with self.assertRaises(ValidationError):
+                self.dashboard.get_cash_directory(self.options, 0, invalid)
