@@ -4,7 +4,40 @@
 Access was restored on 20 September 2026. The feature build and dashboard opened
 successfully. No main merge, production change or Shopify work was performed.
 
-## Live findings, 20 September
+## Latest verified checkpoint, 20 September 12:24 UTC
+
+- Application `2389d8930e4856ec04c56fd3aa79bf8d09f6b448`, tree
+  `7090704144ba32550cb8be50bd4c9dbedf13f3ae`, Odoo.sh build `38342887`:
+  **35 tests, zero failures/errors**; 10 frontend tests pass locally. Test: Warning
+  remains. No latest-candidate upgrade qualification or full UAT is claimed.
+- Optional `adams_dashboard_finance` integrates approved native report expressions
+  for twelve financial metrics. It batches native evaluation, checks scope,
+  enforces accounting permissions, protects approvals, detects definition drift
+  (including referenced reports), and withholds undefined ratios. See
+  [financial adapter](finance-adapter.md) for configuration and evidence.
+- Known-value native tests cover refunds, losses, true zero, historical settlement,
+  restricted users/company isolation, native-action scope, unapproved mappings,
+  percentage units and zero denominators. The earlier permission-test helper bug
+  was fixed; its corrected environment passes the actual native access checks.
+- [Private evidence](https://github.com/MostafaEssamm12/Odoo/tree/6afc5ef453cd6aa407d955c9ef03790f52ab7b43/evidence/adams-dashboard/20260920-2389d89)
+  retains actual log paragraphs and candidate identity; retrieved after saving.
+- Live browser: latest dashboard renders all twelve finance cards as Access
+  restricted for the current non-accounting session. Invoice Analysis drilldown
+  opens successfully and the native pivot total 76,049.00 matches the dashboard
+  under the selected September 2026 scope. Breadcrumb return restores the period.
+  This bounded check does not qualify all navigation/export/role journeys.
+- Prior localization build `517c2e6` / `38341624` passed 26 native tests and
+  paired English/Arabic desktop review. Its
+  [separate evidence](https://github.com/MostafaEssamm12/Odoo/tree/7f76610c0f7fe4f98f9d9de248ac88f0f7040261/evidence/adams-dashboard/20260920-517c2e6)
+  remains candidate-specific.
+- Full v4 remains incomplete: dated account balances/Cash Flow/Partner Ledger,
+  detailed aging and forecasts/budgets, operational valuation/history/workforce,
+  approved additional fulfillment definitions, full bilingual/mobile browser
+  coverage, representative performance and exact-candidate upgrade acceptance.
+  Owner-approved financial mappings and accounting-authorized browser access are
+  also still needed. Development is not business UAT readiness.
+
+## Earlier live findings, 20 September
 
 - Odoo.sh build `38327805` runs application `c6586cba771fec8a9c5a0901980486d98dce44ec`.
   Its install log reports **one failure, zero errors, 25 tests**: only
@@ -51,9 +84,9 @@ candidate. They are not relabelled as evidence for these new localization change
   [native gaps](native-gaps.md); [UAT preparation](uat-checklist.md) covers the
   first session after build/source access is restored.
 
-## Current verification
+## Earlier pinned-harness verification
 
-Latest application: `365a0f1056613e3e4e1999bc768595f9235eda67`.
+Previously tested application: `365a0f1056613e3e4e1999bc768595f9235eda67`.
 Private controller: `e16a42d03410e2e07d6f86f505e1eee55e2cd896`.
 Executor remains `10ec1d059b5ddc5d422875f68e0726cc500487ce` and Community remains
 `82f4b92eaf3f2014eb1667e4845e80c377dbfb4f`. The original harness qualification is

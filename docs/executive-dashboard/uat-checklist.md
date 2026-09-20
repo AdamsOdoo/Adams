@@ -7,6 +7,9 @@ browser/deployment evidence are still required before inviting finance users.
 ## Development installation
 
 Install `adams_executive_dashboard` on the dashboard development branch only.
+For licensed financial reports also install `adams_dashboard_finance`; configure
+company mappings under Accounting → Configuration → Dashboard Financial
+Definitions. Only an accounting manager can approve these business definitions.
 It depends on Web and Accounting. Sales, Purchase, CRM, Stock and Time Off are
 optional; install their normal apps to enable the corresponding native adapters.
 Do not install `adams_dashboard_native_tests` in a customer database. That addon
@@ -25,9 +28,9 @@ locally per user. Native drilldown/back now preserves applied filters, selected 
 
 | Journey | Expected behavior | Status |
 |---|---|---|
-| Historical receivables/payables | Known dated settlements match native aging; drill to aging, original document, full export and back | Blocked: licensed engine mapping |
+| Historical receivables/payables | Known dated settlements match native aging; drill to aging, original document, full export and back | Native historical receivable fixture passes; approved company mapping and accounting-authorized UI journey pending |
 | Financial statements and cash | Native P&L/BS/CFS values and comparisons; complete dynamic account balances including zero and archived history | Blocked: licensed engine mapping |
-| Sales and purchasing | Dashboard amount, distinct count, group/trend, native pivot and full export agree under the same company/dates/state/currency | Bounded native fixtures passed; actual browser comparison pending |
+| Sales and purchasing | Dashboard amount, distinct count, group/trend, native pivot and full export agree under the same company/dates/state/currency | Bounded native fixtures passed; one Invoice Analysis pivot/browser comparison passed at 2389d89, remaining journeys pending |
 | CRM | Weighted open pipeline uses native prorated revenue and current pending status for opportunities created in period; stages remain dynamic | Bounded native fixtures passed; browser comparison pending |
 | Inventory | Current quantities match native Stock by product/UoM; no false historical cutoff or mixed-unit total | Native current-quantity fixture passed; valuation/history/browser checks still pending |
 | HR | Only authorized native approved-request hours appear, retaining negative native signs and start-date semantics | Native four-hour leave fixture and −4 signed report result passed; browser checks pending |
@@ -40,7 +43,7 @@ locally per user. Native drilldown/back now preserves applied filters, selected 
 
 ## Explicit remaining functionality
 
-Financial engine adapters and report/variant approval; historical aging and partner
+Remaining financial report families and report/variant approval; detailed aging and partner
 journeys; complete bank/cash balances; native forecasts/budgets where configured;
 backlog value/on-time measures after native-gap inspection and approved
 business definitions; inventory valuation/aging/shortage coverage; workforce

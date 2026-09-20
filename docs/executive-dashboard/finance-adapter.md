@@ -6,7 +6,7 @@ calculations in Odoo. No Enterprise source is copied into Adams.
 
 Accounting managers configure one mapping per company/metric in **Accounting →
 Configuration → Dashboard Financial Definitions**. Choose the exact report and
-expression, document its business meaning, and approve the definition. No customer
+expression (and native denominator for a ratio), document its business meaning, and approve the definition. No customer
 mapping is installed automatically. Business data changes flow through on refresh;
 mapping/report definition changes withhold the value until reviewed again.
 
@@ -35,7 +35,7 @@ Authorized Odoo.sh Enterprise revision:
 - `account_reports/data/profit_and_loss.xml`: Revenue and Gross Profit expressions.
 - `account_reports/data/aged_partner_balance.xml`: Aged Receivable and total expression.
 
-## Verification under development
+## Native verification, 20 September 2026
 
 New Enterprise tests use the built-in reports and independently known values:
 signed invoice/refund results; genuine zero; definition drift and unapproved
@@ -43,7 +43,19 @@ mapping; protected approval fields; denied accounting access and company
 isolation; native action scope; batched evaluation; and historical receivable
 settlement (100,000 invoiced, 40,000 paid in August, 60,000 in September).
 
-Execution and live-browser parity are pending for this candidate. These tests do
-not qualify all currency/aging/cash-flow/ledger/budget cases. Full UAT readiness
+Application `2389d8930e4856ec04c56fd3aa79bf8d09f6b448`, Odoo.sh build
+`38342887`: **35 tests, zero failures/errors**, including nine financial tests.
+The build displays Test: Warning; it is not warning-free. Ten local frontend tests
+also pass. Margin coverage verifies native percentage units, zero-denominator
+withholding, and approval invalidation after changes in referenced P&L definitions.
+
+[Retained native evidence](https://github.com/MostafaEssamm12/Odoo/tree/6afc5ef453cd6aa407d955c9ef03790f52ab7b43/evidence/adams-dashboard/20260920-2389d89)
+was read back after storage. Original harness qualification was reused.
+
+The deployed browser session can open the dashboard but lacks accounting-report
+access: all twelve financial cards correctly display Access restricted. Financial
+native UI/export parity needs an accounting-authorized session and approved
+company mappings. Automated test mappings exist only inside rolled-back fixtures.
+These tests do not qualify all currency/aging/cash-flow/ledger/budget cases. Full UAT readiness
 still requires the remaining acceptance-plan gates and business-definition
 decisions for genuine native-report gaps.
