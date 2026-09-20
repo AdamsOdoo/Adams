@@ -24,7 +24,7 @@ export class ExecutiveDashboard extends Component {
             { key: 'hr', name: _t('Human Resources'), short: _t('HR'), icon: 'people', number: '06', description: _t('Workforce and approved leave.') },
         ];
         this.labels = {
-            revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'),
+            revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'), cash_flow: _t('Net cash movement'),
             receivables: _t('Receivables'), payables: _t('Payables'),
             gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
@@ -182,6 +182,7 @@ export class ExecutiveDashboard extends Component {
                 if (this.alive && generation === this.generation) {
                     this.state.sections[key] = { ...data, status: 'ready' };
                     if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { void this.loadRecent('orders'); void this.loadRanking('invoiced_sales'); void this.loadCustomers(); }
+                    if (key === 'finance' && data.items.some(item => item.key === 'cash' && item.status === 'ready')) { void this.loadDirectory('cash'); }
                     if (key === 'finance' && ['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) { void this.loadProfitabilityChart(); }
                 }
             } catch {
@@ -204,7 +205,7 @@ export class ExecutiveDashboard extends Component {
         if (section.key === 'finance') {
             return [
                 { key: 'profitability', name: _t('Profitability'), description: _t('Performance during the selected financial period.'), items: select(['revenue', 'gross_profit', 'profit', 'operating_expenses']) },
-                { key: 'liquidity', name: _t('Liquidity'), description: _t('Recorded cash and a separately labelled native forecast.'), items: select(['cash', 'standard_forecast']) },
+                { key: 'liquidity', name: _t('Liquidity'), description: _t('Recorded cash and a separately labelled native forecast.'), items: [ ...select(['cash']), this.cashMovement(result), ...select(['standard_forecast']) ] },
                 { key: 'working-capital', name: _t('Working capital'), description: _t('Receivables and payables at the selected balance cutoff.'), items: select(['receivables', 'payables']) },
                 { key: 'financial-position', name: _t('Financial position'), description: _t('Native Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
             ];
@@ -215,9 +216,18 @@ export class ExecutiveDashboard extends Component {
 
     metricIcon(key) {
         return { revenue: 'chart', gross_profit: 'trend', profit: 'coins', operating_expenses: 'wallet',
-            cash: 'bank', standard_forecast: 'calendar', receivables: 'invoice', payables: 'invoice',
+            cash: 'bank', cash_flow: 'trend', standard_forecast: 'calendar', receivables: 'invoice', payables: 'invoice',
             invoiced_sales: 'invoice', invoiced_margin: 'trend', confirmed_sales: 'sales', orders: 'box',
             quotations: 'invoice', purchases: 'truck', inventory: 'box', crm: 'target', hr: 'people' }[key] || 'chart';
+    }
+
+    cashMovement(result) {
+        const flow = result.cash_flow;
+        return { key: 'cash_flow', status: flow?.status || 'not_installed',
+            value: flow?.bridge?.net_increase?.value ?? null, unit: 'currency', date_field: 'period',
+            source: flow?.source, measure: 'net_increase', drilldown: flow?.status === 'ready',
+            definition: _t('Native Cash Flow Statement net increase. Cash composition may differ from the Balance Sheet.'),
+            has_warnings: flow?.has_warnings };
     }
 
     financeMetric(key) {

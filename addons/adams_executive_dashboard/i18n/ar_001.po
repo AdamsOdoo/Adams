@@ -1729,3 +1729,115 @@ msgstr "إعادة المحاولة"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Load customers"
 msgstr "تحميل العملاء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Net cash movement"
+msgstr "صافي الحركة النقدية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Native Cash Flow Statement net increase. Cash composition may differ from the Balance Sheet."
+msgstr "صافي الزيادة من قائمة التدفقات النقدية القياسية. قد يختلف نطاق النقد عن الميزانية العمومية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Native due-date aging · signed balances"
+msgstr "أعمار الديون القياسية حسب الاستحقاق · الأرصدة بإشاراتها"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open full native aging"
+msgstr "فتح تقرير أعمار الديون القياسي الكامل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Recorded cash movements during the selected period"
+msgstr "الحركات النقدية المسجلة خلال الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open native report ↗"
+msgstr "فتح التقرير القياسي ↗"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Activities and unclassified movements"
+msgstr "الأنشطة والحركات غير المصنفة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Cash composition follows the native Cash Flow Statement and may differ from the Balance Sheet or account directory."
+msgstr "يتبع نطاق النقد قائمة التدفقات النقدية القياسية وقد يختلف عن الميزانية العمومية أو دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Cash flow outlook"
+msgstr "توقعات التدفقات النقدية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The standard short-term forecast is shown above. A daily cash plan and minimum projected balance require an approved definition."
+msgstr "تظهر التوقعات القياسية قصيرة الأجل أعلاه. تتطلب الخطة النقدية اليومية والحد الأدنى للرصيد المتوقع تعريفاً معتمداً."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Bank & cash accounts"
+msgstr "الحسابات البنكية والنقدية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Native balances at the selected cutoff"
+msgstr "الأرصدة القياسية في تاريخ القطع المحدد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Refresh accounts"
+msgstr "تحديث الحسابات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Load the authorized account directory to inspect balances."
+msgstr "حمّل دليل الحسابات المسموح بها لفحص الأرصدة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Account scope and currencies"
+msgstr "نطاق الحسابات والعملات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Archived accounts are included. Account currency is separate from the report balance currency. Statement reconciliation is not assessed."
+msgstr "تشمل القائمة الحسابات المؤرشفة. عملة الحساب منفصلة عن عملة رصيد التقرير. لم يتم تقييم مطابقة كشوف الحسابات."

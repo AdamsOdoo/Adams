@@ -252,3 +252,36 @@
     }
     @media (prefers-reduced-motion: reduce) { scroll-behavior: auto; * { scroll-behavior: auto; } }
 }
+
+// Reference liquidity composition and native aging, without prototype arithmetic.
+.o_adams_dashboard {
+    .adams_liquidity_grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+    .adams_finance_panel_body { padding: 18px 20px; font-size: 12px; }
+    .adams_cash_bridge { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-block: 8px 20px; }
+    .adams_cash_bridge span, .adams_cash_bridge small { display: block; font-size: 11px; color: var(--adams-sub); }
+    .adams_cash_bridge strong { display: block; margin-block: 8px; font-size: 19px; overflow-wrap: anywhere; }
+    .adams_cash_details { border-top: 1px solid var(--adams-line); padding-block: 12px; margin-top: 12px; font-size: 11px; }
+    .adams_forecast_note { border-top: 1px solid var(--adams-line); padding-top: 16px; margin-top: 18px; }
+    .adams_forecast_note h4 { font-size: 14px; font-weight: 600; }
+    .adams_bank_list { max-height: 340px; overflow-y: auto; }
+    .adams_bank_row { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--adams-line); padding-block: 15px; }
+    .adams_bank_icon { display: grid; place-items: center; width: 32px; height: 32px; background: #eef4f2; color: var(--adams-green); border-radius: 8px; flex-shrink: 0; }
+    .adams_bank_identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .adams_bank_identity strong { font-size: 12px; }
+    .adams_bank_identity small, .adams_bank_amount small { display: block; font-size: 10px; color: var(--adams-sub); margin-top: 4px; }
+    .adams_bank_amount { text-align: end; max-width: 45%; overflow-wrap: anywhere; }
+    .adams_bank_amount .btn { padding: 0; color: var(--adams-ink); font-size: 13px; }
+    .adams_aging_list { margin-block: 12px; }
+    .adams_aging_row { display: grid; grid-template-columns: minmax(60px, 1fr) minmax(25px, 1fr) minmax(55px, 1fr); align-items: center; gap: 12px; margin-block: 13px; font-size: 11px; }
+    .adams_aging_row bdi { text-align: end; overflow-wrap: anywhere; }
+    .adams_aging_track { height: 5px; background: #edf2f2; border-radius: 5px; overflow: hidden; }
+    .adams_aging_track i { display: block; height: 100%; background: #70a995; }
+    .adams_aging_track i.negative { background: #b65054; }
+    #adams-group-working-capital > .adams_grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 1080px) { .adams_liquidity_grid { grid-template-columns: 1fr; } }
+    @media (max-width: 600px) {
+        #adams-group-working-capital > .adams_grid { grid-template-columns: 1fr; }
+        .adams_cash_bridge { grid-template-columns: 1fr; }
+        .adams_finance_panel_body { padding-inline: 15px; }
+    }
+}

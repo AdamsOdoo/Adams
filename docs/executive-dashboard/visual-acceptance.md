@@ -27,3 +27,20 @@ unsupported branch policies must not be rendered as real application facts.
 Any further necessary visual departure must be explicit and reviewed, not silently
 substituted by a generic design. Passing a reflow assertion alone does not close
 this gate.
+
+## Liquidity and working-capital correction
+
+The next candidate positions the native Cash Flow Statement bridge beside the
+bank/cash account directory under three liquidity cards. The bridge reads the
+native opening_balance/net_increase/closing_balance rows directly, without
+recalculating their values. Bank rows retain native balance, account currency,
+archive status, pagination and scoped native GL routes. A ready approved cash
+mapping loads the directory automatically; unavailable access never becomes zero.
+
+Receivable/payable cards expose the existing native due-date buckets as signed
+values and magnitude bars. The full native aging action is explicit; individual
+buckets are not advertised as scoped drilldowns. Daily cash-plan/minimum cash
+remain visibly unconfigured until their distinct business definition is approved.
+Native browser fixtures now configure cash and both aging reports to exercise the
+actual layout and automatic directory loading in EN/AR, instead of only revenue.
+Pending native candidate execution; prior screenshots are not relabelled.

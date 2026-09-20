@@ -29,6 +29,26 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             'definition_note': 'Disposable browser fixture approval; not customer accounting policy.',
         })
         mapping.action_approve()
+        mapping_model = self.env['adams.dashboard.finance.mapping']
+        cash_line = self.env.ref('account_reports.account_financial_report_bank_view0')
+        cash_mapping = mapping_model.create({
+            'company_id': self.env.company.id, 'metric': 'cash',
+            'report_id': self.env.ref('account_reports.balance_sheet').id,
+            'expression_id': cash_line.expression_ids.filtered(lambda expr: expr.label == 'balance').id,
+            'cash_detail_report_id': self.env.ref('account_reports.general_ledger_report').id,
+            'cash_detail_expression_id': self.env.ref('account_reports.general_ledger_line_balance').id,
+            'cash_flow_report_id': self.env.ref('account_reports.cash_flow_report').id,
+            'definition_note': 'Disposable browser cash fixture; not customer accounting policy.',
+        })
+        cash_mapping.action_approve()
+        for metric, prefix in [('receivables', 'aged_receivable'), ('payables', 'aged_payable')]:
+            aging_mapping = mapping_model.create({
+                'company_id': self.env.company.id, 'metric': metric,
+                'report_id': self.env.ref(f'account_reports.{prefix}_report').id,
+                'expression_id': self.env.ref(f'account_reports.{prefix}_line_total').id,
+                'definition_note': 'Disposable browser aging fixture; not customer accounting policy.',
+            })
+            aging_mapping.action_approve()
         language = self.env['res.lang'].with_context(active_test=False).search([('code', '=', 'ar_001')])
         if not language.active:
             self.env['base.language.install'].create({'lang_ids': [Command.set(language.ids)]}).lang_install()
@@ -62,6 +82,16 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const columns = getComputedStyle(profitability).gridTemplateColumns.split(' ').length;
                     if ((WIDTH === 390 && columns !== 2) || (WIDTH === 320 && columns !== 1) || (WIDTH >= 1440 && columns !== 4)) throw new Error('Incorrect reference KPI column count');
                     if (!root.querySelector('.adams_profit_grid .adams_performance')) throw new Error('Missing reference performance-context panel');
+                    const liquidity = root.querySelector('#adams-group-liquidity');
+                    if (liquidity.querySelector('.adams_grid').children.length !== 3) throw new Error('Reference requires three liquidity cards');
+                    await wait(() => liquidity.querySelector('.adams_bank_row button'), 'Native cash account balances must load automatically');
+                    if (liquidity.querySelectorAll('.adams_cash_bridge strong').length !== 3) throw new Error('Native cash bridge must show opening, movement and closing');
+                    const aging = root.querySelector('#adams-group-working-capital');
+                    if (aging.querySelectorAll('.adams_aging_list').length !== 2) throw new Error('Both native aging panels must be visible');
+                    if (!aging.querySelector('.adams_aging_list').innerText.includes(expected)) throw new Error('Native receivable bucket must contain the invoice value');
+                    for (const date of root.querySelectorAll('.adams_card_date')) {
+                        if (getComputedStyle(date).direction !== 'ltr') throw new Error('ISO date ranges must preserve order in RTL');
+                    }
                     const source = card.querySelector('.adams_source_button');
                     source.click();
                     const drawer = await wait(() => root.querySelector('dialog[open]'), 'Source drawer must open');
@@ -79,6 +109,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
                     }
+                    if (WIDTH === 768 || WIDTH === 1024) liquidity.scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
                 '''.replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width))

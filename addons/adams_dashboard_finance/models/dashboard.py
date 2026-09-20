@@ -453,7 +453,9 @@ class ExecutiveDashboard(models.AbstractModel):
             if not required.issubset({row['key'] for row in rows}) or len(rows) > 100:
                 raise UnsupportedFinancialScope()
             difference = report._get_generic_line_id(None, None, markup='unexplained_difference')
-            result.update(status='ready', rows=rows, source=report.display_name,
+            bridge = {key: next(row for row in rows if row['key'] == report._get_generic_line_id(None, None, markup=key))
+                      for key in ('opening_balance', 'net_increase', 'closing_balance')}
+            result.update(status='ready', rows=rows, bridge=bridge, source=report.display_name,
                           has_warnings=bool(information.get('warnings')) or any(row['key'] == difference for row in rows),
                           options=prepared, mapping_version=mapping.definition_fingerprint)
         except (AccessError, UnsupportedFinancialScope, UserError, KeyError, TypeError, ValueError) as error:
