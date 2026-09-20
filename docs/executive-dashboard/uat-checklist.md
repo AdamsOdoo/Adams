@@ -22,7 +22,7 @@ CSV download also requires Odoo's export permission. Payroll is not exposed.
 
 Use one currently selected, authorized Odoo company. Apply period and balance
 cutoff explicitly. Supporting sections start collapsed; section expansion is saved
-locally per user. Native drilldown/back now preserves applied filters, selected analysis/pages and scroll in the action stack, while reloading values and rechecking permissions. Persistent local preferences contain section expansion only. Actual browser restoration remains to be verified.
+locally per user. Native drilldown/back now preserves applied filters, selected analysis/pages and scroll in the action stack, while reloading values and rechecking permissions. Persistent local preferences contain section expansion only. The current admin quotation-to-document-and-back journey restored Sales, quotation selection and dates with fresh retrieval. Other report and role journeys remain open.
 
 ## Business acceptance journeys (pending)
 
@@ -90,8 +90,10 @@ close the Sales/mobile visual fidelity gate or full v4 UAT.
 
 ## Latest closure evidence
 
-See implementation-status.md for ac52010 / build 38346414: 50 native tests pass,
-16 local controller checks, and twelve retained native EN/AR captures. Owner
-financial mappings remain empty. Review owner-decisions.md for concrete policies
-and custom-definition choices. Those choices do not replace unfinished engineering
-gates; this checklist is not a UAT pass.
+See implementation-status.md for 397557b / build 38347354: 53 native tests pass,
+17 local controller checks and twelve retained native EN/AR captures. A separate
+core upgrade from 365a0f1 passed all 14 selected native tests. Enterprise finance
+upgrade remains open. The admin quotation breadcrumb journey matched USD 377.50
+and restored the selected Sales context with fresh retrieval. Owner financial
+mappings remain unapproved. The full role/export/performance/visual matrix remains
+open; these bounded passes are not a UAT pass.

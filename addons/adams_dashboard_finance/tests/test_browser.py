@@ -76,6 +76,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const root = document.querySelector('.o_adams_dashboard');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    if (WIDTH < 760) {
+                        const toggle = root.querySelector('.adams_mobile_menu');
+                        toggle.click();
+                        const menu = await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must open');
+                        await wait(() => menu.contains(document.activeElement), 'Mobile navigation must receive focus');
+                        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Escape must dismiss mobile navigation');
+                        if (document.activeElement !== toggle) throw new Error('Mobile navigation must return focus');
+                        toggle.click();
+                        await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must reopen');
+                        root.querySelector('.adams_workspace_close').click();
+                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Close control must dismiss mobile navigation');
+                    }
                     const profitability = root.querySelector('#adams-group-profitability > .adams_grid');
                     if (profitability.children.length !== 4) throw new Error('Reference requires four primary profitability cards');
                     if (root.querySelectorAll('.adams_nav button').length !== 6) throw new Error('Reference requires six department tabs');

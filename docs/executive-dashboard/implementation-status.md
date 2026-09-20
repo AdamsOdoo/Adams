@@ -4,44 +4,51 @@
 Access was restored on 20 September 2026. The feature build and dashboard opened
 successfully. No main merge, production change or Shopify work was performed.
 
-## Current verified checkpoint — 20 September 2026, 14:21 UTC
+## Current verified checkpoint — 20 September 2026
 
-Application `ac52010ffb531a027663cbca3f7f92bb67861b29`, tree
-`79c04c85809aa5590c29b8fbc4c59249d9528222`, Odoo.sh build **38346414**:
-**50 native tests, zero failures/errors**; 16 isolated frontend/controller tests
-passed locally. Native browser checks exercise EN/AR at 320/390/768/1024/1440/1920,
-source drawer focus/exact values/fit/closing, responsive column counts and one
-native financial drilldown. Odoo.sh reports Test: Warning, not a clean release gate.
+Application `397557b0aac6f14b46dc853a385e4e0047ef1939`, tree
+`67a8f0a9c27f11f98e73b967101e7740d237da3c`, Odoo.sh build **38347354**:
+**53 native tests, zero failures/errors** (65.43 seconds, 32347 queries), and
+17 local controller tests pass. Odoo.sh reports Test: Warning, not a clean release.
 
-[Private evidence](https://github.com/MostafaEssamm12/Odoo/tree/87e9320b1fb5c142f9d556e10d6455c2796f6c10/evidence/adams-dashboard/20260920-ac52010)
-retains 12 actual native screenshots, hashes/dimensions and the original result
-excerpt. EN 1440 is the native report; other images show Finance after drawer
-closure. The rolled-back fixture approves only revenue 100. It is not customer
-configuration, full visual parity or owner approval.
+The Finance layout now has three liquidity cards, a native CFS opening/movement/
+closing bridge, searchable and paged cash accounts with complete matching counts,
+and native signed aging buckets. Native tests include historical installment aging,
+settlement after cutoff, foreign-currency Invoice Analysis versus native P&L, and
+backdated general-journal revenue adjustments. No duplicated report arithmetic.
 
-Implemented: native financial statements/ratios, dated cash, aging/CFS/Partner
-Ledger, standard forecast/budgets/monthly trends; native commercial analysis,
-recent orders, salesperson/customer rankings, quantity fulfillment; current and
-historical stock quantity/valuation, workforce, CRM/leave and purchase worklists.
-The source side drawer, four-column recent orders, compact display with exact
-values, scope-preserving exports and workspace restoration are implemented.
+[Private evidence](https://github.com/MostafaEssamm12/Odoo/tree/2c7fb898c145bb8d191ba29928c2afd8fe20d6aa/evidence/adams-dashboard/20260920-397557b)
+retains twelve native EN/AR captures at 320/390/768/1024/1440/1920 widths, hashes,
+original install excerpts and the structured core-upgrade result. The disposable
+browser fixture approves revenue, cash and both aging mappings; it is not customer
+configuration. EN 1440 captures native P&L; 768/1024 capture Liquidity. EN/AR 1024
+were visually inspected. This is bounded evidence, not complete visual acceptance.
 
-Native full Accounting activation resolved finance report access on disposable
-build 38345613. The mapping list was inspected and is empty. No ACL was weakened
-and no owner mapping was approved. Fresh builds need their own app configuration.
-Current company reporting policy and additional metric definitions require the
-concrete decisions in [owner decisions](owner-decisions.md), per contract §2.2/2.5.
+The pinned private harness ran a separate **core upgrade from 365a0f1 to 397557b**:
+**14 tests passed, zero failures/errors/skips**. [Run 35518201496](https://github.com/MostafaEssamm12/Odoo/actions/runs/35518201496).
+Only `adams_executive_dashboard` was upgraded against the qualified Community
+runtime. This does not qualify the Enterprise finance module upgrade. Unchanged
+harness onboarding qualification was reused.
 
-Screenshot review found duplicate unavailable margin text and RTL numeric date
-ranges; the following template correction removes the duplicate, isolates dates
-LTR and fixes balance-card footer semantics even when unavailable. That correction
-requires its own native candidate result; ac52010 images do not qualify it.
+Live build access succeeded. In the native quotation journey S00064, USD 377.50
+matched the original untaxed document amount; breadcrumb return restored Sales,
+Recent quotations and September 1–20 dates, with fresh retrieval at 15:11:15 UTC
+(previously 15:10:07). Scroll returned to the Sales area. This single admin journey
+does not qualify every role, export or report route.
 
-Full UAT remains open: full reference fidelity and departmental interaction matrix,
-remaining role/field/export cases, representative-volume p95, a current finance
-upgrade campaign, approved company definitions and the additional custom measures.
-Historical statements below describe their dated candidates only; this section
-supersedes old claims that finance is unimplemented or login is wholly blocked.
+Full Accounting was activated only on earlier build 38345613. Current fresh build
+38347354 has Invoicing access and restricted financial reports; no owner mapping
+was approved. Company reporting policy and custom metric choices remain in
+[owner decisions](owner-decisions.md), per contract §2.2/2.5.
+
+The following candidate adds mobile close/Escape/focus-return behavior and fixes
+the account range label when a previously populated page becomes empty. Its native
+browser assertions are extended; native candidate execution is pending.
+
+Full UAT remains open: full reference fidelity/departmental interactions, remaining
+role/field/export cases, representative-volume p95, Enterprise finance upgrade,
+approved company definitions and the still-required custom measures. Historical
+sections below retain their original candidate scope and are not current claims.
 
 ## Earlier live findings, 20 September
 

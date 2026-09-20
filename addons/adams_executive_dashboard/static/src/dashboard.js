@@ -47,6 +47,8 @@ export class ExecutiveDashboard extends Component {
             quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
         this.root = useRef('root');
         this.sourceDialog = useRef('sourceDialog');
+        this.workspaceMenu = useRef('workspaceMenu');
+        this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
@@ -56,6 +58,9 @@ export class ExecutiveDashboard extends Component {
             if (this.state.source && !dialog.open) dialog.showModal();
             if (!this.state.source && dialog.open) dialog.close();
         }, () => [this.state.source]);
+        useEffect(() => {
+            if (this.state.sidebarOpen) this.workspaceMenu.el?.querySelector('button')?.focus();
+        }, () => [this.state.sidebarOpen]);
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -240,6 +245,18 @@ export class ExecutiveDashboard extends Component {
         this.state.collapsed[key] = false;
         this.state.sidebarOpen = false;
         requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+    }
+
+    closeWorkspace() {
+        this.state.sidebarOpen = false;
+        this.workspaceToggle.el?.focus();
+    }
+
+    workspaceKeydown(event) {
+        if (event.key === 'Escape' && this.state.sidebarOpen) {
+            event.preventDefault();
+            this.closeWorkspace();
+        }
     }
 
     openSource(item, result) {

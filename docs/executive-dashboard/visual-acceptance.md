@@ -30,7 +30,7 @@ this gate.
 
 ## Liquidity and working-capital correction
 
-The next candidate positions the native Cash Flow Statement bridge beside the
+Source 397557b positions the native Cash Flow Statement bridge beside the
 bank/cash account directory under three liquidity cards. The bridge reads the
 native opening_balance/net_increase/closing_balance rows directly, without
 recalculating their values. Bank rows retain native balance, account currency,
@@ -43,4 +43,7 @@ buckets are not advertised as scoped drilldowns. Daily cash-plan/minimum cash
 remain visibly unconfigured until their distinct business definition is approved.
 Native browser fixtures now configure cash and both aging reports to exercise the
 actual layout and automatic directory loading in EN/AR, instead of only revenue.
-Pending native candidate execution; prior screenshots are not relabelled.
+Build 38347354 passed 53 native tests with zero failures/errors. Twelve source-matched
+EN/AR captures are retained in the private evidence linked in implementation-status.md.
+The 1024px liquidity screens were inspected in both languages. Full visual parity
+and the remaining Sales/mobile/department interactions are not yet accepted.

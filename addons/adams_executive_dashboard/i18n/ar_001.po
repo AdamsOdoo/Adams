@@ -1890,3 +1890,9 @@ msgstr "من"
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
 msgid "matching accounts"
 msgstr "حسابات مطابقة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Close workspace navigation"
+msgstr "إغلاق تنقل مساحة العمل"
