@@ -1,3 +1,6 @@
+import csv
+import io
+
 from odoo import Command
 from odoo.tests import tagged
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
@@ -131,6 +134,8 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         self.assertEqual([r['id'] for r in orders['rows']], confirmed.ids)
         self.assertEqual(orders['rows'][0]['amount_untaxed'], 500)
         self.assertEqual(orders['rows'][0]['currency'], confirmed.currency_id.name)
+        self.assertEqual(orders['rows'][0]['user_id'][0], confirmed.user_id.id)
+        self.assertIn('delivery_label', orders['rows'][0])
         action = self.dashboard.open_recent_sale('orders', self.options, confirmed.id)
         self.assertEqual(action['res_id'], confirmed.id)
         self.assertEqual(action['views'], [(False, 'form')])
@@ -159,6 +164,12 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         self.assertEqual(items['orders']['value'], 27)
         export = self.dashboard.export_breakdown('confirmed_sales', 'customer', self.options)
         self.assertEqual(export['row_count'], 27)
+        rows = list(csv.DictReader(io.StringIO(export['content'].lstrip('\ufeff'))))
+        self.assertEqual(len(rows), 27)
+        self.assertTrue(export['generated_at'])
+        self.assertEqual({row['Fetched at UTC'] for row in rows}, {export['generated_at']})
+        self.assertEqual({row['Scope fingerprint'] for row in rows}, {export['provenance']['fingerprint']})
+        self.assertEqual({row['Definition'] for row in rows}, {'v4'})
 
     def test_sales_only_user_and_cross_company_record_isolation(self):
         from odoo.exceptions import AccessError

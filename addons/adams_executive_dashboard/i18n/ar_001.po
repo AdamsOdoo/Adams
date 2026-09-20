@@ -1651,3 +1651,81 @@ msgstr "اختر مقياساً قياسياً لتحميل الترتيب."
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Native values retain signs. Bars show relative magnitude, not target attainment. Commercial margin uses current product cost."
 msgstr "تحتفظ القيم القياسية بإشاراتها. تُظهر الأشرطة الحجم النسبي وليس تحقيق الهدف. يستخدم الهامش التجاري تكلفة المنتج الحالية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "As of balance"
+msgstr "الرصيد في تاريخ القطع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Period actual"
+msgstr "القيمة الفعلية للفترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Source & definition ⓘ"
+msgstr "المصدر والتعريف ⓘ"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Close"
+msgstr "إغلاق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Dates, amounts & scope"
+msgstr "التواريخ والمبالغ والنطاق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Order / date"
+msgstr "الطلب / التاريخ"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Customer / salesperson"
+msgstr "العميل / مسؤول المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Expires"
+msgstr "ينتهي في"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Top customers"
+msgstr "أكبر العملاء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Net invoiced sales by commercial customer"
+msgstr "صافي المبيعات المفوترة حسب العميل التجاري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Posted invoices and credit notes in the selected period."
+msgstr "الفواتير والإشعارات الدائنة المُرحّلة خلال الفترة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Retry"
+msgstr "إعادة المحاولة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load customers"
+msgstr "تحميل العملاء"

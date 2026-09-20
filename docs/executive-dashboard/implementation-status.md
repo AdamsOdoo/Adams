@@ -328,3 +328,29 @@ vector icons, typography/spacing and mobile two-column cards (single-column belo
 fictional prototype amounts, identities, scenario controls or trust badges are
 imported. Visual comparison against the supplied Finance/Sales/Mobile references
 is now a separate blocking acceptance gate. Do not call the current work UAT-ready.
+
+
+## UAT closure work — source drawer and Sales details (20 September)
+
+The exact 9a7d137237f88c83f25a69e035ca5e5bab8ac980 candidate passed 50 native
+tests with zero failures/errors on Odoo.sh build 38345613. The actual Sales
+workspace was inspected: three headline cards and side-by-side orders/ranking.
+This is not complete visual acceptance.
+
+The Finance access restriction was traced to native app configuration: only
+Invoicing was activated. The full Accounting app was activated in this disposable
+development database. Finance now returns Not configured, not Access restricted;
+no dashboard access check was weakened and no financial mapping was approved.
+The native account security source at Community 7bbce824 documents why the
+manager group implies report access only with the full Accounting app.
+
+The next candidate moves source details to a keyboard-accessible native modal
+side drawer, retains precise values behind compact large headlines, aligns recent
+orders with the reference's four-column hierarchy, shows native salesperson and
+delivery status, and adds top customers from Invoice Analysis. Source drawers and
+customer rankings clear immediately on filter/company changes. CSV exports now
+include retrieval UTC, definition version and scope fingerprint.
+
+Sixteen focused controller tests pass locally. Expanded native browser checks
+exercise drawer opening, focus, viewport fit, exact value and closing in EN/AR.
+Native candidate execution is pending; do not reuse the prior candidate's result.

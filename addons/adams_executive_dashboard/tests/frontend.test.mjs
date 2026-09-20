@@ -21,7 +21,7 @@ function fixture() {
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
         useState: value => value, useService: key => services[key], _t: value => value,
-        registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
+        requestAnimationFrame() {}, registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
     const controller = new Controller();
     controller.setup();
@@ -216,4 +216,28 @@ test('old salesperson ranking cannot survive a company change', async () => {
     for (const request of pending.slice(1)) { request.resolve(data(0)); }
     await refresh;
     assert.equal(controller.state.ranking, null);
+});
+
+test('source drawer and customer values are cleared on a company change', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    controller.openSource({ key: 'revenue', value: 99 }, { currency: 'USD' });
+    const old = controller.loadCustomers();
+    controller.state.draft.company_id = 2;
+    const current = controller.refresh();
+    assert.equal(controller.state.source, null);
+    assert.equal(controller.state.customers, null);
+    pending[0].resolve({ status: 'ready', rows: [{ id: 1, value: 999 }] });
+    await old;
+    assert.equal(controller.state.customers, null);
+    for (const request of pending.slice(1)) request.resolve(data(100));
+    await current;
+});
+
+test('large headline abbreviation retains exact detail formatting and native signs', () => {
+    const { controller } = fixture();
+    assert.equal(controller.headline({value: -2330000}, {digits: 2}), '-2.33M');
+    assert.equal(controller.formatted({value: -2330000}, {digits: 2}), '-2,330,000.00');
+    assert.equal(controller.headline({value: 0}, {digits: 2}), '0.00');
+    assert.equal(controller.headline({value: null, status: 'restricted'}, {digits: 2}), 'Access restricted');
 });

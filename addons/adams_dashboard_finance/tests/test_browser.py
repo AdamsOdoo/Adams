@@ -60,6 +60,14 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const columns = getComputedStyle(profitability).gridTemplateColumns.split(' ').length;
                     if ((WIDTH === 390 && columns !== 2) || (WIDTH === 320 && columns !== 1) || (WIDTH >= 1440 && columns !== 4)) throw new Error('Incorrect reference KPI column count');
                     if (!root.querySelector('.adams_profit_grid .adams_performance')) throw new Error('Missing reference performance-context panel');
+                    const source = card.querySelector('.adams_source_button');
+                    source.click();
+                    const drawer = await wait(() => root.querySelector('dialog[open]'), 'Source drawer must open');
+                    if (!drawer.innerText.includes(expected)) throw new Error('Source drawer must retain precise native value');
+                    if (!drawer.contains(document.activeElement)) throw new Error('Source drawer must receive focus');
+                    if (drawer.getBoundingClientRect().width > WIDTH + 2) throw new Error('Source drawer exceeds viewport');
+                    drawer.querySelector('header button').click();
+                    await wait(() => !root.querySelector('dialog[open]'), 'Source drawer must close');
                     const filter = root.querySelector('.adams_filters button');
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');

@@ -221,3 +221,34 @@
     .adams_empty_note { padding: 25px 20px; color: #65778a; font-size: 12px; }
     @media (max-width: 1080px) { .adams_sales_workspace { grid-template-columns: 1fr; } }
 }
+
+.o_adams_dashboard {
+    .adams_metric_foot { display: flex; justify-content: space-between; align-items: center; gap: 5px; min-height: 44px; color: var(--adams-sub); }
+    .adams_source_button { border: 0; background: transparent; padding: 5px 0; color: var(--adams-green); font: inherit; text-align: end; min-height: 30px; }
+    .adams_source_dialog { position: fixed; inset-block: 0; inset-inline: auto 0; margin: 0; width: min(520px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; padding: 0; background: #fff; color: var(--adams-ink); box-shadow: -8px 0 40px #17263122; overflow-y: auto; text-align: start; }
+    .adams_source_dialog::backdrop { background: #17263166; }
+    .adams_source_dialog > .adams_panel_head { position: sticky; top: 0; background: #fff; padding-bottom: 18px; border-bottom: 1px solid var(--adams-line); z-index: 1; }
+    .adams_source_dialog h2 { font-size: 22px; margin-bottom: 4px; }
+    .adams_source_body { padding: 22px; font-size: 13px; line-height: 1.6; }
+    .adams_source_body code { overflow-wrap: anywhere; }
+    .adams_source_body .adams_source_value { font-size: 26px; font-weight: 650; color: var(--adams-ink); }
+    .adams_source_body details { padding-block: 12px; border-top: 1px solid var(--adams-line); }
+    .adams_recent_tabs { display: flex; justify-content: start; gap: 5px; padding: 14px 18px 0; }
+    .adams_recent_tabs .btn { color: var(--adams-sub); border: 0; }
+    .adams_recent_tabs .active { background: #f2ecf3; color: var(--adams-purple); }
+    .adams_recent_panel .adams_list_scope { margin: 0 18px 8px; font-size: 11px; }
+    .adams_recent_panel .adams_list_scope p { margin: 10px 0; }
+    .adams_recent_panel td small { display: block; margin-top: 5px; color: #61778a; font-size: 10px; }
+    .adams_recent_panel td { vertical-align: top; }
+    .adams_state_badge { display: inline-block; border-radius: 4px; padding: 3px 7px; background: #f2ecf3; color: var(--adams-purple); font-size: 10px; white-space: nowrap; }
+    .adams_sales_lower > .adams_analysis { margin-top: 0; }
+    .adams_customers_panel .adams_rank_list { margin-top: 14px; }
+    #adams-analysis-title { scroll-margin-top: 85px; }
+    @media (max-width: 760px) {
+        .adams_metric_foot { font-size: 9px; flex-wrap: wrap; }
+        .adams_source_button { min-height: 35px; }
+        .adams_recent_panel table { min-width: 560px; }
+        .adams_source_body { padding: 18px; }
+    }
+    @media (prefers-reduced-motion: reduce) { scroll-behavior: auto; * { scroll-behavior: auto; } }
+}

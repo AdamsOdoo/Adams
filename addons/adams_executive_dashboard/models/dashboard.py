@@ -166,12 +166,16 @@ class ExecutiveDashboard(models.AbstractModel):
         if 'sale.order' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
         orders, domain = scoped._recent_scope(kind, dates)
-        columns = ['name', 'partner_id', 'date_order', 'validity_date', 'state', 'amount_untaxed', 'currency_id']
+        columns = ['name', 'partner_id', 'user_id', 'date_order', 'validity_date', 'state', 'amount_untaxed', 'currency_id']
+        if 'delivery_status' in orders._fields:
+            columns.append('delivery_status')
         orders.check_field_access_rights('read', columns)
         records = orders.search(domain, order='date_order desc, id desc', limit=26, offset=offset)
         rows = records[:25].read(columns)
         states = dict(orders._fields['state']._description_selection(scoped.env))
+        delivery_labels = dict(orders._fields['delivery_status']._description_selection(scoped.env)) if 'delivery_status' in columns else {}
         for row, record in zip(rows, records[:25]):
+            row['delivery_label'] = delivery_labels.get(row.get('delivery_status'))
             row.update(state_label=states[row['state']], currency=record.currency_id.name,
                        digits=record.currency_id.decimal_places,
                        date_label=fields.Datetime.context_timestamp(record, record.date_order).strftime('%Y-%m-%d %H:%M'))
@@ -310,7 +314,10 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('Use the native report export for more than 5,000 groups.'))
         output = io.StringIO(newline='')
         writer = csv.writer(output)
-        writer.writerow(['Group', 'Value', 'Unit', 'Company', 'From', 'To', 'Source', 'Measure'])
+        generated_at = fields.Datetime.to_string(fields.Datetime.now())
+        provenance = scoped._provenance(key, domain, aggregate)
+        writer.writerow(['Group', 'Value', 'Unit', 'Company', 'From', 'To', 'Source', 'Measure',
+                         'Fetched at UTC', 'Definition', 'Scope fingerprint'])
         def safe_text(value):
             value = str(value)
             return "'" + value if value.startswith(('\t', '\r', '\n')) or value.lstrip().startswith(('=', '+', '-', '@')) else value
@@ -318,9 +325,9 @@ class ExecutiveDashboard(models.AbstractModel):
             writer.writerow([safe_text(group.display_name if group else _('Unassigned')), value,
                              'hours' if key == 'hr' else 'count' if key == 'orders' else scoped.env.company.currency_id.name,
                              safe_text(scoped.env.company.name), dates[0].isoformat(), dates[1].isoformat(),
-                             SOURCES[key][0], aggregate])
+                             SOURCES[key][0], aggregate, generated_at, 'v4', provenance['fingerprint']])
         return {'filename': f'adams-{key}-{dimension}.csv', 'content': '\ufeff' + output.getvalue(),
-                'row_count': len(rows), 'provenance': scoped._provenance(key, domain, aggregate)}
+                'row_count': len(rows), 'generated_at': generated_at, 'provenance': provenance}
 
     @api.model
     def get_cash_directory(self, options, offset=0):
