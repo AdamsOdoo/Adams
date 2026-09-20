@@ -907,3 +907,63 @@ msgstr "تم جلب البيانات في"
 #, python-format
 msgid "UTC. Source completeness has not been assessed."
 msgstr "بالتوقيت العالمي المنسق. لم يُقيّم اكتمال بيانات المصدر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Gross profit"
+msgstr "مجمل الربح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Operating expenses"
+msgstr "المصروفات التشغيلية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Gross margin"
+msgstr "هامش مجمل الربح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Net margin"
+msgstr "هامش صافي الربح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Assets"
+msgstr "الأصول"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Liabilities"
+msgstr "الالتزامات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Equity"
+msgstr "حقوق الملكية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Unsupported report scope"
+msgstr "نطاق التقرير غير مدعوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Report unavailable"
+msgstr "التقرير غير متاح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The native report has warnings. Open it before interpreting this result."
+msgstr "يتضمن التقرير الأصلي تنبيهات. افتحه قبل تفسير هذه النتيجة."

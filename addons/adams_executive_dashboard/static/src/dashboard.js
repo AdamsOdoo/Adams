@@ -23,6 +23,9 @@ export class ExecutiveDashboard extends Component {
         this.labels = {
             revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'),
             receivables: _t('Receivables'), payables: _t('Payables'),
+            gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
+            gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
+            assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
             invoiced_sales: _t('Net invoiced sales'), confirmed_sales: _t('Confirmed sales'),
             orders: _t('Distinct sales orders'), quotations: _t('Draft and sent quotations'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (native signed)'),
@@ -31,6 +34,7 @@ export class ExecutiveDashboard extends Component {
         this.statusLabels = {
             not_configured: _t('Not configured'), not_installed: _t('App not installed'),
             restricted: _t('Access restricted'), empty: _t('No matching records'),
+            unsupported_scope: _t('Unsupported report scope'), error: _t('Report unavailable'),
         };
         this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
             vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };

@@ -84,7 +84,9 @@
                             <div class="adams_value" t-esc="formatted(item, result)"/>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'currency'" class="adams_currency" t-esc="result.currency"/>
                             <span t-if="item.value !== null &amp;&amp; item.unit === 'hours'" class="adams_currency">hours</span>
+                            <span t-if="item.value !== null &amp;&amp; item.unit === 'percentage'" class="adams_currency">%</span>
                             <p t-if="item.status === 'not_configured'" class="adams_hint">Native report mapping awaits verification.</p>
+                            <p t-if="item.has_warnings" class="adams_hint" role="status">The native report has warnings. Open it before interpreting this result.</p>
                             <p t-if="item.key === 'invoiced_sales'" class="adams_hint">Posted customer invoices less credit notes, untaxed. Invoice date; distinct from accounting revenue.</p>
                             <p t-if="item.key === 'confirmed_sales' || item.key === 'orders'" class="adams_hint">Confirmed orders by order date. Untaxed amounts; this is not delivered or invoiced sales.</p>
                             <p t-if="item.key === 'quotations'" class="adams_hint">Draft and sent quotations by native order date, untaxed. Expired quotations remain included while their native state is draft or sent.</p>
@@ -94,6 +96,8 @@
                             <footer t-if="item.source">
                                 <details><summary>Source and scope</summary>
                                     <p t-esc="item.source"/><code t-esc="item.measure"/>
+                                    <p t-if="item.source_line" t-esc="item.source_line"/>
+                                    <p t-if="item.definition" t-esc="item.definition"/>
                                     <p>Date basis: <code t-esc="item.date_field"/></p>
                                     <p>One company · native report currency · current access rules</p>
                                 </details>

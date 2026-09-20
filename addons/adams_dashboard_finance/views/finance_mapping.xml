@@ -1,0 +1,37 @@
+<odoo>
+    <record id="finance_mapping_list" model="ir.ui.view">
+        <field name="name">adams.dashboard.finance.mapping.list</field>
+        <field name="model">adams.dashboard.finance.mapping</field>
+        <field name="arch" type="xml">
+            <list><field name="company_id"/><field name="metric"/><field name="report_id"/>
+                <field name="expression_id"/><field name="approved_by"/><field name="approved_at"/></list>
+        </field>
+    </record>
+    <record id="finance_mapping_form" model="ir.ui.view">
+        <field name="name">adams.dashboard.finance.mapping.form</field>
+        <field name="model">adams.dashboard.finance.mapping</field>
+        <field name="arch" type="xml">
+            <form>
+                <header><button name="action_approve" string="Approve native definition" type="object"
+                    class="oe_highlight" groups="account.group_account_manager"/></header>
+                <sheet>
+                    <p>Choose the exact native report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again.</p>
+                    <group><field name="company_id"/><field name="metric"/>
+                        <field name="report_id" options="{'no_create': True}"/>
+                        <field name="expression_id" domain="[('report_line_id.report_id', '=', report_id)]" options="{'no_create': True}"/>
+                        <field name="definition_note"/><field name="active"/>
+                    </group>
+                    <group><field name="approved_by"/><field name="approved_at"/></group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="action_finance_mappings" model="ir.actions.act_window">
+        <field name="name">Dashboard Financial Definitions</field>
+        <field name="res_model">adams.dashboard.finance.mapping</field>
+        <field name="view_mode">list,form</field>
+    </record>
+    <menuitem id="menu_finance_mappings" name="Dashboard Financial Definitions"
+              parent="account.menu_finance_configuration" action="action_finance_mappings"
+              groups="account.group_account_manager" sequence="95"/>
+</odoo>

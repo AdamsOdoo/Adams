@@ -1,0 +1,186 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo 19.0\n"
+"Language: ar_001\n"
+"PO-Revision-Date: 2026-09-20 00:00+0000\n"
+"Last-Translator: Adams\n"
+"Language-Team: Arabic\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select an expression belonging to the chosen report."
+msgstr "اختر تعبيرًا تابعًا للتقرير المحدد."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Select the specific report section, not its composite parent."
+msgstr "اختر قسم التقرير المحدد بدلاً من التقرير المجمع."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "The report date mode does not match this metric."
+msgstr "نمط تاريخ التقرير لا يطابق هذا المؤشر."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Choose a native report column with the correct monetary or percentage unit."
+msgstr "اختر عمودًا من التقرير الأصلي بوحدة نقدية أو نسبة مئوية مطابقة."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Use the review action to approve a financial mapping."
+msgstr "استخدم إجراء المراجعة لاعتماد ربط المؤشر المالي."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
+msgid "Only accounting managers can approve financial mappings."
+msgstr "يمكن لمديري المحاسبة فقط اعتماد ربط المؤشرات المالية."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Accounting report access is required."
+msgstr "يلزم امتلاك صلاحية الوصول إلى التقارير المحاسبية."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Use the native financial report filters for further analysis."
+msgstr "استخدم مرشحات التقرير المالي الأصلي لمزيد من التحليل."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Review and approve this financial mapping first."
+msgstr "راجع ربط المؤشر المالي واعتمده أولاً."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "The native report returned an unsupported scope."
+msgstr "أعاد التقرير الأصلي نطاقًا غير مدعوم."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__company_id
+msgid "Company"
+msgstr "الشركة"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__metric
+msgid "Metric"
+msgstr "المؤشر"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__report_id
+msgid "Report"
+msgstr "التقرير"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__expression_id
+msgid "Expression"
+msgstr "التعبير"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__definition_note
+msgid "Definition Note"
+msgstr "تعريف المؤشر"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__approved_by
+msgid "Approved By"
+msgstr "اعتمد بواسطة"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__approved_at
+msgid "Approved At"
+msgstr "تاريخ الاعتماد"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_dashboard_finance.field_adams_dashboard_finance_mapping__active
+msgid "Active"
+msgstr "نشط"
+
+#. module: adams_dashboard_finance
+#: model:ir.actions.act_window,name:adams_dashboard_finance.action_finance_mappings
+#: model:ir.ui.menu,name:adams_dashboard_finance.menu_finance_mappings
+msgid "Dashboard Financial Definitions"
+msgstr "تعريفات المؤشرات المالية"
+
+#. module: adams_dashboard_finance
+#: model_terms:ir.ui.view,arch_db:adams_dashboard_finance.finance_mapping_form
+msgid "Approve native definition"
+msgstr "اعتماد التعريف الأصلي"
+
+#. module: adams_dashboard_finance
+#: model_terms:ir.ui.view,arch_db:adams_dashboard_finance.finance_mapping_form
+msgid "Choose the exact native report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again."
+msgstr "اختر التقرير والتعبير الأصليين لهذه الشركة بدقة. يؤكد الاعتماد التعريف وسياسة إعداد التقارير، ولا يؤكد اكتمال الدفاتر. تتطلب التغييرات مراجعة جديدة."
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__revenue
+msgid "Accounting revenue"
+msgstr "الإيرادات المحاسبية"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__gross_profit
+msgid "Gross profit"
+msgstr "مجمل الربح"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__profit
+msgid "Net profit"
+msgstr "صافي الربح"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__operating_expenses
+msgid "Operating expenses"
+msgstr "المصروفات التشغيلية"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__gross_margin
+msgid "Gross margin"
+msgstr "هامش مجمل الربح"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__net_margin
+msgid "Net margin"
+msgstr "هامش صافي الربح"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__cash
+msgid "Bank and cash"
+msgstr "البنوك والنقدية"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__assets
+msgid "Assets"
+msgstr "الأصول"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__liabilities
+msgid "Liabilities"
+msgstr "الالتزامات"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__equity
+msgid "Equity"
+msgstr "حقوق الملكية"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__receivables
+msgid "Receivables"
+msgstr "الذمم المدينة"
+
+#. module: adams_dashboard_finance
+#: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__payables
+msgid "Payables"
+msgstr "الذمم الدائنة"

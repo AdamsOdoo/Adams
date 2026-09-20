@@ -84,7 +84,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
 
     def test_unconfigured_finance_never_returns_zero(self):
         result = self.dashboard.get_section('finance', self.options)
-        self.assertEqual(len(result['items']), 5)
+        self.assertTrue({'revenue', 'profit', 'cash', 'receivables', 'payables'}.issubset(
+            {item['key'] for item in result['items']}))
         for item in result['items']:
             self.assertEqual(item['status'], 'not_configured')
             self.assertIsNone(item['value'])

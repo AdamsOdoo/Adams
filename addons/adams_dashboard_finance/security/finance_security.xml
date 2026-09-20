@@ -1,0 +1,7 @@
+<odoo>
+    <record id="finance_mapping_company_rule" model="ir.rule">
+        <field name="name">Financial dashboard mappings: allowed companies</field>
+        <field name="model_id" ref="model_adams_dashboard_finance_mapping"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+    </record>
+</odoo>
