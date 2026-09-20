@@ -171,8 +171,12 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
 
     def test_dashboard_styles_compile_with_odoo_sass(self):
         with file_open('adams_executive_dashboard/static/src/dashboard.scss') as source:
-            compiled = sass.compile(string=source.read())
-        self.assertIn('.o_adams_dashboard', compiled)
+            stylesheet = source.read()
+        # This variable is supplied by Odoo's native primary-variable bundles.
+        for scheme in ('bright', 'dark'):
+            compiled = sass.compile(string=f'$o-webclient-color-scheme: {scheme};\n' + stylesheet)
+            self.assertIn('.o_adams_dashboard', compiled)
+            self.assertIn('color-scheme: ' + ('dark' if scheme == 'dark' else 'light'), compiled)
 
     def test_cash_directory_search_counts_pages_and_archived_records(self):
         accounts = self.env['account.account'].create([{
