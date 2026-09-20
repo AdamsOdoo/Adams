@@ -55,6 +55,8 @@
     padding: 0; display: grid; grid-template-columns: 222px minmax(0, 1fr);
     align-items: start; background: #f4f6f8; color: var(--adams-ink);
     font-family: Inter, "Segoe UI", Arial, sans-serif; font-variant-numeric: tabular-nums;
+    // The reference workspace keeps a light paper surface inside either Odoo theme.
+    h1, h2, h3, h4, h5, h6 { color: var(--adams-ink); }
     .adams_icon { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
     .adams_workspace_close { display: none; }
     .adams_sidebar { position: sticky; top: 0; height: calc(100vh - 48px); min-height: 540px; background: #fff; border-inline-end: 1px solid var(--adams-line); padding: 24px 14px; display: flex; flex-direction: column; }

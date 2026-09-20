@@ -207,6 +207,9 @@ export class ExecutiveDashboard extends Component {
     }
 
     metricGroups(section, result) {
+        // Native stock quantities and valuation live in the product workspace below.
+        // There is no separate accounting valuation mapping in the agreed scope.
+        if (section.key === 'inventory') { return []; }
         const select = keys => keys.map(key => result.items.find(item => item.key === key)).filter(Boolean);
         if (section.key === 'finance') {
             return [

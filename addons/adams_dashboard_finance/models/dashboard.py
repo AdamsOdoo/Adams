@@ -202,13 +202,17 @@ class ExecutiveDashboard(models.AbstractModel):
         # Standalone vendor credits/payments remain in full native AP aging;
         # only their reconciled effects on the bill enter these bill-only cards.
         prepared['forced_domain'] = self._supplier_window_domain(dates[2], window)
+        prepared['adams_supplier_window'] = window
         return prepared
 
-    def _supplier_payment_windows(self, dates):
-        labels = [('supplier_overdue', _('Overdue supplier bills')),
+    def _supplier_window_labels(self):
+        return [('supplier_overdue', _('Overdue supplier bills')),
                   ('supplier_today', _('Supplier bills due today')),
                   ('supplier_due_7', _('Supplier bills due in 7 days')),
                   ('supplier_due_30', _('Supplier bills due in 30 days'))]
+
+    def _supplier_payment_windows(self, dates):
+        labels = self._supplier_window_labels()
         mapping = self._financial_mapping('payables')
         rows = []
         for key, label in labels:
@@ -314,7 +318,9 @@ class ExecutiveDashboard(models.AbstractModel):
                 raise ValidationError(_('Review and approve this financial mapping first.'))
             prepared = scoped._supplier_window_options(mapping, dates, key)
             return {'type': 'ir.actions.client', 'tag': 'account_report',
-                    'name': mapping.report_id.display_name,
+                    'name': '%s — %s — %s' % (mapping.report_id.display_name,
+                                               dict(scoped._supplier_window_labels())[key],
+                                               dates[2].isoformat()),
                     'keep_journal_groups_options': True,
                     'context': dict(scoped.env.context, report_id=mapping.report_id.id,
                                     adams_supplier_window=key),

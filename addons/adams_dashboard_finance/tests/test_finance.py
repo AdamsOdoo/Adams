@@ -1,3 +1,7 @@
+from xml.etree import ElementTree
+import io
+import zipfile
+import json
 """Known amounts evaluated by installed native reports, not mock report totals."""
 from unittest.mock import patch
 
@@ -557,9 +561,29 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
             self.assertEqual(rebuilt['forced_domain'], action['params']['options']['forced_domain'])
             self.assertFalse(report.get_options(rebuilt).get('forced_domain'))
-            native = report.get_report_information(rebuilt)
+            self.assertFalse(report.get_options(rebuilt).get('report_title'))
+            # RPC and native export serialize tuple domains to JSON lists.
+            serialized = json.loads(json.dumps(rebuilt))
+            native = report.get_report_information(serialized)
             group = next(iter(rebuilt['column_groups']))
             self.assertEqual(native['column_groups_totals'][group][expression.id]['value'], value)
+            self.assertIn(windows[key]['label'], native['report']['name'])
+            self.assertIn(windows[key]['label'], report.get_default_report_filename(rebuilt, 'xlsx'))
+            self.assertIn('2026-08-31', report.get_default_report_filename(rebuilt, 'xlsx'))
+            printable = report.get_options(dict(serialized, export_mode='print'))
+            html = report._get_pdf_export_html(printable, report._get_lines(printable))
+            self.assertIn(windows[key]['label'], str(html))
+            self.assertIn('2026-08-31', str(html))
+            exported = report.export_to_xlsx(serialized)
+            with zipfile.ZipFile(io.BytesIO(exported['file_content'])) as archive:
+                strings = archive.read('xl/sharedStrings.xml').decode()
+                sheet = ElementTree.fromstring(archive.read('xl/worksheets/sheet1.xml'))
+                ns = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+                numbers = [float(c.find('x:v', ns).text) for c in sheet.findall('.//x:c', ns)
+                           if c.get('t') not in ('s', 'inlineStr') and c.find('x:v', ns) is not None]
+                self.assertEqual(numbers[-1], value, 'Native XLSX must retain the payment-window total')
+            self.assertIn(windows[key]['label'], strings)
+            self.assertIn('2026-08-31', strings)
             self.assertTrue(action['params']['ignore_session'])
         # Full native AP preserves standalone credit notes; window cards do not
         # silently use them to net unrelated supplier bills.

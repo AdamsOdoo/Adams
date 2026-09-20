@@ -211,10 +211,13 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const restoredDates = [...restored.querySelectorAll('.adams_filters input')].map(input => input.value);
                         if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
                             throw new Error('Financial report return changed applied dates');
-                        restored.querySelectorAll('.adams_supplier_windows .adams_card')[2]
-                            .querySelector('button').click();
+                        const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button'),
+                            'Payment window drilldown must load after financial report return');
+                        paymentOpen.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('129.45'), 'Scoped native payment report must render 129.45');
+                        if (!document.body.innerText.includes('Supplier bills due in 7 days'))
+                            throw new Error('Native payment report must identify its restricted window');
                         if (document.body.innerText.includes('1,128.45'))
                             throw new Error('Native payment drilldown lost its due-window filter');
                         const paymentBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
