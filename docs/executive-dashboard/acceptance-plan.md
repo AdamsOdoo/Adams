@@ -2,7 +2,7 @@
 
 Development continues on the dedicated dashboard branch. Access and licensed
 source inspection have succeeded. Latest evidence is in
-[implementation status](implementation-status.md). Fifty native tests and sixteen
+[implementation status](implementation-status.md). 56 native tests and 17
 isolated controller tests pass on their recorded candidate. Bounded native browser
 checks do not replace the full acceptance matrix below. Original v4 scope remains.
 
@@ -35,12 +35,12 @@ Owner/finance UAT will confirm real source completeness, report variant/financia
 |---|---|
 | ED-ENV | Exact feature source/build and licensed source inspected; harness pin reverified. UAT company/localization/report policy and custom gaps still need owner decisions. |
 | ED-AR / ED-FIN / ED-CASH / ED-LEDGER | Native adapters and bounded known-value fixtures pass, including historical settlement, dated accounts, aging, CFS, ledger scopes, budgets and standard forecast. Full customer-configured parity/journey matrix remains open. |
-| ED-SEC | Native permission/company/RPC/export/context/revocation fixtures pass. Full role/field/currency/browser matrix remains open. |
+| ED-SEC | Native permission/company/RPC/export/context/revocation and financial-field restrictions pass; actual browser finance/sales/dashboard-only/no-dashboard roles pass. Full customer currency/export matrix remains open. |
 | ED-SALES | Native grouped totals, 27-row completeness/export, recent records, commercial margin and scoped routes pass. Full UI/export/currency/UoM journeys remain open. |
 | ED-OPS | Native historical/current stock quantity/valuation, forecast/history routes, workforce, leave, CRM and purchase worklists have bounded fixtures. Expanded warehouse/owner/aging/shortage acceptance remains open. |
-| ED-UX / ED-ASYNC | 16 controller checks; native EN/AR at six widths with drawer/focus and drilldown assertions. Twelve captures retained. Full reference comparison, mobile interactions, zoom and accessibility remain open. |
-| ED-DELIVERY | ac52010/build 38346414 passes 50 native install tests. Older core upgrade is retained for its original source only. Current finance upgrade and full UAT closure remain open. |
-| ED-PERF / ED-FULFILL | Representative-volume p95 remains unmeasured. Native product/UoM delivery quantities pass; backlog value/on-time definitions require owner approval. |
+| ED-UX / ED-ASYNC | 17 controller checks; EN/AR six-width navigation, explicit ARIA states, drawer/focus, mobile close/Escape/focus return and native P&L breadcrumb restoration pass. Twelve earlier source-bound captures retained. Full visual signoff and zoom/accessibility matrix remain open. |
+| ED-DELIVERY | 67a6d655/build 38348614 passes 56 native tests. Prepared-baseline core+Enterprise update preserves accounting records, users, native expressions and an unapproved draft mapping; raw evidence retained. English/Arabic guide delivered. Customer-configured upgrade/UAT and independent review remain open. |
+| ED-PERF / ED-FULFILL | Synthetic 1000-invoice browser baseline: first 1.1846s, rendered refresh p95 0.7848s/20 samples. Customer-volume/concurrency not qualified. Native product/UoM delivery quantities pass; valued backlog/on-time definitions await deferred owner decisions. |
 
 Failed 63f9823/build 38346314 is retained as failed. Its native Sass defect was
 fixed at ac52010 without weakening checks. Prior harness qualification is reused.

@@ -1,7 +1,9 @@
 # Executive dashboard — UAT preparation
 
-**Status: not ready for business UAT.** This is the planned checklist, not a record
-of completed acceptance. The full contract, customer-approved definitions and visual fidelity gates remain open. Native financial integration and bounded responsive browser evidence are now available; they do not establish full UAT readiness.
+**Status: implemented workspace available for review; full v4 business UAT pending.**
+Use [current implementation status](implementation-status.md) for completed engineering
+checks and [user guide](user-guide.md) for operation. The journeys below are the
+business acceptance checklist, not a record of completed customer acceptance. The full contract, customer-approved definitions and visual fidelity gates remain open. Native financial integration and bounded responsive browser evidence are now available; they do not establish full UAT readiness.
 
 ## Development installation
 
@@ -90,10 +92,15 @@ close the Sales/mobile visual fidelity gate or full v4 UAT.
 
 ## Latest closure evidence
 
-See implementation-status.md for 397557b / build 38347354: 53 native tests pass,
-17 local controller checks and twelve retained native EN/AR captures. A separate
-core upgrade from 365a0f1 passed all 14 selected native tests. Enterprise finance
-upgrade remains open. The admin quotation breadcrumb journey matched USD 377.50
-and restored the selected Sales context with fresh retrieval. Owner financial
-mappings remain unapproved. The full role/export/performance/visual matrix remains
-open; these bounded passes are not a UAT pass.
+67a6d655 / build 38348614: 56 native tests, zero failures/errors; 17 local controller
+checks. Browser role boundaries, financial field restriction, all-department EN/AR
+navigation, mobile dismissal/focus and P&L breadcrumb return now pass. Synthetic
+1000-invoice navigation/rendered refresh measurements are 1.1846s / p95 0.7848s.
+Core+Enterprise update from a prepared baseline preserves documents, users, native
+expressions and an unapproved draft mapping. Raw results are retained privately
+through the link in implementation-status.md. English/Arabic guidance is delivered.
+
+The older journey rows retain broad customer acceptance requirements; they must
+not be read as undoing these completed bounded checks. Owner policy is deferred,
+not approved. Customer-scale concurrency, full reference/business signoff and
+custom metric development following approved definitions remain open.

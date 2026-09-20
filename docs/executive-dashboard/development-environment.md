@@ -1,6 +1,26 @@
 # ED-001 — authorized Enterprise database inspection
 
-## Current feature environment — 20 September 2026
+## Current candidate — 20 September 2026
+
+Application `67a6d655c5776504cd80e8183bdf6a751ef7affb`, build **38348614**.
+[Open the development candidate](https://adamsmen-feature-executive-dashboard-report-first-38348614.dev.odoo.com/_odoo/paas/connect).
+This is an expiring Odoo.sh development database; after expiry use the feature
+branch's latest CONNECT link, not the old onboarding host.
+
+Signed-in access was verified and full native Accounting was activated through
+Apps on this build. Finance now correctly shows **Not configured**, rather than
+Access restricted, because owner mappings remain unapproved. No owner policy was
+selected or approved. Native Sales values and the three-card/orders/ranking layout
+were inspected live after update. The prepared-baseline module-upgrade experiment
+preserved data and access before the later Accounting app activation.
+
+Exact source inspection during the upgrade confirms Community
+`7bbce824a1897a912441a7f0511ffec505cbe1d5` and Enterprise
+`c874ba3aab567f9b3c6a86dedabf7e76ceb8cef7`. Current verification and raw evidence
+are linked in [implementation status](implementation-status.md). Historical
+blocked/pending statements below apply to their original candidates only.
+
+## Earlier feature environment — 20 September 2026
 
 Signed-in access was verified in the feature branch, as Mitchell Admin in its
 disposable demo database. Dashboard route:

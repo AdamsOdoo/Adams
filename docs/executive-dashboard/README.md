@@ -1,6 +1,6 @@
 # Executive dashboard — ED-001
 
-Status: **Engineering closure in progress. Owner decisions remain deferred.**
+Status: **Native workspace implemented and bounded engineering checks passed. Owner decisions remain deferred.**
 
 Access and licensed native report integration are available. Current results,
 source/build identities and remaining limits are in [implementation status](implementation-status.md).
