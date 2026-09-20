@@ -153,6 +153,25 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         authorized = self.dashboard.with_context(allowed_company_ids=[self.env.company.id, foreign.id])
         self.assertIsNone(self._item(options=foreign_scope, dashboard=authorized)['value'])
 
+    def test_restricted_financial_field_blocks_sql_report_and_routes(self):
+        self._mapping()
+        self._invoice(100)
+        reader = new_test_user(self.env, login='dashboard_finance_field_reader',
+            groups='base.group_user,account.group_account_readonly,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
+        dashboard = self.dashboard.with_user(reader)
+        self.assertEqual(self._item(dashboard=dashboard)['value'], 100)
+        # A real field restriction, not a mocked report result or denied RPC.
+        with patch.object(self.env['account.move.line']._fields['balance'], 'groups', 'base.group_system'):
+            self.assertEqual(self._item(dashboard=dashboard)['status'], 'restricted')
+            self.assertIsNone(self._item(dashboard=dashboard)['value'])
+            with self.assertRaises(AccessError):
+                dashboard.open_report('revenue', self.options)
+            with self.assertRaises(AccessError):
+                dashboard.get_financial_trend('revenue', self.options)
+        reader.group_ids -= self.env.ref('account.group_account_readonly')
+        self.assertEqual(self._item(dashboard=dashboard)['status'], 'restricted')
+
     def test_native_action_keeps_posted_dates_and_ignores_saved_filters(self):
         self._mapping()
         self._invoice(100)

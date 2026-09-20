@@ -30,6 +30,12 @@ class ExecutiveDashboard(models.AbstractModel):
             raise AccessError(_('Accounting report access is required.'))
         self.env['account.report'].check_access('read')
         self.env['account.move.line'].check_access('read')
+        # The native report engine can aggregate through SQL. Preserve field-level
+        # restrictions as well as its accounting group and model permissions.
+        self.env['account.move.line'].check_field_access_rights('read', [
+            'balance', 'debit', 'credit', 'amount_currency', 'account_id',
+            'date', 'company_id', 'partner_id', 'date_maturity',
+        ])
 
     def _financial_options(self, report, key, dates, previous_extra=None, budget_id=None):
         report.check_access('read')

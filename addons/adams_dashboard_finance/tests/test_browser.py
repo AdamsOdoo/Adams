@@ -116,6 +116,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const filter = root.querySelector('.adams_filters button');
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');
+                    // Exercise all department navigation in the rendered client.
+                    // Restricted native departments must still reflow correctly.
+                    for (const key of ['sales', 'crm', 'inventory', 'procurement', 'hr', 'finance']) {
+                        const keys = ['finance', 'sales', 'crm', 'inventory', 'procurement', 'hr'];
+                        root.querySelectorAll('.adams_nav button')[keys.indexOf(key)].click();
+                        await wait(() => root.querySelector('#adams-' + key)?.querySelector('.adams_section_toggle')?.getAttribute('aria-expanded') === 'true',
+                            'Department must expand: ' + key);
+                        if (root.scrollWidth > root.clientWidth + 2) throw new Error('Department overflow: ' + key);
+                    }
                     if (WIDTH === 1440 && DIRECTION === 'ltr') {
                         const open = card.querySelector('button[aria-label="Open native report"]');
                         open.click();
