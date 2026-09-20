@@ -6,7 +6,8 @@ of completed acceptance. The full contract, customer-approved definitions and vi
 ## Development installation
 
 Install `adams_executive_dashboard` on the dashboard development branch only.
-For licensed financial reports also install `adams_dashboard_finance`; configure
+For licensed financial reports activate the full native Accounting app (Invoicing
+alone does not grant full report access), and install `adams_dashboard_finance`; configure
 company mappings under Accounting → Configuration → Dashboard Financial
 Definitions. Only an accounting manager can approve these business definitions.
 It depends on Web and Accounting. Sales, Purchase, CRM, Stock and Time Off are
@@ -86,3 +87,11 @@ counts and a performance-context panel. Native commercial margin/current-cost an
 purchase worklist/no-approval-side-effect fixtures pass. Desktop Finance screenshot
 was visually compared to the supplied reference on 20 September. This does not
 close the Sales/mobile visual fidelity gate or full v4 UAT.
+
+## Latest closure evidence
+
+See implementation-status.md for ac52010 / build 38346414: 50 native tests pass,
+16 local controller checks, and twelve retained native EN/AR captures. Owner
+financial mappings remain empty. Review owner-decisions.md for concrete policies
+and custom-definition choices. Those choices do not replace unfinished engineering
+gates; this checklist is not a UAT pass.

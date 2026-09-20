@@ -4,38 +4,44 @@
 Access was restored on 20 September 2026. The feature build and dashboard opened
 successfully. No main merge, production change or Shopify work was performed.
 
-## Latest verified checkpoint, 20 September 12:24 UTC
+## Current verified checkpoint — 20 September 2026, 14:21 UTC
 
-- Application `2389d8930e4856ec04c56fd3aa79bf8d09f6b448`, tree
-  `7090704144ba32550cb8be50bd4c9dbedf13f3ae`, Odoo.sh build `38342887`:
-  **35 tests, zero failures/errors**; 10 frontend tests pass locally. Test: Warning
-  remains. No latest-candidate upgrade qualification or full UAT is claimed.
-- Optional `adams_dashboard_finance` integrates approved native report expressions
-  for twelve financial metrics. It batches native evaluation, checks scope,
-  enforces accounting permissions, protects approvals, detects definition drift
-  (including referenced reports), and withholds undefined ratios. See
-  [financial adapter](finance-adapter.md) for configuration and evidence.
-- Known-value native tests cover refunds, losses, true zero, historical settlement,
-  restricted users/company isolation, native-action scope, unapproved mappings,
-  percentage units and zero denominators. The earlier permission-test helper bug
-  was fixed; its corrected environment passes the actual native access checks.
-- [Private evidence](https://github.com/MostafaEssamm12/Odoo/tree/6afc5ef453cd6aa407d955c9ef03790f52ab7b43/evidence/adams-dashboard/20260920-2389d89)
-  retains actual log paragraphs and candidate identity; retrieved after saving.
-- Live browser: latest dashboard renders all twelve finance cards as Access
-  restricted for the current non-accounting session. Invoice Analysis drilldown
-  opens successfully and the native pivot total 76,049.00 matches the dashboard
-  under the selected September 2026 scope. Breadcrumb return restores the period.
-  This bounded check does not qualify all navigation/export/role journeys.
-- Prior localization build `517c2e6` / `38341624` passed 26 native tests and
-  paired English/Arabic desktop review. Its
-  [separate evidence](https://github.com/MostafaEssamm12/Odoo/tree/7f76610c0f7fe4f98f9d9de248ac88f0f7040261/evidence/adams-dashboard/20260920-517c2e6)
-  remains candidate-specific.
-- Full v4 remains incomplete: dated account balances/Cash Flow/Partner Ledger,
-  detailed aging and forecasts/budgets, operational valuation/history/workforce,
-  approved additional fulfillment definitions, full bilingual/mobile browser
-  coverage, representative performance and exact-candidate upgrade acceptance.
-  Owner-approved financial mappings and accounting-authorized browser access are
-  also still needed. Development is not business UAT readiness.
+Application `ac52010ffb531a027663cbca3f7f92bb67861b29`, tree
+`79c04c85809aa5590c29b8fbc4c59249d9528222`, Odoo.sh build **38346414**:
+**50 native tests, zero failures/errors**; 16 isolated frontend/controller tests
+passed locally. Native browser checks exercise EN/AR at 320/390/768/1024/1440/1920,
+source drawer focus/exact values/fit/closing, responsive column counts and one
+native financial drilldown. Odoo.sh reports Test: Warning, not a clean release gate.
+
+[Private evidence](https://github.com/MostafaEssamm12/Odoo/tree/87e9320b1fb5c142f9d556e10d6455c2796f6c10/evidence/adams-dashboard/20260920-ac52010)
+retains 12 actual native screenshots, hashes/dimensions and the original result
+excerpt. EN 1440 is the native report; other images show Finance after drawer
+closure. The rolled-back fixture approves only revenue 100. It is not customer
+configuration, full visual parity or owner approval.
+
+Implemented: native financial statements/ratios, dated cash, aging/CFS/Partner
+Ledger, standard forecast/budgets/monthly trends; native commercial analysis,
+recent orders, salesperson/customer rankings, quantity fulfillment; current and
+historical stock quantity/valuation, workforce, CRM/leave and purchase worklists.
+The source side drawer, four-column recent orders, compact display with exact
+values, scope-preserving exports and workspace restoration are implemented.
+
+Native full Accounting activation resolved finance report access on disposable
+build 38345613. The mapping list was inspected and is empty. No ACL was weakened
+and no owner mapping was approved. Fresh builds need their own app configuration.
+Current company reporting policy and additional metric definitions require the
+concrete decisions in [owner decisions](owner-decisions.md), per contract §2.2/2.5.
+
+Screenshot review found duplicate unavailable margin text and RTL numeric date
+ranges; the following template correction removes the duplicate, isolates dates
+LTR and fixes balance-card footer semantics even when unavailable. That correction
+requires its own native candidate result; ac52010 images do not qualify it.
+
+Full UAT remains open: full reference fidelity and departmental interaction matrix,
+remaining role/field/export cases, representative-volume p95, a current finance
+upgrade campaign, approved company definitions and the additional custom measures.
+Historical statements below describe their dated candidates only; this section
+supersedes old claims that finance is unimplemented or login is wholly blocked.
 
 ## Earlier live findings, 20 September
 

@@ -1,12 +1,10 @@
 # ED-001 acceptance plan
 
-Development continues under the owner's deferred-login instruction. The latest
-exact-source evidence is recorded in [implementation status](implementation-status.md).
-The expanded campaign covers recent sales, multi-page groups, sales-only/export
-permissions, cross-company records and numeric signed HR values. Native delivery
-quantity/quotation additions have separate candidate evidence. Ten isolated
-JavaScript controller tests pass locally; they do not replace Odoo browser
-acceptance. These IDs retain the original v4 acceptance scope.
+Development continues on the dedicated dashboard branch. Access and licensed
+source inspection have succeeded. Latest evidence is in
+[implementation status](implementation-status.md). Fifty native tests and sixteen
+isolated controller tests pass on their recorded candidate. Bounded native browser
+checks do not replace the full acceptance matrix below. Original v4 scope remains.
 
 | IDs / gate | Required behavior and evidence |
 |---|---|
@@ -31,20 +29,18 @@ Run affected slice checks during development and batch broad native/browser/secu
 
 Owner/finance UAT will confirm real source completeness, report variant/financial definitions, cut-off policy and any additional logic. Report parity does not audit the books. Development verification, UAT readiness, business acceptance and production release remain distinct states.
 
-## Expanded implementation gate ledger
+## Current gate ledger — 20 September 2026
 
-| Gate | Current evidence boundary |
+| Gate | Evidence and remaining boundary |
 |---|---|
-| ED-ENV | Authorized onboarding Enterprise DB inspected. Feature build identity and licensed source still blocked at GitHub device verification; no new permission request. |
-| ED-AR / ED-FIN / ED-LEDGER | Financial numeric adapters are not implemented. Native definitions/UI inspection is not parity evidence. |
-| ED-CASH | Dynamic authorized account/journal metadata discovery implemented and tested. Native dated balances and full mandatory financial cases remain blocked. |
-| ED-SEC | RPC membership/company checks, underlying account permissions, export checks, context validation and revocation covered by bounded fixtures. Added sales-only record restrictions, separate-company record scopes, export-disabled users and membership checks on every public RPC. Full browser/field/currency role matrix remains pending. |
-| ED-SALES | Invoice fixtures and grouped/trend/source action tests; expanded Sale/Purchase known-value fixtures passed, including 27-group completeness and scoped recent orders/quotations. Currency/UoM/history/complete browser matrix still pending. |
-| ED-OPS | Current Stock product quantities, native CRM weighted pipeline and signed Time Off adapter implemented. A four-hour approved leave fixture proves the native −4-hour report value and exclusion after employee archival. Other operational scope remains unfinished. |
-| ED-UX / ED-ASYNC | Ten isolated controller checks and static/catalog checks. Stylesheet native compilation added. No deployed DOM/visual/RTL/mobile pass. |
-| ED-DELIVERY | Feature-native install/update campaigns are bound to the exact sources in implementation-status.md. No UAT/release closure, independent review or production deployment. |
-| ED-PERF / ED-FULFILL | Performance remains pending. Native product/UoM delivery quantities are implemented; backlog value and on-time completion still need installed-source inspection and approved definitions. |
+| ED-ENV | Exact feature source/build and licensed source inspected; harness pin reverified. UAT company/localization/report policy and custom gaps still need owner decisions. |
+| ED-AR / ED-FIN / ED-CASH / ED-LEDGER | Native adapters and bounded known-value fixtures pass, including historical settlement, dated accounts, aging, CFS, ledger scopes, budgets and standard forecast. Full customer-configured parity/journey matrix remains open. |
+| ED-SEC | Native permission/company/RPC/export/context/revocation fixtures pass. Full role/field/currency/browser matrix remains open. |
+| ED-SALES | Native grouped totals, 27-row completeness/export, recent records, commercial margin and scoped routes pass. Full UI/export/currency/UoM journeys remain open. |
+| ED-OPS | Native historical/current stock quantity/valuation, forecast/history routes, workforce, leave, CRM and purchase worklists have bounded fixtures. Expanded warehouse/owner/aging/shortage acceptance remains open. |
+| ED-UX / ED-ASYNC | 16 controller checks; native EN/AR at six widths with drawer/focus and drilldown assertions. Twelve captures retained. Full reference comparison, mobile interactions, zoom and accessibility remain open. |
+| ED-DELIVERY | ac52010/build 38346414 passes 50 native install tests. Older core upgrade is retained for its original source only. Current finance upgrade and full UAT closure remain open. |
+| ED-PERF / ED-FULFILL | Representative-volume p95 remains unmeasured. Native product/UoM delivery quantities pass; backlog value/on-time definitions require owner approval. |
 
-The failed expanded run is retained, not relabeled as passing. Corrected fixture
-roles and flush boundaries are recorded alongside the new campaign result in
-implementation-status.md. No application ACL was loosened to pass a fixture.
+Failed 63f9823/build 38346314 is retained as failed. Its native Sass defect was
+fixed at ac52010 without weakening checks. Prior harness qualification is reused.
