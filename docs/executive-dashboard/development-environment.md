@@ -1,6 +1,17 @@
 # ED-001 — authorized Enterprise database inspection
 
-## Current candidate — 20 September 2026
+## Current UAT environment
+
+Use [Adams For Men staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004),
+company 1, EGP, Egyptian localization, with 13 approved native report mappings.
+Staging `29121a55098acefcc9d55031c2dd0bb68942d4c9` contains the two dashboard
+addons exactly as tested at `adbe2997718aad8ad57c341b071415a910f7a8f4`
+(build 38352343, 58 native tests, zero failures/errors).
+The staging database/build is 38326320 and expires on 19 October 2026.
+Production and main are excluded. Current evidence and limits are in
+[implementation status](implementation-status.md); older build links below are historical.
+
+## Earlier development candidate — 20 September 2026
 
 Application `67a6d655c5776504cd80e8183bdf6a751ef7affb`, build **38348614**.
 [Open the development candidate](https://adamsmen-feature-executive-dashboard-report-first-38348614.dev.odoo.com/_odoo/paas/connect).

@@ -1,20 +1,114 @@
 # Executive dashboard — implementation and verification
 
-**Current implementation candidate: 8b623a21; native qualification running.**
-Owner decisions 1–10 are approved in [owner decisions](owner-decisions.md).
-Adams For Men staging is authorized for UAT; production and main are excluded.
-Staging access and the neutralized company have been verified. Deployment and
-customer-data verification are not yet completed.
+## Current staging handoff — 20 September 2026
 
-This candidate adds four posted supplier-bill installment windows (overdue,
-due today, days 1–7 and days 1–30) using native historical Aged Payable results.
-The native report initializer retains the same fixed scope on drilldown.
-Full native AR/AP aging remains available. Native-only operational scope and
-explicit missing budget targets follow the approved decisions.
-New native boundary, installment, historical settlement and browser navigation
-checks are awaiting the Odoo.sh result. Local Python/XML/catalog checks pass;
-17 controller tests pass. The pinned harness and unchanged recorded qualification
-are reused. The checkpoint below applies to its named source, not this change.
+All ten [owner decisions](owner-decisions.md) are recorded. The dashboard is a
+separate custom workspace implemented by `adams_executive_dashboard` and
+`adams_dashboard_finance`; calculations and drilldowns use existing native Odoo
+reports and permissions. The supplied reference informs the English/Arabic UI.
+
+Adams For Men staging is configured (company 1, EGP, Egyptian localization).
+Thirteen financial mappings were approved against inspected native definitions.
+Production, main and the old Shopify development are unchanged.
+
+Final implementation candidate: `adbe2997718aad8ad57c341b071415a910f7a8f4`.
+Odoo.sh build **38352343**: **58 native tests, zero failures/errors**,
+116.49 seconds, 53,451 queries. Native supplier boundaries/installments/historical
+settlement, real XLSX totals/filter metadata, printable PDF headings, role checks
+and six-width EN/AR browser journeys pass. The first build attempt 38352319
+failed with a platform error before testing; the native rebuild above passed.
+Odoo.sh displays Test: Warning, not a clean production release certification.
+
+Staging commit **`29121a55098acefcc9d55031c2dd0bb68942d4c9`** contains the same
+two addon directories. Odoo.sh reports staging Success; the explicit update of
+both addons exited 0. Open [Adams For Men staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004)
+for owner UAT. The staging build expires on **19 October 2026**.
+
+### Completed behavior
+
+- Posted-only native P&L, Balance Sheet, Cash Flow Statement, standard forecast,
+  ratios, accounts and full signed Aged Receivable/Aged Payable remain authoritative.
+- Four supplier-bill installment windows use the selected balance cutoff:
+  overdue, due today, days 1–7 and days 1–30 (inclusive of the first seven).
+  Native historical residual/currency calculations are retained. Standalone
+  credits and unapplied payments remain in complete native aging.
+- The native payment report keeps the fixed window on navigation and export.
+  Screen titles, export filenames, XLSX filter metadata and printable PDF headings
+  identify the window and cutoff. Normal AP initialization clears the custom scope.
+- Sales, customer/salesperson analysis, ordered/delivered/remaining quantities,
+  native stock quantities/valuation/forecast/replenishment, purchase worklists,
+  CRM and workforce use current authorized native sources.
+- No targets are invented. This staging company has no configured financial
+  budgets. Time Off is not installed; leave hours explicitly report that state.
+- Reference headings now retain readable contrast with the native dark theme.
+  Inventory presents its working native stock workspace without an obsolete
+  unconfigured headline. English and Arabic catalogs include the payment labels.
+
+### Staging observations and preservation
+
+Initial installation preserved hashes of 1,047 accounting documents, six users'
+company/group access and 250 native report expressions. Setup subsequently added
+only dashboard membership to the existing administrator and approved 13 mappings;
+no native accounting rights or business records were added. The final update
+preserved all four recorded hashes, including the 13 approved mappings.
+
+Native report comparisons matched all 17 financial/window values for both
+September-to-date and year-to-date scope at the same balance cutoff. Actual native
+P&L, payment-window, inventory, late-receipt and workforce navigation was exercised.
+The final staging check also matched all four window totals through native
+print-option reconstruction and actual XLSX files; four generated PDFs identify
+their scope/cutoff, and the overdue PDF was rendered and visually inspected.
+The browser downloaded the seven-day XLSX with correct filter metadata. Actual
+English/Arabic staging screenshots verify readable native-dark-theme headings;
+the user language was restored to English after inspection.
+
+Native P&L warns about unposted entries, which are excluded. Unusual native balances
+and source completeness require finance-owner investigation, not development
+adjustments to accounting records.
+
+Staging backups were verified at **18:04:30 UTC** before installation and
+**18:33:05 UTC** after configuration, both on 20 September 2026. Updates add only
+the two dashboard addons to the pre-existing staging tree. The disposable
+`adams_dashboard_native_tests` addon is not deployed. No schema/data migration is
+required; upgrade the two addons to load views, assets and translations.
+
+### Evidence and release boundaries
+
+The pinned private harness `10ec1d059b5ddc5d422875f68e0726cc500487ce` and unchanged
+onboarding qualification are reused. The local connection integrity check passes;
+this does not turn the Work shell into a local Odoo runtime.
+
+The 4c7ec502 checkpoint passed 58 native tests and 17 controller checks; its twelve
+EN/AR captures, raw result and checksum manifest are retained in the private
+[4c7ec502 archive](https://github.com/MostafaEssamm12/Odoo/tree/e576b9c3a399cabb268db592afc521b8ff2c6421/evidence/adams-dashboard/20260920-4c7ec50).
+Later export/title changes require their own evidence and are not qualified by it.
+The controller suite also passes on the current production JavaScript (17/17).
+
+[Final private evidence](https://github.com/MostafaEssamm12/Odoo/tree/41b092033ec3b9700987393a420dff6076e5a021/evidence/adams-dashboard/20260920-adbe299)
+retains the native result, 12 EN/AR captures, source/dependency manifest, initial
+staging parity and final upgrade/preservation/export/UI evidence. Text receipts
+were retrieved after publication. Binary archives were uploaded with recorded
+checksums; connector binary read-back is unsupported, so complete remote byte
+retrieval is not claimed. Customer evidence remains in the private repository.
+
+Latest synthetic single-user browser baseline: first usable Finance **1.2058s**,
+refresh **p95 0.9569s** over 20 samples; 1,000 invoices, 2,000 journal items,
+100 partners, one company, four mapped metrics. This is not customer-volume or
+concurrency qualification. The earlier staging 17-value calls took about 0.54s
+and 0.47s; those backend observations are not browser performance measurements.
+
+Independent engineering review remains unrecorded. The pinned harness delivery
+and acceptance guidance requires a separate review before release approval; an
+implementer's checks are not that review. Owner visual/financial UAT signoff,
+representative concurrency and the full acceptance matrix are not claimed by the
+bounded automated evidence. PR #214 remains draft; no main merge or production
+action is authorized. See [UAT checklist](uat-checklist.md) and
+[user guide](user-guide.md) for the supported staging workflow.
+
+## Historical exact-source evidence
+
+The sections below retain observations for earlier revisions. Their then-pending
+statements do not override the current handoff above.
 
 ## Verified checkpoint — 20 September 2026
 
@@ -64,25 +158,6 @@ was attempted; older captures are not mislabelled as current-source evidence.
 Full Accounting was activated through native Apps on current build 38348614.
 Live Finance now shows Not configured; owner mappings remain unapproved. The
 current Finance and Sales desktop screens were captured after the module update.
-
-## Remaining acceptance boundaries
-
-The implemented report-first workspace is available for developer/owner review.
-Full v4 business UAT cannot be declared complete merely because native tests pass.
-Remaining work: qualify the approved supplier-payment windows, configure and
-verify Adams For Men's native report mappings in staging, execute the customer-data
-parity/navigation checks and retain current visual evidence. The custom daily cash
-plan, minimum balance, valued backlog, on-time percentage, management thresholds,
-stock aging and shortage exposure are explicitly excluded by owner decisions.
-No unavailable card is counted as delivery of a custom measure.
-
-Representative customer volume/concurrency, full visual signoff against all
-reference states, the complete financial edge-case/export matrix and independent
-review are not claimed by the bounded automated evidence. The acceptance plan
-retains those gates. Business UAT signoff remains the owner’s decision after engineering verification.
-
-Historical sections below describe their original candidates and may contain
-then-pending items now resolved above. They are not the current status.
 
 ## Earlier live findings, 20 September
 

@@ -1,12 +1,14 @@
 # Executive dashboard — ED-001
 
-Status: **Native workspace implemented and bounded engineering checks passed. Owner decisions remain deferred.**
+Status: **Approved scope implemented and deployed to Adams For Men staging for UAT.**
+Final addon source `adbe2997`: 58 native tests pass. Independent review and owner
+UAT signoff are outstanding; production and main remain excluded.
 
 Access and licensed native report integration are available. Current results,
 source/build identities and remaining limits are in [implementation status](implementation-status.md).
 Read the [user and administrator guide](user-guide.md) for actual behavior and setup,
 the [acceptance plan](acceptance-plan.md) for qualification, and
-[owner decisions](owner-decisions.md) for the later business choices. The feature
+[owner decisions](owner-decisions.md) for the ten approved business choices. The feature
 remains on development PR #214; no production or main-branch deployment is authorized.
 
 Historical development notes below describe their original implementation slices.
@@ -58,14 +60,15 @@ Use a native Owl client action with reusable metric, section, source-detail and 
 
 Then complete Finance and dynamic cash discovery, Sales, and installed supporting departments in contract G2–G4 order. Preserve the approved visual hierarchy, signed values, chart tables, compact mobile attention and English/Arabic RTL. Prototype shell duplication, sample entities, scenario controls and simulated authorization are excluded from the application.
 
-## Concrete blocker and next action
+## Historical blocker and next action (resolved)
 
 ED-B01 (unknown database) is resolved. ED-B02 is now an authentication/source/build
 blocker, not an authorization question. Complete GitHub device verification for the
 authorized Odoo.sh development session. Then inspect licensed native financial
 APIs and exact build identities, implement the remaining report mappings, deploy
 the dashboard development branch and execute the complete bilingual browser/UAT
-readiness matrix. Production and staging remain excluded.
+readiness matrix. At this historical point staging was excluded; the owner later
+explicitly authorized staging, as recorded in owner-decisions.md.
 
 The public source connection still returns 404 for `odoo/enterprise`. No guessed
 financial API or alternative accounting calculation may replace that inspection.

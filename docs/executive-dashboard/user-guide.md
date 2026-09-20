@@ -7,6 +7,10 @@ that the accounts are complete or the period is closed.
 
 ## Open and filter
 
+For the authorized UAT, use [Adams For Men staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004).
+This is the existing neutralized business database, with EGP company currency.
+Production is not part of this handoff.
+
 Open **Executive Dashboard** from Odoo's app menu. Select one authorized company,
 period start/end and balance cutoff, then **Apply filters**. Changing the input fields
 alone does not change the displayed scope. The applied dates are shown beneath the
@@ -16,6 +20,10 @@ Use the sidebar or the six department tabs. Finance and Sales start expanded;
 supporting departments start compact. Expansion preferences are remembered per
 user. On mobile, the menu receives focus when opened. Close it with × or Escape.
 Dates and mixed-script account codes retain their order in Arabic.
+
+Supplier-payment drilldowns identify their window and balance cutoff in the
+native action title. Native XLSX filters and PDF headings retain that same scope.
+The complete Aged Payable report remains separately available.
 
 ## Investigate a value
 

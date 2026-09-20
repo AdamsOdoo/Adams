@@ -5,8 +5,12 @@ are the design authority. Their hashes are recorded in `requirements/input-manif
 The contract supersedes fictional data/calculations, not the visual hierarchy.
 
 The initial generic card grid did not implement the supplied design closely enough.
-The user raised this on 20 September 2026. Correction is in progress, preserving
-native Odoo data integration and existing branch work.
+The user raised this on 20 September 2026. The correction is implemented with
+native Odoo data integration and preserved branch work. Final source adbe2997
+has twelve actual EN/AR captures at 320/390/768/1024/1440/1920. Current staging
+English/Arabic desktop captures also confirm the heading-contrast correction
+inside the native dark theme. Evidence is linked in implementation-status.md.
+Owner visual signoff against the reference remains part of UAT.
 
 ## Required comparison
 

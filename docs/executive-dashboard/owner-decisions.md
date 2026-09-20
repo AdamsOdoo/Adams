@@ -1,4 +1,4 @@
-# Decisions needed to finish the full v4 scope
+# Approved dashboard owner decisions
 
 Status: Decisions 1–10 approved below. This records the material business choices required
 by sections 2.2 and 2.5 of the supplied v4 contract. Explicit exclusions in Decisions 4 and 6–9 amend the delivery scope; all remaining accuracy, design and acceptance requirements remain applicable.
@@ -12,9 +12,10 @@ company for UAT, and explicitly authorized deployment to **staging**.
 development-only / staging-excluded boundary for this dashboard's UAT work.
 It does not authorize a main/production merge or approve financial definitions.
 
-Staging deployment is authorized but has not yet been performed. Preserve existing
-staging work and verify the selected company's identity, native currency,
-localization, reports and permissions before treating its figures as UAT evidence.
+Staging deployment and configuration have been performed for Adams For Men
+(company 1, EGP, Egyptian localization). Thirteen mappings were approved against
+its existing native report definitions. Existing staging work was preserved; see
+implementation-status.md for exact revisions and verification boundaries.
 The US/USD demo company is not the chosen business UAT company.
 The owner requested the remaining decisions one at a time.
 
@@ -106,8 +107,7 @@ minimum projected cash, valued backlog, on-time percentage, alert rules, stock
 aging or shortage-exposure measure is required for this delivery.
 
 These are business decisions, not evidence of completed implementation or UAT.
-Next engineering work must reconcile UI/guidance with these choices, implement
-and qualify Decision 5, inspect and configure Adams for Men in authorized staging,
-and complete the remaining relevant financial, visual, access, export and
-representative-performance acceptance checks. Preserve prior exact-source
-evidence and reuse unchanged harness qualification. Production remains prohibited.
+Implementation, staging configuration and native comparisons are recorded in
+implementation-status.md with exact tested revisions. Final export, visual and
+review gates remain distinct from these business choices. Prior exact-source
+evidence and unchanged harness qualification are retained. Production remains prohibited.
