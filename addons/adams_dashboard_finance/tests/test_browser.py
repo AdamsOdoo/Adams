@@ -191,6 +191,9 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (root.querySelectorAll('.adams_header_actions button').length !== 5) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    const scopeDates = [...root.querySelectorAll('.adams_scope .adams_date_value')];
+                    if (scopeDates.length !== 3) throw new Error('Applied filter summary must show three individual dates');
+                    if (scopeDates.some(date => date.getClientRects().length !== 1)) throw new Error('Applied filter summary split an individual date');
                     if (WIDTH < 760) {
                         const toggle = root.querySelector('.adams_mobile_menu');
                         toggle.click();

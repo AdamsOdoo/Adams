@@ -137,7 +137,7 @@
     .adams_margin_note strong { color: var(--adams-green); margin-inline-end: 4px; }
     .adams_hint { font-size: var(--adams-helper); line-height: 1.55; margin: 8px 0; }
     .adams_card_date { color: var(--adams-sub); font-size: var(--adams-helper); margin: auto 0 12px; padding-top: 14px; }
-    .adams_card_date .adams_date_value { white-space: nowrap; }
+    .adams_date_value { white-space: nowrap; }
     .adams_metric_foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; color: var(--adams-sub); background: var(--adams-soft); margin-inline: -16px; padding: 8px 12px; border-top: 1px solid var(--adams-line); margin-top: 0; font-size: var(--adams-helper); }
     .adams_metric_foot summary { color: var(--adams-green); font-size: var(--adams-helper); min-height: 24px; display: list-item; }
     .adams_metric_foot .btn { font-size: var(--adams-helper); min-height: 26px; }
