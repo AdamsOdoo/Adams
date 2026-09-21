@@ -355,3 +355,43 @@ test('saved Sales tabs reload their selected measures and suppress earlier defau
     assert.equal(controller.state.ranking.rows[0].value, 30);
     assert.equal(controller.navigationState().ranking.key, 'invoiced_margin');
 });
+
+
+test('closed or refreshed search cannot receive old results', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.searchQuery = 'invoice';
+    const first = controller.searchRecords();
+    controller.closeSearch();
+    pending[0].resolve({groups: [{rows: [{name: 'private'}]}]});
+    await first;
+    assert.equal(controller.state.search, null);
+    const second = controller.searchRecords();
+    controller.state.draft.company_id = 2;
+    const refresh = controller.refresh();
+    pending[1].resolve({groups: [{rows: [{name: 'old company'}]}]});
+    await second;
+    for (const request of pending.slice(2)) request.resolve(data(0));
+    await refresh;
+    assert.equal(controller.state.search, null);
+});
+
+test('summary export is suppressed after company changes', async () => {
+    const {controller, pending, notifications} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    const exporting = controller.exportSummary();
+    controller.state.draft.company_id = 2;
+    const refresh = controller.refresh();
+    pending[0].resolve({filename: 'private.csv', content: 'old values'});
+    await exporting;
+    for (const request of pending.slice(1)) request.resolve(data(0));
+    await refresh;
+    assert.equal(notifications.length, 0);
+    assert.equal(controller.state.exporting, false);
+});
+
+test('restricted finance is labelled restricted in attention', () => {
+    const {controller} = fixture();
+    controller.state.sections.finance = {status:'ready',items:[{key:'payables',status:'restricted',value:null}]};
+    assert.equal(controller.supplierStatus, 'Access restricted');
+});

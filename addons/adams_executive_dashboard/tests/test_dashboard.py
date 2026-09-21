@@ -4,6 +4,8 @@ from odoo.tests import new_test_user, tagged
 from odoo.tools import file_open
 from odoo.tools.translate import code_translations
 import sass
+import csv
+import io
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
 
 
@@ -50,7 +52,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
     def test_dashboard_permission_required_on_every_rpc(self):
         outsider = new_test_user(self.env, login='dashboard_outsider', groups='base.group_user')
         dashboard = self.dashboard.with_user(outsider)
-        for method, args in [('get_bootstrap', []), ('get_section', ['sales', self.options]),
+        for method, args in [('search_records', ['Test', self.options]), ('open_search_record', ['Test', self.options, 'invoices', 1]),
+                             ('export_summary', [self.options]), ('get_bootstrap', []), ('get_section', ['sales', self.options]),
                              ('open_report', ['invoiced_sales', self.options]),
                              ('get_breakdown', ['invoiced_sales', 'customer', self.options]),
                              ('get_trend', ['invoiced_sales', self.options]),
@@ -198,3 +201,51 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         for invalid in (None, {}, ['cash'], 'x' * 101):
             with self.assertRaises(ValidationError):
                 self.dashboard.get_cash_directory(self.options, 0, invalid)
+
+    def test_workspace_search_scope_and_access(self):
+        included = self._invoice(100)
+        draft = self._invoice(999, post=False)
+        outside = self._invoice(777, invoice_date='2026-09-01')
+        result = self.dashboard.search_records(self.partner_a.name, self.options, 'invoices')
+        ids = [row['id'] for row in result['groups'][0]['rows']]
+        self.assertIn(included.id, ids)
+        self.assertNotIn(draft.id, ids)
+        self.assertNotIn(outside.id, ids)
+        action = self.dashboard.open_search_record(self.partner_a.name, self.options, 'invoices', included.id)
+        self.assertEqual(action['res_id'], included.id)
+        self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+        with self.assertRaises(AccessError):
+            self.dashboard.open_search_record(self.partner_a.name, self.options, 'invoices', outside.id)
+        restricted = self.dashboard.with_user(self.reader).search_records(self.partner_a.name, self.options, 'invoices')
+        self.assertEqual(restricted['groups'][0]['status'], 'restricted')
+        self.assertFalse(restricted['groups'][0]['rows'])
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).open_search_record(self.partner_a.name, self.options, 'invoices', included.id)
+        with self.assertRaises(ValidationError):
+            self.dashboard.search_records('a', self.options)
+        with self.assertRaises(ValidationError):
+            self.dashboard.search_records('Test', self.options, 'res.users')
+        with self.assertRaises(ValidationError):
+            self.dashboard.search_records('Test', self.options, offset=-1)
+        foreign = self.env['res.company'].create({'name': 'Search forbidden company'})
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).search_records('Test', dict(self.options, company_id=foreign.id))
+
+    def test_summary_native_values_unavailable_states_and_export_access(self):
+        self._invoice(100)
+        self._invoice(25, move_type='out_refund')
+        self.env.company.name = '=UNTRUSTED()'
+        result = self.dashboard.export_summary(self.options)
+        rows = list(csv.DictReader(io.StringIO(result['content'].lstrip('\ufeff'))))
+        sales = next(row for row in rows if row['Metric'] == 'Net invoiced sales')
+        self.assertEqual(float(sales['Value']), 75)
+        self.assertEqual(sales['Company'], "'=UNTRUSTED()")
+        self.assertEqual(sales['From'], '2026-08-01')
+        self.assertTrue(sales['Scope fingerprint'])
+        self.assertEqual(sales['Source'], 'account.invoice.report')
+        finance = next(row for row in rows if row['Metric'] == 'Accounting revenue')
+        self.assertEqual(finance['Value'], '')
+        self.assertEqual(finance['Status'], 'not_configured')
+        self.reader.group_ids -= self.env.ref('base.group_allow_export')
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).export_summary(self.options)

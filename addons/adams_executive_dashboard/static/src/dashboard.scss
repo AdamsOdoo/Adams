@@ -383,3 +383,11 @@
         .adams_attention_item { border-inline-start: 0; border-top: 1px solid var(--adams-attention-line); }
     }
 }
+
+.o_adams_dashboard {
+  .adams_global_search { display: flex; gap: 10px; margin-block: 0 18px; flex-wrap: wrap;
+    input { flex: 1 1 260px; min-width: 0; } select { flex: 0 1 190px; } }
+  .adams_search_dialog { padding: 24px; width: 760px; max-width: 96vw;
+    h3 { margin-block: 24px 12px; } .adams_table_wrap { max-width: 100%; } }
+  @media (max-width: 480px) { .adams_global_search input { flex-basis: 100%; } .adams_search_dialog { padding: 16px; } }
+}

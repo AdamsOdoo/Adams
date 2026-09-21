@@ -204,6 +204,128 @@ class ExecutiveDashboard(models.AbstractModel):
         scope['fingerprint'] = hashlib.sha256(json.dumps(scope, sort_keys=True).encode()).hexdigest()
         return scope
 
+    def _search_scope(self, kind, dates, query):
+        """Allowlisted native documents; ORM ACLs and record rules remain active."""
+        if kind in ('orders', 'quotations'):
+            records, domain = self._recent_scope(kind, dates)
+            date_field = 'date_order'
+        elif kind in ('invoices', 'bills'):
+            records = self.env['account.move']
+            records.check_access('read')
+            date_field = 'invoice_date'
+            types = ['out_invoice', 'out_refund'] if kind == 'invoices' else ['in_invoice', 'in_refund']
+            domain = [('company_id', '=', self.env.company.id), ('state', '=', 'posted'),
+                      ('move_type', 'in', types), *self._date_bounds(records, date_field, dates)]
+        else:
+            raise ValidationError(_('Invalid document type.'))
+        records.check_field_access_rights('read', ['name', 'partner_id', date_field, 'company_id', 'state'])
+        return records, [*domain, '|', ('name', 'ilike', query), ('partner_id.name', 'ilike', query)], date_field
+
+    @api.model
+    def search_records(self, query, options, kind='all', offset=0):
+        scoped, dates = self._scope(options)
+        if (not isinstance(query, str) or not 2 <= len(query.strip()) <= 100
+                or kind not in ('all', 'invoices', 'bills', 'orders', 'quotations')
+                or type(offset) is not int or not 0 <= offset <= 10000):
+            raise ValidationError(_('Enter 2–100 characters and a valid document type or page.'))
+        kinds = ('invoices', 'bills', 'orders', 'quotations') if kind == 'all' else (kind,)
+        groups = []
+        for entry in kinds:
+            group = {'kind': entry, 'rows': [], 'status': 'empty', 'has_more': False}
+            groups.append(group)
+            if entry in ('orders', 'quotations') and 'sale.order' not in scoped.env:
+                group['status'] = 'not_installed'
+                continue
+            try:
+                records, domain, date_field = scoped._search_scope(entry, dates, query.strip())
+                page = records.search(domain, limit=26, offset=offset, order=f'{date_field} desc, id desc')
+                # read() enforces field access too; never use sudo or reveal hidden counts.
+                group['rows'] = [{'id': row['id'], 'name': row['name'],
+                                  'partner': row['partner_id'][1] if row['partner_id'] else '',
+                                  'date': (fields.Datetime.context_timestamp(records, row[date_field]).strftime('%Y-%m-%d')
+                                           if date_field == 'date_order' else str(row[date_field])) if row[date_field] else ''}
+                                 for row in page[:25].read(['name', 'partner_id', date_field])]
+                group.update(status='ready' if page else 'empty', has_more=len(page) > 25)
+            except AccessError:
+                group.update(status='restricted', rows=[])
+        return {'groups': groups, 'offset': offset, 'has_more': any(g['has_more'] for g in groups)}
+
+    @api.model
+    def open_search_record(self, query, options, kind, record_id):
+        scoped, dates = self._scope(options)
+        if (not isinstance(query, str) or not 2 <= len(query.strip()) <= 100
+                or type(record_id) is not int or record_id < 1):
+            raise ValidationError(_('Invalid search record.'))
+        records, domain, _date_field = scoped._search_scope(kind, dates, query.strip())
+        if not records.search([*domain, ('id', '=', record_id)], limit=1):
+            raise AccessError(_('The record is unavailable in the selected scope.'))
+        return {'type': 'ir.actions.act_window', 'res_model': records._name,
+                'res_id': record_id, 'views': [(False, 'form')], 'view_mode': 'form',
+                'target': 'current', 'context': dict(scoped.env.context)}
+
+    @api.model
+    def export_summary(self, options):
+        """Re-evaluate authorized native metrics; never accept client values."""
+        scoped, dates = self._scope(options)
+        if not scoped.env.user.has_group('base.group_allow_export'):
+            raise AccessError(_('You do not have export permission.'))
+        output = io.StringIO(newline='')
+        writer = csv.writer(output)
+        writer.writerow([_('Section'), _('Metric'), _('Value'), _('Unit'), _('Status'),
+                         _('Company'), _('From'), _('To'), _('Balance as of'), _('Source'),
+                         _('Fetched at UTC'), _('Scope fingerprint'), _('Native report warning'), _('Date basis')])
+        def safe(value):
+            if value is None:
+                return ''
+            if isinstance(value, (int, float)):
+                return value
+            value = str(value)
+            return "'" + value if value.startswith(('\t', '\r', '\n')) or value.lstrip().startswith(('=', '+', '-', '@')) else value
+        labels = {
+            'revenue': _('Accounting revenue'),
+            'profit': _('Net profit'),
+            'cash': _('Bank and cash'),
+            'cash_flow': _('Net cash movement'),
+            'receivables': _('Receivables'),
+            'payables': _('Payables'),
+            'gross_profit': _('Gross profit'),
+            'operating_expenses': _('Operating expenses'),
+            'gross_margin': _('Gross margin'),
+            'net_margin': _('Net margin'),
+            'assets': _('Assets'),
+            'liabilities': _('Liabilities'),
+            'equity': _('Equity'),
+            'standard_forecast': _('Native short-term cash forecast'),
+            'invoiced_sales': _('Net invoiced sales'),
+            'invoiced_margin': _('Native invoiced commercial margin'),
+            'confirmed_sales': _('Confirmed sales'),
+            'orders': _('Distinct sales orders'),
+            'quotations': _('Draft and sent quotations'),
+            'purchases': _('Confirmed purchases'),
+            'inventory': _('Inventory valuation'),
+            'crm': _('Weighted open pipeline'),
+            'hr': _('Approved leave hours (native signed)'),
+            'supplier_overdue': _('Overdue supplier bills'),
+            'supplier_today': _('Supplier bills due today'),
+            'supplier_due_7': _('Supplier bills due in 7 days'),
+            'supplier_due_30': _('Supplier bills due in 30 days'),
+        }
+        count = 0
+        for section, label in [('finance', _('Accounting & Finance')), ('sales', _('Sales')), ('operations', _('Operations'))]:
+            result = scoped.get_section(section, options)
+            for item in [*result['items'], *result.get('supplier_windows', [])]:
+                provenance = item.get('provenance') or {}
+                # Stable metric keys match the source drawer and exported definitions.
+                row = [label, labels.get(item['key'], item['key']), item.get('value') if item['status'] == 'ready' else None,
+                       result['currency'] if item.get('unit') == 'currency' else item.get('unit', ''),
+                       item['status'], scoped.env.company.name, dates[0], dates[1], dates[2],
+                       provenance.get('model') or item.get('source', ''), result.get('generated_at', ''),
+                       provenance.get('fingerprint', ''), _('Yes') if item.get('has_warnings') else '', item.get('date_field', '')]
+                writer.writerow([safe(value) for value in row])
+                count += 1
+        return {'filename': f'adams-executive-summary-{dates[0]}-{dates[1]}.csv',
+                'content': '\ufeff' + output.getvalue(), 'row_count': count}
+
     @api.model
     def get_section(self, section, options):
         scoped, dates = self._scope(options)

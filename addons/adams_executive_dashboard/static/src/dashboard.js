@@ -48,11 +48,20 @@ export class ExecutiveDashboard extends Component {
         this.root = useRef('root');
         this.sourceDialog = useRef('sourceDialog');
         this.analysisDialog = useRef('analysisDialog');
+        this.searchDialog = useRef('searchDialog');
+        this.searchInput = useRef('searchInput');
+        this.searchKinds = { all: _t('All documents'), invoices: _t('Customer invoices'), bills: _t('Vendor bills'), orders: _t('Sales orders'), quotations: _t('Quotations') };
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
+        useEffect(() => {
+            const dialog = this.searchDialog.el;
+            if (!dialog) return;
+            if (this.state.search && !dialog.open) dialog.showModal();
+            if (!this.state.search && dialog.open) dialog.close();
+        }, () => [this.state.search]);
         useEffect(() => {
             const dialog = this.sourceDialog.el;
             if (!dialog) return;
@@ -201,6 +210,7 @@ export class ExecutiveDashboard extends Component {
         const generation = ++this.generation;
         const options = { ...this.state.draft, company_id: Number(this.state.draft.company_id) };
         this.state.applied = options;
+        this.closeSearch();
         this.state.detail = null;
         this.state.directory = null;
         this.state.cashSearch = '';
@@ -223,7 +233,7 @@ export class ExecutiveDashboard extends Component {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
                 if (this.alive && generation === this.generation) {
                     this.state.sections[key] = { ...data, status: 'ready' };
-                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { void this.loadRecent('orders'); void this.loadRanking('invoiced_sales'); void this.loadCustomers(); }
+                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { if (!this.state.recent) void this.loadRecent('orders'); if (!this.state.ranking) void this.loadRanking('invoiced_sales'); void this.loadCustomers(); }
                     if (key === 'finance' && data.items.some(item => item.key === 'cash' && item.status === 'ready')) { void this.loadDirectory('cash'); }
                     if (key === 'finance' && ['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) { void this.loadProfitabilityChart(); }
                 }
@@ -288,6 +298,69 @@ export class ExecutiveDashboard extends Component {
 
     supplierWindow(key) {
         return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
+    }
+
+    get supplierStatus() {
+        return this.statusLabels[this.financeMetric('payables')?.status] ||
+            this.statusLabels[this.state.sections.finance?.status] || this.statusLabels.not_configured;
+    }
+
+    navigateWorkspace(event, id) {
+        event.preventDefault();
+        this.state.sidebarOpen = false;
+        if (id === 'adams-attention') this.state.attentionExpanded = true;
+        const node = this.root.el?.querySelector('#' + id);
+        if (node?.tagName === 'DETAILS') node.open = true;
+        requestAnimationFrame(() => { node?.scrollIntoView({ block: 'start' }); node?.querySelector('button, summary')?.focus(); });
+    }
+
+    closeSearch() { this.state.search = null; }
+
+    async searchRecords(event = null, offset = 0) {
+        event?.preventDefault();
+        const query = (this.state.searchQuery || '').trim();
+        if (query.length < 2 || query.length > 100 || !this.state.applied) return;
+        const generation = this.generation;
+        this.state.search = { query, kind: this.state.searchKind || 'all', offset, status: 'loading', groups: [] };
+        const search = this.state.search;
+        try {
+            const result = await this.orm.call('adams.executive.dashboard', 'search_records', [query, { ...this.state.applied }, search.kind, offset]);
+            if (this.alive && generation === this.generation && this.state.search === search) Object.assign(search, result, { status: 'ready' });
+        } catch {
+            if (this.alive && generation === this.generation && this.state.search === search) search.status = 'error';
+        }
+    }
+
+    async openSearchRecord(kind, id) {
+        if (this.state.opening || !this.state.search) return;
+        const generation = this.generation;
+        const search = this.state.search;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_search_record', [search.query, { ...this.state.applied }, kind, id]);
+            if (this.alive && generation === this.generation && search === this.state.search) {
+                this.closeSearch();
+                await this.action.doAction(action);
+            }
+        } catch {
+            if (this.alive) this.notification.add(_t('The record is unavailable in the selected scope.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.opening = false; }
+    }
+
+    async exportSummary() {
+        if (!this.state.applied || this.state.exporting) return;
+        const generation = this.generation;
+        this.state.exporting = true;
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'export_summary', [{ ...this.state.applied }]);
+            if (!this.alive || generation !== this.generation) return;
+            const url = URL.createObjectURL(new Blob([data.content], { type: 'text/csv;charset=utf-8' }));
+            const anchor = document.createElement('a');
+            anchor.href = url; anchor.download = data.filename; anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('Export unavailable. Check your export permissions or use the native report for large exports.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.exporting = false; }
     }
 
     switchTabs(event) {
@@ -370,6 +443,11 @@ export class ExecutiveDashboard extends Component {
     }
 
     workspaceKeydown(event) {
+        if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
+                !event.target.isContentEditable && !this.state.search && !this.state.source && !this.state.detail) {
+            event.preventDefault();
+            this.searchInput.el?.focus();
+        }
         if (event.key === 'Escape' && this.state.sidebarOpen) {
             event.preventDefault();
             this.closeWorkspace();
