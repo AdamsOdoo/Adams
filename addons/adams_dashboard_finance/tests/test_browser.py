@@ -211,8 +211,12 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1].classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1].classList.contains('active'), 'Sales selections must activate');
                         root.querySelectorAll('.adams_header_actions button')[0].click();
+                        await wait(() => !root.querySelectorAll('.adams_header_actions button')[1].disabled,
+                            'Saving must enable Restore view');
                         root.querySelectorAll('.adams_recent_tabs button')[0].click();
                         root.querySelectorAll('.adams_rank_tabs button')[0].click();
+                        await wait(() => root.querySelectorAll('.adams_recent_tabs button')[0].classList.contains('active') &&
+                            root.querySelectorAll('.adams_rank_tabs button')[0].classList.contains('active'), 'Changed Sales selections must activate');
                         root.querySelectorAll('.adams_header_actions button')[1].click();
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1]?.classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1]?.classList.contains('active') &&
