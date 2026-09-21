@@ -89,6 +89,8 @@ class ExecutiveDashboard(models.AbstractModel):
         result = {'items': [], 'supplier_windows': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
                   'currency': currency.name, 'digits': currency.decimal_places,
                   'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
+        if 'finance' not in scoped._visible_sections():
+            return result
         try:
             scoped._finance_access()
         except AccessError:

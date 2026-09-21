@@ -76,7 +76,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             'invoice_date': today, 'date': today,
             'journal_id': self.company_data['default_journal_sale'].id,
             'invoice_line_ids': [Command.create({
-                'name': 'Browser native revenue fixture', 'quantity': 1, 'price_unit': 100,
+                'name': 'Browser native revenue fixture', 'product_id': self.product_a.id, 'quantity': 1, 'price_unit': 100,
                 'account_id': self.company_data['default_account_revenue'].id,
                 'tax_ids': [Command.clear()],
             })],
@@ -205,8 +205,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         root.querySelectorAll('.adams_nav button')[keys.indexOf(key)].click();
                         await wait(() => root.querySelector('#adams-' + key)?.querySelector('.adams_section_toggle')?.getAttribute('aria-expanded') === 'true',
                             'Department must expand: ' + key);
+                        await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Clicked section must remain active: ' + key);
                         if (root.scrollWidth > root.clientWidth + 2) throw new Error('Department overflow: ' + key);
                     }
+                    const productRank = await wait(() => root.querySelector('.adams_product_ranking .adams_rank_row'), 'Native product ranking must render');
+                    if (!productRank.innerText.includes(expected)) throw new Error('Product ranking must retain signed native invoice value');
+                    // Manual scroll must follow the visible section, not the last click.
+                    root.dispatchEvent(new Event('wheel'));
+                    const salesSection = root.querySelector('#adams-sales');
+                    const sticky = root.querySelector('.adams_nav').getBoundingClientRect().height + 16;
+                    root.scrollTop += salesSection.getBoundingClientRect().top - root.getBoundingClientRect().top - sticky;
+                    await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === 'sales', 'Manual scroll must activate Sales');
+                    root.dispatchEvent(new Event('wheel')); root.scrollTop = 0;
+                    await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === 'finance', 'Scroll to top must activate Finance');
                     const searchInput = root.querySelector('#adams-search');
                     searchInput.value = 'Dashboard Search Fixture';
                     searchInput.dispatchEvent(new Event('input', {bubbles: true}));
@@ -287,3 +298,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
                     self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=90)
+
+
+    def test_hidden_sections_are_absent_from_both_navigation_surfaces(self):
+        self.env.company.write({'adams_dashboard_hr': False, 'adams_dashboard_inventory': False})
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        self.browser_js(f'/odoo/action-{action.id}', r"""
+            (async () => {
+                const wait = async fn => {for(let i=0;i<200;i++){if(fn())return;await new Promise(r=>setTimeout(r,50));}throw new Error('Hidden sections did not settle');};
+                await wait(()=>document.querySelector('.adams_nav button'));
+                const root=document.querySelector('.o_adams_dashboard');
+                if(root.querySelector('#adams-hr') || root.querySelector('#adams-inventory'))throw new Error('Disabled section rendered');
+                if(root.querySelector('.adams_side_link[data-section="hr"]') || root.querySelector('.adams_side_link[data-section="inventory"]'))throw new Error('Disabled sidebar item rendered');
+                if(root.querySelectorAll('.adams_nav button').length !== 4)throw new Error('Disabled tab rendered');
+                console.log('test successful');
+            })().catch(error=>console.error(error));
+        """, login=self.env.user.login, timeout=60)

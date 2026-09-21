@@ -410,3 +410,64 @@ test('print preparation rejects an old company response', async () => {
     assert.equal(controller.state.printSummary, null);
     assert.equal(notifications.length, 0);
 });
+
+
+test('product ranking suppresses stale responses and retains signed top-five native values', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    const old = controller.loadProducts();
+    const current = controller.loadProducts();
+    pending[1].resolve({status:'ready', rows:[{id:1,value:75},{id:2,value:-10}]});
+    await current;
+    pending[0].resolve({status:'ready', rows:[{id:9,value:999}]});
+    await old;
+    assert.equal(pending[0].args[1], 'product');
+    assert.equal(controller.state.products.rows[1].value, -10);
+    const third = controller.loadProducts();
+    const refresh = controller.refresh();
+    pending[2].resolve({status:'ready', rows:[{id:9,value:999}]});
+    await third;
+    for (const request of pending.slice(3)) request.resolve(data(0));
+    await refresh;
+    assert.equal(controller.state.products, null);
+});
+
+test('company section settings filter navigation and skip hidden source requests', async () => {
+    const {controller,pending} = fixture();
+    controller.state.companies = [{id:1, enabled_sections:['sales']},{id:2,enabled_sections:[]}];
+    const refresh = controller.refresh();
+    assert.equal(controller.visibleSections.length,1);
+    assert.equal(controller.state.activeSection,'sales');
+    assert.equal(pending.length,1);
+    assert.equal(pending[0].args[0],'sales');
+    pending[0].resolve({items:[{key:'invoiced_sales',status:'empty'}]});
+    await refresh;
+    // A successful Sales response also requests its native product ranking.
+    pending[1].resolve({status:'empty',rows:[]});
+    controller.state.draft.company_id=2;
+    await controller.refresh();
+    assert.equal(controller.visibleSections.length,0);
+    assert.equal(controller.state.activeSection,'');
+    assert.equal(controller.state.products,null);
+});
+
+test('scroll tracking uses real sticky height, supports bottom sections and clicked targets', () => {
+    const {controller} = fixture();
+    controller.state.companies=[{id:1,enabled_sections:['finance','sales','hr']}];
+    controller.state.applied={company_id:1};
+    const boxes={finance:{top:-600,bottom:150},sales:{top:155,bottom:900},hr:{top:920,bottom:1050}};
+    const root={scrollTop:600,clientHeight:700,scrollHeight:2000,style:{setProperty(){}},
+        getBoundingClientRect:()=>({top:50,bottom:750}),
+        querySelector:selector=>selector==='.adams_nav'?{getBoundingClientRect:()=>({height:100})}:{getBoundingClientRect:()=>boxes[selector.replace('#adams-','')]}};
+    controller.root.el=root;
+    controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'sales');
+    boxes.sales={top:70,bottom:280};boxes.hr={top:300,bottom:430};
+    root.scrollTop=1300;
+    controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'hr');
+    controller.scrollTarget='sales';controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'sales');
+    controller.scrollTarget=null;controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'hr');
+});

@@ -83,10 +83,16 @@ class ExecutiveDashboard(models.AbstractModel):
         today = fields.Date.context_today(self)
         return {
             'user_id': self.env.uid,
-            'companies': [{'id': c.id, 'name': c.name} for c in self.env.companies],
+            'companies': [{'id': c.id, 'name': c.name, 'enabled_sections': self._visible_sections(c)} for c in self.env.companies],
+            'can_configure': self.env.user.has_group('base.group_system'),
             'options': {'company_id': self.env.company.id, 'date_from': today.replace(day=1).isoformat(),
                         'date_to': today.isoformat(), 'as_of': today.isoformat()},
         }
+
+    def _visible_sections(self, company=None):
+        company = company if company is not None else self.env.company
+        return [key for key in ('finance', 'sales', 'crm', 'inventory', 'procurement', 'hr')
+                if company[f'adams_dashboard_{key}']]
 
     def _native_scope(self, key, dates):
         model, date_field, states, aggregate, action_id = SOURCES[key]
@@ -313,6 +319,9 @@ class ExecutiveDashboard(models.AbstractModel):
         count = 0
         print_rows = []
         for section, label in [('finance', _('Accounting & Finance')), ('sales', _('Sales')), ('operations', _('Operations'))]:
+            enabled = scoped._visible_sections()
+            if section in ('finance', 'sales') and section not in enabled:
+                continue
             result = scoped.get_section(section, options)
             items = [*result['items'], *result.get('supplier_windows', [])]
             if section == 'finance':
@@ -353,7 +362,11 @@ class ExecutiveDashboard(models.AbstractModel):
         if section not in SECTIONS:
             raise ValidationError(_('Unknown dashboard section.'))
         result = []
+        enabled = scoped._visible_sections()
         for key in SECTIONS[section]:
+            visible_key = ('procurement' if key == 'purchases' else key) if section == 'operations' else section
+            if visible_key not in enabled:
+                continue
             item = {'key': key, 'status': 'not_configured', 'value': None}
             if key in SOURCES:
                 if SOURCES[key][0] not in scoped.env:

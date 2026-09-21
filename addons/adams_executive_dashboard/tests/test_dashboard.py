@@ -24,7 +24,7 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
                        'Explore delivery quantities', 'Not configured',
                        'Review native worklist →', 'Review receivable aging →', 'Approvals & late receipts →',
                        'Search results', 'Print preview', 'Valuation:', 'Active employees:',
-                       'Native budget:', 'Matching orders:'):
+                       'Native budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)
@@ -265,3 +265,52 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         self.reader.group_ids -= self.env.ref('base.group_allow_export')
         with self.assertRaises(AccessError):
             self.dashboard.with_user(self.reader).export_summary(self.options)
+
+
+    def test_company_section_settings_persist_and_scope_summary(self):
+        company = self.env.company
+        company.adams_dashboard_hr = False
+        self.assertNotIn('hr', self.dashboard._visible_sections())
+        settings = self.env['res.config.settings'].create({'company_id': company.id})
+        settings.write({'adams_dashboard_sales': False})
+        self.assertFalse(company.adams_dashboard_sales)
+        bootstrap = self.dashboard.with_user(self.reader).get_bootstrap()
+        current = next(c for c in bootstrap['companies'] if c['id'] == company.id)
+        self.assertNotIn('hr', current['enabled_sections'])
+        self.assertNotIn('sales', current['enabled_sections'])
+        self.assertFalse(bootstrap['can_configure'])
+        self.assertFalse(self.dashboard.get_section('sales', self.options)['items'])
+        self.assertFalse(any(i['key'] == 'hr' for i in self.dashboard.get_section('operations', self.options)['items']))
+        summary = self.dashboard.export_summary(self.options)
+        self.assertFalse(any(row['section'] == 'Sales' for row in summary['print_rows']))
+        foreign = self.env['res.company'].create({'name': 'Independent visibility company'})
+        self.assertIn('hr', self.dashboard._visible_sections(foreign))
+        self.assertIn('sales', self.dashboard._visible_sections(foreign))
+        with self.assertRaises(AccessError):
+            company.with_user(self.reader).write({'adams_dashboard_hr': True})
+        settings.write({'adams_dashboard_sales': True})
+        self.assertIn('sales', self.dashboard._visible_sections())
+
+    def test_product_ranking_native_refunds_dates_and_drilldown(self):
+        products = self.env['product.product'].create([{'name':'Ranked product A'}, {'name':'Ranked product B'}])
+        for product, amount, kind, when, post in [(products[0],100,'out_invoice','2026-08-15',True),
+                (products[0],25,'out_refund','2026-08-15',True),
+                (products[1],10,'out_refund','2026-08-15',True),
+                (products[1],999,'out_invoice','2026-09-01',True),
+                (products[1],999,'out_invoice','2026-08-15',False)]:
+            move = self._invoice(amount, kind, when, post=False)
+            move.invoice_line_ids.write({'product_id': product.id, 'price_unit': amount, 'tax_ids': [Command.clear()]})
+            if post:
+                move.action_post()
+        products[0].active = False
+        groups = self.dashboard.get_breakdown('invoiced_sales','product',self.options)
+        values = {row['id']:row['value'] for row in groups['rows']}
+        self.assertEqual(values[products[0].id],75)
+        self.assertEqual(values[products[1].id],-10)
+        self.assertLess(next(i for i,r in enumerate(groups['rows']) if r['id']==products[0].id),
+                        next(i for i,r in enumerate(groups['rows']) if r['id']==products[1].id))
+        action = self.dashboard.open_report('invoiced_sales',self.options,'product',products[0].id)
+        self.assertIn(('product_id','=',products[0].id),action['domain'])
+        self.assertIn(('state','=','posted'),action['domain'])
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).get_breakdown('invoiced_sales','product',self.options)

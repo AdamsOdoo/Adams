@@ -103,7 +103,7 @@
     .adams_nav button, .adams_nav a { flex-shrink: 0; border: 0; background: transparent; padding: 8px 11px; font-size: 12px; color: var(--adams-sub); font-weight: 600; border-radius: 7px; white-space: nowrap; text-decoration: none; }
     .adams_nav .active { background: var(--adams-purple-soft); color: var(--adams-purple); }
     .adams_nav .adams_trust_link { background: var(--adams-paper); border: 1px solid var(--adams-line); color: var(--adams-green); margin-inline-start: auto; }
-    .adams_section { margin: 0 0 32px; scroll-margin-top: 76px; }
+    .adams_section { margin: 0 0 32px; scroll-margin-top: var(--adams-scroll-offset, 76px); }
     .adams_section_heading { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; }
     .adams_section_icon { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center; background: var(--adams-green-soft); color: var(--adams-green); flex-shrink: 0; }
     #adams-sales .adams_section_icon { background: var(--adams-purple-soft); color: var(--adams-purple); }
@@ -111,7 +111,7 @@
     .adams_section_heading p { font-size: 13px; color: var(--adams-sub); margin: 0; }
     .adams_section_number { font-size: 10px; letter-spacing: 1.3px; margin-inline-end: 8px; color: var(--adams-green); }
     .adams_section_toggle { margin-inline-start: auto; border: 1px solid var(--adams-line); border-radius: 8px; width: 35px; height: 35px; flex-shrink: 0; display: grid; place-items: center; background: var(--adams-paper); font-size: 18px; }
-    .adams_metric_group { margin-bottom: 24px; scroll-margin-top: 76px; }
+    .adams_metric_group { margin-bottom: 24px; scroll-margin-top: var(--adams-scroll-offset, 76px); }
     .adams_group_heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-inline-start: 3px solid var(--adams-green); padding-inline-start: 12px; margin: 0 0 14px; }
     .adams_group_heading h3 { font-size: 18px; font-weight: 650; margin: 0 0 3px; color: var(--adams-ink); }
     .adams_group_heading p { font-size: 12px; margin: 0; color: var(--adams-sub); }
@@ -366,7 +366,7 @@
 .o_adams_dashboard {
     --adams-attention: #fffaf3; --adams-attention-line: #e8ded0;
     @if $o-webclient-color-scheme == dark { --adams-attention: #352f27; --adams-attention-line: #625341; }
-    .adams_attention { display: grid; grid-template-columns: 130px minmax(0, 1fr); border: 1px solid var(--adams-attention-line); background: var(--adams-attention); border-radius: 12px; margin: 0 0 20px; scroll-margin-top: 76px; }
+    .adams_attention { display: grid; grid-template-columns: 130px minmax(0, 1fr); border: 1px solid var(--adams-attention-line); background: var(--adams-attention); border-radius: 12px; margin: 0 0 20px; scroll-margin-top: var(--adams-scroll-offset, 76px); }
     .adams_attention_title { display: flex; align-items: center; padding: 14px; font-size: 12px; }
     .adams_attention_toggle { display: none; }
     .adams_attention_items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -413,4 +413,12 @@
       h1, h2, p, th, td { color: #17242c !important; background: white !important; }
       table { width: 100%; } th, td { padding: 5px; } tr { break-inside: avoid; } thead { display: table-header-group; } }
   }
+}
+
+.o_adams_dashboard {
+    .adams_settings_link { margin-top: 12px; color: var(--adams-purple); text-align: start; }
+    .adams_product_ranking { margin-bottom: 24px; }
+    .adams_product_ranking > .adams_hint, .adams_product_ranking > p { padding-inline: 20px; }
+    .adams_product_ranking .adams_rank_row { grid-template-columns: 24px minmax(0, 1fr); }
+    .adams_product_ranking .adams_rank_top { flex-wrap: wrap; gap: 8px; }
 }

@@ -24,6 +24,9 @@ msgid "Profitability, liquidity and working capital"
 msgstr "الربحية والسيولة ورأس المال العامل"
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_sales
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_sales
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-python
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
@@ -137,6 +140,9 @@ msgid "Confirmed purchases"
 msgstr "المشتريات المؤكدة"
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_inventory
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_inventory
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -144,6 +150,9 @@ msgid "Inventory"
 msgstr "المخزون"
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_crm
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_crm
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -369,6 +378,7 @@ msgid "Financial integrations and browser acceptance are pending. No financial t
 msgstr "تكاملات التقارير المالية واختبارات المتصفح لم تكتمل بعد. لا يتم تقدير الإجماليات المالية."
 
 #. module: adams_executive_dashboard
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #: model:ir.actions.client,name:adams_executive_dashboard.action_dashboard
 #: model:ir.ui.menu,name:adams_executive_dashboard.menu_dashboard
 #: model:res.groups,name:adams_executive_dashboard.group_dashboard_user
@@ -1267,6 +1277,9 @@ msgid "Load monthly values"
 msgstr "تحميل القيم الشهرية"
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_finance
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_finance
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-python
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
@@ -1305,6 +1318,9 @@ msgid "Workforce and approved leave."
 msgstr "القوى العاملة والإجازات المعتمدة."
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_hr
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_hr
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Human Resources"
@@ -1317,6 +1333,9 @@ msgid "HR"
 msgstr "الموارد البشرية"
 
 #. module: adams_executive_dashboard
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_procurement
+#: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_config_settings__adams_dashboard_procurement
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Procurement"
@@ -2529,3 +2548,54 @@ msgstr "ليست لديك صلاحية الوصول إلى لوحة الإدار
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
 msgid "You do not have export permission."
 msgstr "ليست لديك صلاحية التصدير."
+
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+#: model:ir.actions.act_window,name:adams_executive_dashboard.action_dashboard_settings
+msgid "Dashboard Settings"
+msgstr "إعدادات لوحة المعلومات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "Visible dashboard sections"
+msgstr "أقسام لوحة المعلومات الظاهرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "Choose the sections shown for the selected company. Reload the dashboard after saving. Visibility does not grant or revoke native application permissions."
+msgstr "اختر الأقسام الظاهرة للشركة المحددة. أعد تحميل لوحة المعلومات بعد الحفظ. لا يغيّر الإظهار صلاحيات التطبيقات الأصلية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "No dashboard sections are enabled for this company."
+msgstr "لم يتم تفعيل أي قسم في لوحة المعلومات لهذه الشركة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "Sold product ranking"
+msgstr "ترتيب المنتجات المباعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "Top five products by net invoiced sales"
+msgstr "أفضل خمسة منتجات حسب صافي المبيعات المفوترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: model_terms:ir.ui.view,arch_db:adams_executive_dashboard.view_dashboard_settings
+msgid "Posted customer invoices less credit notes, excluding tax, in the selected company and invoice-date period. Values retain their signs."
+msgstr "فواتير العملاء المرحلة بعد خصم الإشعارات الدائنة، دون الضريبة، ضمن الشركة وفترة تاريخ الفاتورة المحددتين. تحتفظ القيم بإشاراتها."
