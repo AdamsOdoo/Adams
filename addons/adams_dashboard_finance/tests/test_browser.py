@@ -1,10 +1,18 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
+import hashlib
 import json
+import logging
+import os
+from pathlib import Path
+import tempfile
+import time
+from uuid import uuid4
 from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import Command, fields
+from odoo.tools import config
 from odoo.tests import new_test_user, tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
@@ -147,11 +155,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         if not language.active:
             self.env['base.language.install'].create({'lang_ids': [Command.set(language.ids)]}).lang_install()
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        screenshot_source = Path(config['screenshots']) / self.env.cr.dbname / 'screenshots'
+        existing_screenshots = set(screenshot_source.glob('*.png'))
+        capture_prefixes = []
         for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
             self.env.user.lang = lang
             for theme, width in product(('light', 'dark'), (320, 390, 768, 1024, 1440, 1920)):
                 self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x900'
+                prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
+                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking', 'polish_sales_lower']
+                if stock_category:
+                    prefixes += ['polish_inventory_table', 'polish_inventory_page2']
+                capture_prefixes.extend(f'{prefix}_{lang}_{theme}_{width}_' for prefix in prefixes)
                 # No mocked reports or browser RPCs: interact with rendered Odoo UI.
                 code = '''
                 (async () => {
@@ -408,6 +424,52 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
                     self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=90)
+
+        # Odoo.sh may clean its temporary screenshots after startup. Retain only
+        # this successful matrix's PNGs under the configured private data_dir.
+        # A pending directory is promoted atomically only after exact coverage,
+        # PNG signature and copied-byte hashes are verified. Existing runs survive.
+        deadline = time.monotonic() + 5
+        while True:
+            current = set(screenshot_source.glob(f'*_{self._testMethodName}.png')) - existing_screenshots
+            matched = {prefix: [path for path in current if path.name.startswith(prefix)]
+                       for prefix in capture_prefixes}
+            if all(len(paths) == 1 for paths in matched.values()) or time.monotonic() >= deadline:
+                break
+            # take_screenshot's file-writing callback may finish just after its Future.
+            time.sleep(0.05)
+        self.assertEqual(len(capture_prefixes), 24 * (10 if stock_category else 8))
+        self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
+                        'Each matrix view must have exactly one newly saved screenshot')
+        retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
+        retained_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        retained_root.parent.chmod(0o700)
+        retained_root.chmod(0o700)
+        pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=retained_root))
+        manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
+                    'matrix_cases': 24, 'screenshots': len(capture_prefixes),
+                    'populated_stock': bool(stock_category), 'files': []}
+        for prefix, paths in matched.items():
+            source = paths[0]
+            self.assertFalse(source.is_symlink(), 'Evidence must be a regular screenshot')
+            content = source.read_bytes()
+            self.assertTrue(content.startswith(b'\x89PNG\r\n\x1a\n') and len(content) > 24,
+                            'Screenshot is missing its PNG header')
+            destination = pending / source.name
+            with destination.open('xb') as output:
+                output.write(content)
+            destination.chmod(0o600)
+            digest = hashlib.sha256(content).hexdigest()
+            self.assertEqual(hashlib.sha256(destination.read_bytes()).hexdigest(), digest)
+            manifest['files'].append({'prefix': prefix, 'name': source.name,
+                                      'bytes': len(content), 'sha256': digest})
+        manifest_path = pending / 'manifest.json'
+        manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+        manifest_path.chmod(0o600)
+        destination = retained_root / ('run-' + uuid4().hex)
+        os.replace(pending, destination)
+        logging.getLogger(__name__).info('ADAMS_DASHBOARD_UI_EVIDENCE: %s (%s verified PNGs)',
+                                         destination, len(capture_prefixes))
 
 
     def test_hidden_sections_are_absent_from_both_navigation_surfaces(self):
