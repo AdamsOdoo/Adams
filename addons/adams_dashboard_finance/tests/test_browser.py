@@ -294,6 +294,29 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # Instrument only evidence capture after the real browser assertions.
                     # Business data, rendering and test success are never mocked.
                     browser.take_screenshot(prefix=f'dashboard_{lang}_{theme}_{width}_').result(timeout=20)
+                    # Retain real rendered sections for semantic visual review, not
+                    # only the landing screen. This never supplies business values
+                    # or changes a test result. Responsive/theme coverage is shared
+                    # with the existing 24-case application journey above.
+                    for section in ('sales', 'inventory', 'procurement', 'crm'):
+                        expression = '''(async () => {
+                            const root = document.querySelector('.o_adams_dashboard');
+                            const section = root.querySelector('#adams-SECTION');
+                            if (!section) throw new Error('Missing visual evidence section');
+                            const toggle = section.querySelector('.adams_section_toggle');
+                            if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            const nav = root.querySelector('.adams_nav');
+                            root.scrollTop += section.getBoundingClientRect().top - root.getBoundingClientRect().top - nav.getBoundingClientRect().height - 16;
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            return {section:'SECTION', width:innerWidth, direction:getComputedStyle(root).direction};
+                        })()'''.replace('SECTION', section)
+                        observed = browser._websocket_request('Runtime.evaluate', params={
+                            'expression': expression, 'awaitPromise': True, 'returnByValue': True,
+                        })
+                        if observed.get('exceptionDetails'):
+                            raise AssertionError(observed['exceptionDetails'])
+                        browser.take_screenshot(prefix=f'polish_{section}_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
