@@ -2014,7 +2014,7 @@ msgstr "فواتير الموردين المستحقة خلال ٧ أيام"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Review native worklist \u2192"
+msgid "Review native worklist →"
 msgstr "مراجعة قائمة أودو ←"
 
 #. module: adams_executive_dashboard
@@ -2026,13 +2026,13 @@ msgstr "التحصيل والمشتريات"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Review receivable aging \u2192"
+msgid "Review receivable aging →"
 msgstr "مراجعة أعمار الذمم المدينة ←"
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Approvals & late receipts \u2192"
+msgid "Approvals & late receipts →"
 msgstr "الموافقات والاستلامات المتأخرة ←"
 
 #. module: adams_executive_dashboard

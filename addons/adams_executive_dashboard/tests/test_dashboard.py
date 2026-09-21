@@ -17,7 +17,9 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         # Exercise Odoo's actual loader: syntactically valid PO files without
         # odoo-javascript markers silently produced an English dashboard.
         for source in ('Finance', 'Business overview', 'Apply filters', 'Recent orders',
-                       'Explore delivery quantities', 'Not configured'):
+                       'Explore delivery quantities', 'Not configured',
+                       'Review native worklist →', 'Review receivable aging →', 'Approvals & late receipts →',
+                       'Search results', 'Print preview'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)
