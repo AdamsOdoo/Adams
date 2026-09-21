@@ -63,3 +63,33 @@ profitability cards, white sidebar, plum active navigation, chart/context split 
 three-card liquidity structure remain in place. Restricted/unconfigured values
 are deliberately distinct from the prototype's fictional approved figures.
 This evidence does not represent full visual signoff or all-reference-state parity.
+
+
+## Recovered reference interaction audit — 21 September 2026
+
+The original HTML was inspected for its click, keyboard, input and saved-view
+handlers, including the v2 overrides. Its file URL was rejected by the cloud
+browser, so this is a source audit plus native Odoo checks, not an interactive
+HTML-browser pass. Original reference images remain unchanged.
+
+| Reference behavior | Odoo continuation and remaining evidence |
+|---|---|
+| Six department links, active section, expand/collapse | Existing implementation retained; native EN/AR/light/dark six-width fixture recovered at d59b5d57. |
+| Native dark mode | Existing native Sass theme support retained. Manual Odoo Preferences switch verified the dark workspace and card surfaces at build 38354024; original System preference restored. |
+| Save/restore/reset view | Existing dates/company/layout retained. Corrected missing Sales list and ranking measure; restored selections reload authorized current data, with late-response protection. New native saved-view regression added. |
+| Sales orders/quotations and ranking choice | Existing controls and full-ranking drawer retained. Manual commercial-margin switch and full-ranking drawer verified on d59b5d57, preserving negative values. |
+| Clickable cards, source drawer, chart/table drilldowns | Existing routes retained; native scoped report/return and source focus checks remain source-bound. Full current-source visual review is still required. |
+| Mobile attention expansion and keyboard tabs | Already implemented; no duplicate redesign. Full manual mobile interaction acceptance is not claimed from source inspection. |
+| Prototype branch selector, scenario switch, RTL switch | Company permissions and native language/theme govern the application. Prototype-only scenario fixtures and fictional branch identities are not deployed. |
+| Prototype sample-record search, summary print/export | Native report/list search and existing scoped native exports are available; the prototype's unified sample-record search and whole-dashboard summary export are not equivalent implemented features. Exact scope/parity remains open. |
+| Approved forecast/delivery/inventory exclusions | Owner decisions 4 and 6–9 remain authoritative; do not silently restore excluded custom calculations to imitate sample numbers. |
+
+The theme and saved-view continuation does not close the entire 1:1 visual and
+interaction acceptance gate. Record remaining differences explicitly and retain
+the original 58-test evidence instead of reclassifying it as final visual signoff.
+
+Current continuation evidence: 9d9ae4ef/build 38363622 passed 58 native tests,
+zero failures/errors. Staging c6b8ad3e reports Success. Paired native light/dark
+Finance desktop screens were inspected after the module update; saved quotations
+and commercial margin restore correctly. All 19 displayed metric values match
+the pre-update snapshot. These bounded checks do not close the open parity gate.

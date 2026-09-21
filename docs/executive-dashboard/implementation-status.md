@@ -19,14 +19,25 @@ The next correction preserves the selected Sales list and ranking measure in sav
 views and native-report return navigation, matching the reference's save/restore
 behavior. Saved views retain selections only and reopen lists at page one. A race
 regression confirms that slower default loads cannot overwrite restored selections.
-21 focused controller checks pass. Native browser assertions cover the same saved
-Sales journey; their changed-source execution is pending until this candidate builds.
+21 focused controller checks pass. Candidate
+`9d9ae4efe10ba4bace6f7b2872cdf0b22558ed86`, tree
+`d6e5325b96bb676453734dfc9aa25e2543e60edd`, passed **58 native tests,
+zero failures/errors** on build **38363622** (146.35s, 60,399 queries).
+This includes saved Sales controls plus the EN/AR light/dark six-width fixture.
+The browser regression explicitly waits for rendered controls before proceeding.
+The synthetic rendered Finance baseline was 1.2037s first use and 1.0953s refresh
+p95; customer-volume/concurrency qualification is still not claimed.
 
 No accounting calculation, access right, schema or staging business data changed.
-No migration is required. Prior staging remains at 29121a55; the new UX is not yet
-claimed deployed there. Remaining work: current-source native/browser execution,
-reference interaction/visual comparison, EN/AR screenshots, staging update and owner
-UAT. The local HTML could be inspected as source, but the cloud browser rejected its
+No migration is required. Staging now runs `c6b8ad3e3e28d23dd79c3380ef1fdee10809917a`,
+which replaces only the two dashboard addons with this candidate. Odoo.sh reports
+Success. The backup was verified at 2026-09-21 05:04:49 UTC; the installed executive
+dashboard was upgraded through native Apps. All 19 displayed finance/Sales values
+match the pre-update snapshot exactly for September-to-date and cutoff 21 September.
+Manual staging save/change/restore retains quotations and commercial margin.
+Paired current-staging Finance light/dark screenshots were inspected. Remaining
+work: full reference interaction/visual comparison, current Arabic screenshot
+retention, independent review and owner UAT. The local HTML could be inspected as source, but the cloud browser rejected its
 file URL; no interactive reference-browser pass is claimed. Production stays prohibited.
 
 ## Previous staging handoff — 20 September 2026
