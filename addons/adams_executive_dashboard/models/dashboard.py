@@ -311,6 +311,7 @@ class ExecutiveDashboard(models.AbstractModel):
             'supplier_due_30': _('Supplier bills due in 30 days'),
         }
         count = 0
+        print_rows = []
         for section, label in [('finance', _('Accounting & Finance')), ('sales', _('Sales')), ('operations', _('Operations'))]:
             result = scoped.get_section(section, options)
             for item in [*result['items'], *result.get('supplier_windows', [])]:
@@ -322,9 +323,14 @@ class ExecutiveDashboard(models.AbstractModel):
                        provenance.get('model') or item.get('source', ''), result.get('generated_at', ''),
                        provenance.get('fingerprint', ''), _('Yes') if item.get('has_warnings') else '', item.get('date_field', '')]
                 writer.writerow([safe(value) for value in row])
+                print_rows.append({'section': row[0], 'metric': row[1], 'value': row[2],
+                                   'unit': row[3], 'status': row[4], 'warning': bool(item.get('has_warnings'))})
                 count += 1
         return {'filename': f'adams-executive-summary-{dates[0]}-{dates[1]}.csv',
-                'content': '\ufeff' + output.getvalue(), 'row_count': count}
+                'content': '\ufeff' + output.getvalue(), 'row_count': count,
+                'print_rows': print_rows, 'company': scoped.env.company.name,
+                'currency_digits': scoped.env.company.currency_id.decimal_places,
+                'scope': dict(options), 'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
 
     @api.model
     def get_section(self, section, options):

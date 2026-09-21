@@ -395,3 +395,18 @@ test('restricted finance is labelled restricted in attention', () => {
     controller.state.sections.finance = {status:'ready',items:[{key:'payables',status:'restricted',value:null}]};
     assert.equal(controller.supplierStatus, 'Access restricted');
 });
+
+
+test('print preparation rejects an old company response', async () => {
+    const {controller, pending, notifications} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    const printing = controller.printDashboard();
+    controller.state.draft.company_id = 2;
+    const refresh = controller.refresh();
+    pending[0].resolve({print_rows: [{value: 999}]});
+    await printing;
+    for (const request of pending.slice(1)) request.resolve(data(0));
+    await refresh;
+    assert.equal(controller.state.printSummary, null);
+    assert.equal(notifications.length, 0);
+});

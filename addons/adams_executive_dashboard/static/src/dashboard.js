@@ -54,7 +54,7 @@ export class ExecutiveDashboard extends Component {
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.searchDialog.el;
@@ -211,6 +211,7 @@ export class ExecutiveDashboard extends Component {
         const options = { ...this.state.draft, company_id: Number(this.state.draft.company_id) };
         this.state.applied = options;
         this.closeSearch();
+        this.state.printSummary = null;
         this.state.detail = null;
         this.state.directory = null;
         this.state.cashSearch = '';
@@ -345,6 +346,28 @@ export class ExecutiveDashboard extends Component {
         } catch {
             if (this.alive) this.notification.add(_t('The record is unavailable in the selected scope.'), { type: 'warning' });
         } finally { if (this.alive) this.state.opening = false; }
+    }
+
+    printValue(row) {
+        return row.value === null ? '—' : new Intl.NumberFormat(document.documentElement.lang || 'en', {
+            maximumFractionDigits: this.state.printSummary.currency_digits,
+        }).format(row.value);
+    }
+
+    async printDashboard() {
+        if (!this.state.applied || this.state.exporting) return;
+        const generation = this.generation;
+        this.state.exporting = true;
+        this.state.printSummary = null;
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'export_summary', [{ ...this.state.applied }]);
+            if (!this.alive || generation !== this.generation) return;
+            this.state.printSummary = data;
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            if (this.alive && generation === this.generation) window.print();
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('Export unavailable. Check your export permissions or use the native report for large exports.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.exporting = false; }
     }
 
     async exportSummary() {
