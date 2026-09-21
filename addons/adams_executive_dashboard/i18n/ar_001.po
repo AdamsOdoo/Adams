@@ -2282,3 +2282,21 @@ msgstr "وقت الجلب بتوقيت UTC:"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Values follow the native reports. Unavailable values are not zero. Use the CSV export for source and scope details."
 msgstr "تتبع القيم التقارير الأصلية. القيم غير المتاحة ليست صفراً. استخدم ملف CSV للاطلاع على تفاصيل المصدر والنطاق."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Print preview"
+msgstr "معاينة الطباعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Print / Save PDF"
+msgstr "طباعة / حفظ PDF"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Close preview"
+msgstr "إغلاق المعاينة"

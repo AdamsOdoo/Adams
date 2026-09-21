@@ -368,6 +368,10 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         for key, expected in [('opening_balance', 50), ('net_increase', 80), ('closing_balance', 130)]:
             self.assertEqual(values[report._get_generic_line_id(None, None, markup=key)], expected)
             self.assertEqual(result['bridge'][key]['value'], expected)
+        summary = self.dashboard.export_summary(self.options)
+        printed_flow = next(row for row in summary['print_rows'] if row['metric'] == 'Net cash movement')
+        self.assertEqual(printed_flow['value'], 80)
+        self.assertIn('Net cash movement,80', summary['content'])
         # Unclassified activity is shown, not discarded to force a bridge.
         self.assertIn(report._get_generic_line_id(None, None, markup='unclassified_activities'), values)
         action = self.dashboard.open_report('cash_flow', self.options)
