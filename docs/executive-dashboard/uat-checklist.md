@@ -1,5 +1,30 @@
 # Adams For Men dashboard — staging UAT
 
+## Current visual-polish follow-up — not yet ready for owner UAT
+
+The current polish work is **under qualification**. The `a88e9628` readiness
+statement retained below is historical and does not approve the new candidate.
+The latest reviewed run (`7930`, build **38414698**) passed 65 Odoo tests and
+retained 240 captures, but review of 40 contact sheets found **Medium RTL
+stock-table clipping**. The correction is implemented at `c17dd27e4eb982eee995f547d93e5e44de19b6a1` but remains open until new rendering evidence confirms it. Build38415574 reported a platform error and Cloud Browser disconnected. Staging remains65ccfa9c; no new upgrade occurred. The backup at18:56:40UTC and before-values are retained.
+
+Before inviting owner UAT, complete and record:
+
+- [ ] Final source SHA/tree and successful qualification build: **pending**.
+- [ ] Final English/Arabic × Odoo Light/Dark × six-width visual review: **pending**.
+- [ ] Durable final screenshot archive, manifest and checksum: **pending**.
+- [ ] Exact staging revision, verified backup and dashboard-only upgrade build: **pending**.
+- [ ] Staging journeys and unchanged critical displayed values: **pending**.
+- [ ] Independent review with no unresolved Critical/High issues and explicit RTL clipping disposition: **pending**.
+- [ ] Restore agreed user language/theme after testing: **pending**.
+
+Owner acceptance remains separate. Keep PR #214 draft; main and production remain
+prohibited. See [current implementation status](implementation-status.md) and
+[qualification history](change-20260921-visual-polish.md).
+
+## Previous enhancement UAT baseline — historical
+
+
 Use the authorized **Adams For Men staging database**, company **Adams For Men**,
 currency **EGP**. Production and main are excluded. The agreed scope is recorded
 in [owner decisions](owner-decisions.md). See [implementation status](implementation-status.md)

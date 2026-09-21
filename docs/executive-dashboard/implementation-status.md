@@ -1,7 +1,63 @@
 # Executive dashboard — implementation and verification
 
+## Current visual polish — qualification in progress
 
-## Current design enhancements — qualified for owner UAT
+**This follow-up is not yet owner-UAT-ready.** The earlier `a88e9628` readiness
+record below describes the previous enhancement delivery, not this visual-polish
+candidate. Preserve that history; do not use it as acceptance of the new work.
+See [visual-polish change record](change-20260921-visual-polish.md).
+
+The latest reviewed qualification run (`7930` / build **38414698**) passed
+**65 Odoo tests** and retained **240 actual browser captures**. Visual review of
+**40 contact sheets** nevertheless found a **Medium RTL stock-table clipping
+issue**. Correction is implemented at `c17dd27e4eb982eee995f547d93e5e44de19b6a1`; its first build **38415574** reported a platform error. Corrected-candidate rendering is not yet verified. Passing automated
+checks did not close the visual defect. No final independent approval is claimed.
+
+| Final handoff field | Current status |
+|---|---|
+| Exact executable source SHA / tree | `c17dd27e4eb982eee995f547d93e5e44de19b6a1` / `d74f08108ad3e7a2da1a4b16dc6e906ce2975f7d` |
+| Odoo.sh qualification build / test result | 38415574 platform error; no qualifying result. 37 controller checks pass; syntax/PO/diff checks pass. |
+| English/Arabic × Light/Dark × six widths | Pending final visual review after RTL correction |
+| Durable screenshot archive / manifest / checksum | Pending final candidate; 240 captures retained for the reviewed `7930` run |
+| Current staging revision / backup / before values | Unchanged `65ccfa9c73effc133b2dfda5d89fe50e78e3ac7a`, clean runtime verified; backup 2026-09-21 18:56:40 UTC; 21 displayed values and 21 cash-account rows retained |
+| Intended dashboard-only staging revision / upgrade build | Not deployed; preserve staging 65ccfa9c / build38409525 |
+| Staging interactions / critical-value comparison | Pending exact staged candidate verification |
+| Independent final engineering review | Pending; RTL clipping remains open until corrected evidence is reviewed |
+| Owner UAT | Pending; PR #214 stays draft, main and production prohibited |
+
+
+### Current blocker and exact continuation
+
+Cloud Browser disconnected with `exec-server transport disconnected` during build
+recovery. Reconnection and the supported runtime reset did not return. No alternate
+browser or hidden application access was used. Native qualification and live staging
+verification cannot be claimed while this surface is unavailable. The final preference
+restore action to English (US)/Dark was submitted before disconnect; settled readback
+is still required. Staging source and business data were not changed by this polish.
+
+Resume the existing feature head and preserve the local work branch. Recover Odoo.sh
+build38415574 or rebuild the same addon trees; inspect the retained 240-state matrix
+and close the RTL issue. Then reverify staging source/backup, deploy only the two
+qualified dashboard addon trees, confirm module upgrade, compare the retained values,
+review every enabled section and key interaction in Cloud Browser, restore preferences,
+and obtain final independent review. Do not deploy the unreferenced earlier staging
+candidate `fcefd26e`; it contains superseded code. No owner decision or additional
+routine staging permission is required to continue this authorized work.
+
+See [independent review](independent-review-20260921-visual-polish.md). Core version
+19.0.1.4.2, finance19.0.1.4.0; no report/source/security logic changed.
+
+
+### Private continuity evidence
+
+`Adams_Dashboard_UI_Polish_Checkpoint_20260921.zip` (38,926,650 bytes), SHA-256
+`60f8e8ac26504aa9e0503ecc93c95cea49dfda1ed12a92aa4269ebb2015e9aa5`, contains
+source-bound native archives (120 and 240 images), raw results/manifests, original
+UX v2 references, actual pre-upgrade staging screenshots/values and review records.
+The 240-image archive belongs to793059d4; it does not verifyc17dd27e. Customer
+screenshots/values stay private and are not committed to this public repository.
+
+## Previous design enhancements — historical qualification
 
 Executable source **a88e9628997f72fda5f225130456d2fa6aef4ce4**, tree
 `a0629b019ebaf83529f22c7ab46d6fc166aa8e71`.

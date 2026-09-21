@@ -1,5 +1,20 @@
 # UX v2 visual fidelity — blocking acceptance gate
 
+## Current polish gate — 21 September, not closed
+
+Live staging review and the retained 793059d4 matrix (240 actual screenshots across
+EN/AR × native Light/Dark ×320/390/768/1024/1440/1920) identified typography, spacing,
+Sales panel-height, pagination, source-dialog and date-wrap defects. The implemented
+shared corrections preserve UX v2 composition and authoritative Odoo sources.
+Independent inspection of all40 contact sheets and selected full-resolution originals
+found one remaining Medium RTL stock identity clipping issue. c17dd27e fixes its
+layout cause, with geometry/scroll regressions; corrected rendering is pending after
+build38415574 Platform error and Cloud Browser transport loss. This current gate
+supersedes readiness impressions in historical records below. No final approval or
+post-polish staging visual pass is claimed. See the independent review and current
+implementation-status for exact continuation.
+
+
 The supplied `Odoo_Executive_Dashboard_UX_v2.html` and Finance/Sales/Mobile PNGs
 are the design authority. Their hashes are recorded in `requirements/input-manifest.json`.
 The contract supersedes fictional data/calculations, not the visual hierarchy.
