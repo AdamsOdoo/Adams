@@ -149,7 +149,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
                     const surface = getComputedStyle(card).backgroundColor;
                     if (surface !== (THEME === 'dark' ? 'rgb(38, 42, 54)' : 'rgb(255, 255, 255)')) throw new Error('Card has incorrect theme surface');
-                    if (root.querySelectorAll('.adams_header_actions button').length !== 3) throw new Error('Reference view controls are missing');
+                    if (root.querySelectorAll('.adams_header_actions button').length !== 5) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
                     if (WIDTH < 760) {
