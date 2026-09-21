@@ -5,21 +5,22 @@ currency **EGP**. Production and main are excluded. The agreed scope is recorded
 in [owner decisions](owner-decisions.md). See [implementation status](implementation-status.md)
 for the exact tested/deployed source and evidence boundaries.
 
-**New follow-up is pending native qualification and is not deployed:** source
-6ac4798a adds product ranking, section settings and scroll tracking (19.0.1.3.0).
-28 local controller checks pass; Odoo.sh is still queuing the native test build.
-Fresh pre-upgrade backup: **2026-09-21 08:28:54 UTC**, staging 06a5274b.
-The three new journeys below are acceptance instructions, not completed results.
+Current enhancement candidate: **a88e9628**, core **19.0.1.4.1**, finance **19.0.1.4.0**.
+The candidate is **ready for owner UAT**. Build **38409118** passed **65 Odoo tests,
+zero failures/errors**; **37 controller checks** pass. Staging **65ccfa9c**, upgrade
+build **38409525**, contains the qualified addon trees. All 22 displayed values
+matched the initial upgrade snapshot; HR was then disabled through Settings.
+Fresh pre-upgrade backup: **2026-09-21 16:35:54 UTC**, staging 06a5274b.
+Owner UAT signoff is not implied by automated or technical checks.
 
-The staging candidate is **ready for owner UAT** at source **ef01fbe6**, addon version **19.0.1.2.2**.
-Native build **38371030** passes **60 tests with zero failures/errors**; the 25 controller checks pass. Staging is **06a5274b**; exact identities and evidence are in implementation-status.md.
-The current pre-update backup is **21 September 2026, 07:08 UTC**. Older
-source/build/backup details below are retained as historical evidence.
+Technical evidence: initial 22-value comparison unchanged; final 21-value comparison
+unchanged after hiding HR. The filtered Inventory/CRM scroll boundary now passes.
+The unchecked boxes below are reserved for the owner’s acceptance.
 
 ## Start UAT
 
 Open [Executive Dashboard in staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004)
-or use the app menu. Use existing authorized native roles.
+or use the app menu. Use existing authorized Odoo roles.
 Select the company, period and Balance as of date, then Apply filters. Check the
 applied dates before comparing any result. Returning through the dashboard
 breadcrumb restores the scope and reloads current authorized values.
@@ -32,11 +33,11 @@ breadcrumb restores the scope and reloads current authorized values.
 | Supplier windows | Check overdue, due today, days 1–7 and days 1–30. The 30-day window includes the first seven days. Drill-down and export must identify and retain the same bill-installment window. |
 | Budgets | Use existing applicable native budgets only. This staging company has none configured; expect No target configured. |
 | Sales | Compare invoiced sales, confirmed orders and quotations separately. Check salesperson/customer breakdowns, recent documents, native analysis and export. |
-| Product ranking | Compare the top five signed net invoiced product values to Invoice Analysis for the same company/date range; credit notes reduce sales, tax is excluded. Open a product and Full ranking. |
+| Product ranking | Compare Top 5/10 net invoiced product values to Invoice Analysis for the same company/date range. Check Quantity sold by one unit; credit notes reduce quantities. Open a product and Full ranking. |
 | Section settings | As administrator disable HR, Save and reload: HR disappears from both navigation surfaces, body and summary. Re-enable and verify it returns. Verify choices are company-specific; all-disabled has a clear empty state. |
 | Scroll tracking | Scroll down and up; the active category follows the visible section beneath the sticky tabs. Click a short final section and verify it stays selected. Repeat after resizing and in Arabic. |
 | Fulfillment | Inspect ordered, delivered and remaining quantities by product/UoM. No mixed-unit headline, valued backlog or custom on-time percentage is required. |
-| Inventory | Open current stock and stock at the balance cutoff. Compare quantities and native operational valuation by product. Check forecast/replenishment routes with existing stock rights. |
+| Inventory | Filter stock by warehouse, category, product and date. Compare each product/location row to the stock report; test independent zero/negative hiding, numbered pages, source data and return navigation. Historical dates omit current availability/forecast columns. |
 | Purchasing | Inspect awaiting-approval and native late-receipt worklists. Open a record and return. Viewing does not approve, receive or bill an order. |
 | CRM and HR | Use existing native opportunity and workforce sources. Empty results remain explicit. Time Off is not installed in this staging database, so leave hours correctly show App not installed. |
 | Access | Dashboard membership must not grant native accounting, HR, stock or export rights. Check each intended UAT user's existing permissions before granting access. |
@@ -90,7 +91,7 @@ are distinct. Independent engineering review and owner UAT signoff must be recor
 before calling this an approved release. No main merge or production deployment
 is authorized by this checklist.
 
-## Current-design enhancement acceptance (new candidate; not yet signed off)
+## Current-design enhancement owner acceptance (technical checks passed; owner signoff pending)
 
 - [ ] Existing layout retained; English/Arabic and Odoo light/dark reflow without clipping.
 - [ ] Invoice and order salesperson rankings use their correct periods and source records.

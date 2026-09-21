@@ -35,18 +35,28 @@ main, financial mappings and business records remain outside this change.
 
 ## Evidence and limits
 
-36 local controller tests pass; Python/XML parse checks pass. New Odoo fixtures cover
+37 local controller tests pass; Python/XML parse checks pass. New Odoo fixtures cover
 strict location quantities, negative/zero filters, category/warehouse scope, pagination,
 historical dates, source actions, archived accounts and unit-separated refund ranking.
-These fixtures require the Odoo.sh build; their presence is not a passing result.
-Native build, live staging reflow/interactions and owner UAT remain pending.
+Candidate e24bde9e, Odoo.sh build 38408224, passed 65 tests with zero failures/errors
+(170.51s, 65,223 queries). It was deployed to staging c82159cc, build 38408548.
+All 22 displayed values matched the pre-upgrade snapshot at identical dates.
+Live Settings save/reload hides HR. Historical stock at 2026-08-31 for Hair Care /
+مخزن النزهة reconciles to the source report (first conditioner: 1 PCS), and return
+navigation retains those filters. Top 10/quantity mode correctly compares PCS.
+English Light and Arabic Dark were visually checked with the original layout.
+
+Live filtering revealed a final scroll threshold edge case: only CRM's footer
+remained above the Inventory heading, yet CRM stayed selected. Candidate a88e9628
+adds a bounded 64px content tracking zone below the sticky navigation; the focused
+controller regression passes. Its final build 38409118 passed 65 tests, zero failures/errors (181.13s, 65,148 queries). Staging 65ccfa9c/build38409525 successfully upgraded. The exact previously failing geometry now highlights Inventory in both navigation surfaces, with six historical rows rendered.
+Owner acceptance remains separate from technical verification.
 
 ## Upgrade / rollback
 
-Both addons advance to 19.0.1.4.0. No new business data migration or accounting formula.
+Core advances to 19.0.1.4.1; finance is 19.0.1.4.0. No new business data migration or accounting formula.
 Upgrade both addons after feature qualification. Roll back only the two addon trees to
-previous staging 06a5274b if needed, preserving unrelated code and business data. Previous
-staging backup was verified at 2026-09-21 08:28:54 UTC; take a fresh backup before upgrade.
+previous staging 06a5274b if needed, preserving unrelated code and business data. Fresh staging backup was verified at 2026-09-21 16:35:54 UTC before upgrade.
 
 ## Primary source contracts
 

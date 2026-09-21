@@ -51,9 +51,9 @@ Left/Right and Home/End keyboard navigation.
 
 Use **Source & definition** for the exact value, source, scope and retrieval
 information. Large headlines can be abbreviated; the source drawer retains precision.
-Use a card or supported row's native-report control to investigate in Odoo. Return
+Use a card or supported row's report control to investigate in Odoo. Return
 with the **Executive Dashboard** breadcrumb to restore applied filters and selected
-lists while fetching fresh values. transactional actions remain in Odoo.
+lists while fetching fresh values. Transactional actions remain in Odoo.
 
 Profitability uses approved P&L/ratio definitions. Cash movement uses the Cash Flow Statement; cash account balances use the General Ledger. The
 standard short-term forecast is not a daily cash plan. Aging uses the selected
@@ -71,7 +71,7 @@ accounts remain discoverable. The visible page does not determine the headline.
 
 Sales invoice amounts, confirmed orders and quotations are separate measures.
 Commercial margin uses the installed current-cost measure; it is not P&L
-gross profit. Rankings preserve negative and unassigned values. delivery
+gross profit. Rankings preserve negative and unassigned values. Delivery
 quantities are shown by product and unit; quantities are not combined across units.
 Inventory distinguishes current figures from historical cutoff figures. HR access
 requires HR rights and does not expose payroll.
@@ -116,7 +116,7 @@ resumes automatic tracking.
 
 ### ترتيب المنتجات وإظهار الأقسام
 
-تعرض المبيعات أفضل خمسة منتجات حسب صافي قيمة المبيعات المفوترة دون الضريبة،
+تعرض المبيعات أفضل خمسة أو عشرة منتجات حسب صافي قيمة المبيعات المفوترة دون الضريبة،
 بعد خصم الإشعارات الدائنة، للشركة وفترة تاريخ الفاتورة المطبقتين. افتح المنتج
 للوصول إلى تحليل الفواتير الأصلي، أو اختر الترتيب الكامل لعرض التحليل المجمع.
 
@@ -199,7 +199,7 @@ The summary follows the user language. Currency values use company precision; co
 صلاحية التصدير الأصلية في أودو. يستخدم **طباعة الملخص** القيم نفسها في معاينة واضحة. اختر طباعة / حفظ PDF لفتح نافذة الطباعة في
 المتصفح، أو أغلق المعاينة للعودة. للتفاصيل الكاملة استخدم التقرير الأصلي.
 
-## Current UI enhancements — deployment qualification pending
+## Current UI enhancements
 
 Use **Top 5 / Top 10** for the Sales rankings. Salespeople have separate invoice and
 confirmed-order widgets; customers use net invoices. Products can be ranked by
@@ -225,7 +225,7 @@ preferences; **Dashboard Settings** controls section visibility for the company.
 A notice reminds you to apply edited date/company filters. **Retry section** reloads
 a failed section without clearing successful sections.
 
-### تحسينات الواجهة الحالية — التحقق من النشر قيد التنفيذ
+### تحسينات الواجهة الحالية
 
 اختر أفضل ٥ أو ١٠ في ترتيب المبيعات. تظهر قوائم منفصلة لمندوبي المبيعات حسب
 الفواتير وأوامر البيع، وللعملاء والمنتجات. يمكن ترتيب المنتجات حسب القيمة أو

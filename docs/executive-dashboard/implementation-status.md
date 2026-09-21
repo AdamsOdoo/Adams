@@ -1,17 +1,44 @@
 # Executive dashboard — implementation and verification
 
 
-## Current design enhancements — verification in progress
+## Current design enhancements — qualified for owner UAT
 
-Candidate **9b102e99f37dad40f654b198d1bdac19723e1d30**, tree
-`d6508262d00af0eaed7a55d4e336518f27568707`, versions **19.0.1.4.0**, implements
-the expanded stock/cash/ranking/navigation scope while preserving the existing UI.
-**36 controller tests pass**; Python/XML and diff checks pass. Odoo.sh is starting
-the candidate build. Native and live staging acceptance have not yet passed.
-Prior queued candidates 6ac4798a/ca0b69f5 failed installation: unsupported Settings
-action target `inline`; corrected to `current`. See the
-[current change contract](change-20260921-current-ui-enhancements.md).
-Historical source-bound observations below are retained; they do not qualify this code.
+Executable source **a88e9628997f72fda5f225130456d2fa6aef4ce4**, tree
+`a0629b019ebaf83529f22c7ab46d6fc166aa8e71`.
+Core **19.0.1.4.1**, finance **19.0.1.4.0**. The existing dashboard design is retained.
+Odoo.sh build **38409118** passed **65 tests, zero failures/errors**, 181.13s,
+65,148 queries. All **37 controller tests** pass, including the filtered-section
+scroll regression. The Odoo suite includes English/Arabic, Light/Dark, six widths,
+source/search/print journeys, hidden sections and report/security contracts.
+
+Authorized staging is **65ccfa9c73effc133b2dfda5d89fe50e78e3ac7a**, tree
+`2cbe9c86ae0b12ede8afbc05a8503a8d78e63b49`, upgrade build **38409525**.
+Only the dashboard addon trees were deployed; disposable test addons are excluded.
+Upgrade logs show both modules and registry loaded successfully. Odoo.sh reports
+Warning for duplicate Human Resources settings labels in documents_hr and the
+dashboard; there is no upgrade error. Backup verified **2026-09-21 16:35:54 UTC**.
+
+The initial enhancement upgrade preserved all **22 displayed values** at identical
+company/dates. HR was then disabled through real company Settings and persisted
+on reload. Historical stock filters reconcile with the stock report and survive
+source navigation. Direct stock page 14 shows 20 of 345 matching product locations
+and disables Next. Top 10/quantity mode displays signed quantities in one unit.
+English Light and Arabic Dark visual checks passed; preferences restored to
+English (US)/Dark. No visible English dashboard guidance contains “native”.
+Final staging readback retained all 21 remaining displayed values after HR was hidden.
+The previously failing filter geometry now selects Inventory in both navigation
+surfaces; manual scrolling upward selects CRM and downward returns to Inventory.
+See [current change contract](change-20260921-current-ui-enhancements.md) and
+[UAT checklist](uat-checklist.md). Owner signoff and independent engineering review
+remain separate from this technical qualification; main/production are unchanged.
+
+### Earlier candidates (historical, superseded)
+
+9b102e99 failed with stale test expectations after the Settings action target was
+corrected. 4e06cafe/build38407345 passed65; e24bde9e/build38408224 passed65 and was
+initially staged as c82159cc. Live filtering exposed the final scroll threshold
+edge case, corrected and independently rebuilt in a88e9628. Earlier queue/failure
+observations below are retained for provenance and are not current instructions.
 
 ## Product ranking, section settings and scroll follow-up — qualification pending
 
