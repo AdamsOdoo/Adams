@@ -2882,3 +2882,9 @@ msgstr "صافي الحركة النقدية المسجلة خلال الفتر�
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "This stock report could not be opened. Check your access and try again."
 msgstr "تعذر فتح تقرير المخزون. تحقق من صلاحياتك وحاول مرة أخرى."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Products ranked by net quantity sold"
+msgstr "ترتيب المنتجات حسب صافي الكمية المباعة"
