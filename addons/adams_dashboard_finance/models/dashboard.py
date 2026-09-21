@@ -16,7 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 class UnsupportedFinancialScope(Exception):
-    """The native engine returned a scope this adapter cannot represent."""
+    """The engine returned a scope this adapter cannot represent."""
 
 
 class ExecutiveDashboard(models.AbstractModel):
@@ -89,6 +89,8 @@ class ExecutiveDashboard(models.AbstractModel):
         result = {'items': [], 'supplier_windows': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
                   'currency': currency.name, 'digits': currency.decimal_places,
                   'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
+        if 'finance' not in scoped._visible_sections():
+            return result
         try:
             scoped._finance_access()
         except AccessError:
@@ -234,7 +236,7 @@ class ExecutiveDashboard(models.AbstractModel):
                             source=mapping.report_id.display_name,
                             definition=_('Posted supplier-bill installments outstanding at the balance cutoff. '
                                          'The 30-day window includes the first 7 days. '
-                                         'Standalone credits and unapplied payments remain in full native aging.'),
+                                         'Standalone credits and unapplied payments remain in full aging.'),
                             provenance={'model': 'account.report', 'report_id': mapping.report_id.id,
                                         'expression_id': mapping.expression_id.id, 'options': prepared,
                                         'company_id': self.env.company.id,
@@ -276,12 +278,12 @@ class ExecutiveDashboard(models.AbstractModel):
             totals = info['column_groups_totals'].get(group, {})
             value = totals.get(mapping.expression_id.id, {}).get('value')
             if type(value) not in (int, float) or not math.isfinite(value):
-                raise ValidationError(_('The native report returned an unsupported scope.'))
+                raise ValidationError(_('The report returned an unsupported scope.'))
             status = 'ready'
             if key in RATIO_KEYS:
                 denominator = totals.get(mapping.denominator_expression_id.id, {}).get('value')
                 if type(denominator) not in (int, float) or not math.isfinite(denominator):
-                    raise ValidationError(_('The native report returned an unsupported scope.'))
+                    raise ValidationError(_('The report returned an unsupported scope.'))
                 if denominator == 0:
                     value, status = None, 'undefined_ratio'
             rows.append({'label': start.strftime('%Y-%m'), 'date_from': start.isoformat(),
@@ -312,7 +314,7 @@ class ExecutiveDashboard(models.AbstractModel):
             scoped, dates = self._scope(options)
             scoped._finance_access()
             if dimension is not None or group_id is not None:
-                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
             mapping = scoped._financial_mapping('payables')
             if not scoped._mapping_ready(mapping):
                 raise ValidationError(_('Review and approve this financial mapping first.'))
@@ -329,13 +331,13 @@ class ExecutiveDashboard(models.AbstractModel):
             scoped, dates = self._scope(options)
             scoped._finance_access()
             if dimension is not None or group_id is not None:
-                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
             mapping = scoped._financial_mapping(key.removeprefix('budget_'))
             if not scoped._mapping_ready(mapping):
                 raise ValidationError(_('Review and approve this financial mapping first.'))
             budget = scoped._budget_data(mapping, dates, {})
             if budget['status'] != 'ready':
-                raise ValidationError(_('The native budget is unavailable for this scope.'))
+                raise ValidationError(_('The budget is unavailable for this scope.'))
             return {'type': 'ir.actions.client', 'tag': 'account_report', 'name': mapping.report_id.display_name,
                     'keep_journal_groups_options': True,
                     'context': dict(scoped.env.context, report_id=mapping.report_id.id),
@@ -344,7 +346,7 @@ class ExecutiveDashboard(models.AbstractModel):
             scoped, dates = self._scope(options)
             scoped._finance_access()
             if dimension is not None or group_id is not None:
-                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
             metric = key.removeprefix('partner_')
             mapping = scoped._financial_mapping(metric)
             if not scoped._mapping_ready(mapping) or not mapping.partner_ledger_report_id:
@@ -357,7 +359,7 @@ class ExecutiveDashboard(models.AbstractModel):
             expected = {item['id'] for item in aging_options['account_type'] if item.get('selected')}
             actual = {item['id'] for item in prepared.get('account_type', []) if item.get('selected')}
             if actual != expected or prepared.get('unreconciled') or prepared.get('partner_ids'):
-                raise ValidationError(_('The native report returned an unsupported scope.'))
+                raise ValidationError(_('The report returned an unsupported scope.'))
             return {'type': 'ir.actions.client', 'tag': 'account_report', 'name': report.display_name,
                     'keep_journal_groups_options': True,
                     'context': dict(scoped.env.context, report_id=report.id),
@@ -366,7 +368,7 @@ class ExecutiveDashboard(models.AbstractModel):
             scoped, dates = self._scope(options)
             scoped._finance_access()
             if dimension is not None or group_id is not None:
-                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
             mapping = scoped._financial_mapping('cash')
             if not scoped._mapping_ready(mapping) or not mapping.cash_flow_report_id:
                 raise ValidationError(_('Review and approve this financial mapping first.'))
@@ -378,21 +380,21 @@ class ExecutiveDashboard(models.AbstractModel):
                     'params': {'options': prepared, 'ignore_session': True}}
         if key == 'cash_account':
             if dimension is not None:
-                raise ValidationError(_('Use the native financial report filters for further analysis.'))
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
             return self._open_cash_account(options, group_id)
         if key not in dict(METRICS):
             return super().open_report(key, options, dimension, group_id)
         scoped, dates = self._scope(options)
         scoped._finance_access()
         if dimension is not None or group_id is not None:
-            raise ValidationError(_('Use the native financial report filters for further analysis.'))
+            raise ValidationError(_('Use the financial report filters for further analysis.'))
         mapping = scoped._financial_mapping(key)
         if not scoped._mapping_ready(mapping):
             raise ValidationError(_('Review and approve this financial mapping first.'))
         try:
             prepared = scoped._financial_options(mapping.report_id, key, dates)
         except UnsupportedFinancialScope as error:
-            raise ValidationError(_('The native report returned an unsupported scope.')) from error
+            raise ValidationError(_('The report returned an unsupported scope.')) from error
         # Verified against account_reports' AccountReportController: explicit
         # options plus ignore_session prevent saved native filters replacing scope.
         return {'type': 'ir.actions.client', 'tag': 'account_report',

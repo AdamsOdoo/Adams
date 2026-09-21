@@ -1,4 +1,4 @@
-"""Thin adapters for native stock services and authorized workforce aggregates."""
+"""Thin adapters for stock services and authorized workforce aggregates."""
 from datetime import datetime, time, timedelta
 
 import pytz
@@ -33,13 +33,119 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         domain = [('is_storable', '=', True), ('company_id', 'in', [False, self.env.company.id])]
         return products, domain
 
+    def _inventory_filter_scope(self, options, mode, filters):
+        scoped, dates = self._scope(options)
+        if not isinstance(filters, dict) or set(filters) - {'warehouse_id', 'category_id', 'location_id', 'hide_zero', 'hide_negative', 'search', 'at_date'}:
+            raise ValidationError(_('Invalid stock filters.'))
+        filters = dict(filters)
+        if mode == 'historical' and filters.get('at_date'):
+            if not isinstance(filters['at_date'], str):
+                raise ValidationError(_('Choose a valid inventory date.'))
+            try:
+                dates = (*dates[:2], fields.Date.to_date(filters['at_date']))
+            except (TypeError, ValueError):
+                raise ValidationError(_('Choose a valid inventory date.'))
+        products, domain = scoped._stock_scope(dates, mode)
+        for key in ('hide_zero', 'hide_negative'):
+            if key in filters and type(filters[key]) is not bool:
+                raise ValidationError(_('Invalid quantity filter.'))
+        for key in ('warehouse_id', 'category_id', 'location_id'):
+            if filters.get(key) and (type(filters[key]) is not int or filters[key] < 1):
+                raise ValidationError(_('Invalid stock filter.'))
+        locations = scoped.env['stock.location'].with_context(active_test=False)
+        locations.check_access('read')
+        locations.check_field_access_rights('read', ['complete_name', 'usage', 'company_id', 'parent_path'])
+        warehouses = scoped.env['stock.warehouse'].search([('company_id', '=', scoped.env.company.id)])
+        location_domain = [('usage', '=', 'internal'), ('company_id', 'in', [False, scoped.env.company.id])]
+        if filters.get('warehouse_id'):
+            warehouse = warehouses.filtered(lambda w: w.id == filters['warehouse_id'])
+            if not warehouse:
+                raise AccessError(_('This warehouse is unavailable in the selected company.'))
+            location_domain.append(('id', 'child_of', warehouse.view_location_id.id))
+        if filters.get('location_id'):
+            location_domain.append(('id', '=', filters['location_id']))
+        locations = locations.search(location_domain, order='complete_name, id')
+        if filters.get('location_id') and not locations:
+            raise AccessError(_('This location is unavailable in the selected scope.'))
+        if filters.get('category_id'):
+            category = scoped.env['product.category'].search([('id', '=', filters['category_id'])], limit=1)
+            if not category:
+                raise AccessError(_('This product category is unavailable.'))
+            domain.append(('categ_id', 'child_of', category.id))
+        search = filters.get('search', '')
+        if not isinstance(search, str) or len(search) > 100:
+            raise ValidationError(_('Enter a product name or reference of up to 100 characters.'))
+        if search.strip():
+            domain += ['|', ('name', 'ilike', search.strip()), ('default_code', 'ilike', search.strip())]
+        if filters.get('hide_zero') and filters.get('hide_negative'):
+            domain.append(('qty_available', '>', 0))
+        elif filters.get('hide_zero'):
+            domain.append(('qty_available', '!=', 0))
+        elif filters.get('hide_negative'):
+            domain.append(('qty_available', '>=', 0))
+        return scoped, dates, products, domain, locations, warehouses
+
+    def _get_inventory_locations(self, options, offset, mode, filters):
+        scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
+        columns = ['display_name', 'default_code', 'qty_available', 'uom_id', 'active', 'categ_id']
+        if mode == 'current':
+            columns += ['free_qty', 'incoming_qty', 'outgoing_qty', 'virtual_available']
+        products.check_field_access_rights('read', columns)
+        rows, total = [], 0
+        # Page product/location pairs, never product totals. Odoo computes and filters
+        # the quantities with strict location semantics, including historical moves.
+        for location in locations:
+            scoped_products = products.with_context(location=location.id, strict=True)
+            count = scoped_products.search_count(domain)
+            local_offset = max(0, offset - total)
+            if len(rows) < 25 and local_offset < count:
+                selected = scoped_products.search(domain, order='default_code, id', offset=local_offset, limit=25 - len(rows))
+                for row in selected.read(columns):
+                    row['product_id'] = row['id']
+                    row['id'] = f"{row['id']}:{location.id}"
+                    row['location_id'] = location.id
+                    row['location_name'] = location.complete_name
+                    row['warehouse_name'] = ', '.join(warehouses.filtered(
+                        lambda w: location.parent_path.startswith(w.view_location_id.parent_path)).mapped('name'))
+                    rows.append(row)
+            total += count
+        return {'status': 'ready' if rows else 'empty', 'rows': rows, 'offset': offset,
+                'total_count': total, 'has_more': offset + len(rows) < total, 'mode': mode,
+                'filters': filters, 'by_location': True, 'date_basis': mode,
+                'as_of': dates[2].isoformat() if mode == 'historical' else False,
+                'company_id': scoped.env.company.id, 'currency': scoped.env.company.currency_id.name,
+                'digits': scoped.env.company.currency_id.decimal_places,
+                'warehouses': [{'id': w.id, 'name': w.display_name} for w in warehouses],
+                'categories': [{'id': c.id, 'name': c.display_name} for c in scoped.env['product.category'].search([], order='complete_name')],
+                'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
+                'provenance': {'model': 'product.product', 'measure': columns,
+                               'domain': domain, 'context': dict(products.env.context), 'location_ids': locations.ids}}
+
     @api.model
-    def get_inventory(self, options, offset=0, mode='current'):
+    def open_inventory_location(self, options, product_id, location_id, mode='current', filters=None):
+        if type(product_id) is not int or product_id < 1:
+            raise ValidationError(_('Invalid product.'))
+        if type(location_id) is not int or location_id < 1:
+            raise ValidationError(_('Invalid stock filter.'))
+        filters = dict(filters or {}, location_id=location_id)
+        scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
+        products = products.with_context(location=location_id, strict=True)
+        domain = [*domain, ('id', '=', product_id)]
+        if not products.search(domain, limit=1):
+            raise AccessError(_('The product is unavailable in the selected scope.'))
+        action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
+        action.update(domain=domain, context=dict(products.env.context))
+        return action
+
+    @api.model
+    def get_inventory(self, options, offset=0, mode='current', filters=None):
         scoped, dates = self._scope(options)
         if type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid page.'))
         if 'stock.quant' not in scoped.env:
             return {'status': 'not_installed', 'rows': [], 'mode': mode}
+        if filters is not None:
+            return self._get_inventory_locations(options, offset, mode, filters)
         products, domain = scoped._stock_scope(dates, mode)
         columns = ['display_name', 'qty_available', 'uom_id', 'active']
         if mode == 'current':
@@ -143,7 +249,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
 
     def _procurement_scope(self, kind):
         if kind not in ('approvals', 'late') or 'purchase.order' not in self.env:
-            raise ValidationError(_('This native list is not configured.'))
+            raise ValidationError(_('This list is not configured.'))
         if not self.env.user.has_group('purchase.group_purchase_user'):
             raise AccessError(_('Purchase reporting access is required.'))
         orders = self.env['purchase.order']

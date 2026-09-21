@@ -1,4 +1,4 @@
-"""Bounded native analytical report adapters. Enterprise financial mappings pending."""
+"""Bounded analytical report adapters. Enterprise financial mappings pending."""
 from datetime import date, datetime, time, timedelta
 import csv
 import hashlib
@@ -83,10 +83,16 @@ class ExecutiveDashboard(models.AbstractModel):
         today = fields.Date.context_today(self)
         return {
             'user_id': self.env.uid,
-            'companies': [{'id': c.id, 'name': c.name} for c in self.env.companies],
+            'companies': [{'id': c.id, 'name': c.name, 'enabled_sections': self._visible_sections(c)} for c in self.env.companies],
+            'can_configure': self.env.user.has_group('base.group_system'),
             'options': {'company_id': self.env.company.id, 'date_from': today.replace(day=1).isoformat(),
                         'date_to': today.isoformat(), 'as_of': today.isoformat()},
         }
+
+    def _visible_sections(self, company=None):
+        company = company if company is not None else self.env.company
+        return [key for key in ('finance', 'sales', 'crm', 'inventory', 'procurement', 'hr')
+                if company[f'adams_dashboard_{key}']]
 
     def _native_scope(self, key, dates):
         model, date_field, states, aggregate, action_id = SOURCES[key]
@@ -113,7 +119,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _recent_scope(self, kind, dates):
         if kind not in ('orders', 'quotations') or 'sale.order' not in self.env:
-            raise ValidationError(_('This native list is not configured.'))
+            raise ValidationError(_('This list is not configured.'))
         orders = self.env['sale.order']
         orders.check_access('read')
         orders.check_field_access_rights('read', ['company_id', 'state', 'date_order'])
@@ -148,7 +154,7 @@ class ExecutiveDashboard(models.AbstractModel):
     def open_fulfillment(self, options):
         scoped, dates = self._scope(options)
         if 'sale.report' not in scoped.env:
-            raise ValidationError(_('This native report is not configured.'))
+            raise ValidationError(_('This report is not configured.'))
         report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
         measures = ['product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', ['product_id', 'product_uom_id', *measures])
@@ -162,7 +168,7 @@ class ExecutiveDashboard(models.AbstractModel):
     def get_recent_sales(self, kind, options, offset=0):
         scoped, dates = self._scope(options)
         if kind not in ('orders', 'quotations') or type(offset) is not int or not 0 <= offset <= 100000:
-            raise ValidationError(_('Invalid native list or page.'))
+            raise ValidationError(_('Invalid list or page.'))
         if 'sale.order' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
         orders, domain = scoped._recent_scope(kind, dates)
@@ -205,7 +211,7 @@ class ExecutiveDashboard(models.AbstractModel):
         return scope
 
     def _search_scope(self, kind, dates, query):
-        """Allowlisted native documents; ORM ACLs and record rules remain active."""
+        """Allowlisted documents; ORM ACLs and record rules remain active."""
         if kind in ('orders', 'quotations'):
             records, domain = self._recent_scope(kind, dates)
             date_field = 'date_order'
@@ -265,7 +271,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def export_summary(self, options):
-        """Re-evaluate authorized native metrics; never accept client values."""
+        """Re-evaluate authorized metrics; never accept client values."""
         scoped, dates = self._scope(options)
         if not scoped.env.user.has_group('base.group_allow_export'):
             raise AccessError(_('You do not have export permission.'))
@@ -273,7 +279,7 @@ class ExecutiveDashboard(models.AbstractModel):
         writer = csv.writer(output)
         writer.writerow([_('Section'), _('Metric'), _('Value'), _('Unit'), _('Status'),
                          _('Company'), _('From'), _('To'), _('Balance as of'), _('Source'),
-                         _('Fetched at UTC'), _('Scope fingerprint'), _('Native report warning'), _('Date basis')])
+                         _('Last updated UTC'), _('Scope fingerprint'), _('report warning'), _('Date basis')])
         def safe(value):
             if value is None:
                 return ''
@@ -295,16 +301,16 @@ class ExecutiveDashboard(models.AbstractModel):
             'assets': _('Assets'),
             'liabilities': _('Liabilities'),
             'equity': _('Equity'),
-            'standard_forecast': _('Native short-term cash forecast'),
+            'standard_forecast': _('short-term cash forecast'),
             'invoiced_sales': _('Net invoiced sales'),
-            'invoiced_margin': _('Native invoiced commercial margin'),
+            'invoiced_margin': _('invoiced commercial margin'),
             'confirmed_sales': _('Confirmed sales'),
             'orders': _('Distinct sales orders'),
             'quotations': _('Draft and sent quotations'),
             'purchases': _('Confirmed purchases'),
             'inventory': _('Inventory valuation'),
             'crm': _('Weighted open pipeline'),
-            'hr': _('Approved leave hours (native signed)'),
+            'hr': _('Approved leave hours (signed)'),
             'supplier_overdue': _('Overdue supplier bills'),
             'supplier_today': _('Supplier bills due today'),
             'supplier_due_7': _('Supplier bills due in 7 days'),
@@ -313,6 +319,9 @@ class ExecutiveDashboard(models.AbstractModel):
         count = 0
         print_rows = []
         for section, label in [('finance', _('Accounting & Finance')), ('sales', _('Sales')), ('operations', _('Operations'))]:
+            enabled = scoped._visible_sections()
+            if section in ('finance', 'sales') and section not in enabled:
+                continue
             result = scoped.get_section(section, options)
             items = [*result['items'], *result.get('supplier_windows', [])]
             if section == 'finance':
@@ -353,7 +362,11 @@ class ExecutiveDashboard(models.AbstractModel):
         if section not in SECTIONS:
             raise ValidationError(_('Unknown dashboard section.'))
         result = []
+        enabled = scoped._visible_sections()
         for key in SECTIONS[section]:
+            visible_key = ('procurement' if key == 'purchases' else key) if section == 'operations' else section
+            if visible_key not in enabled:
+                continue
             item = {'key': key, 'status': 'not_configured', 'value': None}
             if key in SOURCES:
                 if SOURCES[key][0] not in scoped.env:
@@ -382,7 +395,7 @@ class ExecutiveDashboard(models.AbstractModel):
     def open_report(self, key, options, dimension=None, group_id=None):
         scoped, dates = self._scope(options)
         if key not in SOURCES or SOURCES[key][0] not in scoped.env:
-            raise ValidationError(_('This native report is not configured.'))
+            raise ValidationError(_('This report is not configured.'))
         report, domain, aggregate, action_id = scoped._native_scope(key, dates)
         if dimension is not None:
             field = DIMENSIONS.get(key, {}).get(dimension)
@@ -423,6 +436,23 @@ class ExecutiveDashboard(models.AbstractModel):
                 'provenance': scoped._provenance(key, domain, aggregate)}
 
     @api.model
+    def get_product_quantity_ranking(self, options, unit_id=False):
+        scoped, dates = self._scope(options)
+        report, domain, aggregate, action_id = scoped._native_scope('invoiced_sales', dates)
+        report.check_field_access_rights('read', ['quantity', 'product_id', 'product_uom_id'])
+        units = [unit for unit, in report._read_group(domain, ['product_uom_id'], []) if unit]
+        units.sort(key=lambda unit: unit.id)
+        if unit_id and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
+            raise ValidationError(_('Choose a unit from this report.'))
+        selected = unit_id or (units[0].id if units else False)
+        unit = next((unit for unit in units if unit.id == selected), None)
+        rows = report._read_group([*domain, ('product_uom_id', '=', selected), ('product_id', '!=', False)],
+                                  ['product_id'], ['quantity:sum'], order='quantity:sum DESC, product_id ASC', limit=10) if selected else []
+        return {'status': 'ready' if rows else 'empty', 'rows': [{'id': product.id, 'label': product.display_name, 'value': quantity} for product, quantity in rows],
+                'units': [{'id': u.id, 'name': u.display_name} for u in units], 'unit_id': selected,
+                'currency': unit.display_name if unit else '', 'digits': 2, 'unit': 'quantity'}
+
+    @api.model
     def get_trend(self, key, options):
         scoped, dates = self._scope(options)
         if key not in SOURCES:
@@ -448,19 +478,19 @@ class ExecutiveDashboard(models.AbstractModel):
             raise AccessError(_('You do not have export permission.'))
         field = DIMENSIONS.get(key, {}).get(dimension)
         if not field or SOURCES[key][0] not in scoped.env:
-            raise ValidationError(_('This native report is not configured.'))
+            raise ValidationError(_('This report is not configured.'))
         report, domain, aggregate, action_id = scoped._native_scope(key, dates)
         report.check_field_access_rights('read', [field])
         rows = report._read_group(domain, groupby=[field], aggregates=[aggregate],
                                   order=f'{aggregate} DESC, {field} ASC', limit=5001)
         if len(rows) > 5000:
-            raise ValidationError(_('Use the native report export for more than 5,000 groups.'))
+            raise ValidationError(_('Use the report export for more than 5,000 groups.'))
         output = io.StringIO(newline='')
         writer = csv.writer(output)
         generated_at = fields.Datetime.to_string(fields.Datetime.now())
         provenance = scoped._provenance(key, domain, aggregate)
         writer.writerow(['Group', 'Value', 'Unit', 'Company', 'From', 'To', 'Source', 'Measure',
-                         'Fetched at UTC', 'Definition', 'Scope fingerprint'])
+                         'Last updated UTC', 'Definition', 'Scope fingerprint'])
         def safe_text(value):
             value = str(value)
             return "'" + value if value.startswith(('\t', '\r', '\n')) or value.lstrip().startswith(('=', '+', '-', '@')) else value
@@ -486,7 +516,7 @@ class ExecutiveDashboard(models.AbstractModel):
         journals.check_access('read')
         accounts.check_field_access_rights('read', ['name', 'code', 'active', 'currency_id', 'account_type', 'company_ids'])
         journals.check_field_access_rights('read', ['name', 'default_account_id', 'type', 'company_id'])
-        domain = [('company_ids', 'in', [scoped.env.company.id]), ('account_type', '=', 'asset_cash')]
+        domain = [('company_ids', 'in', [scoped.env.company.id]), ('account_type', '=', 'asset_cash'), ('active', '=', True)]
         if search:
             domain += ['|', ('name', 'ilike', search), ('code', 'ilike', search)]
         total_count = accounts.search_count(domain)
