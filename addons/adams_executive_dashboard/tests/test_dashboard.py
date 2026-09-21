@@ -19,7 +19,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         for source in ('Finance', 'Business overview', 'Apply filters', 'Recent orders',
                        'Explore delivery quantities', 'Not configured',
                        'Review native worklist →', 'Review receivable aging →', 'Approvals & late receipts →',
-                       'Search results', 'Print preview'):
+                       'Search results', 'Print preview', 'Valuation:', 'Active employees:',
+                       'Native budget:', 'Matching orders:'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)
