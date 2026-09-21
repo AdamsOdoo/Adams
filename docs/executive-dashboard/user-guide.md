@@ -25,6 +25,28 @@ Supplier-payment drilldowns identify their window and balance cutoff in the
 native action title. Native XLSX filters and PDF headings retain that same scope.
 The complete Aged Payable report remains separately available.
 
+## Theme and saved views
+
+The dashboard follows **Odoo → My Preferences → Theme** (System, Light or Dark).
+There is no separate dashboard theme switch. In Arabic, the workspace and drawers
+follow the native right-to-left direction while dates and chart axes retain their order.
+
+**Save view** remembers the applied company, dates, section expansion, Sales list
+and ranking measure in this browser for the current user. Saved lists reopen at
+the first page and reload current authorized records. **Restore view** revalidates the company and reloads
+current values. **Reset view** returns to the default reporting dates and layout;
+it does not delete the saved view or modify business records.
+
+Finance shortcuts jump to Profitability, Liquidity, Working capital and Financial
+position. The Management attention strip opens existing native payment/collection
+reports and purchasing worklists. It is not a custom alert scoring system. Use
+**Show details** to expand it on mobile.
+
+Full rankings open in a side drawer. Escape closes drawers; source controls remain
+separate from the card's report link. Chart bars and exact-value table cells open
+the corresponding native monthly report. Sales list/ranking controls also support
+Left/Right and Home/End keyboard navigation.
+
 ## Investigate a value
 
 Use **Source & definition** for the exact value, native source, scope and retrieval
@@ -105,3 +127,9 @@ to deploy to production.
 «غير مهيأ» تعني أن التعريف أو اعتماده غير متاح؛ ولا تعني رصيداً صفرياً.
 تعرض أعمار الديون أرصدة تاريخ القطع، وتبقى التوقعات النقدية القياسية منفصلة عن
 الخطة النقدية اليومية. لا تعتمد تعريفات تجريبية نيابةً عن مالك الشركة.
+
+تتبع ألوان اللوحة تفضيل المظهر في Odoo: النظام أو الفاتح أو الداكن.
+يحفظ **حفظ العرض** الشركة والتواريخ والأقسام وقائمة المبيعات ومقياس ترتيب
+مندوبي المبيعات لهذا المستخدم في المتصفح. يعيد **استعادة العرض** تحميل البيانات
+الحالية المصرح بها من الصفحة الأولى، ولا يحفظ الأرصدة أو السجلات.
+يعيد **إعادة تعيين العرض** التواريخ والتخطيط الافتراضيين دون حذف العرض المحفوظ.

@@ -133,6 +133,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
+            ranking: selection(this.state.ranking, ['key']),
             procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
@@ -147,6 +148,9 @@ export class ExecutiveDashboard extends Component {
         }
         if (saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
+        }
+        if (['invoiced_sales', 'invoiced_margin'].includes(saved.ranking?.key)) {
+            jobs.push(this.loadRanking(saved.ranking.key));
         }
         if (saved.directory) { this.state.cashSearch = saved.directory.search || ''; jobs.push(this.loadDirectory('cash', saved.directory.offset, null, this.state.cashSearch)); }
         if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
@@ -329,7 +333,9 @@ export class ExecutiveDashboard extends Component {
             .map(key => [key, this.state.applied[key]]));
         try {
             window.localStorage.setItem(this.viewKey, JSON.stringify({ userId: this.userId, applied,
-                collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection }));
+                collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection,
+                recent: this.state.recent ? { kind: this.state.recent.kind, offset: 0 } : null,
+                ranking: this.state.ranking ? { key: this.state.ranking.key } : null }));
             this.state.savedView = true;
             this.notification.add(_t('View saved in this browser.'), { type: 'success' });
         } catch {

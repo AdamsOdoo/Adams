@@ -1,6 +1,35 @@
 # Executive dashboard — implementation and verification
 
-## Current staging handoff — 20 September 2026
+## Resumed UX continuation — 21 September 2026
+
+Continuation was recovered at remote `d59b5d579a57a013ce943c5a54b1a426a2f68b6a`,
+not restarted from the older staging handoff. Original local commits and dirty
+files remain intact in their original worktree. The Sass-test edit already matches
+that remote commit; its remaining unpublished user-guide section is preserved here.
+
+Odoo.sh development build **38354024**, exact source d59b5d57, records
+**58 tests, zero failures/errors**, 145.22 seconds and 59,870 queries. The
+existing browser fixture covers English/Arabic, light/dark and six widths.
+These are recovered results, not a new campaign. Odoo.sh labels the build Warning.
+A manual native Preferences change to Dark confirmed dashboard color-scheme dark,
+background rgb(27,29,38) and card rgb(38,42,54). The disposable development company
+has restricted finance; this manual screen is not customer financial UAT.
+
+The next correction preserves the selected Sales list and ranking measure in saved
+views and native-report return navigation, matching the reference's save/restore
+behavior. Saved views retain selections only and reopen lists at page one. A race
+regression confirms that slower default loads cannot overwrite restored selections.
+21 focused controller checks pass. Native browser assertions cover the same saved
+Sales journey; their changed-source execution is pending until this candidate builds.
+
+No accounting calculation, access right, schema or staging business data changed.
+No migration is required. Prior staging remains at 29121a55; the new UX is not yet
+claimed deployed there. Remaining work: current-source native/browser execution,
+reference interaction/visual comparison, EN/AR screenshots, staging update and owner
+UAT. The local HTML could be inspected as source, but the cloud browser rejected its
+file URL; no interactive reference-browser pass is claimed. Production stays prohibited.
+
+## Previous staging handoff — 20 September 2026
 
 All ten [owner decisions](owner-decisions.md) are recorded. The dashboard is a
 separate custom workspace implemented by `adams_executive_dashboard` and

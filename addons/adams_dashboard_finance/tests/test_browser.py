@@ -205,7 +205,20 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         if (root.scrollWidth > root.clientWidth + 2) throw new Error('Department overflow: ' + key);
                     }
                     if (WIDTH === 1440 && DIRECTION === 'ltr') {
-                        const open = card.querySelector('button[aria-label="Open native report"]');
+                        // A saved reference view includes both Sales selections.
+                        root.querySelectorAll('.adams_recent_tabs button')[1].click();
+                        root.querySelectorAll('.adams_rank_tabs button')[1].click();
+                        await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1].classList.contains('active') &&
+                            root.querySelectorAll('.adams_rank_tabs button')[1].classList.contains('active'), 'Sales selections must activate');
+                        root.querySelectorAll('.adams_header_actions button')[0].click();
+                        root.querySelectorAll('.adams_recent_tabs button')[0].click();
+                        root.querySelectorAll('.adams_rank_tabs button')[0].click();
+                        root.querySelectorAll('.adams_header_actions button')[1].click();
+                        await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1]?.classList.contains('active') &&
+                            root.querySelectorAll('.adams_rank_tabs button')[1]?.classList.contains('active') &&
+                            !root.querySelector('#adams-sales [role="status"]'), 'Saved Sales selections must reload');
+                        const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
+                        const open = restoredCard.querySelector('button[aria-label="Open native report"]');
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
