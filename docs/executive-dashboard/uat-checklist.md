@@ -3,7 +3,12 @@
 Use the authorized **Adams For Men staging database**, company **Adams For Men**,
 currency **EGP**. Production and main are excluded. The agreed scope is recorded
 in [owner decisions](owner-decisions.md). See [implementation status](implementation-status.md)
-for the exact tested/deployed source and remaining engineering gates.
+for the exact tested/deployed source and evidence boundaries.
+
+The staging candidate is **ready for owner UAT** at source **ef01fbe6**, addon version **19.0.1.2.2**.
+Native build **38371030** passes **60 tests with zero failures/errors**; the 25 controller checks pass. Staging is **06a5274b**; exact identities and evidence are in implementation-status.md.
+The current pre-update backup is **21 September 2026, 07:08 UTC**. Older
+source/build/backup details below are retained as historical evidence.
 
 ## Start UAT
 
@@ -26,7 +31,26 @@ breadcrumb restores the scope and reloads current authorized values.
 | Purchasing | Inspect awaiting-approval and native late-receipt worklists. Open a record and return. Viewing does not approve, receive or bill an order. |
 | CRM and HR | Use existing native opportunity and workforce sources. Empty results remain explicit. Time Off is not installed in this staging database, so leave hours correctly show App not installed. |
 | Access | Dashboard membership must not grant native accounting, HR, stock or export rights. Check each intended UAT user's existing permissions before granting access. |
+| Search | Find posted invoices/bills and confirmed orders/draft-sent quotations by reference or party. Validate company/period, unavailable types, paging and the original native form. |
+| Summary exports | Download CSV and use Print summary. Verify actual native values, units, dates, blank unavailable values, warning labels and native export rights. |
+| Preferences | Save quotations and commercial margin, change both selectors, restore, and verify both selections and dates return with freshly loaded data. Native Odoo theme/language control appearance. |
 | UI | Compare the supplied reference layout in English and Arabic, including mobile navigation, long mixed-script names, exact source values, negative signs, focus and table scrolling. |
+
+## Record owner acceptance
+
+Record the tester, native role, company, applied dates and language/theme for each
+journey. For a defect, retain the exact action, expected native report result,
+observed result and screenshot; do not edit accounting records to force a match.
+Use the source-bound evidence in implementation-status.md as the engineering
+baseline. A UAT-ready staging candidate still requires finance/owner signoff.
+
+| Acceptance | Tester / date / result |
+|---|---|
+| Finance source and cutoff agreement | Pending owner UAT |
+| Sales and operational journeys | Pending owner UAT |
+| English/Arabic visual fit to supplied reference | Pending owner UAT |
+| Intended users and native permissions | Pending owner UAT |
+| Production release decision | Not authorized |
 
 ## Staging accounting observations
 
@@ -46,9 +70,9 @@ company/group permissions and 250 native report expressions. Subsequent setup
 added dashboard membership to the existing administrator and approved 13 mappings
 against the inspected native definitions; it added no native financial rights.
 
-Final addon source is `adbe2997718aad8ad57c341b071415a910f7a8f4`; staging
-commit is `29121a55098acefcc9d55031c2dd0bb68942d4c9`. The final native run
-passes 58 tests and the final staging update preserves accounting/access/report/
+Previous qualified addon source was `adbe2997718aad8ad57c341b071415a910f7a8f4`; historical staging
+commit is `29121a55098acefcc9d55031c2dd0bb68942d4c9`. That historical native run
+passed 58 tests and the final staging update preserves accounting/access/report/
 mapping hashes. The staging environment expires on **19 October 2026**.
 
 The private harness pin and unchanged qualification are reused. Native automated

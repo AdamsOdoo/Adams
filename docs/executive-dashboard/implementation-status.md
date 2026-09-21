@@ -1,5 +1,62 @@
 # Executive dashboard — implementation and verification
 
+## Current UAT-ready staging — 21 September 2026
+
+The resumed implementation now includes the missing reference interactions:
+company/period-scoped native document search, CSV executive summary and a visible
+print/PDF preview. Search reauthorizes the original native form; summaries reevaluate
+native report values under existing export permissions. No sample data, invented
+target, alternate accounting engine or elevated native rights is introduced.
+
+Saved Sales selections, native Odoo dark/light mode, RTL, source definitions,
+keyboard navigation and native report-return behavior are preserved. The remaining
+Arabic attention and inline-label lookup defects are corrected. The cash-flow
+summary row uses the existing native Cash Flow Statement net increase directly.
+
+Final candidate source: `ef01fbe6172969b1ad610ae48a4eb03674a032a8`; tree
+`2fdcf4f50aaac2d012557473d7e078c83a3b39eb`. Both addons are 19.0.1.2.2.
+The server-generated Arabic export/preview labels, currency precision and preview
+padding were corrected after live staging review. Build **38371030** passes **60 native tests, zero failures/errors**, 175.90s and
+62,574 queries. **25 controller tests pass**; Python/XML parsing and diff checks
+pass. The native browser covers EN/AR × light/dark × six widths, including search;
+print preview at 1440 requires actual translated labels and correctly formatted
+native values. Arabic CSV content and native Python/web translation loaders pass.
+Odoo.sh marks the development build Warning; raw tests are all successful.
+
+Staging commit **06a5274bc908c14f67f63822f2dbb7ab04318c33**, tree
+`035ac3a2c3999b111f5f0cfbbbaefc81637022b0`, replaces only the two qualified addon
+trees: core `3c49f3f409f66ae6eef98edb1a030652551bba68` and finance
+`fa41a463bd44c73fce10c9cbc91902b386d410ef`. Other staging code and the native test
+addon are excluded. The verified pre-update backup is 2026-09-21 07:08 UTC at c6b8ad3e.
+Synthetic first usable Finance is 1.4042s; refresh p95 1.0259s. These are single-user
+fixture observations, not customer-volume/concurrency qualification.
+
+**Engineering status: ready for owner UAT in the approved scope.** Odoo.sh reports
+staging **Success**. Live checks on 06a5274b confirm all 19 Finance/Sales card values
+exactly match the pre-update snapshot; all 19 match the final 27-row English CSV.
+The Arabic CSV has 27 translated rows with the same native cash movement. English
+and Arabic print previews have 27 rows and no horizontal overflow. Native light
+and dark preferences both change the dashboard correctly; English/Dark is restored.
+Current source-bound captures cover English light/dark, Arabic dark, Arabic print,
+scoped search, Finance chart/context and Sales. Search finds the original native
+orders/quotations; prior same-implementation form/return verification is preserved.
+
+Private evidence package: `Adams_Dashboard_UAT_20260921.zip` (SHA-256 `a6a89883437fc35ea033cce4e57370facee5bab364fee3bbc6eff525cc9fa902`), containing final raw
+native/controller results, before/after values, downloaded EN/AR CSVs, comparison,
+preview rows, screenshots and SHA-256 manifest. Intermediate defective exports and
+preview are retained with explicit intermediate names. The implementation review
+is complete; independent review and owner UAT are not represented as completed.
+
+The [UAT checklist](uat-checklist.md), bilingual [user guide](user-guide.md) and
+[implementation review](review-20260921.md) describe the delivered scope and tests.
+Historical checkpoints below remain source-bound; their pending items are superseded
+only by explicit current evidence. Owner visual/financial acceptance, independent
+review when available, and customer-volume/concurrency performance remain separate
+from engineering UAT readiness. The cloud browser rejected the reference HTML file
+URL: source and PNG comparison was performed, but no interactive HTML-browser pass
+or pixel-identical reproduction is claimed. Production/main are unchanged.
+
+
 ## Resumed UX continuation — 21 September 2026
 
 Continuation was recovered at remote `d59b5d579a57a013ce943c5a54b1a426a2f68b6a`,
@@ -523,3 +580,21 @@ The 390px layout failure followed the failed stylesheet. The correction uses
 width plus max-width with identical intended layout. Browser evidence capture
 is instrumented after successful assertions using Odoo's native screenshot helper.
 No calculation, rendering or pass condition is mocked.
+
+## Intermediate finalization evidence — feca7e2d
+
+Final source: `feca7e2d909ea4c3af6dedb12a29dda678eaa681`; tree
+`729c3bae485a84fa2484c7e8a4e3505e5eb16648`. Both installed addon versions are
+19.0.1.2.1. Odoo.sh build **38370286** passes **60 tests, zero failures/errors** (184.71s,
+62,505 queries). The 25 controller tests pass; Python/XML parsing and diff checks
+pass. The native Odoo translation loader verifies corrected Arabic lookup keys.
+The EN/AR × light/dark × six-width native fixture includes real search; print
+preview is exercised at 1440 in both languages/themes. Synthetic first usable
+Finance is 1.5125s and refresh p95 1.0273s, without customer-volume/concurrency claims.
+
+The two qualified addon trees are `fa89ce805f757daee476db7d4135e1b779e0c445`
+(core) and `8a60391a3dbe8756a176e4773539fedf8d0beeae` (finance). Staging update
+`87e37ddb99179d858b29ef0366aaf57d177ef652`, tree
+`b0caf770dd8d9b44898f9f62111c762e44af48eb`, preserves every other staging path.
+The pre-update backup is verified at **2026-09-21 07:08:00 UTC**, revision c6b8ad3e.
+The disposable native-test addon is not deployed to staging.

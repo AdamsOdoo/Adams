@@ -93,3 +93,51 @@ zero failures/errors. Staging c6b8ad3e reports Success. Paired native light/dark
 Finance desktop screens were inspected after the module update; saved quotations
 and commercial margin restore correctly. All 19 displayed metric values match
 the pre-update snapshot. These bounded checks do not close the open parity gate.
+
+
+## Intermediate UAT candidate — c97b80f2
+
+The next candidate closes the previously recorded global-search and summary-export
+gaps using native documents/reports. Search remains inside the selected company,
+period and native rights. Unlike the fictional reference, bills are searched by
+posted invoice date rather than a demo-only outstanding-list composition; the scope
+is stated in the drawer. Search supports each document type and bounded paging.
+CSV and print summary share fresh server-provided values and native export rights.
+The printable output is a compact readable summary, with full supporting records
+available from native report exports. It does not copy prototype fictional values.
+
+Mobile workspace anchors close the menu and open attention details. Restricted
+finance correctly says Access restricted in management attention. Slow initial
+Sales loading no longer replaces a user's earlier selection. Local controller
+checks: 25 passing. Native qualification and final paired screenshots are pending.
+
+The original HTML cannot be interactively opened through the current browser's
+file route. That environment limitation remains recorded; source event-handler
+inspection and the unchanged Finance/Sales/Mobile PNGs are the comparison reference.
+This limitation is not a reason to label an untested interaction as passed.
+
+
+## UAT feature completion — feca7e2d / ef01fbe6
+
+Search, CSV and print/PDF preview close the missing functional counterparts noted
+in the recovered audit. The reference layout remains the comparison authority;
+Odoo's native top bar, active company/theme/language and authorized source values
+are intentional integration differences. Printing is a readable executive table,
+not a screenshot of the prototype's fictional dashboard. Source warnings, missing
+budgets and absent apps remain explicit instead of copying prototype sample KPIs.
+
+Native search reflow runs at all six widths in both languages and themes. The
+print preview runs at 1440 in both languages/themes; this is not a claim of every
+printer's PDF pagination. Current staging captures are identified in the final
+implementation evidence. Earlier captures remain tied to their earlier revisions.
+The Arabic review corrected actual attention-link and inline-count translation
+lookup defects, not merely the presence of translation strings in source.
+
+Owner visual signoff remains part of UAT. The HTML reference's interactive file
+route was blocked, so direct interactive HTML validation and pixel-exact parity
+are not claimed. Full customer zoom/accessibility and printer-specific acceptance
+remain recorded in the UAT/release matrix, not silently relabelled as passed.
+
+Live staging review subsequently found English server-generated print labels; ef01fbe6 fixes their Python translation registration and asserts actual Arabic CSV and preview content. Earlier preview evidence is explicitly retained as a defect, not a pass.
+
+Final live staging 06a5274b: inspected retained English light/dark, Arabic dark, Arabic print, native search, Finance chart/context and Sales screenshots. Native preference changes control the workspace theme; English/Dark restored. Both previews render 27 rows without horizontal overflow. These current visual checks support owner UAT readiness; they do not claim the blocked HTML-browser pass or owner pixel/visual signoff.

@@ -30,7 +30,7 @@ Run affected slice checks during development and batch broad native/browser/secu
 
 Owner/finance UAT will confirm real source completeness, report variant/financial definitions, cut-off policy and any additional logic. Report parity does not audit the books. Development verification, UAT readiness, business acceptance and production release remain distinct states.
 
-## Current gate ledger — 20 September 2026
+## Historical gate ledger — 20 September 2026
 
 | Gate | Evidence and remaining boundary |
 |---|---|
@@ -45,3 +45,22 @@ Owner/finance UAT will confirm real source completeness, report variant/financia
 
 Failed 63f9823/build 38346314 is retained as failed. Its native Sass defect was
 fixed at ac52010 without weakening checks. Prior harness qualification is reused.
+
+
+## UAT continuation ledger — 21 September 2026
+
+The final candidate adds native document search and authorized CSV/print summaries,
+with 25 focused controller regressions. Native qualification includes document
+company/period/posting/permission boundaries, exact summary/refund values, CFS net
+movement and real EN/AR light/dark search and print-preview rendering. Record final
+build and staging identities in implementation-status.md; do not transfer a previous
+build's pass to changed code. Original native report/source fixtures remain enabled.
+
+Owner UAT now has an executable journey checklist. Customer accounting completeness,
+visual acceptance, expanded operational scenarios and representative-volume/concurrency
+qualification remain explicit owner/release checks; this continuation does not label
+the historical matrix fully passed or replace it with screenshots. Independent
+review was unavailable; implementation review is identified as such. No owner signoff
+or production authorization is implied by making the staging candidate available.
+
+Final continuation evidence: ef01fbe6 / build 38371030 passes 60 native tests, zero failures/errors; 25 controller checks pass. Staging 06a5274b reports Success. Live EN/AR CSV and preview checks cover 27 rows, all 19 displayed Finance/Sales values match the pre-update snapshot and English export, and current light/dark/RTL/search/Finance/Sales screenshots are retained. Ready for owner UAT within the approved scope; full release/owner acceptance boundaries above remain explicit.

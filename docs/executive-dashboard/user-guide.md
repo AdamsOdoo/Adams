@@ -133,3 +133,40 @@ to deploy to production.
 مندوبي المبيعات لهذا المستخدم في المتصفح. يعيد **استعادة العرض** تحميل البيانات
 الحالية المصرح بها من الصفحة الأولى، ولا يحفظ الأرصدة أو السجلات.
 يعيد **إعادة تعيين العرض** التواريخ والتخطيط الافتراضيين دون حذف العرض المحفوظ.
+
+
+## Workspace search and executive exports
+
+Use the search field above the filters to find an invoice, vendor bill, confirmed
+sales order or quotation by document reference or customer/vendor name. Enter
+at least two characters. The selected company and applied period remain in force.
+Invoices and bills include posted documents and credit notes only; orders are
+confirmed; quotations include draft/sent records. Search does not treat the balance
+cutoff as an invoice-date filter. Each page contains up to 25 records per document
+type; select a type to narrow the result. Native access restrictions remain visible.
+Opening a result uses the original Odoo form and does not change the record.
+Press `/` outside editable fields to focus search; close its drawer or press Escape
+to return to the workspace.
+
+**Export summary** downloads a UTF-8 CSV of current authorized native metric
+results. It includes the company, period, balance cutoff, status, unit, native
+source, retrieval time and scope fingerprint where the adapter supplies one. The four supplier-window rows retain their labelled window, native source and balance cutoff; their fingerprint cell is blank. Blank unavailable values are not zero.
+The native Odoo export permission is required. Results are evaluated afresh, so
+concurrent accounting changes may produce newer values than an older screen.
+**Print summary** uses those same server-generated values in a print-friendly
+summary. Review the preview, then choose Print / Save PDF to open the browser
+print dialog. Close preview or press Escape to return.
+The summary follows the native user language. Currency values use company precision; counts remain whole numbers. Open a native report for its full supporting rows and native report-specific exports.
+
+### البحث والتصدير والطباعة
+
+استخدم حقل البحث أعلى عوامل التصفية للبحث برقم المستند أو اسم العميل أو المورد،
+بحد أدنى حرفين. يلتزم البحث بالشركة والفترة المطبقتين ويعرض الفواتير المرحلة
+وأوامر البيع المؤكدة وعروض الأسعار المسودة والمرسلة وفق صلاحيات المستخدم.
+تعرض كل صفحة حتى 25 سجلاً لكل نوع مستند. اختر نوعاً محدداً لتضييق النتائج.
+فتح النتيجة يعرض نموذج أودو الأصلي ولا يعدل المستند.
+
+يُنزّل **تصدير الملخص** ملف CSV بالقيم الأصلية المحدثة، مع الشركة والتواريخ والوحدات
+وحالة التوفر والمصدر ووقت الجلب. القيمة غير المتاحة ليست صفراً. تتطلب العملية
+صلاحية التصدير الأصلية في أودو. يستخدم **طباعة الملخص** القيم نفسها في معاينة واضحة. اختر طباعة / حفظ PDF لفتح نافذة الطباعة في
+المتصفح، أو أغلق المعاينة للعودة. للتفاصيل الكاملة استخدم التقرير الأصلي.
