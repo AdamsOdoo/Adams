@@ -392,7 +392,7 @@
   @media (max-width: 480px) { .adams_global_search input { flex-basis: 100%; } .adams_search_dialog { padding: 16px; } }
 }
 
-.adams_print_summary { width: 960px; max-width: 96vw; padding: 24px; }
+.o_adams_dashboard .adams_print_summary { width: 960px; max-width: 96vw; padding: 24px; }
 .adams_print_controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
 .adams_print_controls h2 { flex: 1; }
 @media print {

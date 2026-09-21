@@ -24,6 +24,8 @@ msgid "Profitability, liquidity and working capital"
 msgstr "الربحية والسيولة ورأس المال العامل"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -38,6 +40,8 @@ msgid "Invoiced sales and confirmed orders"
 msgstr "المبيعات المفوترة والطلبات المؤكدة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -52,6 +56,8 @@ msgid "Purchasing, inventory, CRM and people"
 msgstr "المشتريات والمخزون والعملاء والموظفون"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -59,6 +65,8 @@ msgid "Accounting revenue"
 msgstr "الإيرادات المحاسبية"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -66,6 +74,8 @@ msgid "Net profit"
 msgstr "صافي الربح"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -73,6 +83,8 @@ msgid "Bank and cash"
 msgstr "البنوك والنقدية"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -80,6 +92,8 @@ msgid "Receivables"
 msgstr "الذمم المدينة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -87,6 +101,8 @@ msgid "Payables"
 msgstr "الذمم الدائنة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -94,6 +110,8 @@ msgid "Net invoiced sales"
 msgstr "صافي المبيعات المفوترة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -101,6 +119,8 @@ msgid "Confirmed sales"
 msgstr "المبيعات المؤكدة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -108,6 +128,8 @@ msgid "Distinct sales orders"
 msgstr "عدد أوامر البيع الفريدة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -206,6 +228,8 @@ msgid "Development preview"
 msgstr "معاينة قيد التطوير"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
@@ -213,6 +237,8 @@ msgid "Company"
 msgstr "الشركة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
@@ -220,6 +246,8 @@ msgid "From"
 msgstr "من"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
@@ -227,6 +255,8 @@ msgid "To"
 msgstr "إلى"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
@@ -482,6 +512,8 @@ msgid "Group by"
 msgstr "تجميع حسب"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
@@ -578,6 +610,8 @@ msgid "Stage"
 msgstr "المرحلة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
@@ -586,6 +620,8 @@ msgid "Unit"
 msgstr "الوحدة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
@@ -602,6 +638,8 @@ msgid "Vendor"
 msgstr "المورد"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
@@ -618,6 +656,8 @@ msgid "hours"
 msgstr "ساعات"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
@@ -762,6 +802,8 @@ msgid "Order date"
 msgstr "تاريخ الطلب"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
@@ -881,6 +923,8 @@ msgid "Remaining"
 msgstr "المتبقي"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #, python-format
@@ -909,42 +953,56 @@ msgid "UTC. Source completeness has not been assessed."
 msgstr "بالتوقيت العالمي المنسق. لم يُقيّم اكتمال بيانات المصدر."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Gross profit"
 msgstr "مجمل الربح"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Operating expenses"
 msgstr "المصروفات التشغيلية"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Gross margin"
 msgstr "هامش مجمل الربح"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Net margin"
 msgstr "هامش صافي الربح"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Assets"
 msgstr "الأصول"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Liabilities"
 msgstr "الالتزامات"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Equity"
@@ -1029,6 +1087,8 @@ msgid "Open Partner Ledger"
 msgstr "فتح دفتر أستاذ الشريك"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Native short-term cash forecast"
@@ -1053,21 +1113,29 @@ msgid "Native dated budget items for the selected period. No daily target prorat
 msgstr "بنود الموازنة الأصلية المؤرخة للفترة المحددة. لا يتم توزيع الأهداف تناسبيًا على الأيام."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Invalid inventory mode."
 msgstr "وضع المخزون غير صالح."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Historical inventory requires a cutoff no later than today."
 msgstr "يتطلب المخزون التاريخي تاريخ قطع لا يتجاوز اليوم."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Invalid inventory route."
 msgstr "مسار المخزون غير صالح."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "HR reporting access is required."
 msgstr "يلزم إذن الوصول إلى تقارير الموارد البشرية."
@@ -1199,6 +1267,8 @@ msgid "Load monthly values"
 msgstr "تحميل القيم الشهرية"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Accounting & Finance"
@@ -1523,6 +1593,8 @@ msgid "Report agreement does not verify source completeness or financial close. 
 msgstr "توافق التقارير لا يثبت اكتمال المصدر أو الإغلاق المالي. افتح تعريف مصدر كل مؤشر وتقريره القياسي للوصول إلى السجلات الداعمة والتصدير الكامل."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Native invoiced commercial margin"
@@ -1571,11 +1643,15 @@ msgid "Planned receipt"
 msgstr "الاستلام المخطط"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Purchase reporting access is required."
 msgstr "يلزم إذن الوصول إلى تقارير المشتريات."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #: code:addons/adams_executive_dashboard/models/operations.py:0
 msgid "Invalid purchase record."
 msgstr "سجل الشراء غير صالح."
@@ -1731,6 +1807,8 @@ msgid "Load customers"
 msgstr "تحميل العملاء"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
@@ -1843,6 +1921,7 @@ msgid "Archived accounts are included. Account currency is separate from the rep
 msgstr "تشمل القائمة الحسابات المؤرشفة. عملة الحساب منفصلة عن عملة رصيد التقرير. لم يتم تقييم مطابقة كشوف الحسابات."
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -1934,6 +2013,8 @@ msgid "Next 30 days includes the first 7 days. Due today and overdue are separat
 msgstr "تشمل الثلاثون يومًا القادمة أول سبعة أيام. تُعرض المستحقات اليوم والمتأخرات بصورة منفصلة. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Native report warning"
@@ -2000,12 +2081,16 @@ msgid "Hide details"
 msgstr "إخفاء التفاصيل"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Overdue supplier bills"
 msgstr "فواتير الموردين المتأخرة"
 
 #. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Supplier bills due in 7 days"
@@ -2172,6 +2257,7 @@ msgid "Date"
 msgstr "التاريخ"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2180,6 +2266,7 @@ msgid "Invalid document type."
 msgstr "نوع المستند غير صالح."
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2188,6 +2275,7 @@ msgid "Enter 2–100 characters and a valid document type or page."
 msgstr "أدخل من حرفين إلى 100 حرف ونوع مستند أو صفحة صالحين."
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2196,6 +2284,7 @@ msgid "Invalid search record."
 msgstr "سجل البحث غير صالح."
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2204,6 +2293,7 @@ msgid "The record is unavailable in the selected scope."
 msgstr "السجل غير متاح ضمن النطاق المحدد."
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2212,6 +2302,7 @@ msgid "Section"
 msgstr "القسم"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2220,6 +2311,7 @@ msgid "Metric"
 msgstr "المؤشر"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2228,6 +2320,7 @@ msgid "Source"
 msgstr "المصدر"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2236,6 +2329,7 @@ msgid "Fetched at UTC"
 msgstr "وقت الجلب بتوقيت UTC"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2244,6 +2338,7 @@ msgid "Scope fingerprint"
 msgstr "بصمة النطاق"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2252,6 +2347,7 @@ msgid "Date basis"
 msgstr "أساس التاريخ"
 
 #. module: adams_executive_dashboard
+#. odoo-python
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
@@ -2300,3 +2396,136 @@ msgstr "طباعة / حفظ PDF"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Close preview"
 msgstr "إغلاق المعاينة"
+
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Count"
+msgstr "العدد"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Hours"
+msgstr "ساعات"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid dashboard filters."
+msgstr "عوامل تصفية لوحة المعلومات غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid native list or page."
+msgstr "القائمة الأصلية أو الصفحة غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid page."
+msgstr "الصفحة غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid report dimension or page."
+msgstr "بُعد التقرير أو الصفحة غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid report dimension."
+msgstr "بُعد التقرير غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Invalid sales record."
+msgstr "سجل المبيعات غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Inventory reporting access is required."
+msgstr "يلزم امتلاك صلاحية تقارير المخزون."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Select a period of up to three years with the start before the end."
+msgstr "اختر فترة لا تتجاوز ثلاث سنوات ويكون تاريخ بدايتها قبل نهايتها."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Select an authorized active company."
+msgstr "اختر شركة نشطة مصرحاً لك بالوصول إليها."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Supplier bills due in 30 days"
+msgstr "فواتير الموردين المستحقة خلال ٣٠ يوماً"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Supplier bills due today"
+msgstr "فواتير الموردين المستحقة اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "This native list is not configured."
+msgstr "لم يتم إعداد هذه القائمة الأصلية."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "This native report is not configured."
+msgstr "لم يتم إعداد هذا التقرير الأصلي."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Unassigned"
+msgstr "غير معيّن"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Unknown dashboard measure."
+msgstr "مؤشر لوحة المعلومات غير معروف."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Unknown dashboard section."
+msgstr "قسم لوحة المعلومات غير معروف."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Use the native report export for more than 5,000 groups."
+msgstr "استخدم تصدير التقرير الأصلي لأكثر من ٥٠٠٠ مجموعة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Use valid ISO dates."
+msgstr "استخدم تواريخ صالحة بتنسيق ISO."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "You do not have access to the executive dashboard."
+msgstr "ليست لديك صلاحية الوصول إلى لوحة الإدارة التنفيذية."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "You do not have export permission."
+msgstr "ليست لديك صلاحية التصدير."

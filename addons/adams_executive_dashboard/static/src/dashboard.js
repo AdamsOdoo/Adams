@@ -360,7 +360,8 @@ export class ExecutiveDashboard extends Component {
 
     printValue(row) {
         return row.value === null ? '—' : new Intl.NumberFormat(document.documentElement.lang || 'en', {
-            maximumFractionDigits: this.state.printSummary.currency_digits,
+            minimumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
+            maximumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
         }).format(row.value);
     }
 

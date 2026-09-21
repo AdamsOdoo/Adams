@@ -330,13 +330,16 @@ class ExecutiveDashboard(models.AbstractModel):
                 provenance = item.get('provenance') or {}
                 # Stable metric keys match the source drawer and exported definitions.
                 row = [label, labels.get(item['key'], item['key']), item.get('value') if item['status'] == 'ready' else None,
-                       result['currency'] if item.get('unit') == 'currency' else item.get('unit', ''),
+                       result['currency'] if item.get('unit') == 'currency' else {
+                           'percentage': '%', 'count': _('Count'), 'hours': _('Hours'),
+                       }.get(item.get('unit'), item.get('unit', '')),
                        item['status'], scoped.env.company.name, dates[0], dates[1], dates[2],
                        provenance.get('model') or item.get('source', ''), result.get('generated_at', ''),
                        provenance.get('fingerprint', ''), _('Yes') if item.get('has_warnings') else '', item.get('date_field', '')]
                 writer.writerow([safe(value) for value in row])
                 print_rows.append({'section': row[0], 'metric': row[1], 'value': row[2],
-                                   'unit': row[3], 'status': row[4], 'warning': bool(item.get('has_warnings'))})
+                                   'unit': row[3], 'digits': 0 if item.get('unit') == 'count' else result['digits'],
+                                   'status': row[4], 'warning': bool(item.get('has_warnings'))})
                 count += 1
         return {'filename': f'adams-executive-summary-{dates[0]}-{dates[1]}.csv',
                 'content': '\ufeff' + output.getvalue(), 'row_count': count,

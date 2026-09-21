@@ -14,6 +14,10 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
     def test_arabic_web_catalog_is_loaded_by_odoo(self):
         messages = code_translations.get_web_translations('adams_executive_dashboard', 'ar_001')['messages']
         translations = {message['id']: message['string'] for message in messages}
+        server = code_translations.get_python_translations('adams_executive_dashboard', 'ar_001')
+        for source in ('Accounting & Finance', 'Accounting revenue', 'Net cash movement', 'Sales', 'Operations', 'Count', 'Hours'):
+            self.assertTrue(server.get(source))
+            self.assertNotEqual(server[source], source)
         # Exercise Odoo's actual loader: syntactically valid PO files without
         # odoo-javascript markers silently produced an English dashboard.
         for source in ('Finance', 'Business overview', 'Apply filters', 'Recent orders',
@@ -252,6 +256,12 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         finance = next(row for row in rows if row['Metric'] == 'Accounting revenue')
         self.assertEqual(finance['Value'], '')
         self.assertEqual(finance['Status'], 'not_configured')
+        arabic = self.dashboard.with_context(lang='ar_001').export_summary(self.options)
+        self.assertIn('المؤشر', arabic['content'])
+        self.assertIn('المبيعات', arabic['content'])
+        self.assertIn('الإيرادات المحاسبية', arabic['content'])
+        self.assertNotIn('Accounting revenue', arabic['content'])
+        self.assertTrue(any(row['metric'] == 'الإيرادات المحاسبية' for row in arabic['print_rows']))
         self.reader.group_ids -= self.env.ref('base.group_allow_export')
         with self.assertRaises(AccessError):
             self.dashboard.with_user(self.reader).export_summary(self.options)
