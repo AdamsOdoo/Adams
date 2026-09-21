@@ -61,12 +61,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 if (!deniedCompany.error) throw new Error('Wrong company RPC must be rejected');
                 const exported = await call('export_breakdown', ['invoiced_sales','customer',OPTIONS]);
                 if (!exported.error) throw new Error('Export-disabled user must be rejected by direct RPC');
+                const summary = await call('export_summary', [OPTIONS]);
+                if (!summary.error) throw new Error('Export-disabled user must not export a summary');
                 console.log('test successful');
             })().catch(error => console.error(error));
             '''.replace('OPTIONS', json.dumps(options)).replace('ROLE', json.dumps(role)).replace('FOREIGN', str(foreign.id))
             self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=60)
 
     def test_bilingual_finance_reflow_and_native_drilldown(self):
+        self.partner_a.name = 'Dashboard Search Fixture'
         today = fields.Date.today()
         self.env['account.move'].create({
             'move_type': 'out_invoice', 'partner_id': self.partner_a.id,
@@ -146,7 +149,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
                     const surface = getComputedStyle(card).backgroundColor;
                     if (surface !== (THEME === 'dark' ? 'rgb(38, 42, 54)' : 'rgb(255, 255, 255)')) throw new Error('Card has incorrect theme surface');
-                    if (root.querySelectorAll('.adams_header_actions button').length !== 3) throw new Error('Reference view controls are missing');
+                    if (root.querySelectorAll('.adams_header_actions button').length !== 5) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
                     if (WIDTH < 760) {
@@ -204,6 +207,16 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             'Department must expand: ' + key);
                         if (root.scrollWidth > root.clientWidth + 2) throw new Error('Department overflow: ' + key);
                     }
+                    const searchInput = root.querySelector('#adams-search');
+                    searchInput.value = 'Dashboard Search Fixture';
+                    searchInput.dispatchEvent(new Event('input', {bubbles: true}));
+                    root.querySelector('.adams_global_search').requestSubmit();
+                    const searchDialog = await wait(() => root.querySelector('.adams_search_dialog[open]'), 'Search drawer must open');
+                    await wait(() => searchDialog.querySelector('tbody tr'), 'Native search must find fixture records');
+                    if (!searchDialog.innerText.includes('Dashboard Search Fixture')) throw new Error('Search lost native partner');
+                    if (searchDialog.scrollWidth > searchDialog.clientWidth + 2) throw new Error('Search drawer overflow');
+                    searchDialog.querySelector('header button').click();
+                    await wait(() => !searchDialog.open, 'Search drawer must close');
                     if (WIDTH === 1440 && DIRECTION === 'ltr') {
                         // A saved reference view includes both Sales selections.
                         root.querySelectorAll('.adams_recent_tabs button')[1].click();

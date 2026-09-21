@@ -2034,3 +2034,251 @@ msgstr "مراجعة أعمار الذمم المدينة ←"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Approvals & late receipts \u2192"
 msgstr "الموافقات والاستلامات المتأخرة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All documents"
+msgstr "كل المستندات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Customer invoices"
+msgstr "فواتير العملاء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Vendor bills"
+msgstr "فواتير الموردين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sales orders"
+msgstr "أوامر البيع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Quotations"
+msgstr "عروض الأسعار"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Export summary"
+msgstr "تصدير الملخص"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Preparing export…"
+msgstr "جارٍ إعداد التصدير…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Find an invoice, bill, order or quotation"
+msgstr "ابحث عن فاتورة أو أمر بيع أو عرض سعر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Document type"
+msgstr "نوع المستند"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Search results"
+msgstr "نتائج البحث"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Close search"
+msgstr "إغلاق البحث"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Searching native records…"
+msgstr "جارٍ البحث في السجلات…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Search unavailable. Check your access and retry."
+msgstr "البحث غير متاح. تحقق من صلاحياتك وأعد المحاولة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Selected company and period. Posted invoices and bills; confirmed orders; draft and sent quotations. Up to 25 records per document type on each page."
+msgstr "ضمن الشركة والفترة المحددتين: الفواتير المرحلة وأوامر البيع المؤكدة وعروض الأسعار المسودة والمرسلة. حتى 25 سجلاً لكل نوع مستند في الصفحة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Document"
+msgstr "المستند"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Customer / vendor"
+msgstr "العميل / المورد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Date"
+msgstr "التاريخ"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invalid document type."
+msgstr "نوع المستند غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Enter 2–100 characters and a valid document type or page."
+msgstr "أدخل من حرفين إلى 100 حرف ونوع مستند أو صفحة صالحين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invalid search record."
+msgstr "سجل البحث غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "The record is unavailable in the selected scope."
+msgstr "السجل غير متاح ضمن النطاق المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Section"
+msgstr "القسم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Metric"
+msgstr "المؤشر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Source"
+msgstr "المصدر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Fetched at UTC"
+msgstr "وقت الجلب بتوقيت UTC"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Scope fingerprint"
+msgstr "بصمة النطاق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Date basis"
+msgstr "أساس التاريخ"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Yes"
+msgstr "نعم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Print summary"
+msgstr "طباعة الملخص"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balance as of:"
+msgstr "الرصيد حتى تاريخ:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Fetched at UTC:"
+msgstr "وقت الجلب بتوقيت UTC:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Values follow the native reports. Unavailable values are not zero. Use the CSV export for source and scope details."
+msgstr "تتبع القيم التقارير الأصلية. القيم غير المتاحة ليست صفراً. استخدم ملف CSV للاطلاع على تفاصيل المصدر والنطاق."
