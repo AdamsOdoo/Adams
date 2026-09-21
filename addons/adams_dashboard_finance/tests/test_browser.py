@@ -406,7 +406,45 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         elif section == 'inventory' and stock_category:
                             # The long first page and its pager cannot fit in one
                             # narrow screenshot; retain both real viewport states.
-                            capture_section(section, '.adams_analysis .adams_table_wrap')
+                            capture_section(section, '.adams_analysis .adams_table_wrap', r"""
+                                const viewport = section.querySelector('.adams_analysis .adams_table_wrap');
+                                const firstRow = viewport.querySelector('tbody tr');
+                                const productCell = firstRow.cells[0];
+                                const sourceCell = firstRow.cells[firstRow.cells.length - 1];
+                                const rtl = getComputedStyle(viewport).direction === 'rtl';
+                                const origin = viewport.scrollLeft;
+                                const visibleBounds = () => {
+                                    const box = viewport.getBoundingClientRect();
+                                    const left = box.left + viewport.clientLeft;
+                                    return {left, right: left + viewport.clientWidth};
+                                };
+                                const bounds = visibleBounds();
+                                const identity = productCell.getBoundingClientRect();
+                                const leading = rtl ? identity.right : identity.left;
+                                if (leading < bounds.left - 2 || leading > bounds.right + 2)
+                                    throw new Error('Initial stock product edge is clipped by its scrollport');
+                                for (const text of productCell.querySelectorAll('span, small')) {
+                                    const range = document.createRange();
+                                    range.selectNodeContents(text);
+                                    for (const box of range.getClientRects()) {
+                                        if (box.left < identity.left - 2 || box.right > identity.right + 2)
+                                            throw new Error('Stock product text overflows its own cell');
+                                    }
+                                }
+                                try {
+                                    viewport.scrollLeft = rtl ? -viewport.scrollWidth : viewport.scrollWidth;
+                                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                    const endBounds = visibleBounds();
+                                    const source = sourceCell.getBoundingClientRect();
+                                    if (source.left < endBounds.left - 2 || source.right > endBounds.right + 2)
+                                        throw new Error('Horizontal stock scrolling cannot reveal the Source data column');
+                                    if (root.scrollWidth > root.clientWidth + 2)
+                                        throw new Error('Stock horizontal scrolling leaked into page overflow');
+                                } finally {
+                                    viewport.scrollLeft = origin;
+                                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                }
+                            """)
                             browser.take_screenshot(prefix=f'polish_inventory_table_{lang}_{theme}_{width}_').result(timeout=20)
                             capture_section(section, '.adams_page_controls', """
                                 const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');

@@ -39,12 +39,22 @@
     .adams_page_context { color: var(--adams-sub); font-size: var(--adams-helper); }
     .adams_analysis_columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 18px; }
     .adams_analysis label { display: grid; gap: 8px; max-width: 280px; }
-    .adams_table_wrap { overflow: auto; min-width: 0; max-width: 100%; scrollbar-gutter: stable; }
+    .adams_table_wrap { overflow: auto; min-width: 0; max-width: 100%; }
     .adams_table_wrap table { margin-bottom: 0; font-size: var(--adams-label); color: var(--adams-ink); }
     .adams_table_wrap td, .adams_table_wrap th { padding: 12px; vertical-align: middle; border-color: var(--adams-line); }
     .adams_table_wrap th { background: var(--adams-soft); color: var(--adams-sub); font-size: var(--adams-helper); font-weight: 600; }
     .adams_table_wrap td small { display: block; margin-top: 4px; color: var(--adams-sub); font-size: var(--adams-helper); }
     .adams_table_wrap .btn-link { text-align: start; padding-inline: 0; }
+    // Stock is a report table: preserve readable identity columns and let the
+    // existing wrapper scroll horizontally instead of crushing names on tablets.
+    #adams-inventory .adams_table_wrap th,
+    #adams-inventory .adams_table_wrap td { min-width: 96px; }
+    #adams-inventory .adams_table_wrap th:first-child,
+    #adams-inventory .adams_table_wrap td:first-child { min-width: 240px; width: 28%; overflow-wrap: anywhere; }
+    #adams-inventory .adams_table_wrap th:nth-child(2),
+    #adams-inventory .adams_table_wrap td:nth-child(2) { min-width: 180px; width: 22%; overflow-wrap: anywhere; }
+    #adams-inventory .adams_table_wrap td:nth-child(n+3) { white-space: nowrap; }
+
     .adams_bar_track { width: 100%; min-width: 100px; height: 5px; background: var(--adams-soft); margin-top: 6px; }
     .adams_bar_track span { display: block; height: 100%; background: #218970; }
     .adams_bar_track .negative { background: #ac493c; }
