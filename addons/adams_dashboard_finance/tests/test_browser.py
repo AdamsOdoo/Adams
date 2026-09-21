@@ -1,10 +1,18 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
+import hashlib
 import json
+import logging
+import os
+from pathlib import Path
+import tempfile
+import time
+from uuid import uuid4
 from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import Command, fields
+from odoo.tools import config
 from odoo.tests import new_test_user, tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
@@ -70,6 +78,29 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
 
     def test_bilingual_finance_reflow_and_native_drilldown(self):
         self.partner_a.name = 'Dashboard Search Fixture'
+        # These native rights and records exist only in this rollback-isolated
+        # browser fixture. The independent negative-role test stays unchanged.
+        stock_category = False
+        if 'sale.order' in self.env:
+            self.env.user.group_ids |= self.env.ref('sales_team.group_sale_manager')
+        if 'stock.quant' in self.env:
+            self.env.user.group_ids |= self.env.ref('stock.group_stock_manager')
+            warehouse = self.env['stock.warehouse'].search([
+                ('company_id', '=', self.env.company.id)], limit=1)
+            self.assertTrue(warehouse, 'Installed stock fixture requires its company warehouse')
+            location = self.env['stock.location'].create({
+                'name': 'Dashboard shelf / رف العرض', 'usage': 'internal',
+                'location_id': warehouse.lot_stock_id.id, 'company_id': self.env.company.id,
+            })
+            stock_category = self.env['product.category'].create({'name': 'Dashboard visual stock'})
+            stock_products = self.env['product.product'].create([{
+                'name': f'Dashboard stock {index:02} / شامبو العرض',
+                'default_code': f'DASH-VIS-{index:02}', 'is_storable': True,
+                'company_id': self.env.company.id, 'categ_id': stock_category.id,
+            } for index in range(27)])
+            for index, stock_product in enumerate(stock_products):
+                self.env['stock.quant']._update_available_quantity(stock_product, location, index + 1)
+            self.env.flush_all()
         today = fields.Date.today()
         self.env['account.move'].create({
             'move_type': 'out_invoice', 'partner_id': self.partner_a.id,
@@ -124,11 +155,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         if not language.active:
             self.env['base.language.install'].create({'lang_ids': [Command.set(language.ids)]}).lang_install()
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        screenshot_source = Path(config['screenshots']) / self.env.cr.dbname / 'screenshots'
+        existing_screenshots = set(screenshot_source.glob('*.png'))
+        capture_prefixes = []
         for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
             self.env.user.lang = lang
             for theme, width in product(('light', 'dark'), (320, 390, 768, 1024, 1440, 1920)):
                 self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x900'
+                prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
+                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking', 'polish_sales_lower']
+                if stock_category:
+                    prefixes += ['polish_inventory_table', 'polish_inventory_page2']
+                capture_prefixes.extend(f'{prefix}_{lang}_{theme}_{width}_' for prefix in prefixes)
                 # No mocked reports or browser RPCs: interact with rendered Odoo UI.
                 code = '''
                 (async () => {
@@ -152,6 +191,9 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (root.querySelectorAll('.adams_header_actions button').length !== 5) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    const scopeDates = [...root.querySelectorAll('.adams_scope .adams_date_value')];
+                    if (scopeDates.length !== 3) throw new Error('Applied filter summary must show three individual dates');
+                    if (scopeDates.some(date => date.getClientRects().length !== 1)) throw new Error('Applied filter summary split an individual date');
                     if (WIDTH < 760) {
                         const toggle = root.querySelector('.adams_mobile_menu');
                         toggle.click();
@@ -294,10 +336,181 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # Instrument only evidence capture after the real browser assertions.
                     # Business data, rendering and test success are never mocked.
                     browser.take_screenshot(prefix=f'dashboard_{lang}_{theme}_{width}_').result(timeout=20)
+                    # Retain real rendered sections for semantic visual review, not
+                    # only the landing screen. This never supplies business values
+                    # or changes a test result. Responsive/theme coverage is shared
+                    # with the existing 24-case application journey above.
+                    def capture_section(section, target_selector=None, setup=''):
+                        expression = r"""(async () => {
+                            const wait = async (test, message) => {
+                                for (let i = 0; i < 200; i++) {
+                                    const value = test(); if (value) return value;
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                }
+                                throw new Error(message);
+                            };
+                            const root = document.querySelector('.o_adams_dashboard');
+                            const section = root.querySelector('#adams-' + SECTION);
+                            if (!section) throw new Error('Missing visual evidence section');
+                            const toggle = section.querySelector('.adams_section_toggle');
+                            if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+                            await wait(() => !section.querySelector('.adams_message[role="status"]'),
+                                'Visual evidence section did not finish loading');
+                            SETUP
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            const target = TARGET ? section.querySelector(TARGET) : section;
+                            if (!target) throw new Error('Missing visual evidence target');
+                            const nav = root.querySelector('.adams_nav');
+                            root.scrollTop += target.getBoundingClientRect().top - root.getBoundingClientRect().top - nav.getBoundingClientRect().height - 16;
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            if (root.scrollWidth > root.clientWidth + 2) throw new Error('Visual evidence page overflow: ' + SECTION);
+                            return {section:SECTION, width:innerWidth, direction:getComputedStyle(root).direction};
+                        })()""".replace('SECTION', json.dumps(section)).replace('TARGET', json.dumps(target_selector)).replace('SETUP', setup)
+                        observed = browser._websocket_request('Runtime.evaluate', params={
+                            'expression': expression, 'awaitPromise': True, 'returnByValue': True,
+                        })
+                        if observed.get('exceptionDetails'):
+                            raise AssertionError(observed['exceptionDetails'])
+
+                    for section in ('sales', 'inventory', 'procurement', 'crm'):
+                        setup = ''
+                        target = None
+                        if section == 'sales':
+                            setup = """
+                                await wait(() => section.querySelector('.adams_product_ranking .adams_rank_row') &&
+                                    section.querySelector('.adams_customers_panel .adams_rank_row') &&
+                                    !section.querySelector('[role="status"]'), 'Invoice rankings must settle before capture');
+                            """
+                        elif section == 'inventory' and stock_category:
+                            setup = """
+                                const explore = section.querySelector(':scope > button.btn-outline-secondary');
+                                if (!explore) throw new Error('Current stock action is missing');
+                                explore.click();
+                                const filters = await wait(() => section.querySelector('.adams_stock_filters'), 'Stock filters must render');
+                                await wait(() => !filters.querySelector('button').disabled, 'Initial stock must settle');
+                                const category = filters.querySelectorAll('select')[1];
+                                category.value = STOCK_CATEGORY;
+                                category.dispatchEvent(new Event('change', {bubbles:true}));
+                                await new Promise(resolve => requestAnimationFrame(resolve));
+                                filters.requestSubmit();
+                                await wait(() => !filters.querySelector('button').disabled &&
+                                    section.querySelectorAll('.adams_analysis tbody tr').length === 25 &&
+                                    section.querySelectorAll('.adams_page_number').length === 2 &&
+                                    [...section.querySelectorAll('.adams_analysis tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
+                                    'Filtered native stock must render 25 rows and two numbered pages');
+                            """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
+                            target = '.adams_stock_filters'
+                        capture_section(section, target, setup)
+                        browser.take_screenshot(prefix=f'polish_{section}_{lang}_{theme}_{width}_').result(timeout=20)
+                        if section == 'sales':
+                            for panel in ('product_ranking', 'order_ranking', 'sales_lower'):
+                                capture_section(section, '.adams_' + panel)
+                                browser.take_screenshot(prefix=f'polish_{panel}_{lang}_{theme}_{width}_').result(timeout=20)
+                        elif section == 'inventory' and stock_category:
+                            # The long first page and its pager cannot fit in one
+                            # narrow screenshot; retain both real viewport states.
+                            capture_section(section, '.adams_analysis .adams_table_wrap', r"""
+                                const viewport = section.querySelector('.adams_analysis .adams_table_wrap');
+                                const firstRow = viewport.querySelector('tbody tr');
+                                const productCell = firstRow.cells[0];
+                                const sourceCell = firstRow.cells[firstRow.cells.length - 1];
+                                const rtl = getComputedStyle(viewport).direction === 'rtl';
+                                const origin = viewport.scrollLeft;
+                                const visibleBounds = () => {
+                                    const box = viewport.getBoundingClientRect();
+                                    const left = box.left + viewport.clientLeft;
+                                    return {left, right: left + viewport.clientWidth};
+                                };
+                                const bounds = visibleBounds();
+                                const identity = productCell.getBoundingClientRect();
+                                const leading = rtl ? identity.right : identity.left;
+                                if (leading < bounds.left - 2 || leading > bounds.right + 2)
+                                    throw new Error('Initial stock product edge is clipped by its scrollport');
+                                for (const text of productCell.querySelectorAll('span, small')) {
+                                    const range = document.createRange();
+                                    range.selectNodeContents(text);
+                                    for (const box of range.getClientRects()) {
+                                        if (box.left < identity.left - 2 || box.right > identity.right + 2)
+                                            throw new Error('Stock product text overflows its own cell');
+                                    }
+                                }
+                                try {
+                                    viewport.scrollLeft = rtl ? -viewport.scrollWidth : viewport.scrollWidth;
+                                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                    const endBounds = visibleBounds();
+                                    const source = sourceCell.getBoundingClientRect();
+                                    if (source.left < endBounds.left - 2 || source.right > endBounds.right + 2)
+                                        throw new Error('Horizontal stock scrolling cannot reveal the Source data column');
+                                    if (root.scrollWidth > root.clientWidth + 2)
+                                        throw new Error('Stock horizontal scrolling leaked into page overflow');
+                                } finally {
+                                    viewport.scrollLeft = origin;
+                                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                }
+                            """)
+                            browser.take_screenshot(prefix=f'polish_inventory_table_{lang}_{theme}_{width}_').result(timeout=20)
+                            capture_section(section, '.adams_page_controls', """
+                                const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');
+                                if (!pageTwo) throw new Error('Second stock page is missing');
+                                pageTwo.click();
+                                await wait(() => section.querySelectorAll('.adams_analysis tbody tr').length === 2 &&
+                                    section.querySelector('.adams_page_number[aria-current="page"]')?.textContent.trim() === '2' &&
+                                    !section.querySelector('.adams_stock_filters button').disabled,
+                                    'Second stock page must settle with the remaining two fixture rows');
+                                if (!section.querySelector('.adams_analysis tbody').innerText.includes('DASH-VIS-26'))
+                                    throw new Error('Second stock page lost its final fixture product');
+                            """)
+                            browser.take_screenshot(prefix=f'polish_inventory_page2_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
                     self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=90)
+
+        # Odoo.sh may clean its temporary screenshots after startup. Retain only
+        # this successful matrix's PNGs under the configured private data_dir.
+        # A pending directory is promoted atomically only after exact coverage,
+        # PNG signature and copied-byte hashes are verified. Existing runs survive.
+        deadline = time.monotonic() + 5
+        while True:
+            current = set(screenshot_source.glob(f'*_{self._testMethodName}.png')) - existing_screenshots
+            matched = {prefix: [path for path in current if path.name.startswith(prefix)]
+                       for prefix in capture_prefixes}
+            if all(len(paths) == 1 for paths in matched.values()) or time.monotonic() >= deadline:
+                break
+            # take_screenshot's file-writing callback may finish just after its Future.
+            time.sleep(0.05)
+        self.assertEqual(len(capture_prefixes), 24 * (10 if stock_category else 8))
+        self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
+                        'Each matrix view must have exactly one newly saved screenshot')
+        retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
+        retained_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        retained_root.parent.chmod(0o700)
+        retained_root.chmod(0o700)
+        pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=retained_root))
+        manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
+                    'matrix_cases': 24, 'screenshots': len(capture_prefixes),
+                    'populated_stock': bool(stock_category), 'files': []}
+        for prefix, paths in matched.items():
+            source = paths[0]
+            self.assertFalse(source.is_symlink(), 'Evidence must be a regular screenshot')
+            content = source.read_bytes()
+            self.assertTrue(content.startswith(b'\x89PNG\r\n\x1a\n') and len(content) > 24,
+                            'Screenshot is missing its PNG header')
+            destination = pending / source.name
+            with destination.open('xb') as output:
+                output.write(content)
+            destination.chmod(0o600)
+            digest = hashlib.sha256(content).hexdigest()
+            self.assertEqual(hashlib.sha256(destination.read_bytes()).hexdigest(), digest)
+            manifest['files'].append({'prefix': prefix, 'name': source.name,
+                                      'bytes': len(content), 'sha256': digest})
+        manifest_path = pending / 'manifest.json'
+        manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
+        manifest_path.chmod(0o600)
+        destination = retained_root / ('run-' + uuid4().hex)
+        os.replace(pending, destination)
+        logging.getLogger(__name__).info('ADAMS_DASHBOARD_UI_EVIDENCE: %s (%s verified PNGs)',
+                                         destination, len(capture_prefixes))
 
 
     def test_hidden_sections_are_absent_from_both_navigation_surfaces(self):

@@ -2888,3 +2888,45 @@ msgstr "تعذر فتح تقرير المخزون. تحقق من صلاحيات�
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Products ranked by net quantity sold"
 msgstr "ترتيب المنتجات حسب صافي الكمية المباعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Top products"
+msgstr "أفضل المنتجات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Late receipts"
+msgstr "الاستلامات المتأخرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Values retain signs. Bars show relative magnitude, not target attainment. Commercial margin uses current product cost."
+msgstr "تحتفظ القيم بإشاراتها. تعرض الأشرطة الحجم النسبي وليس مدى تحقيق الهدف. يُحتسب الهامش التجاري باستخدام تكلفة المنتج الحالية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Ordered, delivered and remaining quantities are shown by product and unit."
+msgstr "تُعرض الكميات المطلوبة والمسلّمة والمتبقية حسب المنتج ووحدة القياس."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current purchases, regardless of the selected dates. Late receipts have passed their planned receipt date and still have quantities to receive. Opening an order does not approve it."
+msgstr "المشتريات الحالية بغض النظر عن التواريخ المحددة. الاستلامات المتأخرة تجاوزت تاريخ الاستلام المخطط ولا تزال بها كميات لم تُستلم. فتح الطلب لا يعني الموافقة عليه."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Choose orders or quotations to view details."
+msgstr "اختر الطلبات أو عروض الأسعار لعرض التفاصيل."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Technical details"
+msgstr "التفاصيل التقنية"
