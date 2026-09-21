@@ -568,3 +568,12 @@ test('changing stock results suppresses an in-flight source action', async () =>
     pending[0].resolve({res_model:'product.product'});await open;
     assert.equal(opened,0);assert.equal(controller.state.opening,false);
 });
+
+test('company settings open for the applied dashboard company', () => {
+    const {controller}=fixture();
+    controller.state.applied={...controller.state.draft,company_id:2};
+    let options;controller.action.doAction=(action, settings)=>{options=settings;};
+    controller.openSettings();
+    assert.equal(options.additionalContext.default_company_id,2);
+    assert.deepEqual([...options.additionalContext.allowed_company_ids],[2]);
+});

@@ -407,7 +407,9 @@ export class ExecutiveDashboard extends Component {
     sectionEnabled(key) { return this.visibleSections.some(section => section.key === key); }
 
     openSettings() {
-        return this.action.doAction('adams_executive_dashboard.action_dashboard_settings');
+        return this.action.doAction('adams_executive_dashboard.action_dashboard_settings', {
+            additionalContext: {allowed_company_ids: [this.state.applied.company_id], default_company_id: this.state.applied.company_id},
+        });
     }
 
     scrollOffset() {
