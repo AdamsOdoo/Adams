@@ -462,6 +462,14 @@ test('scroll tracking uses real sticky height, supports bottom sections and clic
     controller.root.el=root;
     controller.syncActiveSection();
     assert.equal(controller.state.activeSection,'sales');
+    // Filtering can leave only the previous section's footer above the next
+    // heading. The visible content, not that footer, determines the category.
+    boxes.finance={top:-600,bottom:168};boxes.sales={top:200,bottom:900};
+    controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'sales');
+    boxes.finance={top:-600,bottom:400};boxes.sales={top:432,bottom:900};
+    controller.syncActiveSection();
+    assert.equal(controller.state.activeSection,'finance');
     boxes.sales={top:70,bottom:280};boxes.hr={top:300,bottom:430};
     root.scrollTop=1300;
     controller.syncActiveSection();
