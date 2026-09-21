@@ -30,7 +30,7 @@ msgstr "نمط تاريخ التقرير لا يطابق هذا المؤشر."
 #. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Choose a native report column with the correct monetary or percentage unit."
+msgid "Choose a report column with the correct monetary or percentage unit."
 msgstr "اختر عمودًا من التقرير الأصلي بوحدة نقدية أو نسبة مئوية مطابقة."
 
 #. module: adams_dashboard_finance
@@ -54,7 +54,7 @@ msgstr "يلزم امتلاك صلاحية الوصول إلى التقارير 
 #. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
-msgid "Use the native financial report filters for further analysis."
+msgid "Use the financial report filters for further analysis."
 msgstr "استخدم مرشحات التقرير المالي الأصلي لمزيد من التحليل."
 
 #. module: adams_dashboard_finance
@@ -66,7 +66,7 @@ msgstr "راجع ربط المؤشر المالي واعتمده أولاً."
 #. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
-msgid "The native report returned an unsupported scope."
+msgid "The report returned an unsupported scope."
 msgstr "أعاد التقرير الأصلي نطاقًا غير مدعوم."
 
 #. module: adams_dashboard_finance
@@ -117,12 +117,12 @@ msgstr "تعريفات المؤشرات المالية"
 
 #. module: adams_dashboard_finance
 #: model_terms:ir.ui.view,arch_db:adams_dashboard_finance.finance_mapping_form
-msgid "Approve native definition"
+msgid "Approve definition"
 msgstr "اعتماد التعريف الأصلي"
 
 #. module: adams_dashboard_finance
 #: model_terms:ir.ui.view,arch_db:adams_dashboard_finance.finance_mapping_form
-msgid "Choose the exact native report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again."
+msgid "Choose the exact report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again."
 msgstr "اختر التقرير والتعبير الأصليين لهذه الشركة بدقة. يؤكد الاعتماد التعريف وسياسة إعداد التقارير، ولا يؤكد اكتمال الدفاتر. تتطلب التغييرات مراجعة جديدة."
 
 #. module: adams_dashboard_finance
@@ -192,12 +192,12 @@ msgstr "تعبير المقام"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Select the native denominator expression for this ratio."
+msgid "Select the denominator expression for this ratio."
 msgstr "اختر تعبير المقام الأصلي لهذه النسبة."
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "A dependent native report could not be resolved."
+msgid "A dependent report could not be resolved."
 msgstr "تعذر تحديد أحد التقارير الأصلية المعتمَد عليها."
 
 #. module: adams_dashboard_finance
@@ -212,7 +212,7 @@ msgstr "تعبير تفاصيل النقدية"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Cash detail requires the native General Ledger balance expression."
+msgid "Cash detail requires the General Ledger balance expression."
 msgstr "تتطلب تفاصيل النقدية تعبير الرصيد الأصلي لدفتر الأستاذ العام."
 
 #. module: adams_dashboard_finance
@@ -232,7 +232,7 @@ msgstr "تقرير التدفقات النقدية"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Select the native Cash Flow Statement for the cash mapping."
+msgid "Select the Cash Flow Statement for the cash mapping."
 msgstr "اختر قائمة التدفقات النقدية الأصلية لربط النقدية."
 
 #. module: adams_dashboard_finance
@@ -242,17 +242,17 @@ msgstr "تقرير دفتر أستاذ الشريك"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Select the native Partner Ledger for a receivable or payable mapping."
+msgid "Select the Partner Ledger for a receivable or payable mapping."
 msgstr "اختر دفتر أستاذ الشريك الأصلي لربط الذمم المدينة أو الدائنة."
 
 #. module: adams_dashboard_finance
 #: model:ir.model.fields.selection,name:adams_dashboard_finance.selection__adams_dashboard_finance_mapping__metric__standard_forecast
-msgid "Native short-term cash forecast"
+msgid "short-term cash forecast"
 msgstr "التوقع النقدي الأصلي قصير الأجل"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Select the native Executive Summary short-term cash forecast expression."
+msgid "Select the Executive Summary short-term cash forecast expression."
 msgstr "اختر تعبير التوقع النقدي الأصلي قصير الأجل في الملخص التنفيذي."
 
 #. module: adams_dashboard_finance
@@ -262,12 +262,12 @@ msgstr "الموازنة"
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/finance_mapping.py:0
-msgid "Select a same-company native budget for a supported profitability report."
+msgid "Select a same-company budget for a supported profitability report."
 msgstr "اختر موازنة أصلية للشركة نفسها ضمن تقرير ربحية مدعوم."
 
 #. module: adams_dashboard_finance
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
-msgid "The native budget is unavailable for this scope."
+msgid "The budget is unavailable for this scope."
 msgstr "الموازنة الأصلية غير متاحة لهذا النطاق."
 
 #. module: adams_dashboard_finance
@@ -313,7 +313,7 @@ msgstr "فترة مدفوعات الموردين غير معروفة."
 #. module: adams_dashboard_finance
 #. odoo-python
 #: code:addons/adams_dashboard_finance/models/dashboard.py:0
-msgid "Posted supplier-bill installments outstanding at the balance cutoff. The 30-day window includes the first 7 days. Standalone credits and unapplied payments remain in full native aging."
+msgid "Posted supplier-bill installments outstanding at the balance cutoff. The 30-day window includes the first 7 days. Standalone credits and unapplied payments remain in full aging."
 msgstr "أقساط فواتير الموردين المرحلة والمستحقة عند تاريخ الرصيد. تشمل فترة الثلاثين يومًا أول سبعة أيام. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."
 
 #. module: adams_dashboard_finance

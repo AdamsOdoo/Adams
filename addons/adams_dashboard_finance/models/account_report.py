@@ -1,4 +1,4 @@
-"""Retain the fixed supplier window through native report option rebuilding."""
+"""Retain the fixed supplier window through report option rebuilding."""
 from odoo import _, fields, models
 from odoo.exceptions import ValidationError
 

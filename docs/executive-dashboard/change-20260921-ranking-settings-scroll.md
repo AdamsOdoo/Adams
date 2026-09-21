@@ -28,6 +28,11 @@ mappings/business data are excluded. Authorized Adams staging remains the UAT ta
 
 ## Acceptance and evidence
 
+Update: the queued builds subsequently failed installation on the unsupported Settings
+action target `inline`. The correction and expanded authorized work are tracked in
+[the current UI enhancement follow-up](change-20260921-current-ui-enhancements.md).
+The historical queue observation below is retained as provenance.
+
 Required: independent known-value product/refund/date/draft/archived fixtures and
 native product drilldown; company-specific settings persistence and unauthorized
 writes; hidden sections absent in native UI; real browser product content and

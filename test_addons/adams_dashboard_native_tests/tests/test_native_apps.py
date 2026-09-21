@@ -167,7 +167,7 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         rows = list(csv.DictReader(io.StringIO(export['content'].lstrip('\ufeff'))))
         self.assertEqual(len(rows), 27)
         self.assertTrue(export['generated_at'])
-        self.assertEqual({row['Fetched at UTC'] for row in rows}, {export['generated_at']})
+        self.assertEqual({row['Last updated UTC'] for row in rows}, {export['generated_at']})
         self.assertEqual({row['Scope fingerprint'] for row in rows}, {export['provenance']['fingerprint']})
         self.assertEqual({row['Definition'] for row in rows}, {'v4'})
 
@@ -280,6 +280,10 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         past, page = row('historical')
         self.assertEqual(current['qty_available'], 8)
         self.assertEqual(past['qty_available'], 12)
+        location_page = self.dashboard.get_inventory(self.options, 0, 'historical', {'location_id': stock.id, 'search': product.name, 'at_date': '2026-08-31', 'hide_zero': True})
+        self.assertEqual(location_page['rows'][0]['qty_available'], 12)
+        self.assertNotIn('free_qty', location_page['rows'][0])
+        self.assertEqual(location_page['as_of'], '2026-08-31')
         self.assertEqual(past['total_value'], 120)
         self.assertNotIn('free_qty', past)
         self.assertNotIn('virtual_available', past)
@@ -380,3 +384,43 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         order.order_line.qty_received = 2
         self.env.flush_all()
         self.assertNotIn(order.id, [row['id'] for row in self.dashboard.get_procurement(self.options, kind='late')['rows']])
+
+    def test_location_stock_filters_pages_and_source_scope(self):
+        from odoo.exceptions import AccessError, ValidationError
+        warehouse = self.env['stock.warehouse'].search([('company_id', '=', self.env.company.id)], limit=1)
+        parent = warehouse.lot_stock_id
+        child = self.env['stock.location'].create({'name': 'Dashboard shelf', 'usage': 'internal',
+            'location_id': parent.id, 'company_id': self.env.company.id})
+        category = self.env['product.category'].create({'name': 'Dashboard location category'})
+        products = self.env['product.product'].create([{'name': f'Location fixture {i:02}', 'is_storable': True,
+            'categ_id': category.id} for i in range(27)])
+        for product in products:
+            self.env['stock.quant']._update_available_quantity(product, parent, 10)
+        self.env['stock.quant']._update_available_quantity(products[0], child, -3)
+        self.env.flush_all()
+        filters = {'warehouse_id': warehouse.id, 'category_id': category.id, 'hide_zero': True, 'hide_negative': False}
+        first = self.dashboard.get_inventory(self.options, 0, 'current', filters)
+        second = self.dashboard.get_inventory(self.options, 25, 'current', filters)
+        rows = first['rows'] + second['rows']
+        self.assertEqual(first['total_count'], 28)
+        self.assertEqual(len(first['rows']), 25)
+        self.assertEqual(len(second['rows']), 3)
+        self.assertFalse(second['has_more'])
+        quantities = {(r['product_id'], r['location_id']): r['qty_available'] for r in rows}
+        self.assertEqual(quantities[products[0].id, parent.id], 10)
+        self.assertEqual(quantities[products[0].id, child.id], -3)
+        positive = self.dashboard.get_inventory(self.options, 0, 'current', dict(filters, hide_negative=True))
+        self.assertEqual(positive['total_count'], 27)
+        zeros = self.dashboard.get_inventory(self.options, 0, 'current', dict(filters, location_id=child.id, hide_zero=False, hide_negative=True))
+        self.assertEqual(zeros['total_count'], 26)
+        self.assertTrue(all(row['qty_available'] == 0 for row in zeros['rows']))
+        action = self.dashboard.open_inventory_location(self.options, products[0].id, child.id, 'current', filters)
+        self.assertEqual(action['context']['location'], child.id)
+        self.assertTrue(action['context']['strict'])
+        self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+        self.assertEqual(self.env['product.product'].with_context(action['context']).search(action['domain']), products[0])
+        with self.assertRaises(AccessError):
+            self.dashboard.open_inventory_location(self.options, products[0].id, child.id, 'current', dict(filters, hide_negative=True))
+        for invalid in ({'warehouse_id': True}, {'hide_zero': 'yes'}, {'domain': []}, {'location_id': -1}):
+            with self.assertRaises(ValidationError):
+                self.dashboard.get_inventory(self.options, 0, 'current', invalid)

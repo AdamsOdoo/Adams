@@ -422,3 +422,33 @@
     .adams_product_ranking .adams_rank_row { grid-template-columns: 24px minmax(0, 1fr); }
     .adams_product_ranking .adams_rank_top { flex-wrap: wrap; gap: 8px; }
 }
+
+// Small spacing and readability adjustments retain the established dashboard theme.
+.o_adams_dashboard {
+    .adams_filter_guidance .adams_hint { margin: 8px 0; line-height: 1.5; }
+    .adams_layout_controls { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 16px; }
+    .adams_layout_editor { flex-basis: 100%; padding: 16px; border: 1px solid var(--adams-line); border-radius: 10px; }
+    .adams_layout_editor > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .adams_layout_editor > div > span { flex: 1 1 180px; }
+    .adams_stock_filters, .adams_ranking_controls { display: flex; align-items: end; gap: 12px 16px; flex-wrap: wrap; margin-block: 16px; }
+    .adams_stock_filters label, .adams_ranking_controls label { display: grid; gap: 6px; font-size: 13px; font-weight: 500; min-width: 160px; flex: 1 1 180px; }
+    .adams_stock_filters .adams_check { display: flex; align-items: center; gap: 8px; min-height: 38px; }
+    .adams_ranking_controls label { flex: 0 1 220px; }
+    .adams_product_ranking .adams_ranking_controls { padding-inline: 20px; }
+    .adams_stock_filters input, .adams_stock_filters select, .adams_ranking_controls select { font-size: 14px; }
+    .adams_page_controls { flex-wrap: wrap; gap: 8px; align-items: center; }
+    .adams_page_number { min-width: 36px; min-height: 36px; font-variant-numeric: tabular-nums; }
+    .adams_page_number.active { color: var(--adams-green); border-color: currentColor; font-weight: 700; }
+    .adams_order_ranking { margin-bottom: 24px; }
+    .adams_order_ranking .adams_rank_row { grid-template-columns: 24px minmax(0, 1fr); }
+    .adams_rank_top { gap: 10px; flex-wrap: wrap; line-height: 1.5; }
+    .adams_rank_top strong { overflow-wrap: anywhere; }
+    .adams_panel_head p, .adams_rank_foot, .adams_hint, .adams_empty_note { line-height: 1.55; }
+    .adams_analysis .table th, .adams_analysis .table td { padding-block: 12px; vertical-align: middle; }
+    .adams_analysis .table small { display: block; margin-top: 4px; color: var(--adams-sub); }
+    .adams_message { min-height: 100px; }
+    @media (max-width: 480px) {
+        .adams_stock_filters label { flex-basis: 100%; }
+        .adams_page_controls .btn { min-height: 40px; }
+    }
+}

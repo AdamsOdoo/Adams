@@ -7,7 +7,7 @@
             <xpath expr="//form" position="inside">
                 <app string="Executive Dashboard" name="adams_executive_dashboard" groups="base.group_system">
                     <block title="Visible dashboard sections" name="adams_dashboard_sections">
-                        <div class="text-muted mb-3">Choose the sections shown for the selected company. Reload the dashboard after saving. Visibility does not grant or revoke native application permissions.</div>
+                        <div class="text-muted mb-3">Choose the sections shown for the selected company. Reload the dashboard after saving. Visibility does not grant or revoke application permissions.</div>
                         <setting id="adams_dashboard_finance" string="Accounting &amp; Finance" company_dependent="1"><field name="adams_dashboard_finance"/></setting>
                         <setting id="adams_dashboard_sales" string="Sales" company_dependent="1"><field name="adams_dashboard_sales"/></setting>
                         <setting id="adams_dashboard_crm" string="CRM" company_dependent="1"><field name="adams_dashboard_crm"/></setting>
@@ -23,7 +23,7 @@
         <field name="name">Dashboard Settings</field>
         <field name="res_model">res.config.settings</field>
         <field name="view_mode">form</field>
-        <field name="target">inline</field>
+        <field name="target">current</field>
         <field name="context">{'module': 'adams_executive_dashboard'}</field>
     </record>
 </odoo>

@@ -22,9 +22,9 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         # odoo-javascript markers silently produced an English dashboard.
         for source in ('Finance', 'Business overview', 'Apply filters', 'Recent orders',
                        'Explore delivery quantities', 'Not configured',
-                       'Review native worklist →', 'Review receivable aging →', 'Approvals & late receipts →',
+                       'View bills →', 'View overdue receivables →', 'Approvals & late receipts →',
                        'Search results', 'Print preview', 'Valuation:', 'Active employees:',
-                       'Native budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings'):
+                       'Budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)
@@ -196,15 +196,16 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         accounts[-1].active = False
         first = self.dashboard.get_cash_directory(self.options, 0, 'Searchable dashboard cash')
         second = self.dashboard.get_cash_directory(self.options, 25, 'Searchable dashboard cash')
-        self.assertEqual(first['total_count'], 27)
+        self.assertEqual(first['total_count'], 26)
         self.assertEqual(len(first['rows']), 25)
         self.assertTrue(first['has_more'])
-        self.assertEqual({row['id'] for row in first['rows'] + second['rows']}, set(accounts.ids))
+        self.assertEqual({row['id'] for row in first['rows'] + second['rows']}, set(accounts[:-1].ids))
         self.assertFalse(second['has_more'])
-        self.assertFalse(second['rows'][-1]['active'])
+        self.assertEqual(len(second['rows']), 1)
+        self.assertTrue(second['rows'][0]['active'])
         exact = self.dashboard.get_cash_directory(self.options, 0, accounts[-1].code)
-        self.assertEqual(exact['total_count'], 1)
-        self.assertEqual(exact['rows'][0]['id'], accounts[-1].id)
+        self.assertEqual(exact['total_count'], 0)
+        self.assertEqual(exact['rows'], [])
         for invalid in (None, {}, ['cash'], 'x' * 101):
             with self.assertRaises(ValidationError):
                 self.dashboard.get_cash_directory(self.options, 0, invalid)
@@ -268,6 +269,8 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
 
 
     def test_company_section_settings_persist_and_scope_summary(self):
+        action = self.env.ref('adams_executive_dashboard.action_dashboard_settings')
+        self.assertEqual(action.target, 'current')
         company = self.env.company
         company.adams_dashboard_hr = False
         self.assertNotIn('hr', self.dashboard._visible_sections())
@@ -314,3 +317,25 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
         self.assertIn(('state','=','posted'),action['domain'])
         with self.assertRaises(AccessError):
             self.dashboard.with_user(self.reader).get_breakdown('invoiced_sales','product',self.options)
+
+    def test_product_quantity_ranking_retains_refunds_and_separates_units(self):
+        products = self.env['product.product'].create([
+            {'name': 'Quantity units', 'uom_id': self.env.ref('uom.product_uom_unit').id},
+            {'name': 'Quantity weight', 'uom_id': self.env.ref('uom.product_uom_kgm').id},
+        ])
+        for product, quantity, kind in [(products[0], 8, 'out_invoice'), (products[0], 3, 'out_refund'),
+                                         (products[1], 100, 'out_invoice')]:
+            move = self._invoice(10, kind, post=False)
+            move.invoice_line_ids.write({'product_id': product.id, 'product_uom_id': product.uom_id.id,
+                'quantity': quantity, 'price_unit': 10, 'tax_ids': [Command.clear()]})
+            move.action_post()
+        self.env.flush_all()
+        result = self.dashboard.get_product_quantity_ranking(self.options, products[0].uom_id.id)
+        self.assertEqual(result['rows'], [{'id': products[0].id, 'label': products[0].display_name, 'value': 5}])
+        self.assertEqual({u['id'] for u in result['units']}, set(products.mapped('uom_id').ids))
+        weighted = self.dashboard.get_product_quantity_ranking(self.options, products[1].uom_id.id)
+        self.assertEqual(weighted['rows'][0]['value'], 100)
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(self.reader).get_product_quantity_ranking(self.options)
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_product_quantity_ranking(self.options, True)

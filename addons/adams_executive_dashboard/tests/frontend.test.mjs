@@ -471,3 +471,65 @@ test('scroll tracking uses real sticky height, supports bottom sections and clic
     controller.scrollTarget=null;controller.syncActiveSection();
     assert.equal(controller.state.activeSection,'hr');
 });
+
+test('numbered pagination exposes known pages without inventing an unknown last page', () => {
+    const {controller} = fixture();
+    assert.deepEqual([...controller.pageNumbers({offset: 0, total_count: 126})], [1, 2, 3, 4, 5, 6]);
+    assert.deepEqual([...controller.pageNumbers({offset: 0, has_more: true})], [1, 2]);
+    assert.deepEqual([...controller.pageNumbers({offset: 25, has_more: false})], [1, 2]);
+    assert.deepEqual([...controller.pageNumbers({offset: 0, total_count: 0})], [1]);
+});
+
+test('dirty filters normalize company IDs and do not change applied scope', () => {
+    const {controller} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.draft.company_id = '1';
+    assert.equal(controller.filtersDirty, false);
+    controller.state.draft.as_of = '2026-07-31';
+    assert.equal(controller.filtersDirty, true);
+    assert.equal(controller.state.applied.as_of, '2026-08-31');
+});
+
+test('personal section ordering and collapse do not change company visibility', () => {
+    const {controller, storage} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'sales', 'inventory']}];
+    controller.moveSection('inventory', -1);
+    assert.deepEqual([...controller.visibleSections.map(s=>s.key)], ['finance', 'inventory', 'sales']);
+    controller.setAllSections(true);
+    assert.equal(controller.state.collapsed.sales, true);
+    assert.equal(controller.visibleSections.length, 3);
+    assert.ok(storage.size);
+});
+
+test('inventory sends an immutable filter snapshot and retains selectors during pagination', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.stockFilters.warehouse_id = '7';
+    controller.state.stockFilters.category_id = '8';
+    controller.state.stockFilters.at_date = '2026-07-31';
+    controller.state.inventory = {warehouses: [{id: 7, name: 'Main'}], categories: [{id: 8, name: 'Clothes'}]};
+    const load = controller.loadDirectory('inventory', 25, 'historical');
+    controller.state.stockFilters.warehouse_id = '9';
+    assert.equal(pending[0].args[3].warehouse_id, 7);
+    assert.equal(pending[0].args[3].at_date, '2026-07-31');
+    assert.equal(controller.state.inventory.warehouses[0].id, 7);
+    pending[0].resolve({status: 'ready', rows: [], filters: pending[0].args[3]});
+    await load;
+    assert.equal(controller.state.inventory.filters.warehouse_id, 7);
+});
+
+test('sales-order and quantity rankings ignore an old company response', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.productMeasure = 'quantity';
+    const orders = controller.loadOrderRanking();
+    const products = controller.loadProducts();
+    assert.equal(pending[1].method, 'get_product_quantity_ranking');
+    controller.generation++;
+    pending[0].resolve({status: 'ready', rows: [{id: 1, value: 10}]});
+    pending[1].resolve({status: 'ready', rows: [{id: 1, value: 20}], unit_id: 3});
+    await Promise.all([orders, products]);
+    assert.equal(controller.state.orderRanking.status, 'loading');
+    assert.equal(controller.state.products.status, 'loading');
+});

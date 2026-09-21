@@ -12,10 +12,10 @@
         <field name="model">adams.dashboard.finance.mapping</field>
         <field name="arch" type="xml">
             <form>
-                <header><button name="action_approve" string="Approve native definition" type="object"
+                <header><button name="action_approve" string="Approve definition" type="object"
                     class="oe_highlight" groups="account.group_account_manager"/></header>
                 <sheet>
-                    <p>Choose the exact native report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again.</p>
+                    <p>Choose the exact report and expression for this company. Approval confirms the definition and reporting policy, not the completeness of the books. Changes require review again.</p>
                     <group><field name="company_id"/><field name="metric"/>
                         <field name="report_id" options="{'no_create': True}"/>
                         <field name="expression_id" domain="[('report_line_id.report_id', '=', report_id)]" options="{'no_create': True}"/>
