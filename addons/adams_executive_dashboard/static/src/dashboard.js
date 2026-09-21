@@ -433,8 +433,11 @@ export class ExecutiveDashboard extends Component {
             this.scrollTarget = null;
         }
         let active = entries[0]?.key || '';
+        // Track the content below the sticky navigation, not a thin footer of
+        // the preceding section left visible after filtering or resizing.
+        const trackingTop = bounds.top + offset + Math.min(64, Math.max(0, bounds.bottom - bounds.top - offset) * 0.12);
         for (const entry of entries) {
-            if (entry.node.getBoundingClientRect().top <= bounds.top + offset + 2) active = entry.key;
+            if (entry.node.getBoundingClientRect().top <= trackingTop + 2) active = entry.key;
         }
         if (root.scrollTop > 0 && root.scrollTop + root.clientHeight >= root.scrollHeight - 2) active = entries.at(-1)?.key || active;
         this.state.activeSection = active;
