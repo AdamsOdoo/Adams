@@ -1,5 +1,38 @@
 # Executive dashboard — implementation and verification
 
+
+## Product ranking, section settings and scroll follow-up — qualification pending
+
+New executable source **6ac4798ab98a395a4d96bdd3b5c1fdb64233ca35**, tree
+`bc059673d702a5f8fd7b3eba1ec333543c0f3e06`, both addons **19.0.1.3.0**.
+Adds the native signed net-invoiced product ranking, six company-specific section
+visibility settings, and sidebar tracking based on actual sticky navigation geometry.
+See [change/upgrade notes](change-20260921-ranking-settings-scroll.md).
+
+**28 controller checks pass**; Python/XML parsing and diff checks pass. Added native
+fixtures cover refunds, archived products, dates, drafts, native report scope,
+company settings and access. Native browser assertions cover product values,
+click/manual-scroll tracking and hidden navigation/content in the existing bilingual
+light/dark responsive matrix. **These new native tests have not run successfully yet.**
+Odoo.sh reports Build queued for 6ac4798a; no candidate logs or CONNECT build is
+available. Its build-error dialog reports no errors found, and platform Status says
+all systems operational. No cause for the queue delay is established.
+
+Current live staging remains **06a5274b**, version **19.0.1.2.2**, as qualified below.
+The follow-up is **not deployed or UAT-qualified**. A new native backup was created
+and verified at **2026-09-21 08:28:54 UTC**, revision **06a5274b**, before the proposed
+upgrade. No customer records or configuration have been changed for this follow-up.
+
+Resume with the queued native candidate; preserve any failed result if fixes are
+needed. After native qualification, deploy only the two addon trees (core
+`aa8e1d9dfa87884723a5e1464ae04a8fa952d553`, finance
+`da5c3afbe55efed27f04508c6e31a9daa4c77f6c`) onto the then-current authorized staging
+parent. Upgrade both addons, verify real Settings save/reload, disable HR as requested,
+verify product native drilldown and scroll behavior in EN/AR, retain screenshots,
+and restore English (US)/Dark. Do not reuse prior test results as proof for this code.
+Owner acceptance/independent review remain separate; production/main are unchanged.
+
+
 ## Current UAT-ready staging — 21 September 2026
 
 The resumed implementation now includes the missing reference interactions:

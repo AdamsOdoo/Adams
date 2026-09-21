@@ -5,6 +5,12 @@ currency **EGP**. Production and main are excluded. The agreed scope is recorded
 in [owner decisions](owner-decisions.md). See [implementation status](implementation-status.md)
 for the exact tested/deployed source and evidence boundaries.
 
+**New follow-up is pending native qualification and is not deployed:** source
+6ac4798a adds product ranking, section settings and scroll tracking (19.0.1.3.0).
+28 local controller checks pass; Odoo.sh is still queuing the native test build.
+Fresh pre-upgrade backup: **2026-09-21 08:28:54 UTC**, staging 06a5274b.
+The three new journeys below are acceptance instructions, not completed results.
+
 The staging candidate is **ready for owner UAT** at source **ef01fbe6**, addon version **19.0.1.2.2**.
 Native build **38371030** passes **60 tests with zero failures/errors**; the 25 controller checks pass. Staging is **06a5274b**; exact identities and evidence are in implementation-status.md.
 The current pre-update backup is **21 September 2026, 07:08 UTC**. Older
@@ -26,6 +32,9 @@ breadcrumb restores the scope and reloads current authorized values.
 | Supplier windows | Check overdue, due today, days 1–7 and days 1–30. The 30-day window includes the first seven days. Drill-down and export must identify and retain the same bill-installment window. |
 | Budgets | Use existing applicable native budgets only. This staging company has none configured; expect No target configured. |
 | Sales | Compare invoiced sales, confirmed orders and quotations separately. Check salesperson/customer breakdowns, recent documents, native analysis and export. |
+| Product ranking | Compare the top five signed net invoiced product values to Invoice Analysis for the same company/date range; credit notes reduce sales, tax is excluded. Open a product and Full ranking. |
+| Section settings | As administrator disable HR, Save and reload: HR disappears from both navigation surfaces, body and summary. Re-enable and verify it returns. Verify choices are company-specific; all-disabled has a clear empty state. |
+| Scroll tracking | Scroll down and up; the active category follows the visible section beneath the sticky tabs. Click a short final section and verify it stays selected. Repeat after resizing and in Arabic. |
 | Fulfillment | Inspect ordered, delivered and remaining quantities by product/UoM. No mixed-unit headline, valued backlog or custom on-time percentage is required. |
 | Inventory | Open current stock and stock at the balance cutoff. Compare quantities and native operational valuation by product. Check forecast/replenishment routes with existing stock rights. |
 | Purchasing | Inspect awaiting-approval and native late-receipt worklists. Open a record and return. Viewing does not approve, receive or bill an order. |

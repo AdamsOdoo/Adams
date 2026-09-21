@@ -34,8 +34,16 @@ writes; hidden sections absent in native UI; real browser product content and
 click/manual-scroll selection across the existing EN/AR/light/dark/six-width matrix;
 focused stale-response, hidden-source loading and scroll-geometry controller tests.
 
-Current local result: 28 controller checks pass. Native qualification and live
-staging screenshots will be recorded against the exact candidate below.
+Current local result: **28 controller checks pass**. Candidate source
+`6ac4798ab98a395a4d96bdd3b5c1fdb64233ca35`, tree
+`bc059673d702a5f8fd7b3eba1ec333543c0f3e06`. Native qualification and live
+staging screenshots are **pending**, not passed: Odoo.sh still shows Build queued
+with no candidate logs/CONNECT link. Its error dialog found no errors; platform
+health reports all systems operational, which does not prove this build ran.
+Existing staging remains 06a5274b. A fresh native backup is verified at
+2026-09-21 08:28:54 UTC at that revision. HR has not yet been disabled in live
+staging; do so through the new native Settings view after the qualified upgrade.
+The guide and UAT checklist document the new journeys for that deployment.
 
 Native settings view structure follows Odoo 19's own [base_setup settings view](https://github.com/odoo/odoo/blob/19.0/addons/base_setup/views/res_config_settings_views.xml).
 

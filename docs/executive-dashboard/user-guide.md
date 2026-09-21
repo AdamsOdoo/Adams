@@ -16,7 +16,7 @@ period start/end and balance cutoff, then **Apply filters**. Changing the input 
 alone does not change the displayed scope. The applied dates are shown beneath the
 filters. Period cards and balance cards have different date meanings.
 
-Use the sidebar or the six department tabs. Finance and Sales start expanded;
+Use the sidebar or the enabled department tabs. Finance and Sales start expanded;
 supporting departments start compact. Expansion preferences are remembered per
 user. On mobile, the menu receives focus when opened. Close it with × or Escape.
 Dates and mixed-script account codes retain their order in Arabic.
@@ -94,6 +94,37 @@ require the native report's full export route.
 | Unsupported report scope | The selected native report/options cannot be represented by this adapter. Review the configuration. |
 | Report unavailable | Retry, then report the scope and error time to the administrator. |
 | Undefined ratio | The native denominator is zero; this is not a zero-percent result. |
+
+## Product ranking and section visibility
+
+The Sales **Sold product ranking** widget shows the top five products by net
+invoiced sales value, excluding tax. It uses posted customer invoices less credit
+notes in the applied company and invoice-date period. Negative values keep their
+sign; this is a value ranking, not a unit-quantity ranking. Select a product for
+its native Invoice Analysis, or **Full ranking** for the complete grouped analysis.
+
+An administrator can choose **Dashboard Settings** in the sidebar, or open
+**Settings → Executive Dashboard**. Enable only the sections needed for the current
+company, then **Save** and reload the dashboard. For example, clear **Human
+Resources** to hide HR from the sidebar, department tabs, content and summaries.
+Each company has its own choices; all six sections initially remain enabled.
+Visibility does not change native application permissions. With all sections off,
+the dashboard displays an explicit empty-workspace message.
+
+The selected sidebar category follows the visible section when you scroll.
+Selecting a category expands it and aligns its heading below the sticky navigation;
+short sections near the page end retain the category you selected. Manual scrolling
+resumes automatic tracking.
+
+### ترتيب المنتجات وإظهار الأقسام
+
+تعرض المبيعات أفضل خمسة منتجات حسب صافي قيمة المبيعات المفوترة دون الضريبة،
+بعد خصم الإشعارات الدائنة، للشركة وفترة تاريخ الفاتورة المطبقتين. افتح المنتج
+للوصول إلى تحليل الفواتير الأصلي، أو اختر الترتيب الكامل لعرض التحليل المجمع.
+
+يمكن للمسؤول فتح **إعدادات لوحة المعلومات** واختيار الأقسام الظاهرة للشركة الحالية.
+ألغِ تحديد **الموارد البشرية** لإخفائها، ثم احفظ وأعد تحميل اللوحة. لا تغير هذه
+الاختيارات صلاحيات التطبيقات الأصلية. يتبع القسم المحدد في القائمة موضع التمرير.
 
 ## Administrator setup
 
