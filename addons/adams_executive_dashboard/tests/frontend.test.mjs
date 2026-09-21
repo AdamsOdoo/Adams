@@ -533,3 +533,38 @@ test('sales-order and quantity rankings ignore an old company response', async (
     assert.equal(controller.state.orderRanking.status, 'loading');
     assert.equal(controller.state.products.status, 'loading');
 });
+
+test('return from quantity source restores its selected unit and ranking limit', async () => {
+    const {controller, pending} = fixture();
+    const restore = controller.restoreNavigation({rankLimit:10, productMeasure:'quantity', productUnit:'7'});
+    for (const request of pending.slice(0,3)) request.resolve(data(100));
+    await new Promise(resolve=>setImmediate(resolve));
+    const quantity = pending.find(request=>request.method==='get_product_quantity_ranking');
+    assert.equal(quantity.args[1], 7);
+    quantity.resolve({status:'ready', rows:[], units:[], unit_id:7});
+    await restore;
+    assert.equal(controller.state.productUnit, '7');
+    assert.equal(controller.state.rankLimit, 10);
+});
+
+test('paging stock keeps applied filters even when the draft controls have changed', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={mode:'current',filters:{warehouse_id:3,hide_zero:true},rows:[],offset:0};
+    controller.state.stockFilters.warehouse_id='8';
+    const next=controller.loadDirectory('inventory',25);
+    assert.equal(pending[0].args[3].warehouse_id,3);
+    pending[0].resolve({status:'ready',rows:[]});await next;
+});
+
+test('changing stock results suppresses an in-flight source action', async () => {
+    const {controller,pending}=fixture();let opened=0;
+    controller.action.doAction=()=>opened++;
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={mode:'historical',filters:{at_date:'2026-07-31'}};
+    const open=controller.openStockRow({product_id:2,location_id:3});
+    assert.equal(pending[0].args[4].at_date,'2026-07-31');
+    controller.state.inventory={mode:'current',rows:[]};
+    pending[0].resolve({res_model:'product.product'});await open;
+    assert.equal(opened,0);assert.equal(controller.state.opening,false);
+});

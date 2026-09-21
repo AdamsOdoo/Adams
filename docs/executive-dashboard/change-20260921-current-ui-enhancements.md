@@ -35,7 +35,7 @@ main, financial mappings and business records remain outside this change.
 
 ## Evidence and limits
 
-33 local controller tests pass; Python/XML parse checks pass. New Odoo fixtures cover
+36 local controller tests pass; Python/XML parse checks pass. New Odoo fixtures cover
 strict location quantities, negative/zero filters, category/warehouse scope, pagination,
 historical dates, source actions, archived accounts and unit-separated refund ranking.
 These fixtures require the Odoo.sh build; their presence is not a passing result.
@@ -53,3 +53,5 @@ staging backup was verified at 2026-09-21 08:28:54 UTC; take a fresh backup befo
 - [Odoo19 product stock quantities and location/date contexts](https://github.com/odoo/odoo/blob/19.0/addons/stock/models/product.py)
 - [Inventory at Date wizard](https://github.com/odoo/odoo/blob/19.0/addons/stock/wizard/stock_quantity_history.py)
 - [Invoice Analysis quantity and refund signs](https://github.com/odoo/odoo/blob/19.0/addons/account/report/account_invoice_report.py)
+
+Verification update: candidate 4e06cafe, build 38407345, completed **65 Odoo tests, zero failures/errors**, 197.26s, 65,356 queries. Final stock navigation guards and unit restoration are in a subsequent candidate and require its own build. Fresh staging backup verified 2026-09-21 16:35:54 UTC at 06a5274b.

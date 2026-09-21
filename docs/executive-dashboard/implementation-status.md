@@ -6,7 +6,7 @@
 Candidate **9b102e99f37dad40f654b198d1bdac19723e1d30**, tree
 `d6508262d00af0eaed7a55d4e336518f27568707`, versions **19.0.1.4.0**, implements
 the expanded stock/cash/ranking/navigation scope while preserving the existing UI.
-**33 controller tests pass**; Python/XML and diff checks pass. Odoo.sh is starting
+**36 controller tests pass**; Python/XML and diff checks pass. Odoo.sh is starting
 the candidate build. Native and live staging acceptance have not yet passed.
 Prior queued candidates 6ac4798a/ca0b69f5 failed installation: unsupported Settings
 action target `inline`; corrected to `current`. See the
@@ -643,3 +643,5 @@ The two qualified addon trees are `fa89ce805f757daee476db7d4135e1b779e0c445`
 `b0caf770dd8d9b44898f9f62111c762e44af48eb`, preserves every other staging path.
 The pre-update backup is verified at **2026-09-21 07:08:00 UTC**, revision c6b8ad3e.
 The disposable native-test addon is not deployed to staging.
+
+Verification update: candidate 4e06cafe, build 38407345, completed **65 Odoo tests, zero failures/errors**, 197.26s, 65,356 queries. Final stock navigation guards and unit restoration are in a subsequent candidate and require its own build. Fresh staging backup verified 2026-09-21 16:35:54 UTC at 06a5274b.

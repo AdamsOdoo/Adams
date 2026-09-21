@@ -170,6 +170,10 @@ export class ExecutiveDashboard extends Component {
         await this.refresh();
         if (!this.alive || generation !== this.generation || !saved) { return; }
         const jobs = [];
+        if (this.sectionEnabled('sales') && saved.productMeasure === 'quantity' && Number(saved.productUnit) > 0) {
+            this.state.productUnit = String(saved.productUnit);
+            jobs.push(this.loadProducts());
+        }
         if (this.visibleSections.some(section => section.key === saved.activeSection)) this.state.activeSection = saved.activeSection;
         if (saved.detail && this.sectionEnabled(['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'quotations', 'orders'].includes(saved.detail.key) ? 'sales' : ({purchases: 'procurement', crm: 'crm', hr: 'hr'}[saved.detail.key] || 'finance')) && this.dimensions[saved.detail.key]?.includes(saved.detail.dimension)) {
             jobs.push(this.inspect(saved.detail.key, saved.detail.dimension, saved.detail.offset));
@@ -380,12 +384,16 @@ export class ExecutiveDashboard extends Component {
     }
 
     async openStockRow(row) {
+        if (this.state.opening || !this.state.inventory) return;
         const generation = this.generation;
         const data = this.state.inventory;
+        this.state.opening = true;
         try {
             const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_location', [{...this.state.applied}, row.product_id, row.location_id, data.mode, data.filters]);
-            if (this.alive && generation === this.generation) await this.action.doAction(action);
-        } catch { this.notification.add(_t('This stock report could not be opened. Check your access and try again.'), {type: 'warning'}); }
+            if (this.alive && generation === this.generation && this.state.inventory === data) await this.action.doAction(action);
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('This stock report could not be opened. Check your access and try again.'), {type: 'warning'});
+        } finally { if (this.alive) this.state.opening = false; }
     }
 
     get visibleSections() {
@@ -583,7 +591,8 @@ export class ExecutiveDashboard extends Component {
             window.localStorage.setItem(this.viewKey, JSON.stringify({ userId: this.userId, applied,
                 collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection,
                 recent: this.state.recent ? { kind: this.state.recent.kind, offset: 0 } : null,
-                ranking: this.state.ranking ? { key: this.state.ranking.key } : null }));
+                ranking: this.state.ranking ? { key: this.state.ranking.key } : null,
+                rankLimit: this.state.rankLimit, productMeasure: this.state.productMeasure, productUnit: this.state.productUnit }));
             this.state.savedView = true;
             this.notification.add(_t('View saved in this browser.'), { type: 'success' });
         } catch {
@@ -605,6 +614,11 @@ export class ExecutiveDashboard extends Component {
     async resetView() {
         if (!this.defaultOptions) return;
         this.state.draft = { ...this.defaultOptions };
+        this.state.sectionOrder = [];
+        this.state.rankLimit = 5;
+        this.state.productMeasure = 'value';
+        this.state.stockFilters = {warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
+        try { window.localStorage.setItem(this.preferenceKey + '-order', '[]'); } catch { /* Optional. */ }
         this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
         this.state.activeSection = 'finance';
         this.state.sidebarOpen = false;
