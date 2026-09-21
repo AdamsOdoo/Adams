@@ -1932,3 +1932,105 @@ msgstr "أقساط فواتير الموردين المرحلة والمستحق
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full native aging."
 msgstr "تشمل الثلاثون يومًا القادمة أول سبعة أيام. تُعرض المستحقات اليوم والمتأخرات بصورة منفصلة. تظل الإشعارات الدائنة المستقلة والمدفوعات غير المطبقة ضمن تقرير أعمار الديون الكامل في أودو."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Native report warning"
+msgstr "تحذير في تقرير أودو"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Finance groups"
+msgstr "أقسام المالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Save view"
+msgstr "حفظ العرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Restore view"
+msgstr "استعادة العرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reset view"
+msgstr "إعادة ضبط العرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View saved in this browser."
+msgstr "تم حفظ العرض في هذا المتصفح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Browser storage is unavailable. The view could not be saved."
+msgstr "تخزين المتصفح غير متاح. تعذر حفظ العرض."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The saved view is unavailable for your current access."
+msgstr "العرض المحفوظ غير متاح وفق صلاحياتك الحالية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Management attention"
+msgstr "متابعة الإدارة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Show details"
+msgstr "عرض التفاصيل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Hide details"
+msgstr "إخفاء التفاصيل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Overdue supplier bills"
+msgstr "فواتير الموردين المتأخرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Supplier bills due in 7 days"
+msgstr "فواتير الموردين المستحقة خلال ٧ أيام"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review native worklist \u2192"
+msgstr "مراجعة قائمة أودو ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Collections & purchasing"
+msgstr "التحصيل والمشتريات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review receivable aging \u2192"
+msgstr "مراجعة أعمار الذمم المدينة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Approvals & late receipts \u2192"
+msgstr "الموافقات والاستلامات المتأخرة ←"

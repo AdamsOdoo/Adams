@@ -47,11 +47,12 @@ export class ExecutiveDashboard extends Component {
             quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
         this.root = useRef('root');
         this.sourceDialog = useRef('sourceDialog');
+        this.analysisDialog = useRef('analysisDialog');
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
         this.state = useState({ companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
-            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false });
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.sourceDialog.el;
             if (!dialog) return;
@@ -61,6 +62,34 @@ export class ExecutiveDashboard extends Component {
         useEffect(() => {
             if (this.state.sidebarOpen) this.workspaceMenu.el?.querySelector('button')?.focus();
         }, () => [this.state.sidebarOpen]);
+        useEffect(() => {
+            const dialog = this.analysisDialog.el;
+            if (!dialog) return;
+            if (this.state.detail && !dialog.open) dialog.showModal();
+            if (!this.state.detail && dialog.open) dialog.close();
+        }, () => [this.state.detail]);
+        useEffect(() => {
+            const root = this.root.el;
+            if (!root) return;
+            let scheduled = false;
+            const onScroll = () => {
+                if (scheduled) return;
+                scheduled = true;
+                requestAnimationFrame(() => {
+                    scheduled = false;
+                    if (!this.alive) return;
+                    const top = root.getBoundingClientRect().top + 110;
+                    let active = this.sections[0].key;
+                    for (const section of this.sections) {
+                        const node = root.querySelector(`#adams-${section.key}`);
+                        if (node && node.getBoundingClientRect().top <= top) active = section.key;
+                    }
+                    this.state.activeSection = active;
+                });
+            };
+            root.addEventListener('scroll', onScroll, { passive: true });
+            return () => root.removeEventListener('scroll', onScroll);
+        }, () => []);
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -74,12 +103,15 @@ export class ExecutiveDashboard extends Component {
                 if (!this.alive) { return; }
                 this.state.companies = data.companies;
                 this.userId = data.user_id;
+                this.defaultOptions = { ...data.options };
                 const savedNavigation = this.props.state?.dashboard;
                 const restore = savedNavigation?.userId === data.user_id &&
                     data.companies.some(company => company.id === savedNavigation.applied?.company_id)
                     ? savedNavigation : null;
                 this.state.draft = restore ? { ...restore.applied } : data.options;
                 this.preferenceKey = `adams-dashboard-v1-${data.user_id}`;
+                this.viewKey = `adams-dashboard-view-v1-${data.user_id}`;
+                this.state.savedView = Boolean(this.readSavedView());
                 try {
                     const saved = JSON.parse(window.localStorage.getItem(this.preferenceKey) || '{}');
                     for (const section of this.sections) {
@@ -101,6 +133,7 @@ export class ExecutiveDashboard extends Component {
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
+            ranking: selection(this.state.ranking, ['key']),
             procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
@@ -115,6 +148,9 @@ export class ExecutiveDashboard extends Component {
         }
         if (saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
+        }
+        if (['invoiced_sales', 'invoiced_margin'].includes(saved.ranking?.key)) {
+            jobs.push(this.loadRanking(saved.ranking.key));
         }
         if (saved.directory) { this.state.cashSearch = saved.directory.search || ''; jobs.push(this.loadDirectory('cash', saved.directory.offset, null, this.state.cashSearch)); }
         if (saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
@@ -247,7 +283,85 @@ export class ExecutiveDashboard extends Component {
         this.state.activeSection = key;
         this.state.collapsed[key] = false;
         this.state.sidebarOpen = false;
-        requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+        requestAnimationFrame(() => this.root.el?.querySelector(`#adams-${key}`)?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+    }
+
+    supplierWindow(key) {
+        return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
+    }
+
+    switchTabs(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const buttons = [...event.currentTarget.querySelectorAll('button')];
+        const current = buttons.indexOf(event.target);
+        if (current < 0) return;
+        event.preventDefault();
+        const rtl = document.documentElement.dir === 'rtl';
+        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
+            (current + delta + buttons.length) % buttons.length;
+        buttons[next].focus();
+        buttons[next].click();
+    }
+
+    navigateGroup(key) {
+        this.root.el?.querySelector(`#adams-group-${key}`)?.scrollIntoView({ block: 'start',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+
+    get hasFinanceWarnings() {
+        const finance = this.state.sections.finance;
+        return Boolean(finance?.items?.some(item => item.has_warnings) ||
+            finance?.cash_flow?.has_warnings || finance?.supplier_windows?.some(item => item.has_warnings));
+    }
+
+    readSavedView() {
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(this.viewKey) || 'null');
+            const dates = ['date_from', 'date_to', 'as_of'];
+            if (saved?.userId !== this.userId || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
+                !dates.every(key => /^\d{4}-\d{2}-\d{2}$/.test(saved.applied?.[key] || '')) ||
+                saved.applied.date_from > saved.applied.date_to) return null;
+            return saved;
+        } catch { return null; }
+    }
+
+    saveView() {
+        if (!this.state.applied) return;
+        // Store selections only, never amounts, records, permissions or theme.
+        const applied = Object.fromEntries(['company_id', 'date_from', 'date_to', 'as_of']
+            .map(key => [key, this.state.applied[key]]));
+        try {
+            window.localStorage.setItem(this.viewKey, JSON.stringify({ userId: this.userId, applied,
+                collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection,
+                recent: this.state.recent ? { kind: this.state.recent.kind, offset: 0 } : null,
+                ranking: this.state.ranking ? { key: this.state.ranking.key } : null }));
+            this.state.savedView = true;
+            this.notification.add(_t('View saved in this browser.'), { type: 'success' });
+        } catch {
+            this.notification.add(_t('Browser storage is unavailable. The view could not be saved.'), { type: 'warning' });
+        }
+    }
+
+    async restoreView() {
+        const saved = this.readSavedView();
+        if (!saved) {
+            this.state.savedView = false;
+            this.notification.add(_t('The saved view is unavailable for your current access.'), { type: 'warning' });
+            return;
+        }
+        this.state.draft = { ...saved.applied };
+        await this.restoreNavigation(saved);
+    }
+
+    async resetView() {
+        if (!this.defaultOptions) return;
+        this.state.draft = { ...this.defaultOptions };
+        this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
+        this.state.activeSection = 'finance';
+        this.state.sidebarOpen = false;
+        await this.refresh();
+        this.root.el?.scrollTo({ top: 0 });
     }
 
     closeWorkspace() {
@@ -303,11 +417,36 @@ export class ExecutiveDashboard extends Component {
         if (!data.some(Boolean)) { return { status: 'idle', rows: [] }; }
         if (data.some(value => value?.status !== 'ready')) { return { status: 'unavailable', rows: [] }; }
         const labels = [...new Set(data.flatMap(value => value.rows.map(row => row.label)))];
-        const maximum = Math.max(1, ...data.flatMap(value => value.rows.map(row => Math.abs(row.value || 0))));
-        return { status: 'ready', rows: labels.map(label => ({ label, series: keys.map((key, index) => {
-            const row = data[index].rows.find(value => value.label === label);
-            return { ...row, key, height: Math.abs(row?.value || 0) / maximum * 100 };
-        }) })) };
+        const values = data.flatMap(value => value.rows.map(row => row.value)).filter(Number.isFinite);
+        const peak = Math.max(1, ...values.map(Math.abs));
+        const step = 10 ** Math.floor(Math.log10(peak)) / 2;
+        const maximum = Math.ceil(Math.max(0, ...values) * 1.1 / step) * step || 1;
+        const minimum = Math.floor(Math.min(0, ...values) * 1.1 / step) * step;
+        const scale = value => 19 + (maximum - value) / (maximum - minimum) * 174;
+        const zero = scale(0);
+        const width = Math.max(680, labels.length * 104);
+        const number = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {
+            notation: 'compact', maximumFractionDigits: 1 }).format(value);
+        return { status: 'ready', zero, width, ticks: Array.from({ length: 5 }, (_, index) => {
+            const value = minimum + (maximum - minimum) * index / 4;
+            return { label: number(value), y: scale(value) };
+        }), rows: labels.sort().map((label, monthIndex) => ({ label,
+            x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
+            series: keys.map((key, index) => {
+                const row = data[index].rows.find(value => value.label === label);
+                const value = Number.isFinite(row?.value) ? row.value : null;
+                return { ...row, key, value,
+                    x: 67 + (width - 82) / labels.length * (monthIndex + 0.5) + (index - 1) * 29 - 12,
+                    y: value === null ? zero : Math.min(scale(value), zero),
+                    height: value === null ? 0 : Math.max(1, Math.abs(scale(value) - zero)) };
+            }) })) };
+    }
+
+    chartKeydown(event, key, month) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            void this.openFinancialPeriod(key, month);
+        }
     }
 
     formatted(item, section) {
@@ -329,7 +468,6 @@ export class ExecutiveDashboard extends Component {
         dimension ||= this.dimensions[key][0];
         this.closeSource();
         this.state.detail = { key, dimension, offset, status: 'loading', rows: [], trend: [] };
-        requestAnimationFrame(() => this.root.el?.querySelector('#adams-analysis-title')?.scrollIntoView({ block: 'start' }));
         try {
             const [groups, trend] = await Promise.all([
                 this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, dimension, { ...this.state.applied }, offset]),

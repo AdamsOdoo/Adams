@@ -8,6 +8,7 @@ function fixture() {
     const pending = [];
     const notifications = [];
     let destroy;
+    const storage = new Map();
     const services = {
         orm: { call(model, method, args) {
             return new Promise((resolve, reject) => pending.push({ method, args, resolve, reject }));
@@ -18,6 +19,7 @@ function fixture() {
     const source = readFileSync(new URL('../static/src/dashboard.js', import.meta.url), 'utf8')
         .replace(/^import .*;$/gm, '').replace('export class', 'class');
     const Controller = runInNewContext(source + '\nExecutiveDashboard;', {
+        window: { localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } },
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
         useState: value => value, useService: key => services[key], _t: value => value,
@@ -26,7 +28,7 @@ function fixture() {
     const controller = new Controller();
     controller.setup();
     controller.state.draft = { company_id: 1, date_from: '2026-08-01', date_to: '2026-08-31', as_of: '2026-08-31' };
-    return { controller, pending, notifications, destroy: () => destroy() };
+    return { controller, pending, notifications, storage, destroy: () => destroy() };
 }
 
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
@@ -258,4 +260,98 @@ test('cash search rejects stale results and retains applied query on pagination'
     pending[2].resolve({status: 'ready', search: 'New bank', rows: [{id: 27}], total_count: 27});
     await page;
     assert.equal(controller.navigationState().directory.search, 'New bank');
+});
+
+
+test('saved views contain selections only and are rejected for another user or revoked company', () => {
+    const { controller, storage } = fixture();
+    controller.userId = 7;
+    controller.viewKey = 'view-7';
+    controller.state.companies = [{ id: 1 }];
+    controller.state.applied = { ...controller.state.draft, privateResult: 123456 };
+    controller.state.sections.finance = { items: [{ value: 999 }] };
+    controller.state.recent = { kind: 'quotations', offset: 25, rows: [{ name: 'private quotation' }] };
+    controller.state.ranking = { key: 'invoiced_margin', rows: [{ label: 'private salesperson' }] };
+    controller.saveView();
+    const raw = storage.get('view-7');
+    assert.ok(!raw.includes('123456') && !raw.includes('999'));
+    assert.ok(!raw.includes('private quotation') && !raw.includes('private salesperson'));
+    assert.equal(controller.readSavedView().applied.company_id, 1);
+    assert.equal(controller.readSavedView().recent.kind, 'quotations');
+    assert.equal(controller.readSavedView().recent.offset, 0);
+    assert.equal(controller.readSavedView().ranking.key, 'invoiced_margin');
+    controller.userId = 8;
+    assert.equal(controller.readSavedView(), null);
+    controller.userId = 7;
+    controller.state.companies = [{ id: 2 }];
+    assert.equal(controller.readSavedView(), null);
+});
+
+test('restoring a view reloads authorized values and clears former results immediately', async () => {
+    const { controller, pending } = fixture();
+    controller.userId = 7;
+    controller.viewKey = 'view-7';
+    controller.state.companies = [{ id: 1 }];
+    controller.state.applied = { ...controller.state.draft };
+    controller.saveView();
+    controller.state.sections.finance = { items: [{ value: 999 }] };
+    controller.state.draft.date_from = '2026-07-01';
+    const restore = controller.restoreView();
+    assert.equal(controller.state.applied.date_from, '2026-08-01');
+    assert.equal(controller.state.sections.finance.items.length, 0);
+    for (const request of pending) request.resolve(data(20));
+    await restore;
+    assert.equal(controller.state.sections.finance.items[0].value, 20);
+});
+
+
+test('reference chart preserves negative values and distinguishes missing observations from zero', () => {
+    const { controller } = fixture();
+    controller.state.financialTrends = {
+        revenue: { status: 'ready', rows: [{ label: '2026-08', value: 100 }, { label: '2026-09', value: 0 }] },
+        gross_profit: { status: 'ready', rows: [{ label: '2026-08', value: 30 }] },
+        profit: { status: 'ready', rows: [{ label: '2026-08', value: -20 }] },
+    };
+    const chart = controller.profitabilityChart();
+    const positive = chart.rows[0].series[0];
+    const negative = chart.rows[0].series[2];
+    assert.equal(negative.value, -20);
+    assert.equal(negative.y, chart.zero);
+    assert.ok(positive.y < chart.zero);
+    assert.equal(chart.rows[1].series[0].value, 0);
+    assert.equal(chart.rows[1].series[1].value, null);
+    assert.equal(chart.rows[1].series[1].height, 0);
+});
+
+test('saved Sales tabs reload their selected measures and suppress earlier default loads', async () => {
+    const { controller, pending } = fixture();
+    controller.userId = 7;
+    controller.viewKey = 'view-7';
+    controller.state.companies = [{ id: 1 }];
+    controller.state.applied = { ...controller.state.draft };
+    controller.state.recent = { kind: 'quotations', offset: 25 };
+    controller.state.ranking = { key: 'invoiced_margin' };
+    controller.saveView();
+    const restoring = controller.restoreView();
+    pending[0].resolve({ items: [] });
+    pending[1].resolve({ items: [{ key: 'invoiced_sales', status: 'ready', value: 20 }] });
+    pending[2].resolve({ items: [] });
+    // Let section completion schedule default loads and then saved selections.
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    const quotes = pending.find(request => request.method === 'get_recent_sales' && request.args[0] === 'quotations');
+    const margin = pending.find(request => request.method === 'get_breakdown' && request.args[0] === 'invoiced_margin');
+    assert.ok(quotes && margin);
+    assert.equal(quotes.args[2], 0);
+    quotes.resolve({ status: 'ready', rows: [{ id: 22 }] });
+    margin.resolve({ status: 'ready', rows: [{ id: 7, value: 30 }] });
+    await restoring;
+    for (const request of pending.filter(request => request !== quotes && request !== margin)) {
+        request.resolve({ status: 'ready', rows: [{ id: 999, value: 999 }] });
+    }
+    await Promise.resolve();
+    assert.equal(controller.state.recent.kind, 'quotations');
+    assert.equal(controller.state.recent.rows[0].id, 22);
+    assert.equal(controller.state.ranking.key, 'invoiced_margin');
+    assert.equal(controller.state.ranking.rows[0].value, 30);
+    assert.equal(controller.navigationState().ranking.key, 'invoiced_margin');
 });
