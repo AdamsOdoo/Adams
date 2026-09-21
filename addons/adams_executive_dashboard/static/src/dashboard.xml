@@ -121,7 +121,7 @@
         <span t-esc="bucket.label"/><span class="adams_aging_track" aria-hidden="true"><i t-att-class="{'negative': bucket.value &lt; 0}" t-att-style="'width:' + barWidth(bucket.value, item.aging_buckets)"/></span><bdi t-esc="formatted(bucket, result)"/>
     </div><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key)">Open full aging</button>
 </div>
-                            <p class="adams_card_date" dir="ltr" t-if="state.applied" t-esc="(item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)) ? state.applied.as_of : state.applied.date_from + ' — ' + state.applied.date_to"/><footer class="adams_metric_foot">
+                            <p class="adams_card_date" dir="ltr" t-if="state.applied"><span t-if="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)" class="adams_date_value" t-esc="state.applied.as_of"/><t t-else=""><span class="adams_date_value" t-esc="state.applied.date_from"/> — <span class="adams_date_value" t-esc="state.applied.date_to"/></t></p><footer class="adams_metric_foot">
                                 <span t-if="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)">As of balance</span><span t-else="">Period actual</span>
                                 <button type="button" class="adams_source_button" t-on-click="() =&gt; this.openSource(item, result)">Source &amp; definition ⓘ</button>
                             </footer>
@@ -150,7 +150,7 @@
 <div class="adams_card_top"><h3 t-esc="paymentWindow.label"/><button t-if="paymentWindow.drilldown" class="adams_metric_arrow" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(paymentWindow.key)" aria-label="Open report">→</button></div>
 <div class="adams_amount"><span t-if="paymentWindow.status === 'ready'" class="adams_currency" t-esc="result.currency"/><div class="adams_value" t-att-title="formatted(paymentWindow, result)" t-esc="headline(paymentWindow, result)"/></div>
 <p t-if="paymentWindow.has_warnings" class="adams_warning_marker" role="status">report warning</p>
-<p class="adams_card_date" dir="ltr" t-esc="state.applied.as_of"/>
+<p class="adams_card_date" dir="ltr"><span class="adams_date_value" t-esc="state.applied.as_of"/></p>
 </article></div><p class="adams_hint">Next 30 days includes the first 7 days. Due today and overdue are separate. Standalone credits and unapplied payments remain in full aging.</p>
 </section></div></t></div>
                     <p t-if="result &amp;&amp; result.generated_at" class="adams_scope">Last updated <bdi t-esc="result.generated_at"/> UTC. Source completeness has not been assessed.</p>

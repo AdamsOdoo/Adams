@@ -70,6 +70,29 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
 
     def test_bilingual_finance_reflow_and_native_drilldown(self):
         self.partner_a.name = 'Dashboard Search Fixture'
+        # These native rights and records exist only in this rollback-isolated
+        # browser fixture. The independent negative-role test stays unchanged.
+        stock_category = False
+        if 'sale.order' in self.env:
+            self.env.user.group_ids |= self.env.ref('sales_team.group_sale_manager')
+        if 'stock.quant' in self.env:
+            self.env.user.group_ids |= self.env.ref('stock.group_stock_manager')
+            warehouse = self.env['stock.warehouse'].search([
+                ('company_id', '=', self.env.company.id)], limit=1)
+            self.assertTrue(warehouse, 'Installed stock fixture requires its company warehouse')
+            location = self.env['stock.location'].create({
+                'name': 'Dashboard shelf / رف العرض', 'usage': 'internal',
+                'location_id': warehouse.lot_stock_id.id, 'company_id': self.env.company.id,
+            })
+            stock_category = self.env['product.category'].create({'name': 'Dashboard visual stock'})
+            stock_products = self.env['product.product'].create([{
+                'name': f'Dashboard stock {index:02} / شامبو العرض',
+                'default_code': f'DASH-VIS-{index:02}', 'is_storable': True,
+                'company_id': self.env.company.id, 'categ_id': stock_category.id,
+            } for index in range(27)])
+            for index, stock_product in enumerate(stock_products):
+                self.env['stock.quant']._update_available_quantity(stock_product, location, index + 1)
+            self.env.flush_all()
         today = fields.Date.today()
         self.env['account.move'].create({
             'move_type': 'out_invoice', 'partner_id': self.partner_a.id,
@@ -298,25 +321,89 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # only the landing screen. This never supplies business values
                     # or changes a test result. Responsive/theme coverage is shared
                     # with the existing 24-case application journey above.
-                    for section in ('sales', 'inventory', 'procurement', 'crm'):
-                        expression = '''(async () => {
+                    def capture_section(section, target_selector=None, setup=''):
+                        expression = r"""(async () => {
+                            const wait = async (test, message) => {
+                                for (let i = 0; i < 200; i++) {
+                                    const value = test(); if (value) return value;
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                }
+                                throw new Error(message);
+                            };
                             const root = document.querySelector('.o_adams_dashboard');
-                            const section = root.querySelector('#adams-SECTION');
+                            const section = root.querySelector('#adams-' + SECTION);
                             if (!section) throw new Error('Missing visual evidence section');
                             const toggle = section.querySelector('.adams_section_toggle');
                             if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+                            await wait(() => !section.querySelector('.adams_message[role="status"]'),
+                                'Visual evidence section did not finish loading');
+                            SETUP
                             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            const target = TARGET ? section.querySelector(TARGET) : section;
+                            if (!target) throw new Error('Missing visual evidence target');
                             const nav = root.querySelector('.adams_nav');
-                            root.scrollTop += section.getBoundingClientRect().top - root.getBoundingClientRect().top - nav.getBoundingClientRect().height - 16;
+                            root.scrollTop += target.getBoundingClientRect().top - root.getBoundingClientRect().top - nav.getBoundingClientRect().height - 16;
                             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                            return {section:'SECTION', width:innerWidth, direction:getComputedStyle(root).direction};
-                        })()'''.replace('SECTION', section)
+                            if (root.scrollWidth > root.clientWidth + 2) throw new Error('Visual evidence page overflow: ' + SECTION);
+                            return {section:SECTION, width:innerWidth, direction:getComputedStyle(root).direction};
+                        })()""".replace('SECTION', json.dumps(section)).replace('TARGET', json.dumps(target_selector)).replace('SETUP', setup)
                         observed = browser._websocket_request('Runtime.evaluate', params={
                             'expression': expression, 'awaitPromise': True, 'returnByValue': True,
                         })
                         if observed.get('exceptionDetails'):
                             raise AssertionError(observed['exceptionDetails'])
+
+                    for section in ('sales', 'inventory', 'procurement', 'crm'):
+                        setup = ''
+                        target = None
+                        if section == 'sales':
+                            setup = """
+                                await wait(() => section.querySelector('.adams_product_ranking .adams_rank_row') &&
+                                    section.querySelector('.adams_customers_panel .adams_rank_row') &&
+                                    !section.querySelector('[role="status"]'), 'Invoice rankings must settle before capture');
+                            """
+                        elif section == 'inventory' and stock_category:
+                            setup = """
+                                const explore = section.querySelector('.adams_metric_groups > button');
+                                if (!explore) throw new Error('Current stock action is missing');
+                                explore.click();
+                                const filters = await wait(() => section.querySelector('.adams_stock_filters'), 'Stock filters must render');
+                                await wait(() => !filters.querySelector('button').disabled, 'Initial stock must settle');
+                                const category = filters.querySelectorAll('select')[1];
+                                category.value = STOCK_CATEGORY;
+                                category.dispatchEvent(new Event('change', {bubbles:true}));
+                                await new Promise(resolve => requestAnimationFrame(resolve));
+                                filters.requestSubmit();
+                                await wait(() => !filters.querySelector('button').disabled &&
+                                    section.querySelectorAll('.adams_analysis tbody tr').length === 25 &&
+                                    section.querySelectorAll('.adams_page_number').length === 2 &&
+                                    [...section.querySelectorAll('.adams_analysis tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
+                                    'Filtered native stock must render 25 rows and two numbered pages');
+                            """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
+                            target = '.adams_stock_filters'
+                        capture_section(section, target, setup)
                         browser.take_screenshot(prefix=f'polish_{section}_{lang}_{theme}_{width}_').result(timeout=20)
+                        if section == 'sales':
+                            for panel in ('product_ranking', 'order_ranking', 'sales_lower'):
+                                capture_section(section, '.adams_' + panel)
+                                browser.take_screenshot(prefix=f'polish_{panel}_{lang}_{theme}_{width}_').result(timeout=20)
+                        elif section == 'inventory' and stock_category:
+                            # The long first page and its pager cannot fit in one
+                            # narrow screenshot; retain both real viewport states.
+                            capture_section(section, '.adams_analysis .adams_table_wrap')
+                            browser.take_screenshot(prefix=f'polish_inventory_table_{lang}_{theme}_{width}_').result(timeout=20)
+                            capture_section(section, '.adams_page_controls', """
+                                const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');
+                                if (!pageTwo) throw new Error('Second stock page is missing');
+                                pageTwo.click();
+                                await wait(() => section.querySelectorAll('.adams_analysis tbody tr').length === 2 &&
+                                    section.querySelector('.adams_page_number[aria-current="page"]')?.textContent.trim() === '2' &&
+                                    !section.querySelector('.adams_stock_filters button').disabled,
+                                    'Second stock page must settle with the remaining two fixture rows');
+                                if (!section.querySelector('.adams_analysis tbody').innerText.includes('DASH-VIS-26'))
+                                    throw new Error('Second stock page lost its final fixture product');
+                            """)
+                            browser.take_screenshot(prefix=f'polish_inventory_page2_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
