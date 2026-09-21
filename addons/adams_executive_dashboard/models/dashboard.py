@@ -314,7 +314,19 @@ class ExecutiveDashboard(models.AbstractModel):
         print_rows = []
         for section, label in [('finance', _('Accounting & Finance')), ('sales', _('Sales')), ('operations', _('Operations'))]:
             result = scoped.get_section(section, options)
-            for item in [*result['items'], *result.get('supplier_windows', [])]:
+            items = [*result['items'], *result.get('supplier_windows', [])]
+            if section == 'finance':
+                flow = result.get('cash_flow') or {}
+                flow_scope = {'model': 'account.report', 'options': flow.get('options'),
+                              'mapping_version': flow.get('mapping_version'), 'measure': 'net_increase',
+                              'company_id': scoped.env.company.id}
+                items.append({'key': 'cash_flow', 'status': flow.get('status', 'not_installed'),
+                              'value': flow.get('bridge', {}).get('net_increase', {}).get('value'),
+                              'unit': 'currency', 'date_field': 'period', 'source': flow.get('source'),
+                              'has_warnings': flow.get('has_warnings'),
+                              'provenance': {'model': 'account.report', 'fingerprint': hashlib.sha256(
+                                  json.dumps(flow_scope, sort_keys=True, default=str).encode()).hexdigest()}})
+            for item in items:
                 provenance = item.get('provenance') or {}
                 # Stable metric keys match the source drawer and exported definitions.
                 row = [label, labels.get(item['key'], item['key']), item.get('value') if item['status'] == 'ready' else None,

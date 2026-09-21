@@ -1105,7 +1105,7 @@ msgstr "يستخدم التقييم التشغيلي خدمة تكلفة الم�
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Valuation: "
+msgid "Valuation:"
 msgstr "التقييم: "
 
 #. module: adams_executive_dashboard
@@ -1171,7 +1171,7 @@ msgstr "القوى العاملة غير متاحة. يلزم إذن تقاري�
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Active employees: "
+msgid "Active employees:"
 msgstr "الموظفون النشطون: "
 
 #. module: adams_executive_dashboard
@@ -1459,7 +1459,7 @@ msgstr "الإيرادات مقابل الهدف"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Native budget: "
+msgid "Native budget:"
 msgstr "الموازنة القياسية: "
 
 #. module: adams_executive_dashboard
@@ -1561,7 +1561,7 @@ msgstr "قائمة المشتريات غير متاحة. تحقق من صلاح�
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Matching orders: "
+msgid "Matching orders:"
 msgstr "الطلبات المطابقة: "
 
 #. module: adams_executive_dashboard
@@ -2014,7 +2014,7 @@ msgstr "فواتير الموردين المستحقة خلال ٧ أيام"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Review native worklist \u2192"
+msgid "Review native worklist →"
 msgstr "مراجعة قائمة أودو ←"
 
 #. module: adams_executive_dashboard
@@ -2026,13 +2026,13 @@ msgstr "التحصيل والمشتريات"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Review receivable aging \u2192"
+msgid "Review receivable aging →"
 msgstr "مراجعة أعمار الذمم المدينة ←"
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Approvals & late receipts \u2192"
+msgid "Approvals & late receipts →"
 msgstr "الموافقات والاستلامات المتأخرة ←"
 
 #. module: adams_executive_dashboard
@@ -2282,3 +2282,21 @@ msgstr "وقت الجلب بتوقيت UTC:"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Values follow the native reports. Unavailable values are not zero. Use the CSV export for source and scope details."
 msgstr "تتبع القيم التقارير الأصلية. القيم غير المتاحة ليست صفراً. استخدم ملف CSV للاطلاع على تفاصيل المصدر والنطاق."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Print preview"
+msgstr "معاينة الطباعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Print / Save PDF"
+msgstr "طباعة / حفظ PDF"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Close preview"
+msgstr "إغلاق المعاينة"

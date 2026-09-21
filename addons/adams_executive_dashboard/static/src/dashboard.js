@@ -49,6 +49,7 @@ export class ExecutiveDashboard extends Component {
         this.sourceDialog = useRef('sourceDialog');
         this.analysisDialog = useRef('analysisDialog');
         this.searchDialog = useRef('searchDialog');
+        this.printDialog = useRef('printDialog');
         this.searchInput = useRef('searchInput');
         this.searchKinds = { all: _t('All documents'), invoices: _t('Customer invoices'), bills: _t('Vendor bills'), orders: _t('Sales orders'), quotations: _t('Quotations') };
         this.workspaceMenu = useRef('workspaceMenu');
@@ -56,6 +57,12 @@ export class ExecutiveDashboard extends Component {
         this.detailGeneration = 0;
         this.state = useState({ printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
+        useEffect(() => {
+            const dialog = this.printDialog.el;
+            if (!dialog) return;
+            if (this.state.printSummary && !dialog.open) dialog.showModal();
+            if (!this.state.printSummary && dialog.open) dialog.close();
+        }, () => [this.state.printSummary]);
         useEffect(() => {
             const dialog = this.searchDialog.el;
             if (!dialog) return;
@@ -348,6 +355,9 @@ export class ExecutiveDashboard extends Component {
         } finally { if (this.alive) this.state.opening = false; }
     }
 
+    closePrint() { this.state.printSummary = null; }
+    printNow() { window.print(); }
+
     printValue(row) {
         return row.value === null ? '—' : new Intl.NumberFormat(document.documentElement.lang || 'en', {
             maximumFractionDigits: this.state.printSummary.currency_digits,
@@ -363,8 +373,7 @@ export class ExecutiveDashboard extends Component {
             const data = await this.orm.call('adams.executive.dashboard', 'export_summary', [{ ...this.state.applied }]);
             if (!this.alive || generation !== this.generation) return;
             this.state.printSummary = data;
-            await new Promise(resolve => requestAnimationFrame(resolve));
-            if (this.alive && generation === this.generation) window.print();
+
         } catch {
             if (this.alive && generation === this.generation) this.notification.add(_t('Export unavailable. Check your export permissions or use the native report for large exports.'), { type: 'warning' });
         } finally { if (this.alive) this.state.exporting = false; }
@@ -467,7 +476,7 @@ export class ExecutiveDashboard extends Component {
 
     workspaceKeydown(event) {
         if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
-                !event.target.isContentEditable && !this.state.search && !this.state.source && !this.state.detail) {
+                !event.target.isContentEditable && !this.state.search && !this.state.printSummary && !this.state.source && !this.state.detail) {
             event.preventDefault();
             this.searchInput.el?.focus();
         }
