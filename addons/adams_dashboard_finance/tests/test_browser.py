@@ -364,7 +364,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             """
                         elif section == 'inventory' and stock_category:
                             setup = """
-                                const explore = section.querySelector('.adams_metric_groups > button');
+                                const explore = section.querySelector(':scope > button.btn-outline-secondary');
                                 if (!explore) throw new Error('Current stock action is missing');
                                 explore.click();
                                 const filters = await wait(() => section.querySelector('.adams_stock_filters'), 'Stock filters must render');
