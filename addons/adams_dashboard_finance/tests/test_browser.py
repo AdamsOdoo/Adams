@@ -256,7 +256,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             root.querySelectorAll('.adams_rank_tabs button')[1]?.classList.contains('active') &&
                             !root.querySelector('#adams-sales [role="status"]'), 'Saved Sales selections must reload');
                         const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
-                        const open = restoredCard.querySelector('button[aria-label="Open native report"]');
+                        const open = restoredCard.querySelector('button[aria-label="Open report"]');
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');

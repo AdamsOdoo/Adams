@@ -228,6 +228,9 @@ export class ExecutiveDashboard extends Component {
     async refresh() {
         const generation = ++this.generation;
         const options = { ...this.state.draft, company_id: Number(this.state.draft.company_id) };
+        if (this.state.applied?.company_id !== options.company_id) {
+            this.state.stockFilters = {...this.state.stockFilters, warehouse_id: '', category_id: ''};
+        }
         this.state.applied = options;
         this.closeSearch();
         this.state.printSummary = null;
@@ -717,6 +720,10 @@ export class ExecutiveDashboard extends Component {
             event.preventDefault();
             void this.openFinancialPeriod(key, month);
         }
+    }
+
+    guidance(text) {
+        return typeof text === 'string' ? text.replace(/\bnative\s+/gi, '') : text;
     }
 
     formatted(item, section) {

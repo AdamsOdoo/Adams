@@ -452,3 +452,9 @@
         .adams_page_controls .btn { min-height: 40px; }
     }
 }
+.o_adams_dashboard {
+    .adams_filters label { font-size: 12px; letter-spacing: .02em; gap: 6px; }
+    .adams_filters input, .adams_filters select { font-size: 14px; min-height: 38px; }
+    .adams_rank_foot, .adams_panel_head p, .adams_attention_item .btn { font-size: 12px; }
+    [dir="rtl"] & .adams_filters label { letter-spacing: normal; }
+}

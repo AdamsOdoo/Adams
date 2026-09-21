@@ -39,6 +39,8 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise ValidationError(_('Invalid stock filters.'))
         filters = dict(filters)
         if mode == 'historical' and filters.get('at_date'):
+            if not isinstance(filters['at_date'], str):
+                raise ValidationError(_('Choose a valid inventory date.'))
             try:
                 dates = (*dates[:2], fields.Date.to_date(filters['at_date']))
             except (TypeError, ValueError):
@@ -123,6 +125,8 @@ class ExecutiveDashboardOperations(models.AbstractModel):
     def open_inventory_location(self, options, product_id, location_id, mode='current', filters=None):
         if type(product_id) is not int or product_id < 1:
             raise ValidationError(_('Invalid product.'))
+        if type(location_id) is not int or location_id < 1:
+            raise ValidationError(_('Invalid stock filter.'))
         filters = dict(filters or {}, location_id=location_id)
         scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
         products = products.with_context(location=location_id, strict=True)

@@ -1,6 +1,18 @@
 # Executive dashboard — implementation and verification
 
 
+## Current design enhancements — verification in progress
+
+Candidate **9b102e99f37dad40f654b198d1bdac19723e1d30**, tree
+`d6508262d00af0eaed7a55d4e336518f27568707`, versions **19.0.1.4.0**, implements
+the expanded stock/cash/ranking/navigation scope while preserving the existing UI.
+**33 controller tests pass**; Python/XML and diff checks pass. Odoo.sh is starting
+the candidate build. Native and live staging acceptance have not yet passed.
+Prior queued candidates 6ac4798a/ca0b69f5 failed installation: unsupported Settings
+action target `inline`; corrected to `current`. See the
+[current change contract](change-20260921-current-ui-enhancements.md).
+Historical source-bound observations below are retained; they do not qualify this code.
+
 ## Product ranking, section settings and scroll follow-up — qualification pending
 
 New executable source **6ac4798ab98a395a4d96bdd3b5c1fdb64233ca35**, tree

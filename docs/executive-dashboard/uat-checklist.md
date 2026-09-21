@@ -89,3 +89,18 @@ checks, retained screenshots, current-company comparisons and owner acceptance
 are distinct. Independent engineering review and owner UAT signoff must be recorded
 before calling this an approved release. No main merge or production deployment
 is authorized by this checklist.
+
+## Current-design enhancement acceptance (new candidate; not yet signed off)
+
+- [ ] Existing layout retained; English/Arabic and Odoo light/dark reflow without clipping.
+- [ ] Invoice and order salesperson rankings use their correct periods and source records.
+- [ ] Top 5/10 works for all rankings; quantity ranking isolates the selected product unit and deducts refunds.
+- [ ] Warehouse/category/product filters and historical date agree with the stock report for each location.
+- [ ] Parent locations do not include child quantities twice; zero/negative hiding works independently.
+- [ ] Stock page numbers, drilldown and return preserve the applied location/date scope.
+- [ ] Archived bank/cash accounts are absent; opening + movement = closing in the Cash Flow Statement.
+- [ ] No confusing activity subsection or technical “native” wording remains in dashboard guidance.
+- [ ] Every paginated widget has numbered pages; unavailable totals are not invented.
+- [ ] Settings save/reload hides HR; company visibility remains separate from personal ordering/collapse.
+- [ ] Manual scroll and clicked left category remain synchronized, including short bottom sections.
+- [ ] Draft filter notice, per-section retry and last-updated text are clear and usable.

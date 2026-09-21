@@ -175,9 +175,9 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
                 offset += 25
         self.assertIsNone(find_account()['balance'])
         account.write({'name': 'Renamed dashboard cash', 'active': False})
-        row = find_account()
-        self.assertEqual(row['name'], 'Renamed dashboard cash')
-        self.assertFalse(row['active'])
+        archived = self.dashboard.get_cash_directory(self.options, 0, 'Renamed dashboard cash')
+        self.assertEqual(archived['total_count'], 0)
+        self.assertEqual(archived['rows'], [])
 
     def test_dashboard_styles_compile_with_odoo_sass(self):
         with file_open('adams_executive_dashboard/static/src/dashboard.scss') as source:
