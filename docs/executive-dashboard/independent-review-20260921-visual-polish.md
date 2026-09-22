@@ -1,5 +1,63 @@
 # Independent review — dashboard visual polish, 21 September 2026
 
+## Final engineering and staging handoff review — 22 September 2026
+
+The separate reviewer finds no remaining Critical or High engineering or staging
+defect in the evidence for owner UAT. The recovered checkout is the remote feature
+commit `948a006a241603ba8364449cd9dfdaf81b1bb3e4`, tree
+`7fb2118d46b3730453eb6627ffec9333aaa8d439`; its dashboard addon trees are exactly
+`1aaf301bf57fbf5f479d1d013d4c40a625ee3fbc` and
+`7df8ae98326751406f665a75ed9e938b70156862`. The staging deployment is recorded as
+`9af98d4248090f2be3ceefb5d59bca36258b7c3a`, tree
+`2f33a66be48f77bc18f02eff780359a02483bc59`, build38419464, with the same qualified
+addon trees. The staging commit's five changed paths are confined to those addons.
+
+The reviewer inspected the final desktop staging captures for the overview in
+English Light and Arabic Light/Dark, Finance cards and liquidity, Sales, Inventory,
+and the actual Profit and Loss source report. They show coherent native-theme and
+RTL rendering, visible accounting warnings, populated operational data and the
+expected report-first return path. These desktop captures supplement, and do not
+replace, the independently reviewed 240-image responsive development matrix.
+
+The retained final 21-value list is structurally identical after JSON parsing to
+the before-change 21-value list. The retained cash evidence is likewise exactly
+equal, including all 21 account rows and the opening/net-movement/closing bridge.
+This verifies preservation at the explicitly recorded 2026-09-01–2026-09-21 scope;
+it does not certify the financial meaning or completeness of those values. The
+staging interaction account in [the UAT handoff](uat-handoff-20260922.md) accurately
+distinguishes directly exercised paths, automated error/retry coverage and unclaimed
+printer/concurrency work. The English/Arabic CSV difference is limited to the
+translated Count unit (`Count` / `العدد`); numerical values, sources and scope retain
+parity. English (US)/Dark and the default saved view are recorded as restored after
+testing. HR remains disabled.
+
+One handoff-publication gate remained open at the time of this review: the five
+updated historical/status documents and the new UAT handoff were still uncommitted,
+and PR #214's live draft description still named `c17dd27e`/`daf1280`, described
+staging as unchanged and called qualification blocked. Publish the reviewed docs
+and replace that stale summary with the exact final identities and owner-UAT
+boundaries before presenting the handoff. This is not an application defect and
+does not require another build, but the stale PR text must not be used for UAT.
+Keep the PR draft; owner financial and visual acceptance remains pending.
+
+## Final rendered-development disposition — 22 September 2026
+
+Separate reviewer `/root/independent_dashboard_review` approves the exact candidate
+`948a006a241603ba8364449cd9dfdaf81b1bb3e4`, tree
+`7fb2118d46b3730453eb6627ffec9333aaa8d439`, build38418408, for development rendering.
+All 40 contact sheets and selected Arabic full-resolution overview/stock originals
+at 320/390/768/1024 in both themes were inspected. Both Medium issues are closed:
+stock names/references remain visible, and the Arabic 390px balance-cutoff date
+remains intact. No Critical, High or Medium rendered-development finding remains.
+All 240 manifest sizes/hashes, ZIP integrity and archive checksum were independently
+verified. Code review found no calculation/source/mapping/ACL/business-data changes.
+See [exact identities and staging evidence](uat-handoff-20260922.md).
+
+This is separate from owner financial/visual acceptance. Historical provisional
+findings below are retained for provenance and do not reopen the closed defects.
+
+## Historical checkpoint — superseded by the final disposition above
+
 ## Status
 
 **Final independent approval is pending.** No Critical/High engineering finding

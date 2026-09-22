@@ -1,5 +1,15 @@
 # ED-UI-20260921 — current-design visual consistency
 
+## Final continuation — 22 September 2026
+
+See [the final UAT handoff](uat-handoff-20260922.md) for the complete diagnosis,
+successor identities, independent visual review, staging upgrade and unchanged-value
+comparison. The corrected feature is `948a006a`; development build38418408 passes
+65 tests with 240 retained screenshots. Staging is `9af98d42` / build38419464.
+The later date correction changes three summary date wrappers, the shared no-wrap
+selector and one rendered assertion. No report or business logic changed.
+Historical failed/passing builds below retain their original attribution.
+
 ## Scope and baseline
 
 Owner-authorized visual correction of PR #214, preserving the existing UX v2

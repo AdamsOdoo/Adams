@@ -1,5 +1,21 @@
 # Adams For Men dashboard — staging UAT
 
+## Current owner UAT entry — 22 September 2026
+
+Use [Adams For Men staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004).
+Technical preparation is complete at feature `948a006a` / build38418408 and
+staging `9af98d42` / build38419464. See [qualification, evidence and limits](uat-handoff-20260922.md).
+Both Medium visual findings are closed by separate rendered review; 65 native
+tests and 37 controller checks pass. All 21 metric values, 21 cash rows and cash
+bridge are unchanged at the September 1–21 comparison scope. HR remains disabled.
+
+The remaining owner tasks are financial interpretation/source-warning review,
+visual acceptance against UX v2, and acceptance of normal business journeys.
+Keep the owner checklist below unsigned until the owner completes it. Keep PR #214
+draft. No production or main action is authorized.
+
+## Historical checkpoint — superseded by the handoff above
+
 ## Current visual-polish follow-up — not yet ready for owner UAT
 
 The current polish work is **under qualification**. The `a88e9628` readiness

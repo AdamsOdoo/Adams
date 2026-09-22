@@ -1,5 +1,17 @@
 # UX v2 visual fidelity — blocking acceptance gate
 
+## Current technical visual gate — closed, 22 September 2026
+
+Exact successor `948a006a`, build38418408, passes the full 240-image bilingual,
+native-theme, six-width matrix. A separate reviewer inspected all 40 contact sheets
+and selected full-resolution originals, closed RTL stock identity clipping and
+the Arabic 390px cutoff-date split, and found no remaining Critical/High/Medium
+rendered-development issue. Staging desktop Light/Dark and English/Arabic were
+also inspected. See [final evidence and owner boundaries](uat-handoff-20260922.md).
+Owner visual acceptance remains pending; this is not pixel-identical certification.
+
+## Historical checkpoint — superseded by the handoff above
+
 ## Current polish gate — 21 September, not closed
 
 Live staging review and the retained 793059d4 matrix (240 actual screenshots across

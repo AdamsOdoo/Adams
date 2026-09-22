@@ -1,5 +1,19 @@
 # Executive dashboard — implementation and verification
 
+## Current handoff — 22 September 2026
+
+Technical qualification is complete; ready for owner UAT in authorized staging.
+See [the exact-source handoff](uat-handoff-20260922.md), which supersedes the
+qualification-in-progress checkpoint below. Feature `948a006a`, development build
+38418408: 65 tests, zero failures/errors, 37 controller checks; 240 retained and
+hash-verified screenshots. Independent review closes both Medium visual findings
+with no remaining Critical/High/Medium finding. Staging `9af98d42`, build38419464,
+contains only the two qualified addon trees; both modules upgraded successfully.
+All 21 metrics, 21 cash-account rows and cash bridge match before-change evidence.
+Owner financial/visual acceptance remains pending; PR #214 stays draft.
+
+## Historical checkpoint — superseded by the handoff above
+
 ## Current visual polish — qualification in progress
 
 **This follow-up is not yet owner-UAT-ready.** The earlier `a88e9628` readiness
