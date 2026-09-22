@@ -14,10 +14,10 @@ class TestDashboardSourceIdentity(AccountTestInvoicingCommon):
         cls.options = {'company_id': cls.env.company.id, 'date_from': '2026-08-01',
                        'date_to': '2026-08-31', 'as_of': '2026-08-31'}
 
-    def _quantity_invoice(self, quantity, move_type='out_invoice'):
+    def _quantity_invoice(self, quantity, move_type='out_invoice', invoice_date='2026-08-15'):
         invoice = self.env['account.move'].create({
             'move_type': move_type, 'partner_id': self.partner_a.id,
-            'invoice_date': '2026-08-15', 'date': '2026-08-15',
+            'invoice_date': invoice_date, 'date': invoice_date,
             'invoice_line_ids': [Command.create({'product_id': self.product_a.id,
                 'quantity': quantity, 'price_unit': 100,
                 'account_id': self.company_data['default_account_revenue'].id,
@@ -78,3 +78,37 @@ class TestDashboardSourceIdentity(AccountTestInvoicingCommon):
         result = self.dashboard.with_context(allowed_company_ids=[company.id, self.env.company.id]).get_bootstrap()
         self.assertEqual(result['options']['company_id'], company.id)
         self.assertEqual({entry['id'] for entry in result['companies']}, {company.id, self.env.company.id})
+
+    def test_recent_invoices_reuse_posted_document_scope_and_exact_record_actions(self):
+        invoice = self._quantity_invoice(3)
+        credit = self._quantity_invoice(1, 'out_refund')
+        vendor = self._quantity_invoice(5, 'in_invoice')
+        outside = self._quantity_invoice(2, invoice_date='2026-09-01')
+        draft = invoice.copy()
+        cancelled = invoice.copy()
+        cancelled.button_cancel()
+        result = self.dashboard.get_recent_sales('invoices', self.options)
+        self.assertEqual({row['id'] for row in result['rows']}, {invoice.id, credit.id})
+        self.assertEqual(result['date_basis'], 'invoice_date')
+        for row in result['rows']:
+            record = self.env['account.move'].browse(row['id'])
+            self.assertEqual(row['res_model'], 'account.move')
+            self.assertEqual(row['state'], 'posted')
+            self.assertEqual(row['amount_untaxed'], record.amount_untaxed)
+            self.assertEqual(row['currency'], record.currency_id.name)
+            self.assertTrue(row['document_type_label'])
+            action = self.dashboard.open_recent_sale('invoices', self.options, row['id'])
+            self.assertEqual(action['res_model'], 'account.move')
+            self.assertEqual(action['res_id'], record.id)
+        report = self.dashboard.open_recent_sale('invoices', self.options)
+        self.assertEqual(set(self.env['account.move'].search(report['domain']).ids), {invoice.id, credit.id})
+        for excluded in (vendor, outside, draft, cancelled):
+            with self.assertRaises(AccessError):
+                self.dashboard.open_recent_sale('invoices', self.options, excluded.id)
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_recent_sale('invoices', self.options, True)
+        reader = new_test_user(self.env, login='recent_invoice_dashboard_only',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).get_recent_sales('invoices', self.options)

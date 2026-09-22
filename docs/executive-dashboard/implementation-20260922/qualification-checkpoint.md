@@ -33,6 +33,16 @@ The follow-up also adds independent HR draft/applied dates across worklists, pro
 
 **Explicit UI32 deviation pending resolution:** the no-check-in-today summary slot displays unavailable. Open-session employee counts cannot safely establish the whole active workforce's lack of check-in under partial attendance record rules. No subtraction, zero, absence or lateness inference is presented. A source-authorized whole-cohort definition and reconciliation are required to enable this slot.
 
+## Fourth candidate: full suite completed, corrections still required
+
+Candidate `3dcf3cf55c1e5b02a9989695b0bf828510fb5c6b`, development build **38492329**: **103 post-tests, 181.58 seconds, 74,574 queries; 2 failures / 2 errors**. Unlike earlier halted runs, this run reached stock, native operational and workspace-detail tests. The browser matrix failed in the English/light 1440 case at saved-view restoration; earlier cases are partial observations, not retained full-matrix qualification. The timing-sensitive menu helper is being replaced with observed open/close states and stable action selectors. HR fixtures are corrected to use valid hourly requests and assign the attendance officer only in its intended role case.
+
+Follow-up implementation closes source-confirmed gaps: posted invoice/credit-note document tab; product/UoM fulfillment actions; native aging bucket actions; named saved-view dialog; section-level Sales ranking controls; Procurement three-card/paired-table layout and CRM two-card layout. These are new changes requiring native and visual qualification.
+
+The UI32 unavailable placeholder is now replaced, where authorized, by the installed standard employee `last_check_in` snapshot. It uses active selected-company employees and native field/record access, not subtraction from visible attendance sessions. Matching employee actions reuse the exact domain. This **stored native snapshot** can lag chronological session corrections; the interface identifies the snapshot and does not infer absence or lateness.
+
+**Unresolved source-dependent parity:** bank/cash split cannot be inferred safely from the single `asset_cash` account type or ambiguous journal associations; retain the native total/directory until an approved native split definition exists. Procurement approval/late worklists display authoritative order counts rather than invent monetary sums. Both differences require explicit final disposition, not silent parity acceptance.
+
 | Check | Observed status | Limit / next evidence |
 |---|---|---|
 | External harness adapter check | PASS: exact pinned clean resources and eight skills | Toolkit runtime qualification is historical; it does not qualify dashboard edits. |

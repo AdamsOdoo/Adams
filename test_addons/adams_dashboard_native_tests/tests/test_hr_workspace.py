@@ -176,8 +176,7 @@ class TestDashboardHRWorkspace(TransactionCase):
             'name': 'Own attendance employee', 'company_id': self.env.company.id,
             'user_id': self.reader.id})
         managed_employee = self.env['hr.employee'].create({
-            'name': 'Managed attendance employee', 'company_id': self.env.company.id,
-            'attendance_manager_id': self.reader.id})
+            'name': 'Managed attendance employee', 'company_id': self.env.company.id})
         records = self.env['hr.attendance'].create([
             {'employee_id': employee.id, 'check_in': '2026-08-12 09:00:00',
              'check_out': '2026-08-12 10:00:00'}
@@ -185,7 +184,8 @@ class TestDashboardHRWorkspace(TransactionCase):
         service = self.dashboard.with_user(self.reader)
         for officer, expected in ((False, records[:1]), (True, records[:2])):
             if officer:
-                self.reader.group_ids |= self.env.ref('hr_attendance.group_hr_attendance_officer')
+                # Native assignment grants the officer group; keep the first case own-only.
+                managed_employee.attendance_manager_id = self.reader
             with self.subTest(assigned_officer=officer):
                 result = service.get_hr_workspace(self.options, 'attendance')
                 native = self.env['hr.attendance'].with_user(self.reader).search([
@@ -234,12 +234,16 @@ class TestDashboardHRWorkspace(TransactionCase):
     def test_approved_leave_headline_counts_employees_and_worklist_counts_requests(self):
         leave_type = self.env['hr.leave.type'].create({
             'name': 'Concurrent approved requests', 'requires_allocation': False,
-            'leave_validation_type': 'no_validation', 'allow_request_on_top': True})
+            'leave_validation_type': 'no_validation', 'request_unit': 'hour'})
+        self.employee.resource_id.tz = 'UTC'
+        # Two separate valid sessions overlap the same reporting day, not each other.
         leaves = self.env['hr.leave'].create([
             {'employee_id': self.employee.id, 'holiday_status_id': leave_type.id,
-             'request_date_from': '2026-08-03', 'request_date_to': '2026-08-03'},
+             'request_date_from': '2026-08-03', 'request_date_to': '2026-08-03',
+             'request_hour_from': 9.0, 'request_hour_to': 10.0},
             {'employee_id': self.employee.id, 'holiday_status_id': leave_type.id,
-             'request_date_from': '2026-08-03', 'request_date_to': '2026-08-04'}])
+             'request_date_from': '2026-08-03', 'request_date_to': '2026-08-03',
+             'request_hour_from': 14.0, 'request_hour_to': 15.0}])
         self.assertTrue(all(leave.state == 'validate' for leave in leaves))
         with patch.object(fields.Date, 'context_today', return_value=date(2026, 8, 3)):
             overview = self.dashboard.get_hr_workspace(self.options)
@@ -357,6 +361,63 @@ class TestDashboardHRWorkspace(TransactionCase):
         self.assertNotIn('work_email', profile)
         self.assertEqual(profile['name'], self.employee.name)
 
+    def test_no_check_in_today_uses_authorized_native_employee_snapshot(self):
+        self.env.user.tz = 'America/New_York'
+        employees = self.env['hr.employee'].create([
+            {'name': f'Snapshot fixture {label}', 'company_id': self.env.company.id}
+            for label in ('no history', 'prior open', 'today', 'future only', 'archived')])
+        employees[-1].active = False
+        now = fields.Datetime.to_datetime('2026-08-03 16:00:00')
+        with patch.object(fields.Datetime, 'now', return_value=now), \
+                patch.object(fields.Date, 'context_today', return_value=date(2026, 8, 3)):
+            self.env['hr.attendance'].create([
+                {'employee_id': employees[1].id, 'check_in': '2026-08-03 03:59:00'},
+                {'employee_id': employees[2].id, 'check_in': '2026-08-03 04:00:00',
+                 'check_out': '2026-08-03 05:00:00'},
+                {'employee_id': employees[3].id, 'check_in': '2026-08-04 09:00:00'}])
+            filters = {'scope': 'no_check_in_today', 'search': 'Snapshot fixture'}
+            result = self.dashboard.get_hr_workspace(self.options, 'employees', filters)
+            self.assertEqual(set(row['id'] for row in result['rows']),
+                             set((employees[0] | employees[1] | employees[3]).ids))
+            self.assertIn(('last_check_in', '<', '2026-08-03 04:00:00'), result['provenance']['domain'])
+            action = self.dashboard.open_hr_source(self.options, 'employees', filters)
+            self.assertEqual(set(self.env['hr.employee'].search(action['domain']).ids),
+                             set(row['id'] for row in result['rows']))
+            with self.assertRaises(AccessError):
+                self.dashboard.open_hr_source(self.options, 'employees', filters, employees[2].id)
+            overview = self.dashboard.get_hr_workspace(self.options)
+            self.assertEqual(len(overview['metrics']), 4)
+            metric = overview['attendance_summary']['no_check_in_today']
+            native = self.env['hr.employee'].search([
+                ('company_id', '=', self.env.company.id), ('active', '=', True),
+                '|', ('last_check_in', '=', False), ('last_check_in', '<', '2026-08-03 04:00:00')])
+            self.assertEqual(metric['value'], len(native))
+            self.assertEqual(metric['unit'], 'employees')
+            self.assertEqual(metric['filters'], {'scope': 'no_check_in_today'})
+            # Directory/field rights, not dashboard membership, authorize this summary.
+            restricted = self.dashboard.with_user(self.reader).get_hr_workspace(self.options)
+            self.assertEqual(restricted['attendance_summary']['no_check_in_today']['status'], 'restricted')
+            employee_type = type(self.env['hr.employee'])
+            original = employee_type.check_field_access_rights
+
+            def denied(model, operation, names):
+                if 'last_check_in' in names:
+                    raise AccessError('Controlled field denial')
+                return original(model, operation, names)
+
+            with patch.object(employee_type, 'check_field_access_rights', denied):
+                denied_result = self.dashboard.get_hr_workspace(self.options)
+                self.assertEqual(denied_result['attendance_summary']['no_check_in_today']['status'], 'restricted')
+                with self.assertRaises(AccessError):
+                    self.dashboard.open_hr_source(self.options, 'employees', filters)
+            with patch.dict(HR_MODELS, {'attendance': 'adams.test.absent.attendance'}):
+                missing = self.dashboard.get_hr_workspace(self.options)
+                self.assertEqual(missing['attendance_summary']['no_check_in_today']['status'], 'not_installed')
+        for tab, filters in (('attendance', {'scope': 'no_check_in_today'}),
+                             ('employees', {'scope': 'no_check_in_today', 'status': 'archived'})):
+            with self.subTest(tab=tab, filters=filters), self.assertRaises(ValidationError):
+                self.dashboard.get_hr_workspace(self.options, tab, filters)
+
     def test_overview_optional_failure_keeps_other_sources(self):
         service_type = type(self.dashboard)
         original = service_type._hr_source_scope
@@ -421,15 +482,18 @@ class TestDashboardHRWorkspace(TransactionCase):
         with self.assertRaises(AccessError):
             self.dashboard.open_hr_source(self.options, 'shifts', filters, ended.id)
         leave_type = self.env['hr.leave.type'].create({'name': 'Boundary leave',
-            'requires_allocation': False, 'leave_validation_type': 'no_validation'})
+            'requires_allocation': False, 'leave_validation_type': 'hr', 'request_unit': 'hour'})
+        self.employee.resource_id.tz = 'Asia/Dubai'
         leave = self.env['hr.leave'].create({'employee_id': self.employee.id,
-            'holiday_status_id': leave_type.id, 'request_date_from': '2026-07-31',
-            'request_date_to': '2026-07-31'})
-        # Set the native stored endpoint precisely to exercise the midnight edge.
-        leave.write({'date_from': '2026-07-31 22:00:00', 'date_to': '2026-08-01 00:00:00'})
+            'holiday_status_id': leave_type.id, 'request_date_from': '2026-08-01',
+            'request_date_to': '2026-08-01', 'request_hour_from': 2.0, 'request_hour_to': 4.0})
+        self.assertEqual(leave.state, 'confirm')
+        self.assertEqual(leave.date_to, fields.Datetime.to_datetime('2026-08-01 00:00:00'))
         result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
         self.assertEqual(result['total'], 0)
-        leave.date_to = '2026-08-01 00:01:00'
+        # Edit the pending request through native request-hour fields, preserving approval checks.
+        leave.request_hour_to = 4.0 + 1.0 / 60.0
+        self.assertEqual(leave.date_to, fields.Datetime.to_datetime('2026-08-01 00:01:00'))
         result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
         self.assertEqual([row['id'] for row in result['rows']], leave.ids)
 

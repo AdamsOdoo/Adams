@@ -202,7 +202,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 self.browser_size = f'{width}x{height}'
                 prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
                             'polish_crm', 'polish_product_ranking', 'polish_order_ranking',
-                            'polish_recent_orders', 'polish_recent_quotations', 'polish_fulfillment',
+                            'polish_recent_orders', 'polish_recent_quotations', 'polish_recent_invoices', 'polish_fulfillment',
                             'hr_overview', 'hr_attendance', 'hr_time_off', 'hr_shifts', 'hr_employees']
                 if employee:
                     prefixes += ['hr_profile']
@@ -299,14 +299,13 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Department must remain active');
                         if (root.querySelectorAll('.adams_section').length !== 1) throw new Error('Only the selected department must own the page');
                     };
-                    const more = async index => {
+                    const more = async action => {
                         if (!root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
                         const menu = await wait(() => root.querySelector('#adams-more-menu'), 'More menu must open');
-                        const button = menu.querySelectorAll('[role="menuitem"]')[index];
+                        const button = menu.querySelector('[data-action="' + action + '"]');
                         if (!button || button.disabled) throw new Error('Requested utility must be available');
                         button.click();
-                        await new Promise(resolve => requestAnimationFrame(resolve));
-                        if (root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
+                        await wait(() => !root.querySelector('#adams-more-menu'), 'Utility must close its menu');
                     };
                     const identity = root.querySelector('.adams_company_brand strong');
                     if (identity.textContent.trim() !== COMPANY_NAME) throw new Error('Company branding must match standard company name');
@@ -365,7 +364,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     searchDialog.querySelector('header button').click();
                     await wait(() => !searchDialog.open, 'Search drawer must close');
                     if (WIDTH === 1440) {
-                        await more(1);
+                        await more('print');
                         const printPreview = await wait(() => root.querySelector('.adams_print_summary[open] tbody tr'), 'Native print preview must render');
                         const printDialog = printPreview.closest('dialog');
                         if (!printDialog.innerText.includes(expected)) throw new Error('Print preview lost formatted native revenue');
@@ -381,18 +380,43 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         root.querySelectorAll('.adams_rank_tabs button')[1].click();
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1].classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1].classList.contains('active'), 'Sales selections must activate');
-                        root.querySelector('.adams_header > .adams_header_actions > button:nth-child(2)').click();
-                        root.querySelector('[aria-controls="adams-more-menu"]').click();
-                        await wait(() => root.querySelectorAll('#adams-more-menu [role="menuitem"]')[2] && !root.querySelectorAll('#adams-more-menu [role="menuitem"]')[2].disabled, 'Saving must enable Restore view');
-                        root.querySelector('[aria-controls="adams-more-menu"]').click();
+                        root.querySelector('.adams_header [data-action="views"]').click();
+                        const views = await wait(() => root.querySelector('.adams_views_dialog[open]'), 'Saved views dialog must open');
+                        if (!views.contains(document.activeElement)) throw new Error('Saved views dialog must receive keyboard focus');
+                        const viewName = 'Browser Sales selections ' + THEME;
+                        const nameInput = views.querySelector('input');
+                        nameInput.value = viewName;
+                        nameInput.dispatchEvent(new Event('input', {bubbles:true}));
+                        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                        views.querySelector('form').requestSubmit();
+                        await wait(() => !views.open && root.querySelector('.adams_header [data-action="views"]').textContent.trim() === viewName,
+                            'Saving must close the dialog and display the selected view name');
+                        const saved = Object.values(localStorage).map(value => {try {return JSON.parse(value);} catch {return null;}})
+                            .find(value => value?.viewName === viewName && value?.applied?.company_id === COMPANY_ID);
+                        if (!saved || saved.recent?.kind !== 'quotations' || saved.ranking?.key !== 'invoiced_margin')
+                            throw new Error('Saved browser selections must retain Sales tabs');
+                        if (saved.hr?.rows || saved.recent?.rows || saved.sections || saved.employeeProfile)
+                            throw new Error('Saved view must not persist business records');
                         root.querySelectorAll('.adams_recent_tabs button')[0].click();
                         root.querySelectorAll('.adams_rank_tabs button')[0].click();
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[0].classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[0].classList.contains('active'), 'Changed Sales selections must activate');
-                        await more(2);
+                        await more('restore');
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1]?.classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1]?.classList.contains('active') &&
                             !root.querySelector('#adams-sales [role="status"]'), 'Saved Sales selections must reload');
+                        if (root.querySelector('.adams_header [data-action="views"]').textContent.trim() !== viewName)
+                            throw new Error('Restoring must retain its selected view name');
+                        await more('views');
+                        const resetDialog = await wait(() => root.querySelector('.adams_views_dialog[open]'), 'Saved views must reopen for reset');
+                        resetDialog.querySelector('[data-action="reset"]').click();
+                        await wait(() => !resetDialog.open && root.querySelector('#adams-finance') &&
+                            root.querySelector('.adams_header [data-action="views"]').textContent.trim() !== viewName,
+                            'Reset must return to the default Finance view and clear its active name');
+                        await more('restore');
+                        await wait(() => root.querySelector('#adams-sales') &&
+                            root.querySelectorAll('.adams_recent_tabs button')[1]?.classList.contains('active') &&
+                            !root.querySelector('#adams-sales [role="status"]'), 'Reset must preserve the stored view for explicit restoration');
                         await navigate('finance');
                         const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
                         const open = restoredCard.querySelector('button[aria-label="Open report"]');
@@ -506,10 +530,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             # These are separate panels in the approved workspace;
                             # the former sales_lower wrapper no longer exists.
                             # Operate both real list tabs before recording them.
-                            for index, kind in enumerate(('orders', 'quotations')):
+                            for index, kind in enumerate(('orders', 'quotations', 'invoices')):
                                 capture_section(section, '.adams_recent_panel', """
                                     const tabs = section.querySelectorAll('.adams_recent_tabs button');
-                                    if (tabs.length !== 2) throw new Error('Both recent document tabs must exist');
+                                    if (tabs.length !== 3) throw new Error('Orders, quotations and invoices tabs must exist');
                                     tabs[TAB_INDEX].click();
                                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                                     await wait(() => tabs[TAB_INDEX].classList.contains('active') &&
@@ -518,6 +542,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                         'Selected recent document list must finish loading');
                                     if (section.querySelector('.adams_recent_panel [role="alert"]'))
                                         throw new Error('Recent document list failed during evidence capture');
+                                    if (TAB_INDEX === 2 && !section.querySelector('.adams_recent_panel tbody')?.innerText.includes('Dashboard Search Fixture'))
+                                        throw new Error('Invoice tab must show the posted customer invoice fixture');
                                 """.replace('TAB_INDEX', str(index)))
                                 browser.take_screenshot(prefix=f'polish_recent_{kind}_{lang}_{theme}_{width}_').result(timeout=20)
                             capture_section(section, '.adams_fulfillment_panel', """
@@ -621,7 +647,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 break
             # take_screenshot's file-writing callback may finish just after its Future.
             time.sleep(0.05)
-        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (15 + (2 if stock_category else 0) + (1 if employee else 0)))
+        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (16 + (2 if stock_category else 0) + (1 if employee else 0)))
         self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
                         'Each matrix view must have exactly one newly saved screenshot')
         retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname

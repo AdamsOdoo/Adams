@@ -424,3 +424,31 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         for invalid in ({'warehouse_id': True}, {'hide_zero': 'yes'}, {'domain': []}, {'location_id': -1}):
             with self.assertRaises(ValidationError):
                 self.dashboard.get_inventory(self.options, 0, 'current', invalid)
+
+    def test_fulfillment_row_action_preserves_product_unit_and_native_measures(self):
+        from odoo.exceptions import AccessError, ValidationError
+        products = self.env['product.product'].create([
+            {'name': 'Delivery row first', 'type': 'service'},
+            {'name': 'Delivery row second', 'type': 'service'}])
+        order = self.env['sale.order'].create({'partner_id': self.partner_a.id,
+            'order_line': [Command.create({'product_id': product.id, 'product_uom_qty': 5,
+                                          'price_unit': 10, 'tax_ids': [Command.clear()]})
+                           for product in products]})
+        order.action_confirm()
+        order.date_order = '2026-08-15 12:00:00'
+        order.order_line[0].qty_delivered = 7
+        self.env.flush_all()
+        rows = self.dashboard.get_fulfillment(self.options)['rows']
+        row = next(item for item in rows if item['id'] == products[0].id)
+        action = self.dashboard.open_fulfillment(self.options, row['id'], row['unit_id'])
+        source = self.env['sale.report'].search(action['domain'])
+        self.assertEqual(source.product_id, products[0])
+        self.assertEqual(source.product_uom_id.id, row['unit_id'])
+        for field, key in [('product_uom_qty', 'ordered'), ('qty_delivered', 'delivered'), ('qty_to_deliver', 'remaining')]:
+            self.assertEqual(sum(source.mapped(field)), row[key])
+        self.assertEqual(row['remaining'], -2)
+        self.assertEqual(action['context']['pivot_measures'], ['product_uom_qty', 'qty_delivered', 'qty_to_deliver'])
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_fulfillment(self.options, row['id'])
+        with self.assertRaises(AccessError):
+            self.dashboard.open_fulfillment(self.options, row['id'], 2147483647)

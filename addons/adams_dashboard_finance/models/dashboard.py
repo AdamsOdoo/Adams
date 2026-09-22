@@ -388,6 +388,21 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key in {'receivables', 'payables'} and dimension == 'aging_bucket':
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if not isinstance(group_id, str) or group_id not in tuple(f'period{i}' for i in range(6)):
+                raise ValidationError(_('Invalid aging bucket.'))
+            mapping = scoped._financial_mapping(key)
+            if not scoped._mapping_ready(mapping):
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            marker = {'metric': key, 'period': group_id}
+            report = mapping.report_id.with_context(adams_aging_bucket=marker)
+            prepared = scoped._financial_options(report, key, dates)
+            return {'type': 'ir.actions.client', 'tag': 'account_report',
+                    'name': prepared['report_title'], 'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=report.id, adams_aging_bucket=marker),
+                    'params': {'options': prepared, 'ignore_session': True}}
         if key in self._overdue_labels():
             scoped, dates = self._scope(options)
             scoped._finance_access()

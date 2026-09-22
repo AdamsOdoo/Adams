@@ -4284,3 +4284,141 @@ msgstr "في إجازة معتمدة"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Apply period"
 msgstr "تطبيق الفترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Purchasing overview"
+msgstr "نظرة عامة على المشتريات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Pipeline overview"
+msgstr "نظرة عامة على الفرص"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Untaxed purchase orders"
+msgstr "أوامر شراء دون ضريبة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open opportunities · weighted by probability"
+msgstr "الفرص المفتوحة · مرجّحة بالاحتمال"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "purchase orders need delivery follow-up."
+msgstr "أوامر شراء تحتاج إلى متابعة التسليم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Check their expected dates with your suppliers."
+msgstr "راجع مواعيد التسليم المتوقعة مع الموردين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Outstanding bill instalments at"
+msgstr "أقساط الفواتير المستحقة حتى"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sales rankings"
+msgstr "ترتيب المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Products & customers"
+msgstr "المنتجات والعملاء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Rankings follow the selected period"
+msgstr "يتبع الترتيب الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product ranking measure"
+msgstr "مقياس ترتيب المنتجات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sales value"
+msgstr "قيمة المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Quantity"
+msgstr "الكمية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Saved views"
+msgstr "طرق العرض المحفوظة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View name"
+msgstr "اسم طريقة العرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Save current view"
+msgstr "حفظ طريقة العرض الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Restore saved view"
+msgstr "استعادة طريقة العرض المحفوظة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Save the current department, dates, ranking selections and applied inventory filters on this device."
+msgstr "احفظ القسم الحالي والتواريخ وخيارات الترتيب وفلاتر المخزون المطبّقة على هذا الجهاز."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Only selections are saved. Figures refresh from the source."
+msgstr "تُحفظ الخيارات فقط. تُحدَّث الأرقام من المصدر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "My executive view"
+msgstr "طريقة العرض التنفيذية الخاصة بي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open attendance can include previous days. No check-in follows the standard latest check-in snapshot; it is not an absence decision."
+msgstr "قد تشمل سجلات الحضور المفتوحة أيامًا سابقة. يعتمد عدم تسجيل الحضور على الحالة الحالية لآخر تسجيل حضور في أودو؛ ولا يُعدّ حكمًا بالغياب."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recent documents"
+msgstr "المستندات الأخيرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invoices"
+msgstr "الفواتير"

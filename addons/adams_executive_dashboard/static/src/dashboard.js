@@ -63,13 +63,15 @@ export class ExecutiveDashboard extends Component {
         this.searchInput = useRef('searchInput');
         this.employeeDialog = useRef('employeeDialog');
         this.cashDialog = useRef('cashDialog');
+        this.viewsDialog = useRef('viewsDialog');
+        useEffect(() => { const dialog = this.viewsDialog.el; if (!dialog) return; if (this.state.viewsOpen && !dialog.open) dialog.showModal(); if (!this.state.viewsOpen && dialog.open) dialog.close(); }, () => [this.state.viewsOpen]);
         useEffect(() => { const dialog = this.cashDialog.el; if (!dialog) return; if (this.state.cashOpen && !dialog.open) dialog.showModal(); if (!this.state.cashOpen && dialog.open) dialog.close(); }, () => [this.state.cashOpen]);
         useEffect(() => { const dialog = this.employeeDialog.el; if (!dialog) return; if (this.state.employeeProfile && !dialog.open) dialog.showModal(); if (!this.state.employeeProfile && dialog.open) dialog.close(); }, () => [this.state.employeeProfile]);
         this.searchKinds = { all: _t('All documents'), invoices: _t('Customer invoices'), bills: _t('Vendor bills'), orders: _t('Sales orders'), quotations: _t('Quotations') };
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ workspaceDetails: {}, cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrPeriodDraft: {}, hrPeriodApplied: null, hrPeriodError: '', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ workspaceDetails: {}, viewsOpen: false, viewName: '', activeViewName: '', cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrPeriodDraft: {}, hrPeriodApplied: null, hrPeriodError: '', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, products: null, canConfigure: false, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.printDialog.el;
@@ -170,7 +172,7 @@ export class ExecutiveDashboard extends Component {
     navigationState() {
         const selection = (value, keys) => value ? Object.fromEntries(keys.map(key => [key, value[key]])) : null;
         return { userId: this.userId, applied: this.state.applied ? { ...this.state.applied } : null,
-            hrPeriod: this.state.hrPeriodApplied ? {...this.state.hrPeriodApplied} : null, sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
+            viewName: this.state.activeViewName, hrPeriod: this.state.hrPeriodApplied ? {...this.state.hrPeriodApplied} : null, sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
@@ -185,6 +187,7 @@ export class ExecutiveDashboard extends Component {
         await this.refresh(Boolean(saved));
         if (!this.alive || generation !== this.generation || !saved) { return; }
         const jobs = [];
+        this.state.activeViewName = typeof saved.viewName === 'string' ? saved.viewName.slice(0,60) : '';
         if (Array.isArray(saved.sectionOrder)) this.state.sectionOrder = saved.sectionOrder.filter(key => this.sectionEnabled(key));
         if (saved.search) { this.state.searchQuery = saved.search.query; this.state.searchKind = saved.search.kind; jobs.push(this.searchRecords(null, saved.search.offset)); }
         if (saved.hrPeriod && !this.validateScope({...this.state.applied, ...saved.hrPeriod})) { this.state.hrPeriodApplied = {date_from:saved.hrPeriod.date_from, date_to:saved.hrPeriod.date_to}; this.state.hrPeriodDraft = {...this.state.hrPeriodApplied}; }
@@ -197,7 +200,7 @@ export class ExecutiveDashboard extends Component {
         if (saved.detail && this.sectionEnabled(['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'quotations', 'orders'].includes(saved.detail.key) ? 'sales' : ({purchases: 'procurement', crm: 'crm', hr: 'hr'}[saved.detail.key] || 'finance')) && this.dimensions[saved.detail.key]?.includes(saved.detail.dimension)) {
             jobs.push(this.inspect(saved.detail.key, saved.detail.dimension, saved.detail.offset));
         }
-        if (this.sectionEnabled('sales') && saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
+        if (this.sectionEnabled('sales') && saved.recent && ['orders', 'quotations', 'invoices'].includes(saved.recent.kind)) {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
         }
         if (this.sectionEnabled('sales') && ['invoiced_sales', 'invoiced_margin'].includes(saved.ranking?.key)) {
@@ -261,6 +264,7 @@ export class ExecutiveDashboard extends Component {
         const previousHR = sameCompany ? this.state.hrTab : 'overview';
         this.closeEmployeeProfile();
         this.invalidateHRSource();
+        if (!sameCompany) { this.closeSavedViews(); this.state.activeViewName = ''; this.state.savedView = Boolean(this.readSavedView()); }
         if (!sameCompany || !this.state.hrPeriodApplied) {
             this.state.hrPeriodApplied = {date_from:options.date_from, date_to:options.date_to};
             this.state.hrPeriodDraft = {...this.state.hrPeriodApplied};
@@ -474,6 +478,7 @@ export class ExecutiveDashboard extends Component {
         this.state.collapsed[key] = false;
         this.state.sidebarOpen = false;
         this.root.el?.scrollTo?.({top: 0});
+        if (key === 'sales' && !this.state.fulfillment) void this.loadDirectory('fulfillment');
         if (key === 'inventory' && !this.state.inventory) void this.applyStockFilters();
         if (key === 'procurement' && !this.state.procurement) void this.loadDirectory('procurement');
         if (key === 'hr' && !this.state.hrData) void this.loadHR();
@@ -607,14 +612,20 @@ export class ExecutiveDashboard extends Component {
         } catch { return null; }
     }
 
+    openSavedViews() { this.state.moreOpen = false; this.state.viewName = this.state.activeViewName || this.readSavedView()?.viewName || _t('My executive view'); this.state.viewsOpen = true; }
+    closeSavedViews() { this.state.viewsOpen = false; }
+
     saveView() {
         if (!this.state.applied) return;
         // Store selections only, never amounts, records, permissions or theme.
         const applied = Object.fromEntries(['company_id', 'date_from', 'date_to', 'as_of']
             .map(key => [key, this.state.applied[key]]));
         try {
-            window.localStorage.setItem(this.viewKey, JSON.stringify({...this.navigationState(), applied, recent: this.state.recent ? {kind: this.state.recent.kind, offset: 0} : null, detail: null, scroll: 0}));
+            const viewName = String(this.state.viewName || _t('My executive view')).trim().slice(0,60) || _t('My executive view');
+            window.localStorage.setItem(this.viewKey, JSON.stringify({...this.navigationState(), viewName, applied, recent: this.state.recent ? {kind: this.state.recent.kind, offset: 0} : null, detail: null, scroll: 0}));
             this.state.savedView = true;
+            this.state.activeViewName = viewName;
+            this.closeSavedViews();
             this.notification.add(_t('View saved in this browser.'), { type: 'success' });
         } catch {
             this.notification.add(_t('Browser storage is unavailable. The view could not be saved.'), { type: 'warning' });
@@ -622,6 +633,7 @@ export class ExecutiveDashboard extends Component {
     }
 
     async restoreView() {
+        this.closeSavedViews();
         this.state.moreOpen = false;
         const saved = this.readSavedView();
         if (!saved) {
@@ -634,6 +646,8 @@ export class ExecutiveDashboard extends Component {
     }
 
     async resetView() {
+        this.closeSavedViews();
+        this.state.activeViewName = '';
         this.state.moreOpen = false;
         if (!this.defaultOptions) return;
         this.state.draft = { ...this.defaultOptions };
@@ -1130,6 +1144,7 @@ export class ExecutiveDashboard extends Component {
             if (key === 'inventory') { args.push(this.state.inventory?.mode || 'current'); }
             if (key === 'procurement') { args.push(this.state.procurement?.mode || 'late', groupId); }
             if (key === 'workforce') { args.push(groupId); }
+            if (key === 'fulfillment' && groupId) { args.push(groupId, dimension); }
             if (key === 'inventory_product') { args.push(groupId, dimension); }
             const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);
             if (this.alive && generation === this.generation) { await this.action.doAction(action); }

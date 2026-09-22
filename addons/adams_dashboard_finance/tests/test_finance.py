@@ -728,6 +728,48 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             self.assertEqual(next(row['value'] for row in summary['print_rows'] if row['metric'] == label), -43)
             self.assertIn(label + ',-43', summary['content'])
 
+    def test_native_aging_bucket_actions_reconcile_and_preserve_export_scope(self):
+        for metric, prefix, move_type, refund_type in [
+            ('receivables', 'aged_receivable', 'out_invoice', 'out_refund'),
+            ('payables', 'aged_payable', 'in_invoice', 'in_refund'),
+        ]:
+            report = self.env.ref(f'account_reports.{prefix}_report')
+            expression = self.env.ref(f'account_reports.{prefix}_line_total')
+            self._mapping(metric, report=report, expression=expression)
+            for amount, due in [(80, '2026-08-31'), (10, '2026-08-30'),
+                                (20, '2026-07-31'), (30, '2026-07-01'),
+                                (40, '2026-06-01'), (50, '2026-05-01')]:
+                self._invoice(amount, move_type, invoice_date='2026-01-01', due_date=due)
+            self._invoice(25, refund_type, due_date='2026-08-30')
+            self._invoice(999, move_type, posted=False, due_date='2026-08-30')
+            expected = {bucket['key']: bucket['value'] for bucket in self._item(metric)['aging_buckets']}
+            for period, value in expected.items():
+                action = self.dashboard.open_report(metric, self.options, 'aging_bucket', period)
+                self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+                rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
+                serialized = json.loads(json.dumps(rebuilt))
+                native = report.get_report_information(serialized)
+                group = next(iter(serialized['column_groups']))
+                self.assertEqual(native['column_groups_totals'][group][expression.id]['value'], value)
+                printable = report.get_options(dict(serialized, export_mode='print'))
+                self.assertEqual(printable['forced_domain'], rebuilt['forced_domain'])
+                self.assertIn('2026-08-31', report.get_default_report_filename(printable, 'xlsx'))
+                full = report.get_options(serialized)
+                self.assertFalse(full.get('adams_aging_bucket'))
+                self.assertFalse(full.get('forced_domain'))
+                for changes in [{'forced_domain': []}, {'aging_interval': 15},
+                                {'companies': []}, {'all_entries': True},
+                                {'adams_supplier_window': 'supplier_today'}]:
+                    with self.assertRaises(ValidationError):
+                        report.get_report_information(dict(serialized, **changes))
+        for period in (True, [], 'period6', 'total'):
+            with self.assertRaises(ValidationError):
+                self.dashboard.open_report('receivables', self.options, 'aging_bucket', period)
+        reader = new_test_user(self.env, login='aging_bucket_denied',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user')
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).open_report('receivables', self.options, 'aging_bucket', 'period1')
+
     def test_full_overdue_rejects_changed_scope_mapping_and_denied_user(self):
         report = self.env.ref('account_reports.aged_receivable_report')
         mapping = self._mapping('receivables', report=report,

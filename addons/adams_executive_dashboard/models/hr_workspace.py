@@ -62,9 +62,10 @@ class ExecutiveDashboardHR(models.AbstractModel):
         if result.get('view', 'list') not in ('list', 'week'):
             raise ValidationError(_('Invalid shift view.'))
         scope = result.get('scope', 'period')
-        if scope not in ('period', 'current', 'today') or (
+        if scope not in ('period', 'current', 'today', 'no_check_in_today') or (
                 scope == 'current' and tab not in ('attendance', 'employees')) or (
-                scope == 'today' and tab != 'time_off'):
+                scope == 'today' and tab != 'time_off') or (
+                scope == 'no_check_in_today' and (tab != 'employees' or status != 'active')):
             raise ValidationError(_('Invalid HR date scope.'))
         if ('date_from' in result) != ('date_to' in result):
             raise ValidationError(_('Select both HR dates.'))
@@ -83,6 +84,12 @@ class ExecutiveDashboardHR(models.AbstractModel):
             dates = [dates[0], min(dates[1], dates[0] + timedelta(days=6)), dates[2]]
         return result, dates
 
+    def _hr_has_source(self, tab, filters):
+        return HR_MODELS[tab] in self.env and (
+            filters.get('scope') != 'no_check_in_today' or (
+                HR_MODELS['attendance'] in self.env and
+                'last_check_in' in self.env['hr.employee']._fields))
+
     def _hr_source_scope(self, tab, filters, dates):
         """Every caller enters through _scope; native ACLs/rules remain in force."""
         model_name = HR_MODELS[tab]
@@ -94,6 +101,12 @@ class ExecutiveDashboardHR(models.AbstractModel):
             domain = [('company_id', '=', self.env.company.id)]
             if filters['status'] != 'all':
                 domain.append(('active', '=', filters['status'] == 'active'))
+            if filters.get('scope') == 'no_check_in_today':
+                # Native employee snapshot, not subtraction of partially visible sessions.
+                source.check_field_access_rights('read', ['last_check_in'])
+                today = fields.Date.context_today(self)
+                bounds = self._date_bounds(source, 'last_check_in', [today, today, dates[2]])
+                domain += ['|', ('last_check_in', '=', False), ('last_check_in', '<', bounds[0][2])]
             employee_path = 'id'
             department_path = 'department_id'
             order = 'name, id'
@@ -182,13 +195,15 @@ class ExecutiveDashboardHR(models.AbstractModel):
             ('checked_in', 'attendance', {'scope': 'current', 'status': 'open'}, 'employees', 'current'),
             ('time_off', 'time_off', {'scope': 'today', 'status': 'validate'}, 'employees', 'today'),
             ('unassigned_shifts', 'shifts', {'status': 'published', 'assignment': 'unassigned'}, 'slots', 'period'),
+            ('no_check_in_today', 'employees', {'scope': 'no_check_in_today'}, 'employees', 'today'),
         ]
         metrics = []
+        attendance_summary = {}
         departments = []
         previews = {}
         for key, tab, raw_filters, unit, scope in definitions:
             item = {'key': key, 'unit': unit, 'scope': scope, 'tab': tab, 'filters': raw_filters}
-            if HR_MODELS[tab] not in self.env:
+            if not self._hr_has_source(tab, raw_filters):
                 item['status'] = 'not_installed'
             else:
                 try:
@@ -202,6 +217,12 @@ class ExecutiveDashboardHR(models.AbstractModel):
                             value = source.search_count(domain)
                             record_count = value
                         item.update(status='ready', value=value)
+                        if key == 'no_check_in_today':
+                            item['provenance'] = {
+                                'model': source._name, 'field': 'last_check_in', 'domain': domain,
+                                'source_kind': 'native_stored_employee_snapshot',
+                                'timezone': self.env.user.tz or 'UTC',
+                            }
                         if key in ('time_off', 'unassigned_shifts'):
                             records = source.search(domain, order=order, limit=5)
                             previews[key] = {'status': 'ready' if records else 'empty', 'total': record_count,
@@ -217,8 +238,12 @@ class ExecutiveDashboardHR(models.AbstractModel):
                     item['status'] = 'error'
             if key in ('time_off', 'unassigned_shifts') and key not in previews:
                 previews[key] = {'status': item['status'], 'rows': []}
-            metrics.append(item)
+            if key == 'no_check_in_today':
+                attendance_summary[key] = item
+            else:
+                metrics.append(item)
         return {'status': 'ready', 'metrics': metrics, 'departments': departments, 'previews': previews,
+                'attendance_summary': attendance_summary,
                 'today': fields.Date.context_today(self).isoformat()}
 
     @api.model
@@ -233,7 +258,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 'offset': offset, 'page_size': 25, 'rows': []}
         if tab == 'overview':
             return {**base, **scoped._hr_overview(dates)}
-        if HR_MODELS[tab] not in scoped.env:
+        if not scoped._hr_has_source(tab, filters):
             return {**base, 'status': 'not_installed'}
         try:
             source, domain, columns, order = scoped._hr_source_scope(tab, filters, dates)
@@ -293,7 +318,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
     def open_hr_source(self, options, tab, filters=None, record_id=None, report=False):
         scoped, dates = self._scope(options)
         filters, dates = scoped._hr_filters(tab, filters, dates)
-        if tab not in HR_MODELS or HR_MODELS[tab] not in scoped.env:
+        if tab not in HR_MODELS or not scoped._hr_has_source(tab, filters):
             raise ValidationError(_('This HR application is not installed.'))
         if type(report) is not bool:
             raise ValidationError(_('Invalid HR source.'))

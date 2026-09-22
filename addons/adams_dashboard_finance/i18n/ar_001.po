@@ -363,3 +363,13 @@ msgstr "نطاق تقرير المتأخرات غير مدعوم."
 #: code:addons/adams_dashboard_finance/models/account_report.py:0
 msgid "Overdue balances"
 msgstr "الأرصدة المتأخرة"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Aging bucket"
+msgstr "فئة أعمار الديون"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Invalid aging bucket."
+msgstr "فئة أعمار الديون غير صالحة."
