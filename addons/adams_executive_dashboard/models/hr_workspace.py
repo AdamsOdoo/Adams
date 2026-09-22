@@ -180,7 +180,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
         definitions = [
             ('employees', 'employees', {}, 'employees', 'current'),
             ('checked_in', 'attendance', {'scope': 'current', 'status': 'open'}, 'employees', 'current'),
-            ('time_off', 'time_off', {'scope': 'today', 'status': 'validate'}, 'requests', 'today'),
+            ('time_off', 'time_off', {'scope': 'today', 'status': 'validate'}, 'employees', 'today'),
             ('unassigned_shifts', 'shifts', {'status': 'published', 'assignment': 'unassigned'}, 'slots', 'period'),
         ]
         metrics = []
@@ -195,14 +195,16 @@ class ExecutiveDashboardHR(models.AbstractModel):
                     with self.env.cr.savepoint():
                         filters, scoped_dates = self._hr_filters(tab, raw_filters, dates)
                         source, domain, columns, order = self._hr_source_scope(tab, filters, scoped_dates)
-                        if key == 'checked_in':
-                            value = source._read_group(domain, [], ['employee_id:count_distinct'])[0][0]
+                        if key in ('checked_in', 'time_off'):
+                            value, record_count = source._read_group(
+                                domain, [], ['employee_id:count_distinct', '__count'])[0]
                         else:
                             value = source.search_count(domain)
+                            record_count = value
                         item.update(status='ready', value=value)
                         if key in ('time_off', 'unassigned_shifts'):
                             records = source.search(domain, order=order, limit=5)
-                            previews[key] = {'status': 'ready' if records else 'empty', 'total': value,
+                            previews[key] = {'status': 'ready' if records else 'empty', 'total': record_count,
                                              'rows': self._hr_rows(tab, records, columns)}
                         if key == 'employees':
                             departments = [{'id': dep.id or False, 'name': dep.display_name if dep else _('Unassigned'), 'count': count}

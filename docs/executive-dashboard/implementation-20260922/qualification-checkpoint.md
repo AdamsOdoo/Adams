@@ -20,6 +20,19 @@ Candidate `b679bb39732dacaafe1dea884975c0ccfabefbba` first encountered platform 
 
 Independent review found an avoidable full-catalog scan in default stock name sorting. The corrected name path uses native database order and bounded windows/prefixes, with an additional mixed-script ordering/read-volume regression. Quantity sorting uses native computed quantities and still needs representative timing. Controller suite: **51/51 pass** on the follow-up working tree; no native/visual all-pass claim.
 
+## Third candidate: failures and follow-up scope
+
+Candidate `eb5a6528eab98041067fe63b1fdf642333570459`, development build **38491683**, stopped at **76 tests: 2 failures / 3 errors**. The full suite remains unqualified.
+
+- Native view metadata contains immutable mappings: copy only the top-level result and independently parse/serialize the quantity-only architecture; strengthen native-view noncontamination coverage.
+- Stock source expected-domain fixture omitted archived internal locations while the documented source explicitly includes them. Independent expected scope now includes archived internal locations and excludes external supplier locations.
+- Odoo 19 uses Boolean `requires_allocation`; the historical string `no` enabled allocation in the new leave fixtures. Use the supported Boolean setting, retaining native validity checks.
+- Browser screenshot capture referenced a removed Sales wrapper. Capture actual orders, quotations and fulfillment panels through their controls; retain strict target assertions.
+
+The follow-up also adds independent HR draft/applied dates across worklists, profiles, sources, refresh and saved return selections; current snapshots remain current. Approved leave headlines count distinct authorized employees while request worklists retain request counts. HR panels/cards follow the selected reference more closely. Controller suite: **56/56 pass**. The native browser fixture now includes authorized attendance, leave, assigned/unassigned Planning records and retained profile screenshots. These changes await native execution and visual review.
+
+**Explicit UI32 deviation pending resolution:** the no-check-in-today summary slot displays unavailable. Open-session employee counts cannot safely establish the whole active workforce's lack of check-in under partial attendance record rules. No subtraction, zero, absence or lateness inference is presented. A source-authorized whole-cohort definition and reconciliation are required to enable this slot.
+
 | Check | Observed status | Limit / next evidence |
 |---|---|---|
 | External harness adapter check | PASS: exact pinned clean resources and eight skills | Toolkit runtime qualification is historical; it does not qualify dashboard edits. |

@@ -1,6 +1,4 @@
 """Keep strict-location quantities distinct from company-valued stock columns."""
-from copy import deepcopy
-
 from lxml import etree
 
 from odoo import api, models
@@ -21,7 +19,10 @@ class DashboardInventoryProduct(models.Model):
         # the action's location/strict context for actual record reads.
         # The underlying native view may be cached. Never mutate its shared
         # dictionary/architecture or another action's valuation columns.
-        result = deepcopy(result)
+        # Only the top-level arch entry changes. Odoo metadata can contain
+        # frozendict values which deliberately cannot be deep-copied; retain
+        # those immutable values and parse the XML into a new independent tree.
+        result = dict(result)
         arch = etree.fromstring(result['arch'])
         for node in arch.xpath("//field[@name='total_value' or @name='avg_cost' or @name='standard_price']"):
             node.getparent().remove(node)

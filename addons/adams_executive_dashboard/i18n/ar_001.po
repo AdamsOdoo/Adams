@@ -4224,3 +4224,63 @@ msgstr "تقييم مخزون الشركة ←"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "The stock source could not be opened. Check your access."
 msgstr "تعذّر فتح مصدر بيانات المخزون. تحقّق من صلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current employees"
+msgstr "الموظفون الحاليون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current snapshot"
+msgstr "الوضع الحالي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Today’s attendance"
+msgstr "الحضور اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No check-in today"
+msgstr "لم يُسجَّل حضور اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Not available"
+msgstr "غير متاح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open attendance can include previous days. No-check-in reporting is not available; a missing check-in is not an absence decision."
+msgstr "قد تشمل سجلات الحضور المفتوحة أيامًا سابقة. تقرير الموظفين الذين لم يسجلوا حضورهم غير متاح؛ وعدم تسجيل الحضور لا يُعدّ حكمًا بالغياب."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Time off & upcoming shifts"
+msgstr "الإجازات والورديات القادمة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employees on approved leave today"
+msgstr "الموظفون في إجازة معتمدة اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "On approved time off"
+msgstr "في إجازة معتمدة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Apply period"
+msgstr "تطبيق الفترة"

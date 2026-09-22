@@ -29,11 +29,13 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         view_context = {key: value for key, value in action['context'].items()
                         if key == 'lang' or key.endswith('_view_ref')}
         product_view = self.product.with_context(view_context)
+        original_arch = self.product.get_view(view_id, 'list')['arch']
         quantity_view = etree.fromstring(product_view.get_view(view_id, 'list')['arch'])
         self.assertFalse(quantity_view.xpath("//field[@name='total_value' or @name='avg_cost']"))
         self.assertTrue(quantity_view.xpath("//field[@name='qty_available']"))
         self.assertEqual(product.qty_available, 12)
-        native_view = etree.fromstring(self.product.get_view(view_id, 'list')['arch'])
+        self.assertEqual(self.product.get_view(view_id, 'list')['arch'], original_arch)
+        native_view = etree.fromstring(original_arch)
         self.assertTrue(native_view.xpath("//field[@name='total_value']"))
         # Inverse call order also must not leak the cached native architecture.
         quantity_again = etree.fromstring(product.get_view(view_id, 'list')['arch'])
@@ -112,13 +114,25 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
             self.dashboard.get_inventory(self.options, filters=dict(filters, sort='standard_price'))
 
     def test_global_stock_sources_use_allowed_models_scope_and_permissions(self):
+        # Warehouse input/output locations can be archived when its steps are
+        # changed. Their historical movements must remain reachable. Scope is
+        # internal usage and selected company/warehouse, not active-only.
+        archived = self.env['stock.location'].create({'name': 'Archived source shelf', 'usage': 'internal',
+            'location_id': self.warehouse.view_location_id.id, 'company_id': self.env.company.id, 'active': False})
+        external = self.env['stock.location'].create({'name': 'External source fixture', 'usage': 'supplier',
+            'location_id': self.warehouse.view_location_id.id, 'company_id': self.env.company.id})
+        expected_locations = self.env['stock.location'].with_context(active_test=False).search([
+            ('usage', '=', 'internal'), ('company_id', 'in', [False, self.env.company.id]),
+            ('id', 'child_of', self.warehouse.view_location_id.id)], order='complete_name, id')
+        self.assertIn(archived, expected_locations)
+        self.assertNotIn(external, expected_locations)
         for route, model in [('history', 'stock.move.line'), ('replenishment', 'stock.warehouse.orderpoint')]:
             action = self.dashboard.open_inventory_source(self.options, route, {'warehouse_id': self.warehouse.id})
             self.assertEqual(action['res_model'], model)
             self.assertIn(('company_id', '=', self.env.company.id), action['domain'])
-            self.assertIn(('location_id', 'in', self.env['stock.location'].search([
-                ('usage', '=', 'internal'), ('company_id', 'in', [False, self.env.company.id]),
-                ('id', 'child_of', self.warehouse.view_location_id.id)], order='complete_name, id').ids), action['domain'])
+            self.assertIn(('location_id', 'in', expected_locations.ids), action['domain'])
+            if route == 'history':
+                self.assertIn(('location_dest_id', 'in', expected_locations.ids), action['domain'])
         with self.assertRaises(ValidationError):
             self.dashboard.open_inventory_source(self.options, 'forecast')
         reader = new_test_user(self.env, login='global_stock_source_reader',

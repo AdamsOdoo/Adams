@@ -733,3 +733,51 @@
     #adams-procurement > .adams_metric_groups { max-width:calc(50% - 8px); }
     @media(max-width:650px) { .adams_crm_context, #adams-procurement > .adams_metric_groups { max-width:100%; } }
 }
+
+// HR overview parity: snapshot cards and attendance/department composition.
+.o_adams_dashboard #adams-hr {
+    .adams_hr_kpi { min-height:190px; padding:16px 17px 12px; }
+    .adams_hr_kpi .adams_card_top { justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .adams_hr_kpi .adams_card_top h3 { font-size:13px; font-weight:400; }
+    .adams_hr_kpi .adams_card_top > .adams_icon { width:15px; height:15px; color:var(--adams-sub); }
+    .adams_hr_kpi .adams_value { font-size:28px; line-height:1.25; }
+    .adams_hr_kpi .adams_margin_note { margin:11px 0 13px; font-size:12px; line-height:1.5; }
+    .adams_hr_kpi_footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:auto; padding-top:8px; border-top:1px solid var(--adams-line); font-size:11px; color:var(--adams-sub); background:transparent; }
+    .adams_hr_kpi_scope { min-width:0; }
+    .adams_hr_text_button { padding:2px 0; border:0; background:transparent; color:var(--adams-purple); font-size:12px; font-weight:600; line-height:1.5; min-height:0; border-radius:0; text-align:start; }
+    .adams_hr_text_button:hover { color:var(--adams-purple); background:transparent; text-decoration:underline; text-underline-offset:3px; }
+    .adams_hr_snapshot_grid { align-items:start; margin-top:18px; }
+    .adams_hr_snapshot_grid > .adams_panel { min-height:275px; }
+    .adams_hr_snapshot_grid .adams_panel_head h3 { font-size:15px; line-height:1.5; }
+    .adams_hr_snapshot_grid .adams_panel_head p { font-size:12px; margin-top:3px; }
+    .adams_hr_snapshot_grid .adams_panel_body { padding:17px 20px; }
+    .adams_hr_mini_metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; border-top:1px solid var(--adams-line); padding-top:14px; margin-top:14px; }
+    .adams_hr_mini_metrics > div { min-width:0; }
+    .adams_hr_mini_metrics > div > span { display:block; font-size:12px; color:var(--adams-sub); }
+    .adams_hr_mini_value { display:block; background:none; border:0; padding:5px 0 0; color:var(--adams-ink); font-size:16px; font-weight:650; text-align:start; }
+    .adams_hr_mini_value:hover { color:var(--adams-purple); }
+    .adams_hr_unavailable { display:block; margin-top:5px; font-size:12px; font-weight:500; color:var(--adams-sub); }
+    .adams_hr_snapshot_note { font-size:12px; color:var(--adams-sub); line-height:1.5; margin:16px 0 0; }
+    .adams_hr_department_list { max-height:300px; overflow-y:auto; overscroll-behavior:contain; }
+    .adams_hr_department_list .adams_hr_summary_row { padding:12px 0; }
+    .adams_hr_department_list .adams_hr_summary_row .btn { max-width:85%; min-height:0; font-size:13px; padding:0; text-align:start; white-space:normal; }
+    .adams_hr_department_list .adams_hr_summary_row bdi { font-weight:600; }
+    .adams_hr_upcoming_heading { margin:25px 0 13px; }
+    @media(max-width:650px) {
+        .adams_hr_kpi { padding:14px 12px 11px; min-height:190px; }
+        .adams_hr_kpi .adams_value { font-size:23px; }
+        .adams_hr_snapshot_grid > .adams_panel { min-height:0; }
+        .adams_hr_mini_metrics { gap:8px; }
+        .adams_hr_kpi_footer { font-size:11px; }
+    }
+}
+
+.o_adams_dashboard #adams-hr .adams_hr_period {
+    display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin:0 0 18px;
+    label { display:grid; gap:4px; font-size:12px; color:var(--adams-sub); }
+    input { font-size:13px; width:155px; min-height:34px; }
+    .btn { min-height:34px; font-size:12px; }
+    .adams_hr_timezone { align-self:center; margin-inline-start:auto; font-size:12px; color:var(--adams-sub); }
+    .adams_hr_period_error { flex-basis:100%; color:var(--adams-purple); margin:0; font-size:12px; }
+    @media(max-width:450px) { label { flex:1; min-width:115px; } input { width:100%; } }
+}

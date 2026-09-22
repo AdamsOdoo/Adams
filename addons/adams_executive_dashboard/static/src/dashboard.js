@@ -69,7 +69,7 @@ export class ExecutiveDashboard extends Component {
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ workspaceDetails: {}, cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ workspaceDetails: {}, cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrPeriodDraft: {}, hrPeriodApplied: null, hrPeriodError: '', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, products: null, canConfigure: false, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.printDialog.el;
@@ -170,7 +170,7 @@ export class ExecutiveDashboard extends Component {
     navigationState() {
         const selection = (value, keys) => value ? Object.fromEntries(keys.map(key => [key, value[key]])) : null;
         return { userId: this.userId, applied: this.state.applied ? { ...this.state.applied } : null,
-            sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
+            hrPeriod: this.state.hrPeriodApplied ? {...this.state.hrPeriodApplied} : null, sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
@@ -187,6 +187,7 @@ export class ExecutiveDashboard extends Component {
         const jobs = [];
         if (Array.isArray(saved.sectionOrder)) this.state.sectionOrder = saved.sectionOrder.filter(key => this.sectionEnabled(key));
         if (saved.search) { this.state.searchQuery = saved.search.query; this.state.searchKind = saved.search.kind; jobs.push(this.searchRecords(null, saved.search.offset)); }
+        if (saved.hrPeriod && !this.validateScope({...this.state.applied, ...saved.hrPeriod})) { this.state.hrPeriodApplied = {date_from:saved.hrPeriod.date_from, date_to:saved.hrPeriod.date_to}; this.state.hrPeriodDraft = {...this.state.hrPeriodApplied}; }
         if (saved.hr && this.sectionEnabled('hr')) { this.state.hrFilters = {...saved.hr.filters}; jobs.push(this.loadHR(saved.hr.tab, saved.hr.offset)); }
         if (this.sectionEnabled('sales') && saved.productMeasure === 'quantity' && Number(saved.productUnit) > 0) {
             this.state.productUnit = String(saved.productUnit);
@@ -258,7 +259,13 @@ export class ExecutiveDashboard extends Component {
         const previousRanking = sameCompany && !resetAux ? this.state.ranking?.key : 'invoiced_sales';
         const previousInventory = sameCompany ? this.state.inventory : null;
         const previousHR = sameCompany ? this.state.hrTab : 'overview';
-        this.state.employeeProfile = null;
+        this.closeEmployeeProfile();
+        this.invalidateHRSource();
+        if (!sameCompany || !this.state.hrPeriodApplied) {
+            this.state.hrPeriodApplied = {date_from:options.date_from, date_to:options.date_to};
+            this.state.hrPeriodDraft = {...this.state.hrPeriodApplied};
+            this.state.hrPeriodError = '';
+        }
         this.state.cashOpen = false;
         this.state.hrData = null;
         this.hrDepartments = [];
@@ -639,6 +646,7 @@ export class ExecutiveDashboard extends Component {
         try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional. */ }
         this.state.activeSection = 'finance';
         this.state.sidebarOpen = false;
+        this.state.hrPeriodApplied = null;
         await this.refresh();
         this.root.el?.scrollTo({ top: 0 });
     }
@@ -1054,10 +1062,27 @@ export class ExecutiveDashboard extends Component {
         finally { if (this.alive) this.state.opening = false; }
     }
     quantity(value, digits = 2) { return Number.isFinite(value) ? new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: digits}).format(value) : '—'; }
+    get hrOptions() { return {...this.state.applied, ...this.state.hrPeriodApplied}; }
+    get hrLoading() { return this.state.hrData?.status === 'loading'; }
+    get hrPeriodDirty() { return ['date_from','date_to'].some(key => this.state.hrPeriodDraft[key] !== this.state.hrPeriodApplied?.[key]); }
+    onHRDateChange(event) { const key = event.target.name; if (['date_from','date_to'].includes(key)) this.state.hrPeriodDraft[key] = event.target.value; }
+    async applyHRPeriod(event) {
+        event?.preventDefault?.();
+        const period = {...this.state.hrPeriodDraft};
+        const error = this.validateScope({...this.state.applied, ...period});
+        this.state.hrPeriodError = error;
+        if (error) return;
+        this.state.hrPeriodApplied = period;
+        this.closeEmployeeProfile();
+        return this.loadHR(this.state.hrTab, 0, {...this.state.hrFilters});
+    }
+    invalidateHRSource() { if (this.hrSourceRequest) { this.hrSourceRequest = null; this.state.opening = false; } }
     async loadHR(tab = this.state.hrTab, offset = 0, filters = null) {
         if (!['overview','attendance','time_off','shifts','employees'].includes(tab) || !this.sectionEnabled('hr')) return;
         const generation = this.generation, marker = {};
         this.hrRequest = marker;
+        this.invalidateHRSource();
+        this.closeEmployeeProfile();
         const changedTab = tab !== this.state.hrTab;
         if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week'};
         const appliedFilters = this.normalizedHRFilters(filters || (changedTab ? this.state.hrFilters : this.state.hrData?.filters) || this.state.hrFilters);
@@ -1065,31 +1090,33 @@ export class ExecutiveDashboard extends Component {
         this.state.hrTab = tab;
         this.state.hrData = {status:'loading', rows:[], filters: appliedFilters, offset};
         try {
-            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[{...this.state.applied},tab,appliedFilters,offset]);
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset]);
             if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total}; if (data.departments) this.hrDepartments = data.departments; }
         } catch { if (this.alive && generation === this.generation && this.hrRequest === marker) this.state.hrData = {status:'error',rows:[],filters:appliedFilters,offset}; }
     }
     normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
     applyHRFilters() { return this.loadHR(this.state.hrTab,0,{...this.state.hrFilters}); }
     async openEmployeeProfile(id) {
+        this.invalidateHRSource();
         const generation = this.generation, marker = {};
         this.employeeRequest = marker;
         this.state.employeeProfile = {status:'loading',id};
         try {
-            const data = await this.orm.call('adams.executive.dashboard','get_employee_profile',[{...this.state.applied},id]);
+            const data = await this.orm.call('adams.executive.dashboard','get_employee_profile',[this.hrOptions,id]);
             if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = data;
         } catch { if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = {status:'error',id}; }
     }
-    closeEmployeeProfile() { this.employeeRequest = null; this.state.employeeProfile = null; }
+    closeEmployeeProfile() { this.invalidateHRSource(); this.employeeRequest = null; this.state.employeeProfile = null; }
     async openHRSource(recordId = null, report = false, tab = this.state.hrTab, filters = null) {
-        const generation = this.generation;
+        const generation = this.generation, marker = {};
         if (this.state.opening) return;
+        this.hrSourceRequest = marker;
         this.state.opening = true;
         try {
-            const action = await this.orm.call('adams.executive.dashboard','open_hr_source',[{...this.state.applied},tab,this.normalizedHRFilters(filters || this.state.hrData?.filters || this.state.hrFilters),recordId,report]);
-            if (this.alive && generation === this.generation) await this.action.doAction(action);
-        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The HR record or report could not be opened. Check your access.'),{type:'warning'}); }
-        finally { if (this.alive) this.state.opening = false; }
+            const action = await this.orm.call('adams.executive.dashboard','open_hr_source',[this.hrOptions,tab,this.normalizedHRFilters(filters || this.state.hrData?.filters || this.state.hrFilters),recordId,report]);
+            if (this.alive && generation === this.generation && this.hrSourceRequest === marker) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation && this.hrSourceRequest === marker) this.notification.add(_t('The HR record or report could not be opened. Check your access.'),{type:'warning'}); }
+        finally { if (this.alive && this.hrSourceRequest === marker) { this.state.opening = false; this.hrSourceRequest = null; } }
     }
 
     async openReport(key, dimension = null, groupId = null) {

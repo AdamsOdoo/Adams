@@ -831,3 +831,114 @@ test('global replenishment opens a real scoped action and rejects a late stock r
     pending[1].resolve({type:'ir.actions.act_window'}); await current;
     assert.equal(opened,1);
 });
+
+test('invalid independent HR dates preserve successful rows and issue no RPC', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    const retained={status:'ready',rows:[{id:11}],total:1};
+    controller.state.hrData=retained;
+    for(const period of [
+        {date_from:'2026-02-30',date_to:'2026-03-01'},
+        {date_from:'2026-07-31',date_to:'2026-07-01'},
+        {date_from:'2020-01-01',date_to:'2026-07-31'},
+    ]) {
+        controller.state.hrPeriodDraft=period;
+        await controller.applyHRPeriod();
+        assert.ok(controller.state.hrPeriodError);
+        assert.equal(controller.state.hrData,retained);
+        assert.equal(controller.state.hrPeriodApplied.date_from,'2026-07-01');
+        assert.equal(pending.length,0);
+    }
+});
+
+test('HR overview worklists profiles and sources use applied independent dates, never unsent drafts', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={date_from:'2026-06-01',date_to:'2026-06-30'};
+    const hidden={employee_id:11,department_id:3,status:'open',scope:'current',search:'Private'};
+    const overview=controller.loadHR('overview',0,hidden);
+    assert.deepEqual(Object.keys(pending[0].args[2]),[]);
+    pending[0].resolve({status:'ready',metrics:[],rows:[]}); await overview;
+    const list=controller.loadHR('attendance',25,{employee_id:11});
+    assert.equal(pending[1].args[2].employee_id,11);
+    assert.equal(pending[1].args[3],25);
+    pending[1].resolve({status:'ready',rows:[],total:0}); await list;
+    const profile=controller.openEmployeeProfile(11);
+    pending[2].resolve({status:'ready',employee:{id:11}}); await profile;
+    const source=controller.openHRSource(null,true,'attendance',{employee_id:11});
+    pending[3].resolve({type:'ir.actions.act_window'}); await source;
+    for(const request of pending) {
+        assert.equal(request.args[0].date_from,'2026-07-01',request.method);
+        assert.equal(request.args[0].date_to,'2026-07-31',request.method);
+        assert.equal(request.args[0].company_id,1);
+        assert.equal(request.args[0].as_of,'2026-08-31');
+    }
+    assert.equal(controller.state.hrPeriodDraft.date_from,'2026-06-01');
+});
+
+test('global refresh preserves same-company HR period and saved navigation restores selections without records', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={...controller.state.hrPeriodApplied};
+    controller.state.hrTab='attendance';
+    controller.state.hrData={status:'ready',filters:{employee_id:11},offset:25,rows:[{name:'PRIVATE_HR_RECORD'}]};
+    controller.state.employeeProfile={employee:{name:'PRIVATE_PROFILE'}};
+    const saved=controller.navigationState();
+    assert.equal(JSON.stringify(saved).includes('PRIVATE_'),false);
+    controller.state.draft.date_from='2026-09-01';
+    controller.state.draft.date_to='2026-09-30';
+    await settleRequests(pending,controller.refresh());
+    assert.equal(controller.hrOptions.date_from,'2026-07-01');
+    assert.equal(controller.state.applied.date_from,'2026-09-01');
+    controller.state.hrPeriodApplied={date_from:'2026-06-01',date_to:'2026-06-30'};
+    await settleRequests(pending,controller.restoreNavigation(saved));
+    const request=pending.findLast(request=>request.method==='get_hr_workspace');
+    assert.equal(request.args[0].date_from,'2026-07-01');
+    assert.equal(request.args[1],'attendance');
+    assert.equal(request.args[2].employee_id,11);
+    assert.equal(request.args[3],25);
+    assert.equal(controller.state.hrPeriodDraft.date_to,'2026-07-31');
+    assert.equal(controller.state.employeeProfile,null);
+});
+
+test('rapid HR period changes reject old rows profiles and source navigation', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    const old=controller.loadHR('attendance');
+    const profile=controller.openEmployeeProfile(11);
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const source=controller.openHRSource(5);
+    controller.state.hrPeriodDraft={date_from:'2026-06-01',date_to:'2026-06-30'};
+    const intermediate=controller.applyHRPeriod();
+    controller.state.hrPeriodDraft={date_from:'2026-05-01',date_to:'2026-05-31'};
+    const current=controller.applyHRPeriod();
+    pending[4].resolve({status:'ready',rows:[{id:55}],total:1}); await current;
+    pending[0].resolve({status:'ready',rows:[{id:77}],total:1});
+    pending[1].resolve({status:'ready',employee:{id:11}});
+    pending[2].resolve({type:'ir.actions.act_window'});
+    pending[3].resolve({status:'ready',rows:[{id:66}],total:1});
+    await Promise.all([old,profile,source,intermediate]);
+    assert.equal(controller.state.hrData.rows[0].id,55);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrPeriodApplied.date_from,'2026-05-01');
+    assert.equal(opened,0);
+    assert.equal(controller.state.opening,false);
+});
+
+test('company change resets independent HR dates to the new applied global period', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={date_from:'invalid',date_to:'invalid'};
+    controller.state.hrPeriodError='Previous validation error';
+    controller.state.draft.company_id=2;
+    await settleRequests(pending,controller.refresh());
+    assert.equal(controller.hrOptions.company_id,2);
+    assert.equal(controller.state.hrPeriodApplied.date_from,'2026-08-01');
+    assert.equal(controller.state.hrPeriodDraft.date_to,'2026-08-31');
+    assert.equal(controller.state.hrPeriodError,'');
+});

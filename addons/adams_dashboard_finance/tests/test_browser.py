@@ -107,6 +107,37 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             employee = self.env['hr.employee'].create({'name': '000 Dashboard work profile fixture',
                                                        'company_id': self.env.company.id})
         today = fields.Date.today()
+        hr_start = today - timedelta(days=1)
+        hr_end = today + timedelta(days=6)
+        self.env.user.tz = 'UTC'
+        if employee and 'hr.attendance' in self.env:
+            self.env.user.group_ids |= self.env.ref('hr_attendance.group_hr_attendance_manager')
+            self.env['hr.attendance'].create({'employee_id': employee.id,
+                'check_in': fields.Datetime.to_datetime(hr_start) + timedelta(hours=8)})
+        if employee and 'hr.leave' in self.env:
+            self.env.user.group_ids |= self.env.ref('hr_holidays.group_hr_holidays_manager')
+            leave_employee = self.env['hr.employee'].create({
+                'name': '001 Dashboard leave fixture', 'company_id': self.env.company.id})
+            leave_type = self.env['hr.leave.type'].create({'name': 'Dashboard native leave',
+                'requires_allocation': False, 'leave_validation_type': 'no_validation'})
+            leave = self.env['hr.leave'].create({'employee_id': leave_employee.id,
+                'holiday_status_id': leave_type.id, 'request_date_from': today, 'request_date_to': hr_end})
+            if leave.state != 'validate':
+                leave.action_validate()
+        if employee and 'planning.slot' in self.env:
+            self.env.user.group_ids |= self.env.ref('planning.group_planning_manager')
+            start = fields.Datetime.to_datetime(hr_start)
+            self.env['planning.slot'].create([
+                {'company_id': self.env.company.id, 'resource_id': employee.resource_id.id,
+                 'state': 'published', 'start_datetime': start + timedelta(hours=22),
+                 'end_datetime': start + timedelta(days=1, hours=6)},
+                {'company_id': self.env.company.id, 'state': 'draft',
+                 'start_datetime': start + timedelta(days=2, hours=8),
+                 'end_datetime': start + timedelta(days=2, hours=16)},
+                {'company_id': self.env.company.id, 'state': 'published',
+                 'start_datetime': start + timedelta(days=3, hours=8),
+                 'end_datetime': start + timedelta(days=3, hours=16)},
+            ])
         self.env['account.move'].create({
             'move_type': 'out_invoice', 'partner_id': self.partner_a.id,
             'invoice_date': today, 'date': today,
@@ -170,8 +201,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x{height}'
                 prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
-                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking', 'polish_sales_lower',
+                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking',
+                            'polish_recent_orders', 'polish_recent_quotations', 'polish_fulfillment',
                             'hr_overview', 'hr_attendance', 'hr_time_off', 'hr_shifts', 'hr_employees']
+                if employee:
+                    prefixes += ['hr_profile']
                 if stock_category:
                     prefixes += ['polish_inventory_table', 'polish_inventory_page2']
                 capture_prefixes.extend(f'{prefix}_{lang}_{theme}_{width}_' for prefix in prefixes)
@@ -290,6 +324,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (root.querySelector('.adams_side_link.active')?.dataset.section !== 'sales') throw new Error('Scrolling must not change the selected department');
                     root.scrollTop = 0;
                     await navigate('hr');
+                    const hrPeriod = await wait(() => root.querySelector('.adams_hr_period'), 'Independent HR dates must render');
+                    for (const [name, value] of Object.entries(HR_PERIOD)) {
+                        const input = hrPeriod.querySelector('[name="' + name + '"]');
+                        input.value = value; input.dispatchEvent(new Event('change', {bubbles:true}));
+                    }
+                    await new Promise(resolve => requestAnimationFrame(resolve));
+                    hrPeriod.requestSubmit();
+                    await wait(() => !root.querySelector('#adams-hr [role="status"]') &&
+                        hrPeriod.querySelector('button').disabled, 'HR period must apply');
                     const tabs = await wait(() => root.querySelector('.adams_hr_tabs'), 'Five HR views must be available');
                     if (tabs.querySelectorAll('button').length !== 5) throw new Error('HR must expose five tabs');
                     for (let index = 0; index < 5; index++) {
@@ -382,7 +425,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
+                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):
@@ -416,7 +459,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             SETUP
                             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                             const target = TARGET ? section.querySelector(TARGET) : section;
-                            if (!target) throw new Error('Missing visual evidence target');
+                            if (!target) throw new Error('Missing visual evidence target: ' + SECTION + ' / ' + TARGET);
                             const nav = root.querySelector('.adams_nav');
                             root.scrollTop += target.getBoundingClientRect().top - root.getBoundingClientRect().top - nav.getBoundingClientRect().height - 16;
                             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -457,9 +500,38 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         capture_section(section, target, setup)
                         browser.take_screenshot(prefix=f'polish_{section}_{lang}_{theme}_{width}_').result(timeout=20)
                         if section == 'sales':
-                            for panel in ('product_ranking', 'order_ranking', 'sales_lower'):
+                            for panel in ('product_ranking', 'order_ranking'):
                                 capture_section(section, '.adams_' + panel)
                                 browser.take_screenshot(prefix=f'polish_{panel}_{lang}_{theme}_{width}_').result(timeout=20)
+                            # These are separate panels in the approved workspace;
+                            # the former sales_lower wrapper no longer exists.
+                            # Operate both real list tabs before recording them.
+                            for index, kind in enumerate(('orders', 'quotations')):
+                                capture_section(section, '.adams_recent_panel', """
+                                    const tabs = section.querySelectorAll('.adams_recent_tabs button');
+                                    if (tabs.length !== 2) throw new Error('Both recent document tabs must exist');
+                                    tabs[TAB_INDEX].click();
+                                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                    await wait(() => tabs[TAB_INDEX].classList.contains('active') &&
+                                        section.querySelector('.adams_recent_panel .adams_analysis') &&
+                                        !section.querySelector('.adams_recent_panel [role="status"]'),
+                                        'Selected recent document list must finish loading');
+                                    if (section.querySelector('.adams_recent_panel [role="alert"]'))
+                                        throw new Error('Recent document list failed during evidence capture');
+                                """.replace('TAB_INDEX', str(index)))
+                                browser.take_screenshot(prefix=f'polish_recent_{kind}_{lang}_{theme}_{width}_').result(timeout=20)
+                            capture_section(section, '.adams_fulfillment_panel', """
+                                const panel = section.querySelector('.adams_fulfillment_panel');
+                                if (!panel) throw new Error('Delivery quantities panel must exist');
+                                panel.querySelector('button').click();
+                                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                await wait(() => panel.querySelector('.adams_page_controls') &&
+                                    !panel.querySelector('[role="status"]'),
+                                    'Delivery quantities must finish loading');
+                                if (panel.querySelector('[role="alert"]'))
+                                    throw new Error('Delivery quantities failed during evidence capture');
+                            """)
+                            browser.take_screenshot(prefix=f'polish_fulfillment_{lang}_{theme}_{width}_').result(timeout=20)
                         elif section == 'inventory' and stock_category:
                             # The long first page and its pager cannot fit in one
                             # narrow screenshot; retain both real viewport states.
@@ -522,6 +594,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             await wait(() => !section.querySelector('[role=\"status\"]'), 'HR screenshot must finish loading');
                         """)
                         browser.take_screenshot(prefix=f'hr_{tab}_{lang}_{theme}_{width}_').result(timeout=20)
+                    if employee:
+                        capture_section('hr', None, """
+                            const person = await wait(() => [...section.querySelectorAll('.adams_hr_person')].find(node => node.innerText.includes('000 Dashboard work profile fixture')), 'Profile capture employee must render');
+                            person.click();
+                            const profile = await wait(() => root.querySelector('.adams_employee_dialog[open]'), 'Profile capture must open');
+                            await wait(() => profile.innerText.includes('000 Dashboard work profile fixture') && !profile.querySelector('[role="status"]'), 'Profile capture must settle');
+                            if (profile.querySelector('[role="alert"]')) throw new Error('Profile capture failed');
+                        """)
+                        browser.take_screenshot(prefix=f'hr_profile_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
@@ -540,7 +621,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 break
             # take_screenshot's file-writing callback may finish just after its Future.
             time.sleep(0.05)
-        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (15 if stock_category else 13))
+        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (15 + (2 if stock_category else 0) + (1 if employee else 0)))
         self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
                         'Each matrix view must have exactly one newly saved screenshot')
         retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
