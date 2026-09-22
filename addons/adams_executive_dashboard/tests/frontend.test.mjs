@@ -9,6 +9,8 @@ function fixture() {
     const notifications = [];
     let destroy;
     const storage = new Map();
+    const companyEvents = {};
+    const nativeUser = {};
     const services = {
         orm: { call(model, method, args) {
             return new Promise((resolve, reject) => pending.push({ method, args, resolve, reject }));
@@ -22,13 +24,14 @@ function fixture() {
         window: { localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } },
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
-        useState: value => value, useService: key => services[key], _t: value => value,
+        useState: value => value, useService: key => { if (!services[key]) throw new Error(`Service ${key} is not available`); return services[key]; },
+        useBus(bus, event, callback) { companyEvents[event] = callback; }, user: nativeUser, userBus: {}, _t: value => value,
         requestAnimationFrame() {}, registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
     const controller = new Controller();
     controller.setup();
     controller.state.draft = { company_id: 1, date_from: '2026-08-01', date_to: '2026-08-31', as_of: '2026-08-31' };
-    return { controller, pending, notifications, storage, destroy: () => destroy() };
+    return { controller, pending, notifications, storage, companyEvents, nativeUser, destroy: () => destroy() };
 }
 
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
@@ -749,4 +752,82 @@ test('HR optional-source statuses remain distinct and local errors recover', asy
     pending.at(-1).resolve({status:'ready',rows:[{id:7}],total:1}); await recovery;
     assert.equal(controller.state.hrData.status,'ready');
     assert.equal(controller.state.hrData.rows[0].id,7);
+});
+
+test('HR department selection replaces the unassigned drilldown scope', () => {
+    const {controller}=fixture();
+    controller.state.hrFilters={department_unassigned:true,search:'Engineer'};
+    assert.equal(controller.hrDepartmentSelection,'unassigned');
+    controller.changeHRDepartment({target:{value:'7'}});
+    assert.equal(controller.hrDepartmentSelection,'7');
+    assert.equal(controller.state.hrFilters.department_unassigned,undefined);
+    assert.equal(controller.state.hrFilters.search,'Engineer');
+    controller.changeHRDepartment({target:{value:'unassigned'}});
+    assert.equal(controller.state.hrFilters.department_id,undefined);
+    controller.changeHRDepartment({target:{value:''}});
+    assert.equal(controller.hrDepartmentSelection,'');
+    assert.equal(controller.state.hrFilters.department_unassigned,undefined);
+});
+
+test('native active-company event clears old data even with an invalid draft date', async () => {
+    const {controller,pending,nativeUser,companyEvents}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.draft.date_from='invalid';
+    controller.state.sections.finance=data(999);
+    controller.state.employeeProfile={employee:{id:11}};
+    nativeUser.activeCompany={id:2};
+    companyEvents.ACTIVE_COMPANIES_CHANGED();
+    assert.equal(controller.state.applied.company_id,2);
+    assert.equal(controller.state.draft.date_from,'2026-08-01');
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.sections.finance.items.length,0);
+    for(const request of pending)request.resolve(request.method==='get_bootstrap'
+        ? {options:{company_id:2},companies:[{id:2,name:'Second'}]} : {items:[]});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(controller.companyIdentity.name,'Second');
+});
+
+test('stock sort changes the whole applied query without applying unsent search drafts', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',offset:25,mode:'current',filters:{sort:'name',search:'Applied',warehouse_id:3},rows:[]};
+    controller.state.stockFilters.search='Unsent';
+    const sort=controller.changeStockSort({target:{value:'qty'}});
+    assert.equal(pending[0].args[1],0);
+    assert.equal(pending[0].args[3].sort,'qty');
+    assert.equal(pending[0].args[3].search,'Applied');
+    pending[0].resolve({status:'ready',rows:[],offset:0,filters:pending[0].args[3]});
+    await sort;
+    assert.equal(controller.navigationState().inventory.filters.sort,'qty');
+    assert.equal(controller.state.stockFilters.search,'Unsent');
+});
+
+test('stock page recovery accepts the server clamped offset and truthful valuation labels', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',offset:25,mode:'current',filters:{sort:'name'},rows:[]};
+    assert.equal(controller.stockValuationLabel({warehouse_id:false}),'Company valuation →');
+    assert.equal(controller.stockValuationLabel({warehouse_id:3}),'Warehouse valuation →');
+    const page=controller.pageStock(25);
+    pending[0].resolve({status:'ready',offset:0,total_count:2,rows:[{id:1},{id:2}]});
+    await page;
+    assert.equal(controller.state.inventory.offset,0);
+    assert.deepEqual([...controller.pageNumbers(controller.state.inventory)],[1]);
+});
+
+test('global replenishment opens a real scoped action and rejects a late stock response', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',mode:'current',filters:{warehouse_id:3},rows:[]};
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const action=controller.openStockSource('replenishment');
+    assert.equal(pending[0].method,'open_inventory_source');
+    assert.equal(pending[0].args[1],'replenishment');
+    assert.equal(pending[0].args[2].warehouse_id,3);
+    controller.state.inventory={status:'loading',rows:[]};
+    pending[0].resolve({type:'ir.actions.act_window'}); await action;
+    assert.equal(opened,0);
+    const current=controller.openStockSource('history');
+    pending[1].resolve({type:'ir.actions.act_window'}); await current;
+    assert.equal(opened,1);
 });

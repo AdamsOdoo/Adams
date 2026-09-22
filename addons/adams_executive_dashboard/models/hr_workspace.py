@@ -314,6 +314,10 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 if filters.get(key):
                     report_model.check_field_access_rights('read', [key])
                     action['domain'].append((key, '=', filters[key]))
+            if filters.get('department_unassigned'):
+                report_model.check_field_access_rights('read', ['employee_id'])
+                scoped.env['hr.employee'].check_field_access_rights('read', ['department_id'])
+                action['domain'].append(('employee_id.department_id', '=', False))
             return action
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
         if action.get('res_model') != source._name:

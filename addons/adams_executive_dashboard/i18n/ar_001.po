@@ -4006,6 +4006,7 @@ msgstr "كمية الموقع ←"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Warehouse valuation →"
 msgstr "تقييم المستودع ←"
 
@@ -4187,3 +4188,39 @@ msgstr "الاحتمالية"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Current open attendance sessions"
 msgstr "جلسات الحضور المفتوحة حالياً"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "On hand ↓"
+msgstr "الكمية المتوفرة ↓"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open a product’s Sources menu for its forecast and replenishment. One row per product and location. Valuation opens separately for the selected warehouse or company. Quantities in different units are never added together."
+msgstr "افتح قائمة مصادر المنتج لعرض المخزون المتوقع وإعادة التزويد. يُعرض صف لكل منتج وموقع. يُفتح التقييم بشكل منفصل للمستودع أو الشركة المحددة. لا تُجمع الكميات ذات وحدات القياس المختلفة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product name"
+msgstr "اسم المنتج"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sort"
+msgstr "ترتيب حسب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Company valuation →"
+msgstr "تقييم مخزون الشركة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The stock source could not be opened. Check your access."
+msgstr "تعذّر فتح مصدر بيانات المخزون. تحقّق من صلاحياتك."

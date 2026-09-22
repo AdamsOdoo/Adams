@@ -80,6 +80,35 @@ class TestDashboardHRWorkspace(TransactionCase):
         with self.assertRaises(AccessError):
             service.get_employee_profile(self.options, self.employee.id)
 
+    def test_department_selection_and_unassigned_actions_reconcile(self):
+        department = self.env['hr.department'].create({
+            'name': 'Workspace department', 'company_id': self.env.company.id})
+        assigned = self.env['hr.employee'].create({
+            'name': 'Department fixture assigned', 'company_id': self.env.company.id,
+            'department_id': department.id})
+        unassigned = self.env['hr.employee'].create({
+            'name': 'Department fixture unassigned', 'company_id': self.env.company.id,
+            'department_id': False})
+        for selection, expected in (({'department_id': department.id}, assigned),
+                                    ({'department_unassigned': True}, unassigned),
+                                    ({'department_unassigned': False}, assigned | unassigned)):
+            filters = {'search': 'Department fixture', **selection}
+            with self.subTest(selection=selection):
+                result = self.dashboard.get_hr_workspace(self.options, 'employees', filters)
+                self.assertEqual(set(row['id'] for row in result['rows']), set(expected.ids))
+                self.assertEqual(result['total'], len(expected))
+                action = self.dashboard.open_hr_source(self.options, 'employees', filters)
+                self.assertEqual(set(self.env['hr.employee'].search(action['domain']).ids),
+                                 set(expected.ids))
+        for filters in ({'department_unassigned': value} for value in (0, 1, 'true', None)):
+            with self.subTest(filters=filters), self.assertRaises(ValidationError):
+                self.dashboard.get_hr_workspace(self.options, 'employees', filters)
+        for filters in ({'department_id': True}, {'department_id': str(department.id)},
+                        {'department_id': -1},
+                        {'department_id': department.id, 'department_unassigned': True}):
+            with self.subTest(filters=filters), self.assertRaises(ValidationError):
+                self.dashboard.open_hr_source(self.options, 'employees', filters)
+
     def test_attendance_overlap_native_duration_and_prior_day_open_snapshot(self):
         attendance = self.env['hr.attendance']
         closed = attendance.create({'employee_id': self.employee.id, 'check_in': '2026-07-31 22:00:00',
@@ -103,6 +132,36 @@ class TestDashboardHRWorkspace(TransactionCase):
         self.assertEqual(attendance.search(action['domain']), opened)
         self.assertFalse(any(key.startswith('search_default_') for key in action['context']))
 
+    def test_attendance_sessions_are_not_workforce_or_current_open_employee_counts(self):
+        attendance = self.env['hr.attendance']
+        employee = self.env['hr.employee'].create({
+            'name': 'Session count fixture', 'company_id': self.env.company.id})
+        closed = attendance.create([
+            {'employee_id': employee.id, 'check_in': '2026-08-01 08:00:00',
+             'check_out': '2026-08-01 10:00:00'},
+            {'employee_id': employee.id, 'check_in': '2026-08-01 11:00:00',
+             'check_out': '2026-08-01 13:00:00'}])
+        opened = attendance.create({'employee_id': employee.id, 'check_in': '2026-08-02 08:00:00'})
+        with patch.object(fields.Date, 'context_today', return_value=date(2026, 8, 3)):
+            overview = self.dashboard.get_hr_workspace(self.options)
+        metric = next(item for item in overview['metrics'] if item['key'] == 'checked_in')
+        # Independent source grouping: current open records, without any period cutoff.
+        native_open = attendance.search([('employee_id.company_id', '=', self.env.company.id),
+                                         ('check_out', '=', False)])
+        self.assertIn(opened, native_open)
+        self.assertEqual(metric['unit'], 'employees')
+        self.assertEqual(metric['scope'], 'current')
+        self.assertEqual(metric['value'], len(native_open.employee_id))
+        worklist = self.dashboard.get_hr_workspace(self.options, 'attendance', {'employee_id': employee.id})
+        self.assertEqual(worklist['total'], 3)
+        self.assertEqual(set(row['id'] for row in worklist['rows']), set((closed | opened).ids))
+        self.assertIsNone(next(row['worked_hours'] for row in worklist['rows'] if row['id'] == opened.id))
+        # A historical period does not hide a current open session that began later.
+        historical = {**self.options, 'date_from': '2026-07-01', 'date_to': '2026-07-31'}
+        current = self.dashboard.get_hr_workspace(historical, 'attendance',
+            {'employee_id': employee.id, 'scope': 'current', 'status': 'open'})
+        self.assertEqual([row['id'] for row in current['rows']], opened.ids)
+
     def test_time_off_overlap_keeps_full_native_request_and_signed_report(self):
         leave_type = self.env['hr.leave.type'].create({'name': 'Workspace leave',
                             'requires_allocation': 'no', 'leave_validation_type': 'no_validation'})
@@ -121,6 +180,9 @@ class TestDashboardHRWorkspace(TransactionCase):
         self.assertIn(('state', '=', 'validate'), signed['domain'])
         self.assertIn(('leave_type', '=', 'request'), signed['domain'])
         self.assertEqual(signed['context']['pivot_measures'], ['number_of_hours'])
+        unassigned = self.dashboard.open_hr_source(self.options, 'time_off',
+            {'department_unassigned': True}, report=True)
+        self.assertIn(('employee_id.department_id', '=', False), unassigned['domain'])
         if leave.state != 'validate':
             leave.action_validate()
         with patch.object(fields.Date, 'context_today', return_value=date(2026, 8, 3)):
@@ -218,6 +280,37 @@ class TestDashboardHRWorkspace(TransactionCase):
         self.assertTrue(all(not row['assigned'] for row in unassigned['rows']))
         with self.assertRaises(AccessError):
             self.dashboard.open_hr_source(self.options, 'shifts', record_id=excluded.id)
+
+    def test_nonattendance_overlap_excludes_end_at_period_start(self):
+        if 'planning.slot' not in self.env:
+            self.skipTest('Enterprise Planning is not installed in this native test database')
+        self.env.user.group_ids |= self.env.ref('planning.group_planning_manager')
+        common = {'company_id': self.env.company.id, 'state': 'published',
+                  'resource_id': self.employee.resource_id.id,
+                  'start_datetime': '2026-07-31 22:00:00'}
+        slots = self.env['planning.slot']
+        ended = slots.create({**common, 'end_datetime': '2026-08-01 00:00:00'})
+        continuing = slots.create({**common, 'end_datetime': '2026-08-01 00:01:00'})
+        filters = {'employee_id': self.employee.id, 'view': 'week'}
+        result = self.dashboard.get_hr_workspace(self.options, 'shifts', filters)
+        self.assertEqual([row['id'] for row in result['rows']], continuing.ids)
+        self.assertEqual(result['total'], 1)
+        action = self.dashboard.open_hr_source(self.options, 'shifts', filters)
+        self.assertEqual(slots.search(action['domain']), continuing)
+        with self.assertRaises(AccessError):
+            self.dashboard.open_hr_source(self.options, 'shifts', filters, ended.id)
+        leave_type = self.env['hr.leave.type'].create({'name': 'Boundary leave',
+            'requires_allocation': 'no', 'leave_validation_type': 'no_validation'})
+        leave = self.env['hr.leave'].create({'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id, 'request_date_from': '2026-07-31',
+            'request_date_to': '2026-07-31'})
+        # Set the native stored endpoint precisely to exercise the midnight edge.
+        leave.write({'date_from': '2026-07-31 22:00:00', 'date_to': '2026-08-01 00:00:00'})
+        result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
+        self.assertEqual(result['total'], 0)
+        leave.date_to = '2026-08-01 00:01:00'
+        result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
+        self.assertEqual([row['id'] for row in result['rows']], leave.ids)
 
     def test_planning_own_reader_cannot_see_other_employee_or_drafts(self):
         if 'planning.slot' not in self.env:

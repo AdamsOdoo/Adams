@@ -68,7 +68,8 @@ class TestDashboardSourceIdentity(AccountTestInvoicingCommon):
         self.assertEqual(next(row['name'] for row in second['companies'] if row['id'] == company.id), 'Updated company')
 
     def test_company_metadata_respects_active_company_context(self):
-        company = self.company_data_2['company']
+        company = self.env['res.company'].create({'name': 'Dashboard secondary identity fixture'})
+        self.env.user.company_ids = [Command.link(company.id)]
         result = self.dashboard.with_context(allowed_company_ids=[company.id, self.env.company.id]).get_bootstrap()
         self.assertEqual(result['options']['company_id'], company.id)
         self.assertEqual({entry['id'] for entry in result['companies']}, {company.id, self.env.company.id})

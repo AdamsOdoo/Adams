@@ -1,7 +1,8 @@
 /** @odoo-module **/
 import { Component, onWillStart, onWillUnmount, useState, useRef, useEffect } from '@odoo/owl';
 import { registry } from '@web/core/registry';
-import { useService } from '@web/core/utils/hooks';
+import { useService, useBus } from '@web/core/utils/hooks';
+import { user, userBus } from '@web/core/user';
 import { useSetupAction } from '@web/search/action_hook';
 import { _t } from '@web/core/l10n/translation';
 
@@ -13,7 +14,13 @@ export class ExecutiveDashboard extends Component {
         this.orm = useService('orm');
         this.action = useService('action');
         this.notification = useService('notification');
-        this.companyService = useService('company');
+        this.companyUser = user;
+        useBus(userBus, 'ACTIVE_COMPANIES_CHANGED', () => {
+            if (this.alive && this.state.applied) {
+                this.state.draft = {...this.state.applied, company_id: user.activeCompany.id};
+                void this.refresh();
+            }
+        });
         this.hrDepartments = [];
         this.generation = 0;
         this.alive = true;
@@ -62,7 +69,7 @@ export class ExecutiveDashboard extends Component {
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ workspaceDetails: {}, cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ workspaceDetails: {}, cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, products: null, canConfigure: false, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.printDialog.el;
@@ -242,7 +249,7 @@ export class ExecutiveDashboard extends Component {
 
     async refresh(resetAux = false) {
         resetAux = resetAux === true;
-        const options = { ...this.state.draft, company_id: this.companyService?.currentCompany?.id || Number(this.state.draft.company_id) };
+        const options = { ...this.state.draft, company_id: this.companyUser?.activeCompany?.id || Number(this.state.draft.company_id) };
         const validation = this.validateScope(options);
         if (validation) { this.state.error = validation; return; }
         const generation = ++this.generation;
@@ -264,7 +271,7 @@ export class ExecutiveDashboard extends Component {
             this.state.stockFilters = {...this.state.stockFilters, warehouse_id: '', category_id: ''};
         }
         this.state.applied = options;
-        if (this.companyService) void this.refreshCompanyIdentity(generation);
+        if (this.companyUser?.activeCompany) void this.refreshCompanyIdentity(generation);
         this.closeSearch();
         this.state.printSummary = null;
         this.state.detail = null;
@@ -586,7 +593,7 @@ export class ExecutiveDashboard extends Component {
         try {
             const saved = JSON.parse(window.localStorage.getItem(this.viewKey) || 'null');
             const dates = ['date_from', 'date_to', 'as_of'];
-            if (saved?.userId !== this.userId || (this.companyService?.currentCompany && saved.applied?.company_id !== this.companyService.currentCompany.id) || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
+            if (saved?.userId !== this.userId || (this.companyUser?.activeCompany && saved.applied?.company_id !== this.companyUser.activeCompany.id) || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
                 !dates.every(key => /^\d{4}-\d{2}-\d{2}$/.test(saved.applied?.[key] || '')) ||
                 saved.applied.date_from > saved.applied.date_to) return null;
             return saved;
@@ -626,7 +633,7 @@ export class ExecutiveDashboard extends Component {
         this.state.sectionOrder = [];
         this.state.rankLimit = 5;
         this.state.productMeasure = 'value';
-        this.state.stockFilters = {warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
+        this.state.stockFilters = {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
         try { window.localStorage.setItem(this.preferenceKey + '-order', '[]'); } catch { /* Optional. */ }
         this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
         try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional. */ }
@@ -927,6 +934,14 @@ export class ExecutiveDashboard extends Component {
         } catch { /* Source widgets retain their own permission/error status. */ }
     }
     loadHRDepartment(id) { this.state.hrFilters = id ? {department_id:id} : {department_unassigned:true}; return this.loadHR('employees',0,this.state.hrFilters); }
+    get hrDepartmentSelection() { return this.state.hrFilters.department_unassigned ? 'unassigned' : String(this.state.hrFilters.department_id || ''); }
+    changeHRDepartment(event) {
+        const value = event.target.value;
+        delete this.state.hrFilters.department_unassigned;
+        delete this.state.hrFilters.department_id;
+        if (value === 'unassigned') this.state.hrFilters.department_unassigned = true;
+        else if (value) this.state.hrFilters.department_id = Number(value);
+    }
     setHRView(view) { this.state.hrFilters.view = view; return this.applyHRFilters(); }
     clearHRFilters() { this.state.hrFilters = {view:'week'}; return this.applyHRFilters(); }
     openEmployeeRecord() { const id=this.state.employeeProfile?.employee?.id; if (id) return this.openHRSource(id,false,'employees',{status:'all'}); }
@@ -974,7 +989,7 @@ export class ExecutiveDashboard extends Component {
     }
     formatStockQuantity(value, row) { return this.quantity(value, row?.digits ?? 2); }
     get stockFiltersDirty() { const applied = this.state.inventory?.filters; return Boolean(applied && Object.keys(this.state.stockFilters).some(key=>String(this.state.stockFilters[key] || '') !== String(applied[key] || ''))); }
-    clearStockFilters() { this.state.stockFilters={warehouse_id:'',category_id:'',search:'',hide_zero:true,hide_negative:false,at_date:''}; this.state.stockMode='current'; return this.applyStockFilters(); }
+    clearStockFilters() { this.state.stockFilters={sort:'name',warehouse_id:'',category_id:'',search:'',hide_zero:true,hide_negative:false,at_date:''}; this.state.stockMode='current'; return this.applyStockFilters(); }
     changeStockMode(mode) {
         this.state.stockMode = mode;
         if (mode === 'current') this.state.stockFilters.at_date = '';
@@ -993,6 +1008,16 @@ export class ExecutiveDashboard extends Component {
         return this.loadDirectory('inventory', 0, atDate ? 'historical' : 'current');
     }
     pageStock(offset) { return this.loadDirectory('inventory', offset); }
+    changeStockSort(event) {
+        const sort = event.target.value;
+        if (!['name', 'qty'].includes(sort) || !this.state.inventory) return;
+        this.state.stockFilters.sort = sort;
+        this.state.inventory = {...this.state.inventory, filters: {...this.state.inventory.filters, sort}};
+        return this.pageStock(0);
+    }
+    stockValuationLabel(row = null) {
+        return row?.warehouse_id || this.state.inventory?.filters?.warehouse_id ? _t('Warehouse valuation →') : _t('Company valuation →');
+    }
     async openStockValuation(row = null) {
         const data = this.state.inventory;
         if (!data || this.state.opening) return;
@@ -1006,9 +1031,16 @@ export class ExecutiveDashboard extends Component {
         } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The valuation report could not be opened. Check your access.'), {type:'warning'}); }
         finally { if (this.alive) this.state.opening = false; }
     }
-    openStockSource(kind, row) {
-        if (!row?.product_id) { this.notification.add(_t('Select a product to open its stock details.'), {type:'info'}); return; }
-        return this.openReport('inventory_product', kind, row.product_id);
+    async openStockSource(kind, row = null) {
+        if (row?.product_id) return this.openReport('inventory_product', kind, row.product_id);
+        if (!['history', 'replenishment'].includes(kind) || this.state.opening || !this.state.inventory) return;
+        const generation = this.generation, data = this.state.inventory;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_source', [{...this.state.applied}, kind, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
     }
     async openProductRanking(productId = null) {
         if (this.state.productMeasure !== 'quantity') return this.openReport('invoiced_sales', productId ? 'product' : null, productId);

@@ -1,6 +1,7 @@
 """Thin adapters for stock services and authorized workforce aggregates."""
 from datetime import datetime, time, timedelta
 from decimal import Decimal
+from heapq import nsmallest
 
 import pytz
 
@@ -42,9 +43,11 @@ class ExecutiveDashboardOperations(models.AbstractModel):
 
     def _inventory_filter_scope(self, options, mode, filters):
         scoped, dates = self._scope(options)
-        if not isinstance(filters, dict) or set(filters) - {'warehouse_id', 'category_id', 'location_id', 'hide_zero', 'hide_negative', 'search', 'at_date'}:
+        if not isinstance(filters, dict) or set(filters) - {'warehouse_id', 'category_id', 'location_id', 'hide_zero', 'hide_negative', 'search', 'at_date', 'sort'}:
             raise ValidationError(_('Invalid stock filters.'))
         filters = dict(filters)
+        if filters.get('sort', 'name') not in ('name', 'qty'):
+            raise ValidationError(_('Choose a supported stock sort order.'))
         if mode == 'historical' and filters.get('at_date'):
             if not isinstance(filters['at_date'], str):
                 raise ValidationError(_('Choose a valid inventory date.'))
@@ -99,41 +102,59 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             columns += ['free_qty', 'incoming_qty', 'outgoing_qty', 'virtual_available']
         products.check_field_access_rights('read', columns)
         rows, total = [], 0
-        # Page product/location pairs, never product totals. Odoo computes and filters
-        # the quantities with strict location semantics, including historical moves.
-        quantity_terms = [term for term in domain
-                          if isinstance(term, (tuple, list)) and term[0] == 'qty_available']
-        # Without a quantity predicate, counts are independent of location.
-        # Compute once; never cache across requests/users/companies.
-        invariant_count = products.search_count(domain) if not quantity_terms else None
+        sort_by = filters.get('sort', 'name')
+        products.check_field_access_rights('read', ['name'])
         warehouse_paths = [(w.view_location_id.parent_path, w.name, w.id) for w in warehouses]
-        for location in locations:
-            scoped_products = products.with_context(location=location.id, strict=True)
-            local_domain = list(domain)
-            if quantity_terms:
-                # Expand the native field search once, retaining installed kit
-                # and historical overrides, then reuse it for count and page.
+
+        def candidates():
+            nonlocal total
+            for location in locations:
+                scoped_products = products.with_context(location=location.id, strict=True)
                 local_domain = []
                 for term in domain:
                     if isinstance(term, (tuple, list)) and term[0] == 'qty_available':
+                        # Native search includes installed historical/kit overrides.
                         local_domain.extend(scoped_products._search_qty_available(term[1], term[2]))
                     else:
                         local_domain.append(term)
-            count = invariant_count if invariant_count is not None else scoped_products.search_count(local_domain)
-            local_offset = max(0, offset - total)
-            if len(rows) < 25 and local_offset < count:
-                selected = scoped_products.search(local_domain, order='default_code, id', offset=local_offset, limit=25 - len(rows))
-                for row in selected.read(columns):
-                    row['product_id'] = row['id']
-                    row['id'] = f"{row['id']}:{location.id}"
-                    row['location_id'] = location.id
-                    row['location_name'] = location.complete_name
-                    matched_warehouses = [(name, warehouse_id) for path, name, warehouse_id in warehouse_paths if location.parent_path.startswith(path)]
-                    row['warehouse_name'] = ', '.join(name for name, _ in matched_warehouses)
-                    row['warehouse_id'] = matched_warehouses[0][1] if len(matched_warehouses) == 1 else False
-                    row['digits'] = max(0, -Decimal(str(selected.browse(row['product_id']).uom_id.rounding)).normalize().as_tuple().exponent)
-                    rows.append(row)
-            total += count
+                last_id = 0
+                while True:
+                    batch = scoped_products.search([*local_domain, ('id', '>', last_id)], order='id', limit=256)
+                    if not batch:
+                        break
+                    total += len(batch)
+                    # Only quantity sorting requires evaluating candidate quantities.
+                    # Never sum quants or sort just the current page.
+                    sort_fields = ['name', 'qty_available'] if sort_by == 'qty' else ['name']
+                    for row in batch.read(sort_fields):
+                        name_key = row['name'].casefold()
+                        yield ((-row['qty_available'] if sort_by == 'qty' else 0), name_key,
+                               location.complete_name.casefold(), location.id, row['id'])
+                    last_id = batch[-1].id
+                    if len(batch) < 256:
+                        break
+
+        # Keep at most the requested prefix, not an unbounded business dataset.
+        selected_keys = nsmallest(offset + 25, candidates())
+        # Recover gracefully if another operation removed the previous last page.
+        offset = min(offset, ((total - 1) // 25) * 25) if total else 0
+        page = selected_keys[offset:offset + 25]
+        rows_by_pair = {}
+        for location_id in dict.fromkeys(key[-2] for key in page):
+            location = locations.browse(location_id)
+            ids = [key[-1] for key in page if key[-2] == location_id]
+            selected = products.with_context(location=location_id, strict=True).browse(ids)
+            matched = [(name, wid) for path, name, wid in warehouse_paths
+                       if location.parent_path.startswith(path)]
+            for row in selected.read(columns):
+                product_id = row['id']
+                row.update(product_id=product_id, id=f'{product_id}:{location_id}',
+                           location_id=location_id, location_name=location.complete_name,
+                           warehouse_name=', '.join(name for name, _wid in matched),
+                           warehouse_id=matched[0][1] if len(matched) == 1 else False,
+                           digits=max(0, -Decimal(str(selected.browse(product_id).uom_id.rounding)).normalize().as_tuple().exponent))
+                rows_by_pair[(location_id, product_id)] = row
+        rows = [rows_by_pair[(key[-2], key[-1])] for key in page]
         return {'status': 'ready' if rows else 'empty', 'rows': rows, 'offset': offset,
                 'total_count': total, 'has_more': offset + len(rows) < total, 'mode': mode,
                 'filters': filters, 'by_location': True, 'date_basis': mode,
@@ -236,6 +257,35 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         products, domain = scoped._stock_scope(dates, mode)
         action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
         action.update(domain=domain, context=dict(products.env.context))
+        return action
+
+    @api.model
+    def open_inventory_source(self, options, route, filters=None):
+        if route not in ('history', 'replenishment'):
+            raise ValidationError(_('Select a product for its forecast.'))
+        scoped, dates, products, product_domain, locations, _warehouses = self._inventory_filter_scope(options, 'current', {} if filters is None else filters)
+        model, xmlid = (('stock.move.line', 'stock.stock_move_line_action') if route == 'history'
+                        else ('stock.warehouse.orderpoint', 'stock.action_orderpoint'))
+        records = scoped.env[model]
+        records.check_access('read')
+        domain = [('company_id', '=', scoped.env.company.id)]
+        # Source worklists retain product/category/search scope, but quantity
+        # visibility switches do not define a history/orderpoint business filter.
+        for term in product_domain:
+            if isinstance(term, (tuple, list)):
+                if term[0] != 'qty_available':
+                    domain.append(('product_id.' + term[0], term[1], term[2]))
+            else:
+                domain.append(term)
+        if route == 'history':
+            domain += ['|', ('location_id', 'in', locations.ids), ('location_dest_id', 'in', locations.ids)]
+            domain += scoped._date_bounds(records, 'date', dates)
+            name = _('Stock history — selected period')
+        else:
+            domain.append(('location_id', 'in', locations.ids))
+            name = _('Replenishment — current rules')
+        action = scoped.env['ir.actions.actions']._for_xml_id(xmlid)
+        action.update(name=name, domain=domain, context=dict(products.env.context))
         return action
 
     @api.model

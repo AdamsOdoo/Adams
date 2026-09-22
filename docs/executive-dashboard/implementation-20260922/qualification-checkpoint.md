@@ -2,6 +2,18 @@
 
 **NOT YET READY FOR OWNER UAT.** Results below are scoped observations, not qualification of the evolving candidate. Native and visual gates remain PENDING.
 
+## First integrated candidate: native failures reproduced
+
+Candidate `236f63bd36aa7939b9074a2c2d73c9ad4174edf2`, development build **38459297**:
+29 post-tests, 101.31 seconds, 16,515 queries; **3 failures, 2 errors**. Odoo stopped at its failure limit, so later finance/HR/inventory cases were not qualified.
+
+- LibSass rejected two lowercase mixed-unit `min()` expressions. Replaced with equivalent width/max-width; local LibSass now compiles both bright and dark styles.
+- Odoo 19 exposes company context through `@web/core/user`, not the former company service. Dashboard startup now uses `user.activeCompany` and the `ACTIVE_COMPANIES_CHANGED` event. The test service mock now rejects nonexistent services, and a company event regression covers invalid draft dates and clearing old records.
+- The company identity test referenced an absent fixture. It now creates and authorizes a rollback-isolated second company.
+- Independent follow-up fixed the HR unassigned-department selector transition. Inventory review identified missing sorting, unreachable replenishment/history header actions, hidden validation errors and an inaccurate valuation caption; corrections have focused regressions but still require native/performance qualification.
+
+These changes are fixes under test, not passed owner-UAT gates. Staging remains at `9af98d4248090f2be3ceefb5d59bca36258b7c3a`.
+
 | Check | Observed status | Limit / next evidence |
 |---|---|---|
 | External harness adapter check | PASS: exact pinned clean resources and eight skills | Toolkit runtime qualification is historical; it does not qualify dashboard edits. |
