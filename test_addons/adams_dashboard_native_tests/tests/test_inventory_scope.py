@@ -231,6 +231,13 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         self.assertEqual(row['reserved_quantity'], 0)
         action = self.dashboard.open_inventory_reservations(self.options, kit.id, self.location.id)
         self.assertFalse(self.env['stock.quant'].search(action['domain']))
+        kit.categ_id = self.env['product.category'].create({'name': 'Kit category only'})
+        component.categ_id = self.env['product.category'].create({'name': 'Different component category'})
+        filtered = self.dashboard.get_inventory(self.options, filters={'location_id': self.location.id,
+            'category_id': kit.categ_id.id, 'hide_zero': True})
+        self.assertEqual(filtered['total_count'], 1)
+        self.assertEqual(filtered['rows'][0]['product_id'], kit.id)
+        self.assertEqual(filtered['rows'][0]['qty_available'], native.qty_available)
 
     def test_legacy_product_locations_returns_scoped_window_not_server_action(self):
         other = self.env['product.product'].create({'name': 'Excluded location product', 'is_storable': True})
@@ -251,3 +258,109 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         self.assertFalse(action['context']['delete'])
         with self.assertRaises(AccessError):
             self.dashboard.open_inventory_product(self.options, 2147483647, 'locations')
+
+    def test_empty_location_prefilter_preserves_native_signs_zero_modes_and_fallback(self):
+        locations = self.env['stock.location'].create([
+            {'name': 'Existence %s' % label, 'usage': 'internal', 'location_id': self.location.id,
+             'company_id': self.env.company.id} for label in ('positive', 'negative', 'zero', 'empty')])
+        for location, quantity in zip(locations[:3], (4, -2, 0)):
+            self.env['stock.quant']._update_available_quantity(self.product, location, quantity)
+        scoped, dates = self.dashboard._scope(self.options)
+        products, _domain = scoped._stock_scope(dates, 'current')
+        candidates = scoped._inventory_nonzero_locations(products, locations, 'current', {'hide_zero': True})
+        self.assertEqual(candidates, locations[:3])  # Zero quants are not interpreted or summed.
+        self.assertEqual(scoped._inventory_nonzero_locations(products, locations, 'current',
+                         {'hide_zero': False, 'hide_negative': True}), locations)
+        for location in locations:
+            for hide_zero, hide_negative in ((True, False), (True, True), (False, True)):
+                filters = {'location_id': location.id, 'search': self.product.name,
+                           'hide_zero': hide_zero, 'hide_negative': hide_negative}
+                native = self.product.with_context(location=location.id, strict=True).qty_available
+                expected = not ((hide_zero and native == 0) or (hide_negative and native < 0))
+                result = self.dashboard.get_inventory(self.options, filters=filters)
+                self.assertEqual(result['total_count'], int(expected))
+                self.assertEqual(result['provenance']['location_ids'], [location.id])
+                if expected:
+                    self.assertEqual(result['rows'][0]['qty_available'], native)
+        # An unknown installed adapter must retain the old full native path.
+        original = type(products)._compute_quantities_dict
+        def custom_quantities(records, *args, **kwargs):
+            return original(records, *args, **kwargs)
+        with patch.object(type(products), '_compute_quantities_dict', custom_quantities):
+            self.assertEqual(scoped._inventory_nonzero_locations(products, locations, 'current',
+                             {'hide_zero': True}), locations)
+        reader = new_test_user(self.env, login='existence_no_stock', groups='base.group_user',
+                               company_id=self.env.company.id)
+        with self.assertRaises(AccessError):
+            scoped.with_user(reader)._inventory_nonzero_locations(products.with_user(reader), locations,
+                                                                  'current', {'hide_zero': True})
+
+    def test_historical_prefilter_retains_done_move_location_without_current_quants(self):
+        location = self.env['stock.location'].create({'name': 'Historical empty now', 'usage': 'internal',
+            'location_id': self.location.id, 'company_id': self.env.company.id})
+        quants = self.env['stock.quant']
+        quants._update_available_quantity(self.product, location, 7)
+        move = self.env['stock.move'].create({'product_id': self.product.id, 'product_uom_qty': 7,
+            'product_uom': self.product.uom_id.id, 'location_id': location.id,
+            'location_dest_id': self.env.ref('stock.stock_location_customers').id,
+            'company_id': self.env.company.id})
+        move._action_confirm()
+        move.quantity = 7
+        move.picked = True
+        move._action_done()
+        move.date = '2026-09-01 12:00:00'
+        move.move_line_ids.date = move.date
+        emptied = quants.search([('product_id', '=', self.product.id), ('location_id', '=', location.id)])
+        self.assertTrue(all(quant.quantity == 0 and quant.reserved_quantity == 0 for quant in emptied))
+        emptied.unlink()
+        filters = {'location_id': location.id, 'search': self.product.name, 'hide_zero': True,
+                   'at_date': '2026-08-31'}
+        self.assertEqual(self.dashboard.get_inventory(self.options, filters=filters)['total_count'], 0)
+        historical = self.dashboard.get_inventory(self.options, mode='historical', filters=filters)
+        action = self.dashboard.open_inventory_location(self.options, self.product.id, location.id,
+                                                        mode='historical', filters=filters)
+        native = self.product.with_context(action['context']).qty_available
+        self.assertEqual(native, 7)
+        self.assertEqual(historical['total_count'], 1)
+        self.assertEqual(historical['rows'][0]['qty_available'], native)
+
+    def test_prefilter_falls_back_for_rebound_field_and_unknown_quant_delegate(self):
+        scoped, dates = self.dashboard._scope(self.options)
+        products, _domain = scoped._stock_scope(dates, 'current')
+        location = self.env['stock.location'].create({'name': 'Unknown quantity source', 'usage': 'internal',
+            'location_id': self.location.id, 'company_id': self.env.company.id})
+        field = products._fields['qty_available']
+        for binding, replacement in (('compute', '_custom_quantity_compute'), ('search', '_custom_quantity_search')):
+            with patch.object(field, binding, replacement):
+                self.assertEqual(scoped._inventory_nonzero_locations(products, location, 'current',
+                                 {'hide_zero': True}), location)
+        original = type(products)._search_field_by_quants
+        def custom_delegate(records, *args, **kwargs):
+            return original(records, *args, **kwargs)
+        with patch.object(type(products), '_search_field_by_quants', custom_delegate):
+            self.assertEqual(scoped._inventory_nonzero_locations(products, location, 'current',
+                             {'hide_zero': True}), location)
+
+    def test_prefilter_does_not_convert_denied_quantity_field_into_empty_result(self):
+        reader = new_test_user(self.env, login='existence_restricted_field',
+            groups='base.group_user,stock.group_stock_user,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id)
+        self.assertFalse(reader.has_group('base.group_system'))
+        location = self.env['stock.location'].create({'name': 'Restricted quantity empty location',
+            'usage': 'internal', 'location_id': self.location.id, 'company_id': self.env.company.id})
+        dashboard = self.dashboard.with_user(reader)
+        filters = {'location_id': location.id, 'search': self.product.name, 'hide_zero': True}
+        # Scope itself is allowed and empty. The quantity field restriction
+        # must still raise instead of allowing the prefilter to report zero.
+        self.assertEqual(dashboard.get_inventory(self.options, filters=filters)['total_count'], 0)
+        for model_name, field_name, mode in (
+                ('stock.quant', 'quantity', 'current'),
+                ('stock.quant', 'reserved_quantity', 'current'),
+                ('stock.move', 'quantity', 'historical')):
+            source = self.env[model_name].with_user(reader)
+            field = source._fields[field_name]
+            with patch.object(field, 'groups', 'base.group_system'):
+                with self.assertRaises(AccessError):
+                    source.check_field_access_rights('read', [field_name])
+                with self.assertRaises(AccessError):
+                    dashboard.get_inventory(self.options, mode=mode, filters=filters)

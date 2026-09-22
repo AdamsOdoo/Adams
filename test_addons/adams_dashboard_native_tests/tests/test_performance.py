@@ -213,3 +213,64 @@ class TestDashboardOperationalPerformance(AccountTestInvoicingCommon):
         ]
         for name, params, invoke, verify in cases:
             self._measure(name, dict(params, options=self.options), dataset, invoke, verify)
+
+    def test_sparse_locations_with_cross_category_kit_measurements(self):
+        if 'mrp.bom' not in self.env:
+            self.skipTest('Optional Manufacturing is not installed')
+        from functools import wraps
+        from unittest.mock import patch
+        from odoo import Command
+        warehouse = self.env['stock.warehouse'].create({'name': 'Sparse location performance',
+            'code': 'SPRF', 'company_id': self.env.company.id})
+        location_domain = [('id', 'child_of', warehouse.view_location_id.id), ('usage', '=', 'internal')]
+        locations_model = self.env['stock.location'].with_context(active_test=False)
+        existing = locations_model.search(location_domain)
+        self.assertLess(len(existing), 254)
+        locations_model.create([{'name': f'Sparse shelf {index:03}', 'usage': 'internal',
+            'location_id': warehouse.view_location_id.id, 'company_id': self.env.company.id}
+            for index in range(254 - len(existing))])
+        locations = locations_model.search(location_domain, order='complete_name, id')
+        self.assertEqual(len(locations), 254)
+        category = self.env['product.category'].create({'name': 'Sparse kit category'})
+        component_category = self.env['product.category'].create({'name': 'Sparse component category'})
+        component = self.env['product.product'].create({'name': 'Sparse kit component', 'is_storable': True,
+            'company_id': self.env.company.id, 'categ_id': component_category.id})
+        kit = self.env['product.product'].create({'name': 'Sparse quantity kit', 'is_storable': True,
+            'company_id': self.env.company.id, 'categ_id': category.id})
+        self.env['mrp.bom'].create({'product_tmpl_id': kit.product_tmpl_id.id, 'product_id': kit.id,
+            'type': 'phantom', 'product_qty': 1, 'product_uom_id': kit.uom_id.id,
+            'company_id': self.env.company.id,
+            'bom_line_ids': [Command.create({'product_id': component.id, 'product_qty': 2,
+                                            'product_uom_id': component.uom_id.id})]})
+        for location in locations[:31]:
+            self.env['stock.quant']._update_available_quantity(component, location, 8)
+        native = {location.id: kit.with_context(location=location.id, strict=True).qty_available
+                  for location in locations}
+        eligible = [location.id for location in locations if native[location.id] != 0]
+        self.assertEqual(len(eligible), 31)
+        filters = {'warehouse_id': warehouse.id, 'category_id': category.id, 'hide_zero': True, 'sort': 'name'}
+        calls = []
+        products_type = type(self.env['product.product'])
+        original = products_type._search_qty_available
+        @wraps(original)
+        def counted(records, *args, **kwargs):
+            calls.append(records.env.context.get('location'))
+            return original(records, *args, **kwargs)
+        for offset in (0, 25):
+            def invoke(dashboard, offset=offset):
+                calls.clear()
+                return dashboard.get_inventory(self.options, offset=offset, filters=filters)
+            def verify(result, offset=offset):
+                self.assertEqual(result['total_count'], len(eligible))
+                self.assertEqual([row['location_id'] for row in result['rows']], eligible[offset:offset + 25])
+                self.assertEqual(len(calls), 31)
+                self.assertEqual(set(calls), set(eligible))
+                self.assertEqual(len(result['provenance']['location_ids']), 254)
+                for row in result['rows']:
+                    self.assertEqual(row['product_id'], kit.id)
+                    self.assertEqual(row['qty_available'], native[row['location_id']])
+            with patch.object(products_type, '_search_qty_available', counted):
+                self._measure('sparse_254_locations_31_occupied_kit_page_%s' % offset,
+                    {'options': self.options, 'filters': filters, 'offset': offset},
+                    {'selected_locations': 254, 'occupied_locations': 31, 'kit_products': 1,
+                     'component_products': 1, 'component_category_differs': True}, invoke, verify)

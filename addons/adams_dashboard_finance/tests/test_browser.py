@@ -33,7 +33,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             groups='base.group_user,hr.group_hr_user,account.group_account_readonly,adams_executive_dashboard.group_dashboard_user',
             company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)],
             lang='en_US', tz='UTC')
-        employee = self.env['hr.employee'].create({
+        employee = self.env['hr.employee'].with_user(user).create({
             'name': 'Dashboard recovery employee', 'company_id': self.env.company.id})
         today = fields.Date.today()
         period = {'date_from': (today - timedelta(days=3)).isoformat(), 'date_to': today.isoformat()}
