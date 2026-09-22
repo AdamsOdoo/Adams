@@ -96,6 +96,58 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             domain.append(('qty_available', '>=', 0))
         return scoped, dates, products, domain, locations, warehouses
 
+    def _inventory_nonzero_locations(self, products, locations, mode, filters):
+        """Skip only locations whose native on-hand source terms cannot exist.
+
+        This is an existence prefilter, not a quantity computation. All visible
+        quants count, including zero/negative quantities and kit components in
+        other product categories. Native ACLs/rules apply exactly as in the
+        product quantity service. Historical on-hand also consumes completed
+        moves after the cutoff, so both endpoints are retained. Selected
+        locations themselves remain intact for filters, actions and provenance.
+        """
+        if not filters.get('hide_zero') or not locations:
+            return locations
+        # Unknown quantity/location adapters may have other source terms. Keep
+        # the original native per-location path rather than assume them zero.
+        known_modules = {
+            'odoo.addons.stock.models.product', 'odoo.addons.mrp.models.product',
+            'odoo.addons.purchase_stock.models.product',
+            'odoo.addons.product_expiry.models.product_product',
+        }
+        methods = ('_compute_quantities', '_compute_quantities_dict', '_search_qty_available',
+                   '_search_qty_available_new', '_search_field_by_quants', '_search_product_quantity',
+                   '_get_domain_locations', '_get_domain_locations_new')
+        quantity_field = products._fields['qty_available']
+        if (quantity_field.compute != '_compute_quantities'
+                or quantity_field.search != '_search_qty_available'
+                or quantity_field.compute_sudo
+                or products.env.context.get('mrp_compute_quantities')
+                or products.env.context.get('suggest_based_on')):
+            return locations
+        for cls in type(products).__mro__:
+            for name in methods:
+                method = cls.__dict__.get(name)
+                if method is not None and getattr(method, '__module__', None) not in known_modules:
+                    return locations
+        quant = products.env['stock.quant'].with_context(active_test=False)
+        quant.check_access('read')
+        # An empty source is not an authorization result: require the same
+        # aggregate fields as the native search before omitting any location.
+        quant.check_field_access_rights('read', ['location_id', 'product_id', 'quantity', 'reserved_quantity'])
+        occupied = {location.id for location, in quant._read_group(
+            [('location_id', 'in', locations.ids)], ['location_id'], [])}
+        if mode == 'historical':
+            move = products.env['stock.move'].with_context(active_test=False)
+            move.check_access('read')
+            move.check_field_access_rights('read', ['state', 'date', 'location_id', 'location_dest_id',
+                                                   'product_id', 'quantity', 'product_uom', 'product_qty'])
+            for field in ('location_id', 'location_dest_id'):
+                occupied.update(location.id for location, in move._read_group(
+                    [('state', '=', 'done'), ('date', '>', products.env.context['to_date']),
+                     (field, 'in', locations.ids)], [field], []))
+        return locations.filtered(lambda location: location.id in occupied)
+
     def _get_inventory_locations(self, options, offset, mode, filters):
         scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
         columns = ['display_name', 'default_code', 'qty_available', 'uom_id', 'active', 'categ_id']
@@ -108,6 +160,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         warehouse_paths = [(w.view_location_id.parent_path, w.name, w.id) for w in warehouses]
 
         quantity_filter = any(isinstance(term, (tuple, list)) and term[0] == 'qty_available' for term in domain)
+        candidate_locations = scoped._inventory_nonzero_locations(products, locations, mode, filters)
 
         def expanded_domain(scoped_products):
             local_domain = []
@@ -120,7 +173,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
 
         def candidates():
             nonlocal total
-            for location in locations:
+            for location in candidate_locations:
                 scoped_products = products.with_context(location=location.id, strict=True)
                 local_domain = expanded_domain(scoped_products)
                 last_id = 0
@@ -161,7 +214,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             prefix_size = offset + 25
             retained = []
             location_rank = {location.id: index for index, location in enumerate(locations)}
-            for location in locations:
+            for location in candidate_locations:
                 local_products = products.with_context(location=location.id, strict=True)
                 local_domain = expanded_domain(local_products)
                 count = local_products.search_count(local_domain)
