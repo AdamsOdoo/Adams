@@ -849,6 +849,14 @@ test('reservation source retains the exact row scope and ignores a superseded st
     assert.equal(pending.length,1);
 });
 
+test('compact card dates distinguish the applied period from its balance cutoff', () => {
+    const {controller}=fixture();
+    controller.state.applied={company_id:1,date_from:'2026-09-01',date_to:'2026-09-22',as_of:'2026-08-31'};
+    assert.match(controller.metricPeriodLabel({key:'revenue'}), /1.*22.*Sept.*2026/);
+    assert.equal(controller.metricPeriodLabel({key:'cash'}), '31 Aug 2026');
+    assert.equal(controller.metricPeriodLabel({key:'custom',date_field:'as_of'}), '31 Aug 2026');
+});
+
 test('invalid independent HR dates preserve successful rows and issue no RPC', async () => {
     const {controller,pending}=fixture();
     controller.state.applied={...controller.state.draft};

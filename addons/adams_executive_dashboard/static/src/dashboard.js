@@ -488,6 +488,20 @@ export class ExecutiveDashboard extends Component {
         if (['crm','procurement'].includes(key) && !this.state.workspaceDetails[key]) void this.loadWorkspaceDetails(key);
     }
 
+    metricPeriodLabel(item) {
+        const scope = this.state.applied;
+        if (!scope) return '';
+        const language = document.documentElement.lang || 'en';
+        const formatter = new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language, {
+            day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+        });
+        const date = value => new Date(value + 'T12:00:00Z');
+        if (item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)) {
+            return formatter.format(date(scope.as_of));
+        }
+        return formatter.formatRange(date(scope.date_from), date(scope.date_to));
+    }
+
     supplierWindow(key) {
         return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
     }

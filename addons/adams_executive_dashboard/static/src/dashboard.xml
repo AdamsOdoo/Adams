@@ -23,7 +23,7 @@
     <div><span class="adams_eyebrow">Executive workspace</span><h1 t-esc="activeDepartment.short"/><p t-esc="activeDepartment.description"/></div>
     <div class="adams_header_actions">
         <button class="btn" t-on-click="refresh" t-att-disabled="!state.applied"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'refresh'"/></t>Refresh</button>
-        <button class="btn" data-action="views" t-on-click="openSavedViews" t-att-disabled="!state.applied"><t t-if="state.activeViewName" t-esc="state.activeViewName"/><t t-else="">Save view</t></button>
+        <button class="btn" data-action="views" t-on-click="openSavedViews" t-att-disabled="!state.applied"><t t-if="state.activeViewName" t-esc="state.activeViewName"/><t t-else="">Saved views</t></button>
         <div class="adams_more_wrapper"><button class="btn" t-on-click="toggleMore" aria-controls="adams-more-menu" t-att-aria-expanded="state.moreOpen ? 'true' : 'false'">More <span aria-hidden="true">⌄</span></button>
         <div t-if="state.moreOpen" class="adams_more_menu" id="adams-more-menu" role="menu">
             <button role="menuitem" data-action="export" class="btn" t-on-click="exportSummary" t-att-disabled="!state.applied || state.exporting">Export summary CSV</button>
@@ -151,9 +151,8 @@
         <span t-esc="bucket.label"/><span class="adams_aging_track" aria-hidden="true"><i t-att-class="{'negative': bucket.value &lt; 0}" t-att-style="'width:' + barWidth(bucket.value, item.aging_buckets)"/></span><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key, 'aging_bucket', bucket.key)"><bdi t-esc="formatted(bucket, result)"/></button>
     </div><button class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport(item.key)">Open full aging</button>
 </details><button t-if="item.partner_ledger" class="btn btn-link" t-att-disabled="state.opening" t-on-click="() =&gt; this.openReport('partner_' + item.key)">Partner Ledger →</button>
-                            <p class="adams_card_date" dir="ltr" t-if="state.applied"><span t-if="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)" class="adams_date_value" t-esc="state.applied.as_of"/><t t-else=""><span class="adams_date_value" t-esc="state.applied.date_from"/> — <span class="adams_date_value" t-esc="state.applied.date_to"/></t></p><footer class="adams_metric_foot">
-                                <span t-if="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)">As of balance</span><span t-elif="item.key === 'standard_forecast'">Forecast</span><span t-else="">Selected period</span>
-                                <button type="button" class="adams_source_button" t-on-click="() =&gt; this.openSource(item, result)">Source &amp; definition</button>
+                            <footer class="adams_metric_foot">
+                                <p class="adams_card_date" dir="ltr" t-if="state.applied" t-esc="metricPeriodLabel(item)" t-att-title="item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key) ? state.applied.as_of : state.applied.date_from + ' – ' + state.applied.date_to"/><button type="button" class="adams_source_button" t-on-click="() =&gt; this.openSource(item, result)">Source &amp; definition</button>
                             </footer>
                         </article>
                         </t>
@@ -170,7 +169,7 @@
     </section>
     <section class="adams_panel adams_performance"><header class="adams_panel_head"><div><h3>Performance context</h3><p>Actuals, targets and comparability</p></div></header>
         <div class="adams_context_row"><span>Revenue movement</span><strong>Comparison unavailable</strong><p>Comparable-period movement is not supplied by the approved source.</p></div>
-        <div class="adams_context_row"><span>Revenue target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue" t-esc="formatted(revenue, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'"><span>Budget: </span><bdi t-esc="formatted(revenue.budget, result)"/> <t t-esc="result.currency"/></p><p t-elif="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status !== 'not_configured'" class="adams_empty_note" t-esc="statusLabels[revenue.budget.status]"/><p t-else="">No target configured.</p></div>
+        <div class="adams_context_row"><span>Revenue target</span><t t-set="revenue" t-value="financeMetric('revenue')"/><strong t-if="revenue?.budget?.status === 'ready'" t-esc="formatted(revenue.budget, result)"/><p t-if="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status === 'ready'" t-esc="result.currency"/><p t-elif="revenue &amp;&amp; revenue.budget &amp;&amp; revenue.budget.status !== 'not_configured'" class="adams_empty_note" t-esc="statusLabels[revenue.budget.status]"/><p t-else="">No target configured.</p></div>
         <div class="adams_context_row"><span>Reporting status</span><strong>Not assessed</strong><p>A report match does not confirm period close or source completeness.</p></div>
         <a href="#adams-trust" class="adams_text_link">See calculation and source rules →</a>
     </section>

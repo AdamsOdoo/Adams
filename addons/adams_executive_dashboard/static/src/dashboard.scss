@@ -860,3 +860,15 @@
         .adams_hr_period_error { grid-column:1 / -1; }
     }
 }
+
+// Approved KPI footer: one compact date/source row, never a tinted button strip.
+.o_adams_dashboard {
+    .adams_card { min-height:164px; }
+    .adams_card > .adams_metric_foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; min-height:0; margin:13px 0 0; padding:10px 0 0; border:0; border-top:1px solid var(--adams-line); background:transparent; font-size:11px; }
+    .adams_metric_foot > .adams_card_date { border:0; margin:0; padding:0; font-size:11px; color:var(--adams-sub); }
+    .adams_metric_foot > .adams_source_button { flex:0 0 auto; width:auto; min-height:0; border:0; padding:0; background:transparent; color:var(--adams-purple); font-size:11px; font-weight:600; line-height:1.5; }
+    .adams_metric_foot > .adams_source_button:hover { text-decoration:underline; text-underline-offset:3px; }
+    .btn-link, .adams_panel_head .btn-link, .adams_source_button { color:var(--adams-purple); }
+    .btn-link:hover, .adams_panel_head .btn-link:hover { color:var(--adams-purple); text-decoration:underline; }
+    @media(max-width:650px) { .adams_card > .adams_metric_foot { gap:6px 8px; } }
+}
