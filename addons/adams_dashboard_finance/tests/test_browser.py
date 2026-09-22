@@ -577,6 +577,13 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                             'Chrome must return a nonempty actual PDF')
                             document = PdfReader(io.BytesIO(content))
                             self.assertGreater(len(document.pages), 0)
+                            # This known compact fixture fits one A4 page at the
+                            # unchanged 10pt print size. Nonempty-page checks alone
+                            # missed a second page containing only the final note.
+                            self.assertEqual(print_context['row_count'], 29,
+                                             'Update the PDF fixture acceptance if summary scope changes')
+                            self.assertEqual(len(document.pages), 1,
+                                             'The 29-row summary must retain its note on the same A4 page')
                             page_text = [page.extract_text() or '' for page in document.pages]
                             self.assertTrue(all(text.strip() for text in page_text),
                                             'Actual dashboard PDF contains a blank page')

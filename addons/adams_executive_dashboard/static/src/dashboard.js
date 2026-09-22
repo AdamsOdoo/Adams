@@ -1130,12 +1130,37 @@ export class ExecutiveDashboard extends Component {
         if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week'};
         const appliedFilters = this.normalizedHRFilters(filters || (changedTab ? this.state.hrFilters : this.state.hrData?.filters) || this.state.hrFilters);
         if (tab === 'overview') for (const key of Object.keys(appliedFilters)) delete appliedFilters[key];
+        if (tab === 'shifts' && appliedFilters.view === 'week') offset = 0;
         this.state.hrTab = tab;
         this.state.hrData = {status:'loading', rows:[], filters: appliedFilters, offset};
         try {
             const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset]);
-            if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total}; if (data.departments) this.hrDepartments = data.departments; }
+            if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total, next_offset: (data.offset || 0) + (data.rows?.length || 0)}; if (data.departments) this.hrDepartments = data.departments; }
         } catch { if (this.alive && generation === this.generation && this.hrRequest === marker) this.state.hrData = {status:'error',rows:[],filters:appliedFilters,offset}; }
+    }
+    async loadMoreHRShifts() {
+        const previous = this.state.hrData;
+        if (this.state.hrTab !== 'shifts' || previous?.filters?.view !== 'week' ||
+            previous.status !== 'ready' || !previous.has_more || previous.loading_more) return;
+        const generation = this.generation, marker = {}, options = {...this.hrOptions};
+        const filters = {...previous.filters}, offset = previous.next_offset ?? ((previous.offset || 0) + previous.rows.length);
+        this.hrRequest = marker;
+        this.state.hrData = {...previous, loading_more:true, load_more_error:false};
+        const current = () => this.alive && generation === this.generation && this.hrRequest === marker &&
+            this.state.hrTab === 'shifts' && JSON.stringify(this.hrOptions) === JSON.stringify(options);
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[options,'shifts',filters,offset]);
+            if (!current()) return;
+            if (!['ready','empty'].includes(data.status)) {
+                this.state.hrData = {...data, rows:[], filters, total_count:data.total};
+                return;
+            }
+            const rows = [...new Map([...previous.rows, ...data.rows].map(row => [row.id,row])).values()];
+            this.state.hrData = {...data, status:rows.length ? 'ready' : 'empty', rows, filters, offset:0,
+                next_offset:(data.offset || 0) + data.rows.length, total_count:data.total, loading_more:false, load_more_error:false};
+        } catch {
+            if (current()) this.state.hrData = {...previous, loading_more:false, load_more_error:true};
+        }
     }
     normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
     applyHRFilters() { return this.loadHR(this.state.hrTab,0,{...this.state.hrFilters}); }

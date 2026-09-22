@@ -4554,3 +4554,81 @@ msgstr "حجوزات المنتج المباشرة الحالية"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Reserved is the current native quant reservation for this product and exact location, in its stock unit. Kit component reservations are not converted to kit quantities."
 msgstr "المحجوز هو الحجز الحالي في سجل المخزون لهذا المنتج وفي هذا الموقع تحديدًا، بوحدة مخزونه. لا تُحوَّل حجوزات مكونات الأطقم إلى كميات أطقم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "First seven days of the selected period. Load more to include all matching shifts in this week, or use List for the full selected period. Each continuation belongs to the same shift."
+msgstr "أول سبعة أيام من الفترة المحددة. استخدم «تحميل المزيد» لإظهار جميع الورديات المطابقة لهذا الأسبوع، أو «قائمة» لعرض الفترة المحددة كاملةً. ينتمي كل جزء ممتد إلى الوردية نفسها."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shifts loaded:"
+msgstr "الورديات المحمّلة:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load more shifts"
+msgstr "تحميل المزيد من الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All matching shifts for this week are loaded."
+msgstr "تم تحميل جميع الورديات المطابقة لهذا الأسبوع."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "More shifts could not be loaded. The shifts already loaded remain available. Try Load more shifts again."
+msgstr "تعذّر تحميل المزيد من الورديات. تظل الورديات المحمّلة متاحة. أعد المحاولة باستخدام «تحميل المزيد من الورديات»."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No shifts in loaded records"
+msgstr "لا توجد ورديات ضمن السجلات المحمّلة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparison not configured"
+msgstr "لم تُضبط المقارنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "A comparable-period definition has not been approved."
+msgstr "لم يُعتمد تعريف لفترة المقارنة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Report warnings"
+msgstr "تحذيرات التقرير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review source report"
+msgstr "راجع التقرير المصدري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No report warnings"
+msgstr "لا توجد تحذيرات في التقرير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Period close and source completeness have not been assessed."
+msgstr "لم يُقيَّم إقفال الفترة أو اكتمال البيانات المصدرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review source report →"
+msgstr "مراجعة التقرير المصدري ←"

@@ -252,10 +252,13 @@ class ExecutiveDashboardHR(models.AbstractModel):
         filters, dates = scoped._hr_filters(tab, filters, dates)
         if type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid page.'))
+        # Calendar batches are explicit and bounded; the UI can append further
+        # batches without presenting a paginated fragment as a complete week.
+        page_size = 100 if tab == 'shifts' and filters.get('view') == 'week' else 25
         base = {'tab': tab, 'company_id': scoped.env.company.id, 'timezone': scoped.env.user.tz or 'UTC',
                 'date_from': dates[0].isoformat(), 'date_to': dates[1].isoformat(),
                 'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
-                'offset': offset, 'page_size': 25, 'rows': []}
+                'offset': offset, 'page_size': page_size, 'rows': []}
         if tab == 'overview':
             return {**base, **scoped._hr_overview(dates)}
         if not scoped._hr_has_source(tab, filters):
@@ -263,8 +266,8 @@ class ExecutiveDashboardHR(models.AbstractModel):
         try:
             source, domain, columns, order = scoped._hr_source_scope(tab, filters, dates)
             total = source.search_count(domain)
-            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
-            records = source.search(domain, order=order, limit=25, offset=offset)
+            offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
+            records = source.search(domain, order=order, limit=page_size, offset=offset)
             rows = scoped._hr_rows(tab, records, columns)
         except AccessError:
             return {**base, 'status': 'restricted'}

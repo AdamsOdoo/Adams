@@ -497,6 +497,49 @@ class TestDashboardHRWorkspace(TransactionCase):
         result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
         self.assertEqual([row['id'] for row in result['rows']], leave.ids)
 
+    def test_planning_dense_week_batches_cover_all_slots_without_fragment_counts(self):
+        if 'planning.slot' not in self.env:
+            self.skipTest('Enterprise Planning is not installed in this native test database')
+        self.env.user.group_ids |= self.env.ref('planning.group_planning_manager')
+        slots = self.env['planning.slot']
+        role = self.env['planning.role'].create({'name': 'Dense week service role',
+            'resource_ids': [Command.link(self.employee.resource_id.id)]})
+        common = {'company_id': self.env.company.id, 'state': 'published',
+                  'resource_id': self.employee.resource_id.id, 'role_id': role.id}
+        created = slots.create([
+            {**common, 'start_datetime': '2026-08-03 08:00:00',
+             'end_datetime': '2026-08-03 09:00:00'} for index in range(101)])
+        continuing = slots.create({**common, 'start_datetime': '2026-07-31 22:00:00',
+                                   'end_datetime': '2026-08-02 02:00:00'})
+        outside = slots.create({**common, 'start_datetime': '2026-08-08 08:00:00',
+                                'end_datetime': '2026-08-08 09:00:00'})
+        filters = {'view': 'week', 'employee_id': self.employee.id, 'search': role.name}
+        first = self.dashboard.get_hr_workspace(self.options, 'shifts', filters)
+        second = self.dashboard.get_hr_workspace(self.options, 'shifts', filters, first['page_size'])
+        self.assertEqual(first['page_size'], 100)
+        self.assertEqual(len(first['rows']), 100)
+        self.assertTrue(first['has_more'])
+        self.assertEqual(len(second['rows']), 2)
+        self.assertFalse(second['has_more'])
+        rows = first['rows'] + second['rows']
+        ids = [row['id'] for row in rows]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(set(ids), set((created | continuing).ids))
+        self.assertNotIn(outside.id, ids)
+        self.assertEqual(first['total'], 102)
+        self.assertEqual(ids.count(continuing.id), 1)
+        action = self.dashboard.open_hr_source(self.options, 'shifts', filters)
+        self.assertEqual(set(slots.search(action['domain']).ids), set(ids))
+        listed = self.dashboard.get_hr_workspace(self.options, 'shifts', {**filters, 'view': 'list'})
+        self.assertEqual(listed['page_size'], 25)
+        self.assertEqual(len(listed['rows']), 25)
+        self.assertEqual(listed['total'], 103)
+        self.assertEqual(first['date_to'], '2026-08-07')
+        no_role = self.dashboard.get_hr_workspace(self.options, 'shifts',
+            {**filters, 'search': 'Nonexistent role selection'})
+        self.assertEqual(no_role['status'], 'empty')
+        self.assertEqual(no_role['total'], 0)
+
     def test_planning_own_reader_cannot_see_other_employee_or_drafts(self):
         if 'planning.slot' not in self.env:
             self.skipTest('Enterprise Planning is not installed in this native test database')

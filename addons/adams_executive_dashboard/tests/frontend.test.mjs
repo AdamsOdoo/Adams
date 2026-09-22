@@ -967,3 +967,52 @@ test('company change resets independent HR dates to the new applied global perio
     assert.equal(controller.state.hrPeriodDraft.date_to,'2026-08-31');
     assert.equal(controller.state.hrPeriodError,'');
 });
+
+test('HR week appends bounded batches, deduplicates slots and advances by fetched offset', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',75,{view:'week'});
+    assert.equal(pending[0].args[3],0);
+    pending[0].resolve({status:'ready',offset:0,page_size:100,total:4,has_more:true,rows:[{id:1},{id:2}]});await first;
+    const more=controller.loadMoreHRShifts();
+    assert.equal(controller.state.hrData.rows.length,2);
+    assert.equal(pending[1].args[3],2);
+    await controller.loadMoreHRShifts();assert.equal(pending.length,2);
+    pending[1].resolve({status:'ready',offset:2,page_size:100,total:4,has_more:true,rows:[{id:2,label:'updated'},{id:3}]});await more;
+    assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[1,2,3]);
+    assert.equal(controller.state.hrData.rows[1].label,'updated');
+    const last=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],4);
+    pending[2].resolve({status:'ready',offset:4,page_size:100,total:4,has_more:false,rows:[{id:4}]});await last;
+    assert.equal(controller.state.hrData.rows.length,4);assert.equal(controller.state.hrData.has_more,false);
+    const list=controller.loadHR('shifts',25,{view:'list'});assert.equal(pending[3].args[3],25);
+    assert.equal(controller.state.hrData.rows.length,0);
+    pending[3].resolve({status:'ready',offset:25,page_size:25,total:26,has_more:false,rows:[{id:26}]});await list;
+    assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[26]);
+});
+
+test('late HR week append cannot replace new filters, periods, tabs or company scope', async () => {
+    for (const change of ['filters','period','tab','company']) {
+        const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+        const initial=controller.loadHR('shifts',0,{view:'week',department_id:2});
+        pending[0].resolve({status:'ready',offset:0,total:2,has_more:true,rows:[{id:1}]});await initial;
+        const stale=controller.loadMoreHRShifts();
+        if(change==='company'){controller.generation++;controller.state.applied.company_id=2;}
+        if(change==='period')controller.state.hrPeriodApplied={date_from:'2026-09-01',date_to:'2026-09-07'};
+        const fresh=controller.loadHR(change==='tab'?'employees':'shifts',0,{view:'week',department_id:3});
+        assert.equal(controller.state.hrData.rows.length,0);
+        pending[2].resolve({status:'ready',offset:0,total:1,has_more:false,rows:[{id:99}]});await fresh;
+        pending[1].resolve({status:'ready',offset:1,total:2,has_more:false,rows:[{id:2}]});await stale;
+        assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[99],change);
+    }
+});
+
+test('HR week append failure preserves loaded shifts and retries the same offset', async () => {
+    const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',0,{view:'week'});
+    pending[0].resolve({status:'ready',offset:0,total:2,has_more:true,rows:[{id:1}]});await first;
+    const fail=controller.loadMoreHRShifts();pending[1].reject(new Error('temporary'));await fail;
+    assert.equal(controller.state.hrData.load_more_error,true);assert.equal(controller.state.hrData.rows[0].id,1);
+    const retry=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],1);
+    pending[2].resolve({status:'ready',offset:1,total:2,has_more:false,rows:[{id:2}]});await retry;
+    assert.equal(controller.state.hrData.load_more_error,false);assert.equal(controller.state.hrData.rows.length,2);
+});

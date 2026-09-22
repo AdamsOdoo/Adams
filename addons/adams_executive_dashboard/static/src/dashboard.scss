@@ -409,7 +409,16 @@
     .adams_print_summary::backdrop { background: transparent; }
     .adams_print_summary { position: static; width: 100%; max-width: none; height: auto; max-height: none; margin: 0; border: 0; padding: 0; overflow: visible; display: block; color: #17242c; background: white; font-size: 10pt;
       h1, h2, p, th, td { color: #17242c !important; background: white !important; }
-      table { width: 100%; } th, td { padding: 5px; } tr { break-inside: avoid; } thead { display: table-header-group; } }
+      // Keep the explanatory note with the table's final fragment. The modest
+      // print-only cell spacing also leaves room for it in the 29-row summary,
+      // without shrinking type or suppressing scope, rows or native signs.
+      table { width: 100%; margin-bottom: 8px; break-after: avoid-page; }
+      th, td { padding: 4px 5px; }
+      tr { break-inside: avoid; }
+      tbody tr:last-child { break-after: avoid-page; }
+      thead { display: table-header-group; }
+      table + p { margin-bottom: 0; break-before: avoid-page; break-inside: avoid; orphans: 2; widows: 2; }
+    }
   }
 }
 
