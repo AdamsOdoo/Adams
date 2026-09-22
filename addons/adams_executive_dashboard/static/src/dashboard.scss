@@ -847,3 +847,16 @@
     .btn-primary { color:var(--adams-paper); }
     &:dir(rtl) h1, &:dir(rtl) .adams_group_heading h3 { letter-spacing:0; }
 }
+
+// Native date inputs keep intrinsic minimum widths unless explicitly reset.
+.o_adams_dashboard #adams-hr .adams_hr_period {
+    label, input { min-width:0; min-inline-size:0; }
+    @media(max-width:450px) {
+        display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end;
+        label { min-width:0; width:100%; }
+        input { width:100%; max-width:100%; box-sizing:border-box; }
+        > button { grid-column:1; justify-self:start; max-width:100%; }
+        .adams_hr_timezone { grid-column:2; justify-self:end; margin-inline-start:0; }
+        .adams_hr_period_error { grid-column:1 / -1; }
+    }
+}

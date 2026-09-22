@@ -130,6 +130,9 @@ export class ExecutiveDashboard extends Component {
                 observer.disconnect();
             };
         }, () => [this.visibleSections.map(section => section.key).join(',')]);
+        useEffect(() => {
+            this.root.el?.querySelector('.adams_nav button.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        }, () => [this.state.activeSection, this.visibleSections.map(section => section.key).join(',')]);
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -979,7 +982,8 @@ export class ExecutiveDashboard extends Component {
         if (!start) return [];
         const end=this.state.hrData?.date_to || this.state.applied?.date_to || start;
         const length=Math.min(7,Math.max(1,Math.floor((Date.parse(end)-Date.parse(start))/86400000)+1));
-        return Array.from({length}, (_,index)=>{const value=new Date(start+'T12:00:00Z'); value.setUTCDate(value.getUTCDate()+index); const date=value.toISOString().slice(0,10); return {date,label:date, rows:(this.state.hrData?.rows || []).filter(row => row.start_datetime_label?.slice(0,10)<=date && (row.end_datetime_label?.slice(0,10)>date || (row.end_datetime_label?.slice(0,10)===date && row.end_datetime_label?.slice(11,16)!=='00:00'))).map(row=>({...row,continuation:row.start_datetime_label.slice(0,10)<date}))};});
+        const weekday = new Intl.DateTimeFormat(document.documentElement.lang || 'en', {weekday: 'short', timeZone: 'UTC'});
+        return Array.from({length}, (_,index)=>{const value=new Date(start+'T12:00:00Z'); value.setUTCDate(value.getUTCDate()+index); const date=value.toISOString().slice(0,10); return {date,label:weekday.format(value), rows:(this.state.hrData?.rows || []).filter(row => row.start_datetime_label?.slice(0,10)<=date && (row.end_datetime_label?.slice(0,10)>date || (row.end_datetime_label?.slice(0,10)===date && row.end_datetime_label?.slice(11,16)!=='00:00'))).map(row=>({...row,continuation:row.start_datetime_label.slice(0,10)<date}))};});
     }
     openEmployeeRecords(tab) { const id=this.state.employeeProfile?.employee?.id; if (!id) return; this.closeEmployeeProfile(); this.state.hrFilters={employee_id:id}; return this.loadHR(tab,0,this.state.hrFilters); }
 

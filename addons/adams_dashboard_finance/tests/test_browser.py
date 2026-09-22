@@ -324,6 +324,24 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     root.scrollTop = 0;
                     await navigate('hr');
                     const hrPeriod = await wait(() => root.querySelector('.adams_hr_period'), 'Independent HR dates must render');
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    const periodControls = [...hrPeriod.querySelectorAll('input[type="date"], button[type="submit"]')];
+                    for (let i = 0; i < periodControls.length; i++) {
+                        const a = periodControls[i].getBoundingClientRect();
+                        const container = hrPeriod.getBoundingClientRect();
+                        if (a.left < container.left - 2 || a.right > container.right + 2) throw new Error('HR period control escapes its form at width ' + WIDTH);
+                        for (let j = i + 1; j < periodControls.length; j++) {
+                            const b = periodControls[j].getBoundingClientRect();
+                            if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 2 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 2) throw new Error('HR date/apply controls overlap at width ' + WIDTH);
+                        }
+                    }
+                    if (WIDTH <= 900) {
+                        const nav = root.querySelector('.adams_nav');
+                        const active = nav?.querySelector('button.active');
+                        if (!active) throw new Error('Active HR department must exist in mobile navigation');
+                        const n = nav.getBoundingClientRect(), a = active.getBoundingClientRect();
+                        if (a.left < n.left - 2 || a.right > n.right + 2) throw new Error('Active HR department must remain visible in the horizontal navigation');
+                    }
                     for (const [name, value] of Object.entries(HR_PERIOD)) {
                         const input = hrPeriod.querySelector('[name="' + name + '"]');
                         input.value = value; input.dispatchEvent(new Event('change', {bubbles:true}));
@@ -340,6 +358,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => !root.querySelector('#adams-hr [role="status"]'), 'HR tab must leave loading state');
                         if (root.querySelector('#adams-hr [role="alert"]')) throw new Error('HR tab returned a backend error');
                         if (root.scrollWidth > root.clientWidth + 2) throw new Error('HR tab overflows');
+                        if (index === 3) {
+                            const days = [...root.querySelectorAll('.adams_hr_day > header')];
+                            if (!days.length) throw new Error('Shift week must display day headings');
+                            for (const day of days) {
+                                const weekday = day.querySelector('strong')?.textContent.trim();
+                                const date = day.querySelector('bdi')?.textContent.trim();
+                                if (!weekday || weekday === date || /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(weekday)) throw new Error('Shift headings must have a localized weekday distinct from the date');
+                            }
+                        }
                     }
                     if (HAS_EMPLOYEE) {
                         const person = await wait(() => [...root.querySelectorAll('.adams_hr_person')].find(node => node.innerText.includes('000 Dashboard work profile fixture')), 'Authorized employee fixture must appear');
