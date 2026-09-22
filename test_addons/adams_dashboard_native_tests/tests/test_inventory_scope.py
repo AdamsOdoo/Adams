@@ -165,3 +165,62 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         self.assertEqual([row['product_id'] for row in page['rows']], native[25:50].ids)
         self.assertEqual(reads, [(25, 25)],
                          'Name sort without quantity predicates must read one product page, not the catalog')
+
+    def test_current_reservations_reconcile_native_quants_and_exact_source(self):
+        child = self.env['stock.location'].create({'name': 'Reservation child', 'usage': 'internal',
+            'location_id': self.location.id, 'company_id': self.env.company.id})
+        quants = self.env['stock.quant']
+        quants._update_available_quantity(self.product, self.location, 12)
+        quants._update_reserved_quantity(self.product, self.location, 3)
+        quants._update_available_quantity(self.product, child, 20)
+        quants._update_reserved_quantity(self.product, child, 7)
+        filters = {'location_id': self.location.id, 'search': self.product.name, 'hide_zero': False}
+        result = self.dashboard.get_inventory(self.options, filters=filters)
+        self.assertEqual(len(result['rows']), 1)
+        row = result['rows'][0]
+        self.assertEqual(row['categ_id'][0], self.product.categ_id.id)
+        self.assertEqual(row['reserved_quantity'], 3)
+        self.assertEqual(row['free_qty'], self.product.with_context(location=self.location.id, strict=True).free_qty)
+        action = self.dashboard.open_inventory_reservations(self.options, self.product.id, self.location.id, filters)
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'stock.quant')
+        source = quants.with_context(action['context']).search(action['domain'])
+        self.assertEqual(source.location_id, self.location)
+        self.assertEqual(source.product_id, self.product)
+        self.assertEqual(sum(source.mapped('reserved_quantity')), row['reserved_quantity'])
+        view = etree.fromstring(quants.get_view(action['views'][0][0], 'list')['arch'])
+        self.assertTrue(view.xpath("//field[@name='reserved_quantity']"))
+        historical = self.dashboard.get_inventory(self.options, mode='historical', filters=filters)
+        self.assertTrue(historical['rows'])
+        self.assertNotIn('reserved_quantity', historical['rows'][0])
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_inventory_reservations(self.options, True, self.location.id)
+        with self.assertRaises(AccessError):
+            self.dashboard.open_inventory_reservations(self.options, self.product.id, 2147483647)
+        reader = new_test_user(self.env, login='reservation_denied',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id)
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).open_inventory_reservations(self.options, self.product.id, self.location.id)
+
+    def test_kit_reservations_are_direct_quants_not_derived_availability(self):
+        if 'mrp.bom' not in self.env:
+            self.skipTest('Optional Manufacturing is not installed')
+        component = self.env['product.product'].create({'name': 'Reservation component', 'is_storable': True})
+        kit = self.env['product.product'].create({'name': 'Direct reservation kit', 'is_storable': True})
+        self.env['mrp.bom'].create({'product_tmpl_id': kit.product_tmpl_id.id, 'product_id': kit.id,
+            'type': 'phantom', 'product_qty': 1, 'product_uom_id': kit.uom_id.id,
+            'company_id': self.env.company.id,
+            'bom_line_ids': [Command.create({'product_id': component.id, 'product_qty': 1,
+                                            'product_uom_id': component.uom_id.id})]})
+        self.env['stock.quant']._update_available_quantity(component, self.location, 12)
+        self.env['stock.quant']._update_reserved_quantity(component, self.location, 3)
+        row = self.dashboard.get_inventory(self.options, filters={'location_id': self.location.id,
+            'search': kit.name, 'hide_zero': False})['rows'][0]
+        native = kit.with_context(location=self.location.id, strict=True)
+        self.assertEqual(row['qty_available'], native.qty_available)
+        self.assertEqual(row['free_qty'], native.free_qty)
+        self.assertGreater(row['qty_available'] - row['free_qty'], 0)
+        self.assertEqual(row['reserved_quantity'], 0)
+        action = self.dashboard.open_inventory_reservations(self.options, kit.id, self.location.id)
+        self.assertFalse(self.env['stock.quant'].search(action['domain']))

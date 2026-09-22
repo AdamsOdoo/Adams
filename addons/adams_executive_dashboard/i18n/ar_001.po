@@ -4422,3 +4422,135 @@ msgstr "المستندات الأخيرة"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Invoices"
 msgstr "الفواتير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank accounts"
+msgstr "الحسابات البنكية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Cash on hand"
+msgstr "النقدية في الصندوق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Breakdown unavailable"
+msgstr "التفصيل غير متاح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "active accounts"
+msgstr "حسابات نشطة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active accounts"
+msgstr "الحسابات النشطة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "The approved report does not supply a bank/cash split. Archived accounts are excluded from the account directory."
+msgstr "لا يوفّر التقرير المعتمد تفصيلًا بين الأرصدة البنكية والنقدية في الصندوق. تُستبعد الحسابات المؤرشفة من دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue target"
+msgstr "الإيرادات المستهدفة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue movement"
+msgstr "التغير في الإيرادات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparison unavailable"
+msgstr "المقارنة غير متاحة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparable-period movement is not supplied by the approved source."
+msgstr "لا يوفّر المصدر المعتمد التغير مقارنةً بفترة مماثلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reporting status"
+msgstr "حالة التقارير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "From quantity to source records"
+msgstr "من الكمية إلى السجلات المصدرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Keep your working view"
+msgstr "الاحتفاظ بطريقة العرض الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open a row to inspect that product and location. Current quantities use native stock records; historical on-hand uses the selected stock date. Valuation opens separately with its stated warehouse or company scope."
+msgstr "افتح صفًا لفحص المنتج والموقع المحددين. تستند الكميات الحالية إلى سجلات المخزون القياسية، والكمية المتاحة تاريخيًا إلى تاريخ المخزون المحدد. يُفتح التقييم بشكل منفصل وفق نطاق المستودع أو الشركة الموضّح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Applied warehouse, category, stock date, quantity filters and page are retained when you inspect a report and return."
+msgstr "يُحتفَظ بالمستودع والفئة وتاريخ المخزون وفلاتر الكميات والصفحة المطبّقة عند فحص تقرير والعودة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Signed leave report →"
+msgstr "تقرير الإجازات بالساعات ذات الإشارة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Requests overlap the selected period. Duration is for the full request; days and hours stay separate. The signed leave report uses its separate native report period and signed hours."
+msgstr "تتداخل الطلبات مع الفترة المحددة. تخص المدة الطلب كاملًا؛ وتبقى الأيام والساعات منفصلة. يستخدم تقرير الإجازات بالساعات ذات الإشارة فترة التقرير القياسية المستقلة وساعاته الموجبة والسالبة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reserved"
+msgstr "المحجوز"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Category:"
+msgstr "الفئة:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reservations →"
+msgstr "الحجوزات ←"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Current direct-product reservations"
+msgstr "حجوزات المنتج المباشرة الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reserved is the current native quant reservation for this product and exact location, in its stock unit. Kit component reservations are not converted to kit quantities."
+msgstr "المحجوز هو الحجز الحالي في سجل المخزون لهذا المنتج وفي هذا الموقع تحديدًا، بوحدة مخزونه. لا تُحوَّل حجوزات مكونات الأطقم إلى كميات أطقم."

@@ -832,6 +832,23 @@ test('global replenishment opens a real scoped action and rejects a late stock r
     assert.equal(opened,1);
 });
 
+test('reservation source retains the exact row scope and ignores a superseded stock page', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',mode:'current',filters:{warehouse_id:3},rows:[]};
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const action=controller.openStockReservations({product_id:12,location_id:8});
+    assert.equal(pending[0].method,'open_inventory_reservations');
+    assert.equal(pending[0].args[1],12);
+    assert.equal(pending[0].args[2],8);
+    assert.equal(pending[0].args[3].warehouse_id,3);
+    controller.state.inventory={status:'ready',mode:'historical',rows:[]};
+    pending[0].resolve({type:'ir.actions.act_window'}); await action;
+    assert.equal(opened,0);
+    await controller.openStockReservations({product_id:12,location_id:8});
+    assert.equal(pending.length,1);
+});
+
 test('invalid independent HR dates preserve successful rows and issue no RPC', async () => {
     const {controller,pending}=fixture();
     controller.state.applied={...controller.state.draft};

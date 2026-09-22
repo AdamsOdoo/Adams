@@ -1053,6 +1053,17 @@ export class ExecutiveDashboard extends Component {
         } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The valuation report could not be opened. Check your access.'), {type:'warning'}); }
         finally { if (this.alive) this.state.opening = false; }
     }
+    async openStockReservations(row) {
+        const data = this.state.inventory;
+        if (!data || data.mode !== 'current' || this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_reservations', [{...this.state.applied}, row.product_id, row.location_id, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
     async openStockSource(kind, row = null) {
         if (row?.product_id) return this.openReport('inventory_product', kind, row.product_id);
         if (!['history', 'replenishment'].includes(kind) || this.state.opening || !this.state.inventory) return;

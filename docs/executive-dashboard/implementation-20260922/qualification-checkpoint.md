@@ -1,6 +1,6 @@
 # Qualification checkpoint — active working tree
 
-**NOT YET READY FOR OWNER UAT.** Results below are scoped observations, not qualification of the evolving candidate. Native and visual gates remain PENDING.
+**NOT YET READY FOR OWNER UAT.** Development candidate `f0fe542be27bec15c121db1d0e8fa5abb90ae614` passed its native suite. Results below are source-bound observations, not qualification of subsequent edits or the final staging candidate. Final visual, performance, deployment and evidence gates remain pending.
 
 ## First integrated candidate: native failures reproduced
 
@@ -31,7 +31,7 @@ Candidate `eb5a6528eab98041067fe63b1fdf642333570459`, development build **384916
 
 The follow-up also adds independent HR draft/applied dates across worklists, profiles, sources, refresh and saved return selections; current snapshots remain current. Approved leave headlines count distinct authorized employees while request worklists retain request counts. HR panels/cards follow the selected reference more closely. Controller suite: **56/56 pass**. The native browser fixture now includes authorized attendance, leave, assigned/unassigned Planning records and retained profile screenshots. These changes await native execution and visual review.
 
-**Explicit UI32 deviation pending resolution:** the no-check-in-today summary slot displays unavailable. Open-session employee counts cannot safely establish the whole active workforce's lack of check-in under partial attendance record rules. No subtraction, zero, absence or lateness inference is presented. A source-authorized whole-cohort definition and reconciliation are required to enable this slot.
+**Historical UI32 deviation at the third checkpoint (resolved by the fifth candidate below):** the no-check-in-today summary slot displays unavailable. Open-session employee counts cannot safely establish the whole active workforce's lack of check-in under partial attendance record rules. No subtraction, zero, absence or lateness inference is presented. A source-authorized whole-cohort definition and reconciliation are required to enable this slot.
 
 ## Fourth candidate: full suite completed, corrections still required
 
@@ -43,16 +43,28 @@ The UI32 unavailable placeholder is now replaced, where authorized, by the insta
 
 **Unresolved source-dependent parity:** bank/cash split cannot be inferred safely from the single `asset_cash` account type or ambiguous journal associations; retain the native total/directory until an approved native split definition exists. Procurement approval/late worklists display authoritative order counts rather than invent monetary sums. Both differences require explicit final disposition, not silent parity acceptance.
 
+## Fifth candidate: first all-pass native development checkpoint
+
+Exact application source: [`f0fe542be27bec15c121db1d0e8fa5abb90ae614`](https://github.com/AdamsOdoo/Adams/commit/f0fe542be27bec15c121db1d0e8fa5abb90ae614). Odoo.sh development build **38492934**. The observed native log at **2026-09-22T19:41:52Z** reports **107 tests, 383.00 seconds, 100,550 queries, zero failures and zero errors**. Earlier failures above remain historical evidence and are not relabelled as passes.
+
+The completed suite includes native finance/operational/HR reconciliation and negative cases, source-action validation, and the English/Arabic × light/dark × seven-viewport browser matrix. Its browser assertions cover named saved-view save/restore/reset, source return, posted invoice/credit-note documents, stock pagination, populated HR tabs and employee profiles. Successful assertion/evidence-capture execution does not replace human-readable side-by-side screenshot review or actual staging data reconciliation. The complete suite's query count and runtime are **not** per-operation performance results.
+
+UI32 is now backed by the installed employee `last_check_in` stored snapshot, with model/field/record access and explicit selected-company/local-midnight scope. `test_no_check_in_today_uses_authorized_native_employee_snapshot` reconciles the matching employee source domain and tests prior-day open sessions, future-only entries, timezone boundaries, field denial and missing capability. This is not an absence/lateness calculation or a subtraction from a partially visible attendance list.
+
+Read-only independent review of this candidate found no Critical/High/Medium defect in the scoped aging-bucket permission/domain/export paths, HR snapshot authorization, invoice/refund scope, fulfillment product/UoM actions, and shared company/HR-period/saved-view response guards. It was a focused code review, not a blanket security or final qualification claim.
+
+**Candidate delta remains open:** subsequent palette/panel/Arabic-layout refinements and reserved-stock/performance work are not covered by the f0fe542 pass. Freeze and publish the next source, run its affected native/browser/performance gates, and bind the actual deployed addon identities before final qualification. Staging was not upgraded by this checkpoint; the last inspected staging application source remains `9af98d4248090f2be3ceefb5d59bca36258b7c3a`, with optional Attendance, Time Off and Planning absent. No production/main action or PR draft-status change is authorized by this result.
+
 | Check | Observed status | Limit / next evidence |
 |---|---|---|
 | External harness adapter check | PASS: exact pinned clean resources and eight skills | Toolkit runtime qualification is historical; it does not qualify dashboard edits. |
 | Attached selected HTML checksum | PASS: matches manifest | Prototype identity only; no Odoo parity assertion. |
 | Initial controller regression run reported by coordinating implementation agent | 37 discovered; 36 passed; one existing continuous-scroll expectation failed | Department navigation is changing to the approved single-workspace behavior. Review/replace the obsolete expectation with meaningful active-workspace coverage and retain fresh raw output. This is not an all-pass run. |
-| Current native Odoo backend/frontend tests | PENDING | Exact final source, discovered IDs, raw logs and outcome required. |
-| Changed metric/source reconciliation | PENDING | Independent standard sources and exact filters, signs, date/company/UoM scope required. |
-| HR capabilities, role rules, durations, overnight shifts and employee profiles | PENDING | Installed source identities and non-admin behavior required. |
+| Native Odoo backend/frontend tests | PASS for f0fe542 / build 38492934: 107 tests, zero failures/errors | Final changed candidate, deployed identity, raw-log retention and affected reruns pending. |
+| Changed metric/source reconciliation | PARTIAL: cited native fixture tests passed | Final/staging standard-source reconciliation, exact filters/signs/date/company/UoM and evidence index pending. |
+| HR capabilities, role rules, durations, overnight shifts and employee profiles | PARTIAL: native HR and populated browser fixtures passed on f0fe542 | Final HR paired visuals and staging capability/role disposition pending; absent optional apps are not silently installed. |
 | Company branding, cross-company races and exports | PENDING | Authorized multi-company fixtures; no previous-company records/results after switch. |
-| HTML/Odoo paired visual and interaction campaign | PENDING | All six departments/five HR tabs; English/Arabic; light/dark; exact 1920×1080, 1440×900, 1366×768 plus narrow/zoom. |
+| HTML/Odoo paired visual and interaction campaign | PARTIAL: native bilingual/theme/viewport assertions passed on f0fe542; final parity PENDING | Pair and review actual screenshots at equal widths/zoom; requalify changed palette/panels and close deviations. |
 | Export CSV and real PDF/print output | PENDING | Downloaded bytes/output inspection, exact scope and safe content. |
 | Performance | PENDING | Fixed dataset and scopes, browser/RPC/backend timing and request/query counts; at least three fresh repetitions. |
 | Final independent review and private evidence retention | PENDING | Exact candidate review, hashes and archive read-back required. |

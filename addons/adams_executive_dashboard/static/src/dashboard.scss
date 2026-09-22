@@ -5,25 +5,27 @@
     --adams-helper: 12px; --adams-label: 13px; --adams-text: 14px;
     --adams-radius: 12px; --adams-control-radius: 7px;
     --adams-panel-padding: 20px; --adams-gap: 16px;
-    --adams-button: #77516f; --adams-button-hover: #63415c;
-    --adams-attention: #fffaf3; --adams-attention-line: #e8ded0;
-    --adams-paper: #fff; --adams-bg: #f4f6f8; --adams-ink: #172631;
-    --adams-sub: #586777; --adams-line: #dfe6ec; --adams-soft: #f8fafb;
-    --adams-purple: #77516f; --adams-purple-soft: #f2ecf3;
-    --adams-green: #176d59; --adams-green-soft: #eaf5ef; --adams-focus: #77516f;
+    --adams-button: #714b67; --adams-button-hover: #5c3b53;
+    --adams-attention: #fff4df; --adams-attention-line: #e8ded0;
+    --adams-paper: #fff; --adams-bg: #f5f5f7; --adams-ink: #252a35;
+    --adams-sub: #626b79; --adams-line: #e2e4e9; --adams-soft: #f8f9fa;
+    --adams-purple: #714b67; --adams-purple-soft: #f2eaf0;
+    --adams-green: #216f59; --adams-green-soft: #edf6f1; --adams-focus: #376baa;
     @if $o-webclient-color-scheme == dark {
         color-scheme: dark;
-        --adams-attention: #352f27; --adams-attention-line: #625341;
-        --adams-paper: #262a36; --adams-bg: #1b1d26; --adams-ink: #edf0f5;
-        --adams-sub: #b8c1d0; --adams-line: #424858; --adams-soft: #2c3140;
-        --adams-purple: #dfb4d6; --adams-purple-soft: #423347;
-        --adams-green: #90d7bd; --adams-green-soft: #253e37; --adams-focus: #dfb4d6;
+        --adams-button: #d5a9cb; --adams-button-hover: #e4c5dd;
+        --adams-attention: #3d3325; --adams-attention-line: #625341;
+        --adams-paper: #222732; --adams-bg: #181c24; --adams-ink: #eff0f5;
+        --adams-sub: #afb6c6; --adams-line: #3b4250; --adams-soft: #292f3b;
+        --adams-purple: #d5a9cb; --adams-purple-soft: #3b2f3e;
+        --adams-green: #88d5b3; --adams-green-soft: #233e35; --adams-focus: #95bdec;
     }
 }
 
-// Shared type, controls and content primitives. The Odoo shell supplies the font.
+// Approved dashboard font stack; the native Odoo shell retains its own typography.
 .o_adams_dashboard {
-    height: 100%; overflow: auto; font-family: inherit;
+    height: 100%; overflow: auto; font-family: Inter, "Segoe UI", Arial, sans-serif;
+    h1, h2, h3, button, input, select, textarea { font-family: inherit; }
     font-size: var(--adams-text); line-height: 1.5; font-variant-numeric: tabular-nums;
     p { color: var(--adams-sub); }
     h2 { font-size: 24px; margin-bottom: 8px; }
@@ -825,4 +827,23 @@
     .adams_views_dialog .adams_header_actions { flex-wrap:wrap; margin:20px 0 14px; gap:8px; }
     .adams_views_dialog .adams_hint { margin-bottom:0; }
     @media(max-width:650px) { .adams_views_dialog { width:calc(100% - 24px); } .adams_sales_rank_toolbar .adams_hint { flex-basis:100%; } }
+}
+
+.o_adams_dashboard {
+    .adams_cash_links .adams_cash_split { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--adams-line); font-size:12px; }
+    .adams_cash_split .adams_split_unavailable { color:var(--adams-sub); font-size:11px; text-align:end; }
+    .adams_cash_split .btn { padding:0; min-height:0; color:var(--adams-purple); font-size:12px; }
+    .adams_cash_links > .adams_hint { margin:11px 0 0; }
+    .adams_stock_support { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:18px; }
+    .adams_stock_support .adams_panel_body { padding:20px; }
+    .adams_stock_support h3 { font-size:15px; margin:0; }
+    .adams_stock_support p { font-size:12px; line-height:1.5; color:var(--adams-sub); margin:6px 0 0; }
+    @media(max-width:650px) { .adams_stock_support { grid-template-columns:1fr; } }
+}
+
+.o_adams_dashboard {
+    .adams_group_heading h3 { font-weight:650; }
+    .adams_panel_body > h3 { font-family:inherit; font-size:15px; font-weight:650; }
+    .btn-primary { color:var(--adams-paper); }
+    &:dir(rtl) h1, &:dir(rtl) .adams_group_heading h3 { letter-spacing:0; }
 }

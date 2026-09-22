@@ -23,7 +23,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         # Source-action context can survive a return to the dashboard. Explicit
         # dashboard scopes must not inherit a previous location or cutoff.
         for key in ('location', 'warehouse_id', 'search_warehouse', 'strict',
-                    'from_date', 'to_date', 'lot_id', 'owner_id', 'package_id',
+                    'from_date', 'to_date', 'lot_id', 'owner_id', 'package_id', 'owners',
                     'adams_dashboard_quantity_view_ref'):
             context.pop(key, None)
         if mode == 'historical':
@@ -183,6 +183,19 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             selected_keys = nsmallest(offset + 25, candidates())
             offset = min(offset, ((total - 1) // 25) * 25) if total else 0
             page = [(key[-2], key[-1]) for key in selected_keys[offset:offset + 25]]
+        # Read the native quant reservation measure only for displayed pairs.
+        # This is a current direct-product snapshot, never a kit-equivalent
+        # calculation or a subtraction of rounded product availability fields.
+        reservations = {}
+        if mode == 'current' and page:
+            quants = scoped.env['stock.quant'].with_context(products.env.context)
+            quants.check_field_access_rights('read', ['product_id', 'location_id', 'reserved_quantity'])
+            reservation_domain = [('company_id', 'in', [False, scoped.env.company.id]),
+                                  ('product_id', 'in', list({pair[1] for pair in page})),
+                                  ('location_id', 'in', list({pair[0] for pair in page}))]
+            reservations = {(location.id, product.id): quantity
+                            for product, location, quantity in quants._read_group(
+                                reservation_domain, ['product_id', 'location_id'], ['reserved_quantity:sum'])}
         rows_by_pair = {}
         for location_id in dict.fromkeys(key[-2] for key in page):
             location = locations.browse(location_id)
@@ -197,6 +210,8 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                            warehouse_name=', '.join(name for name, _wid in matched),
                            warehouse_id=matched[0][1] if len(matched) == 1 else False,
                            digits=max(0, -Decimal(str(selected.browse(product_id).uom_id.rounding)).normalize().as_tuple().exponent))
+                if mode == 'current':
+                    row['reserved_quantity'] = reservations.get((location_id, product_id), 0.0)
                 rows_by_pair[(location_id, product_id)] = row
         rows = [rows_by_pair[(key[-2], key[-1])] for key in page]
         return {'status': 'ready' if rows else 'empty', 'rows': rows, 'offset': offset,
@@ -228,6 +243,28 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
         action.update(name=_('Location quantities'), domain=domain,
                       context={**products.env.context, 'adams_dashboard_quantity_view_ref': 'stock.product_product_stock_tree'})
+        return action
+
+    @api.model
+    def open_inventory_reservations(self, options, product_id, location_id, filters=None):
+        if type(product_id) is not int or product_id < 1 or type(location_id) is not int or location_id < 1:
+            raise ValidationError(_('Invalid stock filter.'))
+        if filters is not None and not isinstance(filters, dict):
+            raise ValidationError(_('Invalid stock filters.'))
+        filters = dict(filters or {}, location_id=location_id)
+        scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, 'current', filters)
+        if not products.with_context(location=location_id, strict=True).search([*domain, ('id', '=', product_id)], limit=1):
+            raise AccessError(_('The product is unavailable in the selected scope.'))
+        quants = scoped.env['stock.quant']
+        quants.check_access('read')
+        quants.check_field_access_rights('read', ['product_id', 'location_id', 'reserved_quantity'])
+        action = scoped.env['ir.actions.actions']._for_xml_id('stock.stock_quant_action')
+        action.update(name=_('Current direct-product reservations'),
+                      domain=[('company_id', 'in', [False, scoped.env.company.id]),
+                              ('product_id', '=', product_id), ('location_id', '=', location_id)],
+                      context={**products.env.context, 'create': False, 'edit': False, 'delete': False},
+                      views=[(scoped.env.ref('stock.view_stock_quant_tree_editable').id, 'list')],
+                      view_mode='list')
         return action
 
     @api.model
