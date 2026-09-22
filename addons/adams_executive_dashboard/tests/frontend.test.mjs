@@ -968,22 +968,21 @@ test('company change resets independent HR dates to the new applied global perio
     assert.equal(controller.state.hrPeriodError,'');
 });
 
-test('HR week appends bounded batches, deduplicates slots and advances by fetched offset', async () => {
+test('HR week appends complete bounded batches and retains independent list pagination', async () => {
     const {controller,pending}=fixture();
     controller.state.applied={...controller.state.draft};
     const first=controller.loadHR('shifts',75,{view:'week'});
     assert.equal(pending[0].args[3],0);
-    pending[0].resolve({status:'ready',offset:0,page_size:100,total:4,has_more:true,rows:[{id:1},{id:2}]});await first;
+    pending[0].resolve({status:'ready',offset:0,page_size:100,total:203,has_more:true,rows:Array.from({length:100},(_,i)=>({id:i+1}))});await first;
     const more=controller.loadMoreHRShifts();
-    assert.equal(controller.state.hrData.rows.length,2);
-    assert.equal(pending[1].args[3],2);
+    assert.equal(controller.state.hrData.rows.length,100);
+    assert.equal(pending[1].args[3],100);
     await controller.loadMoreHRShifts();assert.equal(pending.length,2);
-    pending[1].resolve({status:'ready',offset:2,page_size:100,total:4,has_more:true,rows:[{id:2,label:'updated'},{id:3}]});await more;
-    assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[1,2,3]);
-    assert.equal(controller.state.hrData.rows[1].label,'updated');
-    const last=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],4);
-    pending[2].resolve({status:'ready',offset:4,page_size:100,total:4,has_more:false,rows:[{id:4}]});await last;
-    assert.equal(controller.state.hrData.rows.length,4);assert.equal(controller.state.hrData.has_more,false);
+    pending[1].resolve({status:'ready',offset:100,page_size:100,total:203,has_more:true,rows:Array.from({length:100},(_,i)=>({id:i+101}))});await more;
+    assert.equal(controller.state.hrData.rows.length,200);
+    const last=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],200);
+    pending[2].resolve({status:'ready',offset:200,page_size:100,total:203,has_more:false,rows:[{id:201},{id:202},{id:203}]});await last;
+    assert.equal(controller.state.hrData.rows.length,203);assert.equal(controller.state.hrData.has_more,false);
     const list=controller.loadHR('shifts',25,{view:'list'});assert.equal(pending[3].args[3],25);
     assert.equal(controller.state.hrData.rows.length,0);
     pending[3].resolve({status:'ready',offset:25,page_size:25,total:26,has_more:false,rows:[{id:26}]});await list;
@@ -1015,4 +1014,47 @@ test('HR week append failure preserves loaded shifts and retries the same offset
     const retry=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],1);
     pending[2].resolve({status:'ready',offset:1,total:2,has_more:false,rows:[{id:2}]});await retry;
     assert.equal(controller.state.hrData.load_more_error,false);assert.equal(controller.state.hrData.rows.length,2);
+});
+
+
+test('HR week restarts when Planning inserts or removes shifts between calendar batches', async () => {
+    for (const change of ['insert', 'remove', 'changed_during_count', 'same_count_reorder']) {
+        const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+        const initial=controller.loadHR('shifts',0,{view:'week',department_id:2});
+        pending[0].resolve({status:'ready',offset:0,page_size:100,total:102,has_more:true,
+            rows:Array.from({length:100},(_,i)=>({id:102-i}))});await initial;
+        const more=controller.loadMoreHRShifts();assert.equal(pending[1].args[3],100);
+        const response = change === 'insert'
+            ? {total:103,offset:100,rows:[{id:3},{id:2},{id:1}]}
+            : change === 'remove' ? {total:2,offset:0,rows:[{id:2},{id:1}]}
+            : change === 'same_count_reorder' ? {total:102,offset:100,rows:[{id:3},{id:1}]}
+            : {total:102,offset:100,rows:[{id:1}]};
+        pending[1].resolve({status:'ready',page_size:100,has_more:false,...response});
+        await new Promise(setImmediate);
+        assert.equal(pending[2].args[3],0,change);
+        assert.equal(pending[2].args[2].department_id,2,change);
+        assert.equal(controller.state.hrData.rows.length,0,change);
+        const fresh = change === 'remove' ? [{id:2},{id:1}] : Array.from({length:100},(_,i)=>({id:103-i}));
+        pending[2].resolve({status:'ready',offset:0,page_size:100,total:response.total,
+            has_more:fresh.length<response.total,rows:fresh});await more;
+        assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),fresh.map(row=>row.id),change);
+        assert.equal(controller.state.hrData.has_more,fresh.length<response.total,change);
+    }
+});
+
+test('HR week admission revocation clears loaded sensitive data instead of offering transient retry', async () => {
+    const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',0,{view:'week'});
+    pending[0].resolve({status:'ready',offset:0,total:102,has_more:true,
+        rows:Array.from({length:100},(_,i)=>({id:i+1,employee_id:[1,'Previously authorized employee']}))});await first;
+    controller.state.employeeProfile={status:'ready',employee:{id:1,name:'Previously authorized employee'}};
+    controller.hrDepartments=[{id:1,name:'Previously authorized department'}];
+    const denied=controller.loadMoreHRShifts();
+    pending[1].reject(Object.assign(new Error('Access denied'),{data:{name:'odoo.exceptions.AccessError'}}));await denied;
+    assert.equal(controller.state.hrData.status,'restricted');
+    assert.equal(controller.state.hrData.rows.length,0);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.hrDepartments.length,0);
+    assert.equal(controller.state.hrData.load_more_error,undefined);
+    await controller.loadMoreHRShifts();assert.equal(pending.length,2);
 });

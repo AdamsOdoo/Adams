@@ -14,7 +14,8 @@ from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
-from odoo import Command, fields
+from odoo import Command, api, fields
+from odoo.exceptions import UserError
 from odoo.tools import config
 from odoo.tools.pdf import PdfReader
 from odoo.tests import new_test_user, tagged
@@ -24,6 +25,88 @@ from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 @tagged('post_install', '-at_install')
 class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
+    def test_browser_hr_retry_preserves_scope_after_one_rpc_failure(self):
+        if 'hr.employee' not in self.env:
+            self.skipTest('HR is optional; this browser recovery fixture requires installed HR')
+        self.env.company.adams_dashboard_hr = True
+        user = new_test_user(self.env, login='dashboard_hr_recovery',
+            groups='base.group_user,hr.group_hr_user,account.group_account_readonly,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)],
+            lang='en_US', tz='UTC')
+        employee = self.env['hr.employee'].create({
+            'name': 'Dashboard recovery employee', 'company_id': self.env.company.id})
+        today = fields.Date.today()
+        period = {'date_from': (today - timedelta(days=3)).isoformat(), 'date_to': today.isoformat()}
+        model = type(self.env['adams.executive.dashboard'])
+        original = model.get_hr_workspace
+        attempts = []
+
+        @api.model
+        def fail_once(recordset, options, tab='overview', filters=None, offset=0):
+            if (recordset.env.uid == user.id and tab == 'employees'
+                    and (filters or {}).get('search') == employee.name):
+                attempts.append({'options': dict(options), 'filters': dict(filters), 'offset': offset})
+                if len(attempts) == 1:
+                    # UserError is an expected RPC failure, not an unexpected
+                    # server ERROR or a customer/staging fault injection.
+                    raise UserError('Controlled disposable HR recovery failure')
+            return original(recordset, options, tab, filters, offset)
+
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        self.browser_size = '1440x900'
+        code = r"""(async () => {
+            const wait = async (fn, message) => {
+                for (let i=0;i<250;i++) { const value=fn(); if(value)return value; await new Promise(r=>setTimeout(r,100)); }
+                throw new Error(message);
+            };
+            const root = await wait(()=>document.querySelector('.o_adams_dashboard .adams_card')?.closest('.o_adams_dashboard'), 'Initial finance must render');
+            const initialDocument = document, initialTimeOrigin = performance.timeOrigin;
+            const financeValues = () => [...root.querySelectorAll('#adams-finance .adams_card h3, #adams-finance .adams_card .adams_value')].map(node=>node.textContent.trim());
+            const financeText = JSON.stringify(financeValues());
+            root.querySelector('.adams_side_link[data-section="hr"]').click();
+            const hr = await wait(()=>root.querySelector('#adams-hr .adams_hr_tabs')?.closest('#adams-hr'), 'HR navigation must render');
+            await wait(()=>!hr.querySelector('[role="status"]'), 'HR overview must settle');
+            hr.querySelectorAll('.adams_hr_tabs button')[4].click();
+            await wait(()=>hr.querySelector('.adams_hr_filters'), 'Employee filters must render');
+            const periodForm = hr.querySelector('.adams_hr_period');
+            for (const [name,value] of Object.entries(PERIOD)) {
+                const input=periodForm.querySelector('[name="'+name+'"]');
+                input.value=value; input.dispatchEvent(new Event('change',{bubbles:true}));
+            }
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+            periodForm.requestSubmit();
+            await wait(()=>periodForm.querySelector('button').disabled && hr.querySelector('.adams_hr_filters') && !hr.querySelector('[role="status"]'), 'Selected period must apply');
+            const filters=hr.querySelector('.adams_hr_filters'), search=filters.querySelector('input[type="search"]');
+            search.value=EMPLOYEE; search.dispatchEvent(new Event('input',{bubbles:true}));
+            await new Promise(resolve=>requestAnimationFrame(resolve));
+            filters.requestSubmit();
+            const error=await wait(()=>hr.querySelector('.adams_message[role="alert"]'), 'One-shot RPC failure must show local HR error');
+            if(!error.innerText.includes('other departments remain available'))throw new Error('Failure did not remain local');
+            root.querySelector('.adams_side_link[data-section="finance"]').click();
+            await wait(()=>root.querySelector('#adams-finance'), 'Finance must remain navigable during HR error');
+            if(JSON.stringify(financeValues())!==financeText)throw new Error('HR failure changed successful finance data');
+            root.querySelector('.adams_side_link[data-section="hr"]').click();
+            const retry=await wait(()=>root.querySelector('#adams-hr .adams_message[role="alert"] button'), 'Returning HR must retain explicit Retry');
+            retry.click();
+            await wait(()=>[...root.querySelectorAll('#adams-hr .adams_hr_person')].some(node=>node.innerText.includes(EMPLOYEE)), 'Retry must recover native employee row');
+            const restored=root.querySelector('#adams-hr');
+            if(restored.querySelector('[role="alert"]'))throw new Error('Recovery retained error state');
+            if(restored.querySelector('.adams_hr_filters input[type="search"]').value!==EMPLOYEE)throw new Error('Retry lost employee filter');
+            for(const [name,value] of Object.entries(PERIOD)) {
+                if(restored.querySelector('.adams_hr_period [name="'+name+'"]').value!==value)throw new Error('Retry lost selected period');
+            }
+            if(document!==initialDocument || performance.timeOrigin!==initialTimeOrigin || document.querySelector('.o_adams_dashboard')!==root)
+                throw new Error('Recovery reloaded the document or whole dashboard');
+            console.log('test successful');
+        })().catch(error=>console.error(error));""".replace('PERIOD', json.dumps(period)).replace('EMPLOYEE', json.dumps(employee.name))
+        with patch.object(model, 'get_hr_workspace', fail_once):
+            self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=75)
+        self.assertEqual(len(attempts), 2, 'Exactly one failed request followed by its successful Retry')
+        self.assertEqual(attempts[0], attempts[1], 'Retry must preserve the exact company, period, filter and page')
+        self.assertEqual(attempts[1]['options']['company_id'], self.env.company.id)
+        for key, value in period.items():
+            self.assertEqual(attempts[1]['options'][key], value)
+
     def test_browser_roles_and_direct_rpc_boundaries(self):
         company = self.env.company
         foreign = self.env['res.company'].create({'name': 'Browser unauthorized company'})

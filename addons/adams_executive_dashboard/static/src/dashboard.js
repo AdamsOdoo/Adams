@@ -1152,14 +1152,34 @@ export class ExecutiveDashboard extends Component {
             const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[options,'shifts',filters,offset]);
             if (!current()) return;
             if (!['ready','empty'].includes(data.status)) {
+                if (data.status === 'restricted') {
+                    this.invalidateHRSource();
+                    this.closeEmployeeProfile();
+                    this.hrDepartments = [];
+                }
                 this.state.hrData = {...data, rows:[], filters, total_count:data.total};
                 return;
             }
             const rows = [...new Map([...previous.rows, ...data.rows].map(row => [row.id,row])).values()];
+            // Offset paging can overlap or skip slots when Planning changes.
+            // Start a new calendar result instead of labelling a mixed snapshot complete.
+            if (data.total !== previous.total || data.offset !== offset ||
+                rows.length !== previous.rows.length + data.rows.length || rows.length > data.total ||
+                (!data.has_more && rows.length !== data.total)) {
+                return this.loadHR('shifts', 0, filters);
+            }
             this.state.hrData = {...data, status:rows.length ? 'ready' : 'empty', rows, filters, offset:0,
                 next_offset:(data.offset || 0) + data.rows.length, total_count:data.total, loading_more:false, load_more_error:false};
-        } catch {
-            if (current()) this.state.hrData = {...previous, loading_more:false, load_more_error:true};
+        } catch (error) {
+            if (!current()) return;
+            if (error?.data?.name === 'odoo.exceptions.AccessError') {
+                this.invalidateHRSource();
+                this.closeEmployeeProfile();
+                this.hrDepartments = [];
+                this.state.hrData = {status:'restricted', rows:[], filters, offset:0};
+            } else {
+                this.state.hrData = {...previous, loading_more:false, load_more_error:true};
+            }
         }
     }
     normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
