@@ -1,7 +1,8 @@
 /** @odoo-module **/
 import { Component, onWillStart, onWillUnmount, useState, useRef, useEffect } from '@odoo/owl';
 import { registry } from '@web/core/registry';
-import { useService } from '@web/core/utils/hooks';
+import { useService, useBus } from '@web/core/utils/hooks';
+import { user, userBus } from '@web/core/user';
 import { useSetupAction } from '@web/search/action_hook';
 import { _t } from '@web/core/l10n/translation';
 
@@ -13,6 +14,14 @@ export class ExecutiveDashboard extends Component {
         this.orm = useService('orm');
         this.action = useService('action');
         this.notification = useService('notification');
+        this.companyUser = user;
+        useBus(userBus, 'ACTIVE_COMPANIES_CHANGED', () => {
+            if (this.alive && this.state.applied) {
+                this.state.draft = {...this.state.applied, company_id: user.activeCompany.id};
+                void this.refresh();
+            }
+        });
+        this.hrDepartments = [];
         this.generation = 0;
         this.alive = true;
         this.sections = [
@@ -23,9 +32,10 @@ export class ExecutiveDashboard extends Component {
             { key: 'procurement', name: _t('Procurement'), short: _t('Procurement'), icon: 'truck', number: '05', description: _t('Commitments and supplier follow-up.') },
             { key: 'hr', name: _t('Human Resources'), short: _t('HR'), icon: 'people', number: '06', description: _t('Workforce and approved leave.') },
         ];
+        this.sections.sort((a, b) => ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(a.key) - ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(b.key));
         this.labels = {
             revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'), cash_flow: _t('Net cash movement'),
-            receivables: _t('Receivables'), payables: _t('Payables'),
+            receivables: _t('Receivables'), payables: _t('Payables'), receivables_overdue: _t('Overdue receivables'), payables_overdue: _t('Overdue payables'),
             gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
             assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
@@ -38,7 +48,7 @@ export class ExecutiveDashboard extends Component {
         this.statusLabels = {
             not_configured: _t('Not configured'), not_installed: _t('App not installed'),
             restricted: _t('Access restricted'), empty: _t('No matching records'),
-            unsupported_scope: _t('Unsupported report scope'), error: _t('Report unavailable'),
+            source_only: _t('Open the source report'), unsupported_scope: _t('Unsupported report scope'), error: _t('Report unavailable'),
             undefined_ratio: _t('Undefined ratio: zero denominator'),
         };
         this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
@@ -51,11 +61,17 @@ export class ExecutiveDashboard extends Component {
         this.searchDialog = useRef('searchDialog');
         this.printDialog = useRef('printDialog');
         this.searchInput = useRef('searchInput');
+        this.employeeDialog = useRef('employeeDialog');
+        this.cashDialog = useRef('cashDialog');
+        this.viewsDialog = useRef('viewsDialog');
+        useEffect(() => { const dialog = this.viewsDialog.el; if (!dialog) return; if (this.state.viewsOpen && !dialog.open) dialog.showModal(); if (!this.state.viewsOpen && dialog.open) dialog.close(); }, () => [this.state.viewsOpen]);
+        useEffect(() => { const dialog = this.cashDialog.el; if (!dialog) return; if (this.state.cashOpen && !dialog.open) dialog.showModal(); if (!this.state.cashOpen && dialog.open) dialog.close(); }, () => [this.state.cashOpen]);
+        useEffect(() => { const dialog = this.employeeDialog.el; if (!dialog) return; if (this.state.employeeProfile && !dialog.open) dialog.showModal(); if (!this.state.employeeProfile && dialog.open) dialog.close(); }, () => [this.state.employeeProfile]);
         this.searchKinds = { all: _t('All documents'), invoices: _t('Customer invoices'), bills: _t('Vendor bills'), orders: _t('Sales orders'), quotations: _t('Quotations') };
         this.workspaceMenu = useRef('workspaceMenu');
         this.workspaceToggle = useRef('workspaceToggle');
         this.detailGeneration = 0;
-        this.state = useState({ sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+        this.state = useState({ workspaceDetails: {}, viewsOpen: false, viewName: '', activeViewName: '', cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrPeriodDraft: {}, hrPeriodApplied: null, hrPeriodError: '', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
             collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, products: null, canConfigure: false, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false });
         useEffect(() => {
             const dialog = this.printDialog.el;
@@ -114,6 +130,9 @@ export class ExecutiveDashboard extends Component {
                 observer.disconnect();
             };
         }, () => [this.visibleSections.map(section => section.key).join(',')]);
+        useEffect(() => {
+            this.root.el?.querySelector('.adams_nav button.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        }, () => [this.state.activeSection, this.visibleSections.map(section => section.key).join(',')]);
         useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
         useEffect(() => {
             if (this.state.restored && this.restoreScroll !== null && this.root.el) {
@@ -130,7 +149,7 @@ export class ExecutiveDashboard extends Component {
                 this.userId = data.user_id;
                 this.defaultOptions = { ...data.options };
                 const savedNavigation = this.props.state?.dashboard;
-                const restore = savedNavigation?.userId === data.user_id &&
+                const restore = savedNavigation?.userId === data.user_id && savedNavigation.applied?.company_id === data.options.company_id &&
                     data.companies.some(company => company.id === savedNavigation.applied?.company_id)
                     ? savedNavigation : null;
                 this.state.draft = restore ? { ...restore.applied } : data.options;
@@ -156,6 +175,7 @@ export class ExecutiveDashboard extends Component {
     navigationState() {
         const selection = (value, keys) => value ? Object.fromEntries(keys.map(key => [key, value[key]])) : null;
         return { userId: this.userId, applied: this.state.applied ? { ...this.state.applied } : null,
+            viewName: this.state.activeViewName, hrPeriod: this.state.hrPeriodApplied ? {...this.state.hrPeriodApplied} : null, sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
             collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
@@ -167,9 +187,14 @@ export class ExecutiveDashboard extends Component {
         if (saved?.rankLimit === 5 || saved?.rankLimit === 10) this.state.rankLimit = saved.rankLimit;
         if (['value', 'quantity'].includes(saved?.productMeasure)) this.state.productMeasure = saved.productMeasure;
         const generation = this.generation + 1;
-        await this.refresh();
+        await this.refresh(Boolean(saved));
         if (!this.alive || generation !== this.generation || !saved) { return; }
         const jobs = [];
+        this.state.activeViewName = typeof saved.viewName === 'string' ? saved.viewName.slice(0,60) : '';
+        if (Array.isArray(saved.sectionOrder)) this.state.sectionOrder = saved.sectionOrder.filter(key => this.sectionEnabled(key));
+        if (saved.search) { this.state.searchQuery = saved.search.query; this.state.searchKind = saved.search.kind; jobs.push(this.searchRecords(null, saved.search.offset)); }
+        if (saved.hrPeriod && !this.validateScope({...this.state.applied, ...saved.hrPeriod})) { this.state.hrPeriodApplied = {date_from:saved.hrPeriod.date_from, date_to:saved.hrPeriod.date_to}; this.state.hrPeriodDraft = {...this.state.hrPeriodApplied}; }
+        if (saved.hr && this.sectionEnabled('hr')) { this.state.hrFilters = {...saved.hr.filters}; jobs.push(this.loadHR(saved.hr.tab, saved.hr.offset)); }
         if (this.sectionEnabled('sales') && saved.productMeasure === 'quantity' && Number(saved.productUnit) > 0) {
             this.state.productUnit = String(saved.productUnit);
             jobs.push(this.loadProducts());
@@ -178,7 +203,7 @@ export class ExecutiveDashboard extends Component {
         if (saved.detail && this.sectionEnabled(['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'quotations', 'orders'].includes(saved.detail.key) ? 'sales' : ({purchases: 'procurement', crm: 'crm', hr: 'hr'}[saved.detail.key] || 'finance')) && this.dimensions[saved.detail.key]?.includes(saved.detail.dimension)) {
             jobs.push(this.inspect(saved.detail.key, saved.detail.dimension, saved.detail.offset));
         }
-        if (this.sectionEnabled('sales') && saved.recent && ['orders', 'quotations'].includes(saved.recent.kind)) {
+        if (this.sectionEnabled('sales') && saved.recent && ['orders', 'quotations', 'invoices'].includes(saved.recent.kind)) {
             jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
         }
         if (this.sectionEnabled('sales') && ['invoiced_sales', 'invoiced_margin'].includes(saved.ranking?.key)) {
@@ -229,13 +254,38 @@ export class ExecutiveDashboard extends Component {
         } finally { if (this.alive) { this.state.opening = false; } }
     }
 
-    async refresh() {
+    async refresh(resetAux = false) {
+        resetAux = resetAux === true;
+        const options = { ...this.state.draft, company_id: this.companyUser?.activeCompany?.id || Number(this.state.draft.company_id) };
+        const validation = this.validateScope(options);
+        if (validation) { this.state.error = validation; return; }
         const generation = ++this.generation;
-        const options = { ...this.state.draft, company_id: Number(this.state.draft.company_id) };
+        const sameCompany = this.state.applied?.company_id === options.company_id;
+        const previousRecent = sameCompany && !resetAux ? this.state.recent?.kind : 'orders';
+        const previousRanking = sameCompany && !resetAux ? this.state.ranking?.key : 'invoiced_sales';
+        const previousInventory = sameCompany ? this.state.inventory : null;
+        const previousHR = sameCompany ? this.state.hrTab : 'overview';
+        this.closeEmployeeProfile();
+        this.invalidateHRSource();
+        if (!sameCompany) { this.closeSavedViews(); this.state.activeViewName = ''; this.state.savedView = Boolean(this.readSavedView()); }
+        if (!sameCompany || !this.state.hrPeriodApplied) {
+            this.state.hrPeriodApplied = {date_from:options.date_from, date_to:options.date_to};
+            this.state.hrPeriodDraft = {...this.state.hrPeriodApplied};
+            this.state.hrPeriodError = '';
+        }
+        this.state.cashOpen = false;
+        this.state.hrData = null;
+        this.hrDepartments = [];
+        this.state.workspaceDetails = {};
+        this.state.logoFailed = false;
+        this.analysisTrends = {};
+        if (!sameCompany) { this.state.hrFilters = {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}; this.state.productUnit = ''; }
+
         if (this.state.applied?.company_id !== options.company_id) {
             this.state.stockFilters = {...this.state.stockFilters, warehouse_id: '', category_id: ''};
         }
         this.state.applied = options;
+        if (this.companyUser?.activeCompany) void this.refreshCompanyIdentity(generation);
         this.closeSearch();
         this.state.printSummary = null;
         this.state.detail = null;
@@ -248,7 +298,6 @@ export class ExecutiveDashboard extends Component {
         this.state.customers = null;
         this.state.products = null;
         this.state.orderRanking = null;
-        this.state.productUnit = '';
         this.scrollTarget = null;
         this.closeSource();
         this.state.financialTrends = {};
@@ -266,7 +315,7 @@ export class ExecutiveDashboard extends Component {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
                 if (this.alive && generation === this.generation) {
                     this.state.sections[key] = { ...data, status: 'ready' };
-                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { if (!this.state.recent) void this.loadRecent('orders'); if (!this.state.ranking) void this.loadRanking('invoiced_sales'); void this.loadCustomers(); }
+                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { if (!this.state.recent) void this.loadRecent(previousRecent || 'orders'); if (!this.state.ranking) void this.loadRanking(previousRanking || 'invoiced_sales'); void this.loadCustomers(); }
                     if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status)) { void this.loadProducts(); void this.loadOrderRanking(); }
                     if (key === 'finance' && data.items.some(item => item.key === 'cash' && item.status === 'ready')) { void this.loadDirectory('cash'); }
                     if (key === 'finance' && ['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) { void this.loadProfitabilityChart(); }
@@ -277,6 +326,14 @@ export class ExecutiveDashboard extends Component {
                 }
             }
         }));
+        if (this.alive && generation === this.generation) {
+            if (previousInventory && this.sectionEnabled('inventory')) {
+                this.state.inventory = {filters: {...previousInventory.filters}, mode: previousInventory.mode};
+                void this.pageStock(0);
+            }
+            if (['crm','procurement'].includes(this.state.activeSection)) void this.loadWorkspaceDetails(this.state.activeSection);
+            if (this.state.activeSection === 'hr' && this.sectionEnabled('hr')) void this.loadHR(previousHR);
+        }
     }
 
     sectionResult(section) {
@@ -294,8 +351,8 @@ export class ExecutiveDashboard extends Component {
         if (section.key === 'finance') {
             return [
                 { key: 'profitability', name: _t('Profitability'), description: _t('Performance during the selected financial period.'), items: select(['revenue', 'gross_profit', 'profit', 'operating_expenses']) },
-                { key: 'liquidity', name: _t('Liquidity'), description: _t('Recorded cash and a separately labelled forecast.'), items: [ ...select(['cash']), this.cashMovement(result), ...select(['standard_forecast']) ] },
-                { key: 'working-capital', name: _t('Working capital'), description: _t('Receivables and payables at the selected balance cutoff.'), items: select(['receivables', 'payables']) },
+                { key: 'working-capital', name: _t('Cash and working capital'), description: _t('Balances at the selected cutoff.'), items: select(['cash', 'receivables', 'payables']) },
+                { key: 'liquidity', name: _t('Money movement'), description: _t('Recorded cash movement and a separately labelled forecast.'), items: [this.cashMovement(result), ...select(['standard_forecast'])] },
                 { key: 'financial-position', name: _t('Financial position'), description: _t('Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
             ];
         }
@@ -416,47 +473,33 @@ export class ExecutiveDashboard extends Component {
         return (this.root.el?.querySelector('.adams_nav')?.getBoundingClientRect().height || 0) + 16;
     }
 
-    syncActiveSection() {
-        const root = this.root.el;
-        if (!root) return;
-        const bounds = root.getBoundingClientRect();
-        const offset = this.scrollOffset();
-        root.style.setProperty('--adams-scroll-offset', `${offset}px`);
-        const entries = this.visibleSections.map(section => ({key: section.key, node: root.querySelector(`#adams-${section.key}`)})).filter(entry => entry.node);
-        const target = entries.find(entry => entry.key === this.scrollTarget);
-        if (target) {
-            const box = target.node.getBoundingClientRect();
-            if (box.bottom > bounds.top + offset && box.top < bounds.bottom) {
-                this.state.activeSection = target.key;
-                return;
-            }
-            this.scrollTarget = null;
-        }
-        let active = entries[0]?.key || '';
-        // Track the content below the sticky navigation, not a thin footer of
-        // the preceding section left visible after filtering or resizing.
-        const trackingTop = bounds.top + offset + Math.min(64, Math.max(0, bounds.bottom - bounds.top - offset) * 0.12);
-        for (const entry of entries) {
-            if (entry.node.getBoundingClientRect().top <= trackingTop + 2) active = entry.key;
-        }
-        if (root.scrollTop > 0 && root.scrollTop + root.clientHeight >= root.scrollHeight - 2) active = entries.at(-1)?.key || active;
-        this.state.activeSection = active;
-    }
+    syncActiveSection() { /* Explicit department navigation owns the active state. */ }
 
     navigateSection(key) {
         if (!this.sectionEnabled(key)) return;
         this.state.activeSection = key;
         this.state.collapsed[key] = false;
         this.state.sidebarOpen = false;
-        this.scrollTarget = key;
-        requestAnimationFrame(() => {
-            const root = this.root.el;
-            const node = root?.querySelector(`#adams-${key}`);
-            if (!node) return;
-            const top = root.scrollTop + node.getBoundingClientRect().top - root.getBoundingClientRect().top - this.scrollOffset();
-            root.scrollTo({top: Math.max(0, top), behavior: 'instant'});
-            this.syncActiveSection();
+        this.root.el?.scrollTo?.({top: 0});
+        if (key === 'sales' && !this.state.fulfillment) void this.loadDirectory('fulfillment');
+        if (key === 'inventory' && !this.state.inventory) void this.applyStockFilters();
+        if (key === 'procurement' && !this.state.procurement) void this.loadDirectory('procurement');
+        if (key === 'hr' && !this.state.hrData) void this.loadHR();
+        if (['crm','procurement'].includes(key) && !this.state.workspaceDetails[key]) void this.loadWorkspaceDetails(key);
+    }
+
+    metricPeriodLabel(item) {
+        const scope = this.state.applied;
+        if (!scope) return '';
+        const language = document.documentElement.lang || 'en';
+        const formatter = new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language, {
+            day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
         });
+        const date = value => new Date(value + 'T12:00:00Z');
+        if (item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)) {
+            return formatter.format(date(scope.as_of));
+        }
+        return formatter.formatRange(date(scope.date_from), date(scope.date_to));
     }
 
     supplierWindow(key) {
@@ -472,9 +515,7 @@ export class ExecutiveDashboard extends Component {
         event.preventDefault();
         this.state.sidebarOpen = false;
         if (id === 'adams-attention') this.state.attentionExpanded = true;
-        const node = this.root.el?.querySelector('#' + id);
-        if (node?.tagName === 'DETAILS') node.open = true;
-        requestAnimationFrame(() => { node?.scrollIntoView({ block: 'start' }); node?.querySelector('button, summary')?.focus(); });
+        requestAnimationFrame(() => { const node = this.root.el?.querySelector('#' + id); if (node?.tagName === 'DETAILS') node.open = true; node?.scrollIntoView({ block: 'start' }); node?.querySelector('button, summary')?.focus(); });
     }
 
     closeSearch() { this.state.search = null; }
@@ -482,7 +523,7 @@ export class ExecutiveDashboard extends Component {
     async searchRecords(event = null, offset = 0) {
         event?.preventDefault();
         const query = (this.state.searchQuery || '').trim();
-        if (query.length < 2 || query.length > 100 || !this.state.applied) return;
+        if (query.length < 2 || query.length > 100 || !this.state.applied) { this.notification.add(_t('Enter between 2 and 100 characters to search.'), {type: 'warning'}); return; }
         const generation = this.generation;
         this.state.search = { query, kind: this.state.searchKind || 'all', offset, status: 'loading', groups: [] };
         const search = this.state.search;
@@ -502,7 +543,6 @@ export class ExecutiveDashboard extends Component {
         try {
             const action = await this.orm.call('adams.executive.dashboard', 'open_search_record', [search.query, { ...this.state.applied }, kind, id]);
             if (this.alive && generation === this.generation && search === this.state.search) {
-                this.closeSearch();
                 await this.action.doAction(action);
             }
         } catch {
@@ -521,6 +561,7 @@ export class ExecutiveDashboard extends Component {
     }
 
     async printDashboard() {
+        this.state.moreOpen = false;
         if (!this.state.applied || this.state.exporting) return;
         const generation = this.generation;
         this.state.exporting = true;
@@ -536,6 +577,7 @@ export class ExecutiveDashboard extends Component {
     }
 
     async exportSummary() {
+        this.state.moreOpen = false;
         if (!this.state.applied || this.state.exporting) return;
         const generation = this.generation;
         this.state.exporting = true;
@@ -580,12 +622,15 @@ export class ExecutiveDashboard extends Component {
         try {
             const saved = JSON.parse(window.localStorage.getItem(this.viewKey) || 'null');
             const dates = ['date_from', 'date_to', 'as_of'];
-            if (saved?.userId !== this.userId || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
+            if (saved?.userId !== this.userId || (this.companyUser?.activeCompany && saved.applied?.company_id !== this.companyUser.activeCompany.id) || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
                 !dates.every(key => /^\d{4}-\d{2}-\d{2}$/.test(saved.applied?.[key] || '')) ||
                 saved.applied.date_from > saved.applied.date_to) return null;
             return saved;
         } catch { return null; }
     }
+
+    openSavedViews() { this.state.moreOpen = false; this.state.viewName = this.state.activeViewName || this.readSavedView()?.viewName || _t('My executive view'); this.state.viewsOpen = true; }
+    closeSavedViews() { this.state.viewsOpen = false; }
 
     saveView() {
         if (!this.state.applied) return;
@@ -593,12 +638,11 @@ export class ExecutiveDashboard extends Component {
         const applied = Object.fromEntries(['company_id', 'date_from', 'date_to', 'as_of']
             .map(key => [key, this.state.applied[key]]));
         try {
-            window.localStorage.setItem(this.viewKey, JSON.stringify({ userId: this.userId, applied,
-                collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection,
-                recent: this.state.recent ? { kind: this.state.recent.kind, offset: 0 } : null,
-                ranking: this.state.ranking ? { key: this.state.ranking.key } : null,
-                rankLimit: this.state.rankLimit, productMeasure: this.state.productMeasure, productUnit: this.state.productUnit }));
+            const viewName = String(this.state.viewName || _t('My executive view')).trim().slice(0,60) || _t('My executive view');
+            window.localStorage.setItem(this.viewKey, JSON.stringify({...this.navigationState(), viewName, applied, recent: this.state.recent ? {kind: this.state.recent.kind, offset: 0} : null, detail: null, scroll: 0}));
             this.state.savedView = true;
+            this.state.activeViewName = viewName;
+            this.closeSavedViews();
             this.notification.add(_t('View saved in this browser.'), { type: 'success' });
         } catch {
             this.notification.add(_t('Browser storage is unavailable. The view could not be saved.'), { type: 'warning' });
@@ -606,6 +650,8 @@ export class ExecutiveDashboard extends Component {
     }
 
     async restoreView() {
+        this.closeSavedViews();
+        this.state.moreOpen = false;
         const saved = this.readSavedView();
         if (!saved) {
             this.state.savedView = false;
@@ -617,19 +663,29 @@ export class ExecutiveDashboard extends Component {
     }
 
     async resetView() {
+        this.closeSavedViews();
+        this.state.activeViewName = '';
+        this.state.moreOpen = false;
         if (!this.defaultOptions) return;
         this.state.draft = { ...this.defaultOptions };
         this.state.sectionOrder = [];
         this.state.rankLimit = 5;
         this.state.productMeasure = 'value';
-        this.state.stockFilters = {warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
+        this.state.stockFilters = {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
         try { window.localStorage.setItem(this.preferenceKey + '-order', '[]'); } catch { /* Optional. */ }
         this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
+        try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional. */ }
         this.state.activeSection = 'finance';
         this.state.sidebarOpen = false;
+        this.state.hrPeriodApplied = null;
         await this.refresh();
         this.root.el?.scrollTo({ top: 0 });
     }
+
+    openCashDirectory() { this.state.cashOpen = true; if (!this.state.directory) void this.loadDirectory('cash'); }
+    closeCashDirectory() { this.state.cashOpen = false; }
+    toggleMore() { this.state.moreOpen = !this.state.moreOpen; }
+    closeMore() { this.state.moreOpen = false; }
 
     closeWorkspace() {
         this.state.sidebarOpen = false;
@@ -637,6 +693,7 @@ export class ExecutiveDashboard extends Component {
     }
 
     workspaceKeydown(event) {
+        if (event.key === 'Escape') this.closeMore();
         if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
                 !event.target.isContentEditable && !this.state.search && !this.state.printSummary && !this.state.source && !this.state.detail) {
             event.preventDefault();
@@ -699,7 +756,14 @@ export class ExecutiveDashboard extends Component {
     }
 
     async loadProfitabilityChart() {
-        await Promise.all(['revenue', 'gross_profit', 'profit'].map(key => this.loadFinancialTrend(key)));
+        const generation = this.generation, marker = {};
+        this.profitabilityRequest = marker;
+        const keys = ['revenue', 'gross_profit', 'profit'];
+        for (const key of keys) this.state.financialTrends[key] = {status: 'loading', rows: []};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_financial_trends', [keys, {...this.state.applied}]);
+            if (this.alive && generation === this.generation && marker === this.profitabilityRequest) for (const key of keys) this.state.financialTrends[key] = data.series[key];
+        } catch { if (this.alive && generation === this.generation && marker === this.profitabilityRequest) for (const key of keys) this.state.financialTrends[key] = {status: 'error', rows: []}; }
     }
 
     profitabilityChart() {
@@ -763,14 +827,17 @@ export class ExecutiveDashboard extends Component {
         const request = ++this.detailGeneration;
         dimension ||= this.dimensions[key][0];
         this.closeSource();
-        this.state.detail = { key, dimension, offset, status: 'loading', rows: [], trend: [] };
+        const trendKey = JSON.stringify([this.state.applied, key]);
+        const cachedTrend = this.analysisTrends?.[trendKey];
+        this.state.detail = { key, dimension, offset, status: 'loading', rows: [], trend: cachedTrend?.rows || [] };
         try {
             const [groups, trend] = await Promise.all([
                 this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, dimension, { ...this.state.applied }, offset]),
-                this.orm.call('adams.executive.dashboard', 'get_trend', [key, { ...this.state.applied }]),
+                cachedTrend || this.orm.call('adams.executive.dashboard', 'get_trend', [key, { ...this.state.applied }]),
             ]);
             if (this.alive && generation === this.generation && request === this.detailGeneration) {
-                this.state.detail = { ...groups, key, dimension, offset, trend: trend.rows, status: groups.status };
+                if (trend.status === 'ready' || !trend.status) { this.analysisTrends ||= {}; this.analysisTrends[trendKey] = trend; }
+                this.state.detail = { ...groups, key, dimension, offset, trend: trend.rows || [], status: groups.status };
             }
         } catch {
             if (this.alive && generation === this.generation && request === this.detailGeneration) {
@@ -842,10 +909,10 @@ export class ExecutiveDashboard extends Component {
         mode = mode || this.state[stateKey]?.mode || (kind === 'procurement' ? 'late' : 'current');
         search = kind === 'cash' ? (search ?? this.state.directory?.search ?? '') : null;
         const previous = this.state[stateKey];
-        if (kind === 'inventory' && mode === 'historical' && !this.state.stockFilters.at_date) this.state.stockFilters.at_date = this.state.applied.as_of;
-        if (kind === 'inventory' && mode === 'current') this.state.stockFilters.at_date = '';
-        const stockFilters = kind === 'inventory' && offset > 0 && previous?.filters ? {...previous.filters} : kind === 'inventory' ? {...this.state.stockFilters, warehouse_id: Number(this.state.stockFilters.warehouse_id) || false, category_id: Number(this.state.stockFilters.category_id) || false} : null;
-        this.state[stateKey] = { ...previous, status: 'loading', rows: [], offset, mode, search };
+        const stockFilters = kind === 'inventory' && previous?.filters ? {...previous.filters} : kind === 'inventory' ? {...this.state.stockFilters, warehouse_id: Number(this.state.stockFilters.warehouse_id) || false, category_id: Number(this.state.stockFilters.category_id) || false} : null;
+        if (kind === 'inventory' && !previous?.filters && mode === 'historical' && !stockFilters.at_date) stockFilters.at_date = this.state.applied.as_of;
+        if (kind === 'inventory' && mode === 'current') stockFilters.at_date = '';
+        this.state[stateKey] = { status: 'loading', rows: [], offset, mode, search, filters: stockFilters, warehouses: previous?.warehouses || [], categories: previous?.categories || [] };
         try {
             const args = [{ ...this.state.applied }, offset];
             if (kind === 'cash') { args.push(search); }
@@ -853,11 +920,11 @@ export class ExecutiveDashboard extends Component {
             if (kind === 'inventory') args.push(stockFilters);
             const data = await this.orm.call('adams.executive.dashboard', method, args);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
-                this.state[stateKey] = { ...data, offset };
+                this.state[stateKey] = { ...data, offset: Number.isInteger(data.offset) ? data.offset : offset };
             }
         } catch {
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
-                this.state[stateKey] = { ...previous, status: 'error', rows: [], offset, mode, search };
+                this.state[stateKey] = { status: 'error', rows: [], offset, mode, search, filters: stockFilters, warehouses: previous?.warehouses || [], categories: previous?.categories || [] };
             }
         }
     }
@@ -879,6 +946,267 @@ export class ExecutiveDashboard extends Component {
         } finally { if (this.alive) { this.state.exporting = false; } }
     }
 
+    async loadWorkspaceDetails(section, offset = 0) {
+        if (!['crm','procurement'].includes(section) || !this.sectionEnabled(section)) return;
+        const generation=this.generation, marker={};
+        this.workspaceRequests ||= {}; this.workspaceRequests[section]=marker;
+        this.state.workspaceDetails[section]={status:'loading',rows:[],offset};
+        try {
+            const data=await this.orm.call('adams.executive.dashboard','get_workspace_details',[{...this.state.applied},section,offset]);
+            if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]=data;
+        } catch {if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]={status:'error',rows:[],offset};}
+    }
+    async openWorkspaceRecord(section, id = null) {
+        if(this.state.opening)return;
+        const generation=this.generation; this.state.opening=true;
+        try {
+            const action=await this.orm.call('adams.executive.dashboard','open_workspace_record',[{...this.state.applied},section,id]);
+            if(this.alive && generation===this.generation)await this.action.doAction(action);
+        } catch {if(this.alive && generation===this.generation)this.notification.add(_t('The record is unavailable in the selected scope.'),{type:'warning'});}
+        finally {if(this.alive)this.state.opening=false;}
+    }
+
+    async refreshCompanyIdentity(generation) {
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_bootstrap', []);
+            if (this.alive && generation === this.generation && data.options.company_id === this.state.applied.company_id) { this.state.companies = data.companies; this.state.logoFailed = false; }
+        } catch { /* Source widgets retain their own permission/error status. */ }
+    }
+    loadHRDepartment(id) { this.state.hrFilters = id ? {department_id:id} : {department_unassigned:true}; return this.loadHR('employees',0,this.state.hrFilters); }
+    get hrDepartmentSelection() { return this.state.hrFilters.department_unassigned ? 'unassigned' : String(this.state.hrFilters.department_id || ''); }
+    changeHRDepartment(event) {
+        const value = event.target.value;
+        delete this.state.hrFilters.department_unassigned;
+        delete this.state.hrFilters.department_id;
+        if (value === 'unassigned') this.state.hrFilters.department_unassigned = true;
+        else if (value) this.state.hrFilters.department_id = Number(value);
+    }
+    setHRView(view) { this.state.hrFilters.view = view; return this.applyHRFilters(); }
+    clearHRFilters() { this.state.hrFilters = {view:'week'}; return this.applyHRFilters(); }
+    openEmployeeRecord() { const id=this.state.employeeProfile?.employee?.id; if (id) return this.openHRSource(id,false,'employees',{status:'all'}); }
+    loadHROverviewMetric(metric) { this.state.hrFilters = {...metric.filters}; return this.loadHR(metric.tab, 0, metric.filters); }
+    hrMetricLabel(key) { return {employees:_t('Active employees'), checked_in:_t('Checked in now'), time_off:_t('Approved time off today'), unassigned_shifts:_t('Unassigned published shifts')}[key] || key; }
+    employeeInitials(name) { return (name || '').split(/\s+/).slice(0,2).map(part=>part[0]).join(''); }
+    get hrStatusOptions() {
+        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Open')],['closed',_t('Closed')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['all',_t('All')]]};
+        return (options[this.state.hrTab] || []).map(([value,label])=>({value,label}));
+    }
+    get hrWeekDays() {
+        const start = this.state.hrData?.date_from || this.state.applied?.date_from;
+        if (!start) return [];
+        const end=this.state.hrData?.date_to || this.state.applied?.date_to || start;
+        const length=Math.min(7,Math.max(1,Math.floor((Date.parse(end)-Date.parse(start))/86400000)+1));
+        const weekday = new Intl.DateTimeFormat(document.documentElement.lang || 'en', {weekday: 'short', timeZone: 'UTC'});
+        return Array.from({length}, (_,index)=>{const value=new Date(start+'T12:00:00Z'); value.setUTCDate(value.getUTCDate()+index); const date=value.toISOString().slice(0,10); return {date,label:weekday.format(value), rows:(this.state.hrData?.rows || []).filter(row => row.start_datetime_label?.slice(0,10)<=date && (row.end_datetime_label?.slice(0,10)>date || (row.end_datetime_label?.slice(0,10)===date && row.end_datetime_label?.slice(11,16)!=='00:00'))).map(row=>({...row,continuation:row.start_datetime_label.slice(0,10)<date}))};});
+    }
+    openEmployeeRecords(tab) { const id=this.state.employeeProfile?.employee?.id; if (!id) return; this.closeEmployeeProfile(); this.state.hrFilters={employee_id:id}; return this.loadHR(tab,0,this.state.hrFilters); }
+
+    validateScope(options) {
+        const dates = ['date_from', 'date_to', 'as_of'].map(key => options[key]);
+        if (dates.some(value => !/^\d{4}-\d{2}-\d{2}$/.test(value || '') || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) return _t('Enter valid dates.');
+        if (dates[0] > dates[1] || (Date.parse(dates[1]) - Date.parse(dates[0])) / 86400000 > 1095) return _t('Select a period of up to three years with the start before the end.');
+        return '';
+    }
+
+    get activeDepartment() { return this.sections.find(section => section.key === this.state.activeSection) || this.sections[0]; }
+    get companyIdentity() {
+        const company = this.state.companies.find(entry => entry.id === this.state.applied?.company_id) || {};
+        return {id: company.id, name: company.name || '', logoUrl: company.logo_url || '', initials: company.initials || (company.name || '').split(/\s+/).slice(0, 2).map(word => word[0]).join('')};
+    }
+    logoError() { this.state.logoFailed = true; }
+    focusSearch() { this.state.sidebarOpen = false; this.state.moreOpen = false; this.state.searchOpen = true; requestAnimationFrame(() => this.searchInput.el?.focus()); }
+    changePeriod(event) {
+        const value = event.target.value;
+        this.state.periodPreset = value;
+        if (value === 'custom') return;
+        const today = this.defaultOptions?.date_to || new Date().toISOString().slice(0, 10);
+        const current = new Date(today + 'T12:00:00Z');
+        let start = today.slice(0, 7) + '-01', end = today;
+        if (value === 'ytd') start = today.slice(0, 4) + '-01-01';
+        if (value === 'previous') { current.setUTCDate(0); end = current.toISOString().slice(0, 10); start = end.slice(0, 7) + '-01'; }
+        this.state.draft = {...this.state.draft, date_from: start, date_to: end};
+        return this.refresh();
+    }
+    formatStockQuantity(value, row) { return this.quantity(value, row?.digits ?? 2); }
+    get stockFiltersDirty() { const applied = this.state.inventory?.filters; return Boolean(applied && Object.keys(this.state.stockFilters).some(key=>String(this.state.stockFilters[key] || '') !== String(applied[key] || ''))); }
+    clearStockFilters() { this.state.stockFilters={sort:'name',warehouse_id:'',category_id:'',search:'',hide_zero:true,hide_negative:false,at_date:''}; this.state.stockMode='current'; return this.applyStockFilters(); }
+    changeStockMode(mode) {
+        this.state.stockMode = mode;
+        if (mode === 'current') this.state.stockFilters.at_date = '';
+        if (mode === 'cutoff') this.state.stockFilters.at_date = this.state.applied.as_of;
+        if (mode !== 'custom') return this.applyStockFilters();
+    }
+    applyStockFilters() {
+        const atDate = this.state.stockFilters.at_date;
+        const today = this.defaultOptions?.date_to || new Date().toISOString().slice(0, 10);
+        if (atDate && (!/^\d{4}-\d{2}-\d{2}$/.test(atDate) || !Number.isFinite(Date.parse(atDate)) || new Date(atDate).toISOString().slice(0,10) !== atDate || atDate > today)) {
+            this.state.stockError = _t('Choose a valid stock date no later than today.'); return;
+        }
+        this.state.stockError = '';
+        const previous = this.state.inventory;
+        this.state.inventory = {warehouses: previous?.warehouses || [], categories: previous?.categories || []};
+        return this.loadDirectory('inventory', 0, atDate ? 'historical' : 'current');
+    }
+    pageStock(offset) { return this.loadDirectory('inventory', offset); }
+    changeStockSort(event) {
+        const sort = event.target.value;
+        if (!['name', 'qty'].includes(sort) || !this.state.inventory) return;
+        this.state.stockFilters.sort = sort;
+        this.state.inventory = {...this.state.inventory, filters: {...this.state.inventory.filters, sort}};
+        return this.pageStock(0);
+    }
+    stockValuationLabel(row = null) {
+        return row?.warehouse_id || this.state.inventory?.filters?.warehouse_id ? _t('Warehouse valuation →') : _t('Company valuation →');
+    }
+    async openStockValuation(row = null) {
+        const data = this.state.inventory;
+        if (!data || this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const filters = {...data.filters};
+            if (row?.warehouse_id) filters.warehouse_id = row.warehouse_id;
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_valuation', [{...this.state.applied}, data.mode, filters, row?.product_id || null]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The valuation report could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openStockReservations(row) {
+        const data = this.state.inventory;
+        if (!data || data.mode !== 'current' || this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_reservations', [{...this.state.applied}, row.product_id, row.location_id, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openStockSource(kind, row = null) {
+        if (row?.product_id) return this.openReport('inventory_product', kind, row.product_id);
+        if (!['history', 'replenishment'].includes(kind) || this.state.opening || !this.state.inventory) return;
+        const generation = this.generation, data = this.state.inventory;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_source', [{...this.state.applied}, kind, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openProductRanking(productId = null) {
+        if (this.state.productMeasure !== 'quantity') return this.openReport('invoiced_sales', productId ? 'product' : null, productId);
+        if (this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_product_quantity_report', [{...this.state.applied}, productId, Number(this.state.productUnit) || null]);
+            if (this.alive && generation === this.generation) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The quantity report could not be opened. Check the selected unit and your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    quantity(value, digits = 2) { return Number.isFinite(value) ? new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: digits}).format(value) : '—'; }
+    get hrOptions() { return {...this.state.applied, ...this.state.hrPeriodApplied}; }
+    get hrLoading() { return this.state.hrData?.status === 'loading'; }
+    get hrPeriodDirty() { return ['date_from','date_to'].some(key => this.state.hrPeriodDraft[key] !== this.state.hrPeriodApplied?.[key]); }
+    onHRDateChange(event) { const key = event.target.name; if (['date_from','date_to'].includes(key)) this.state.hrPeriodDraft[key] = event.target.value; }
+    async applyHRPeriod(event) {
+        event?.preventDefault?.();
+        const period = {...this.state.hrPeriodDraft};
+        const error = this.validateScope({...this.state.applied, ...period});
+        this.state.hrPeriodError = error;
+        if (error) return;
+        this.state.hrPeriodApplied = period;
+        this.closeEmployeeProfile();
+        return this.loadHR(this.state.hrTab, 0, {...this.state.hrFilters});
+    }
+    invalidateHRSource() { if (this.hrSourceRequest) { this.hrSourceRequest = null; this.state.opening = false; } }
+    async loadHR(tab = this.state.hrTab, offset = 0, filters = null) {
+        if (!['overview','attendance','time_off','shifts','employees'].includes(tab) || !this.sectionEnabled('hr')) return;
+        const generation = this.generation, marker = {};
+        this.hrRequest = marker;
+        this.invalidateHRSource();
+        this.closeEmployeeProfile();
+        const changedTab = tab !== this.state.hrTab;
+        if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week'};
+        const appliedFilters = this.normalizedHRFilters(filters || (changedTab ? this.state.hrFilters : this.state.hrData?.filters) || this.state.hrFilters);
+        if (tab === 'overview') for (const key of Object.keys(appliedFilters)) delete appliedFilters[key];
+        if (tab === 'shifts' && appliedFilters.view === 'week') offset = 0;
+        this.state.hrTab = tab;
+        this.state.hrData = {status:'loading', rows:[], filters: appliedFilters, offset};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset]);
+            if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total, next_offset: (data.offset || 0) + (data.rows?.length || 0)}; if (data.departments) this.hrDepartments = data.departments; }
+        } catch { if (this.alive && generation === this.generation && this.hrRequest === marker) this.state.hrData = {status:'error',rows:[],filters:appliedFilters,offset}; }
+    }
+    async loadMoreHRShifts() {
+        const previous = this.state.hrData;
+        if (this.state.hrTab !== 'shifts' || previous?.filters?.view !== 'week' ||
+            previous.status !== 'ready' || !previous.has_more || previous.loading_more) return;
+        const generation = this.generation, marker = {}, options = {...this.hrOptions};
+        const filters = {...previous.filters}, offset = previous.next_offset ?? ((previous.offset || 0) + previous.rows.length);
+        this.hrRequest = marker;
+        this.state.hrData = {...previous, loading_more:true, load_more_error:false};
+        const current = () => this.alive && generation === this.generation && this.hrRequest === marker &&
+            this.state.hrTab === 'shifts' && JSON.stringify(this.hrOptions) === JSON.stringify(options);
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[options,'shifts',filters,offset]);
+            if (!current()) return;
+            if (!['ready','empty'].includes(data.status)) {
+                if (data.status === 'restricted') {
+                    this.invalidateHRSource();
+                    this.closeEmployeeProfile();
+                    this.hrDepartments = [];
+                }
+                this.state.hrData = {...data, rows:[], filters, total_count:data.total};
+                return;
+            }
+            const rows = [...new Map([...previous.rows, ...data.rows].map(row => [row.id,row])).values()];
+            // Offset paging can overlap or skip slots when Planning changes.
+            // Start a new calendar result instead of labelling a mixed snapshot complete.
+            if (data.total !== previous.total || data.offset !== offset ||
+                rows.length !== previous.rows.length + data.rows.length || rows.length > data.total ||
+                (!data.has_more && rows.length !== data.total)) {
+                return this.loadHR('shifts', 0, filters);
+            }
+            this.state.hrData = {...data, status:rows.length ? 'ready' : 'empty', rows, filters, offset:0,
+                next_offset:(data.offset || 0) + data.rows.length, total_count:data.total, loading_more:false, load_more_error:false};
+        } catch (error) {
+            if (!current()) return;
+            if (error?.data?.name === 'odoo.exceptions.AccessError') {
+                this.invalidateHRSource();
+                this.closeEmployeeProfile();
+                this.hrDepartments = [];
+                this.state.hrData = {status:'restricted', rows:[], filters, offset:0};
+            } else {
+                this.state.hrData = {...previous, loading_more:false, load_more_error:true};
+            }
+        }
+    }
+    normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
+    applyHRFilters() { return this.loadHR(this.state.hrTab,0,{...this.state.hrFilters}); }
+    async openEmployeeProfile(id) {
+        this.invalidateHRSource();
+        const generation = this.generation, marker = {};
+        this.employeeRequest = marker;
+        this.state.employeeProfile = {status:'loading',id};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_employee_profile',[this.hrOptions,id]);
+            if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = data;
+        } catch { if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = {status:'error',id}; }
+    }
+    closeEmployeeProfile() { this.invalidateHRSource(); this.employeeRequest = null; this.state.employeeProfile = null; }
+    async openHRSource(recordId = null, report = false, tab = this.state.hrTab, filters = null) {
+        const generation = this.generation, marker = {};
+        if (this.state.opening) return;
+        this.hrSourceRequest = marker;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard','open_hr_source',[this.hrOptions,tab,this.normalizedHRFilters(filters || this.state.hrData?.filters || this.state.hrFilters),recordId,report]);
+            if (this.alive && generation === this.generation && this.hrSourceRequest === marker) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation && this.hrSourceRequest === marker) this.notification.add(_t('The HR record or report could not be opened. Check your access.'),{type:'warning'}); }
+        finally { if (this.alive && this.hrSourceRequest === marker) { this.state.opening = false; this.hrSourceRequest = null; } }
+    }
+
     async openReport(key, dimension = null, groupId = null) {
         if (this.state.opening) { return; }
         const generation = this.generation;
@@ -890,6 +1218,7 @@ export class ExecutiveDashboard extends Component {
             if (key === 'inventory') { args.push(this.state.inventory?.mode || 'current'); }
             if (key === 'procurement') { args.push(this.state.procurement?.mode || 'late', groupId); }
             if (key === 'workforce') { args.push(groupId); }
+            if (key === 'fulfillment' && groupId) { args.push(groupId, dimension); }
             if (key === 'inventory_product') { args.push(groupId, dimension); }
             const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);
             if (this.alive && generation === this.generation) { await this.action.doAction(action); }

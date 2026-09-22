@@ -2930,3 +2930,1705 @@ msgstr "اختر الطلبات أو عروض الأسعار لعرض التفا
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Technical details"
 msgstr "التفاصيل التقنية"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Overdue receivables"
+msgstr "الذمم المدينة المتأخرة"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Overdue payables"
+msgstr "الذمم الدائنة المتأخرة"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Choose a unit from this report."
+msgstr "اختر وحدة من هذا التقرير."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid product."
+msgstr "المنتج غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "The product is unavailable in the selected scope."
+msgstr "المنتج غير متاح ضمن النطاق المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Open the stock report for quantities and valuation."
+msgstr "افتح تقرير المخزون للاطلاع على الكميات والتقييم."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR view."
+msgstr "عرض الموارد البشرية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR filters."
+msgstr "عوامل تصفية الموارد البشرية غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Enter up to 100 characters."
+msgstr "أدخل نصًا لا يتجاوز ١٠٠ حرف."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR status."
+msgstr "حالة الموارد البشرية غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid shift assignment."
+msgstr "تعيين الوردية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid shift view."
+msgstr "عرض الورديات غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR date scope."
+msgstr "نطاق تواريخ الموارد البشرية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Select both HR dates."
+msgstr "حدد تاريخي البداية والنهاية للموارد البشرية."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid employee."
+msgstr "الموظف غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "The employee is unavailable in the selected company."
+msgstr "الموظف غير متاح في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "This HR application is not installed."
+msgstr "تطبيق الموارد البشرية هذا غير مثبت."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR source."
+msgstr "مصدر الموارد البشرية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "The installed HR source action does not match this view."
+msgstr "إجراء مصدر الموارد البشرية المثبت لا يتوافق مع هذا العرض."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR selection."
+msgstr "اختيار الموارد البشرية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
+msgid "Invalid HR record."
+msgstr "سجل الموارد البشرية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Warehouse valuation — %s"
+msgstr "تقييم المستودع — %s"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Company valuation — %s"
+msgstr "تقييم الشركة — %s"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid stock filters."
+msgstr "عوامل تصفية المخزون غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "This location is unavailable in the selected scope."
+msgstr "هذا الموقع غير متاح ضمن النطاق المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Enter a product name or reference of up to 100 characters."
+msgstr "أدخل اسم المنتج أو مرجعه بما لا يتجاوز ١٠٠ حرف."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid stock filter."
+msgstr "عامل تصفية المخزون غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Location quantities"
+msgstr "كميات الموقع"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Inventory valuation is not installed."
+msgstr "تقييم المخزون غير مثبت."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Choose a valid inventory date."
+msgstr "اختر تاريخًا صالحًا للمخزون."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Invalid quantity filter."
+msgstr "عامل تصفية الكمية غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "This warehouse is unavailable in the selected company."
+msgstr "هذا المستودع غير متاح في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "This product category is unavailable."
+msgstr "فئة المنتجات هذه غير متاحة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Cash and working capital"
+msgstr "النقدية ورأس المال العامل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Balances at the selected cutoff."
+msgstr "الأرصدة حتى التاريخ المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Money movement"
+msgstr "حركة النقدية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Recorded cash movement and a separately labelled forecast."
+msgstr "حركة النقدية المسجلة والتوقع النقدي موضحًا بصورة منفصلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Enter between 2 and 100 characters to search."
+msgstr "أدخل نصًا بين حرفين و١٠٠ حرف للبحث."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Active employees"
+msgstr "الموظفون النشطون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Checked in now"
+msgstr "المسجلون في الحضور حاليًا"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Approved time off today"
+msgstr "الإجازات المعتمدة اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Unassigned published shifts"
+msgstr "الورديات المنشورة غير المسندة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active"
+msgstr "نشط"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Archived"
+msgstr "مؤرشف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "All"
+msgstr "الكل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open"
+msgstr "مفتوح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Closed"
+msgstr "مغلق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "To approve"
+msgstr "بانتظار الموافقة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Second approval"
+msgstr "بانتظار الموافقة الثانية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Approved"
+msgstr "معتمد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Refused"
+msgstr "مرفوض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Cancelled"
+msgstr "ملغى"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Published"
+msgstr "منشور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Draft"
+msgstr "مسودة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Enter valid dates."
+msgstr "أدخل تواريخ صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Choose a valid stock date no later than today."
+msgstr "اختر تاريخًا صالحًا للمخزون لا يتجاوز تاريخ اليوم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The valuation report could not be opened. Check your access."
+msgstr "تعذر فتح تقرير التقييم. تحقق من صلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Select a product to open its stock details."
+msgstr "اختر منتجًا لفتح تفاصيل مخزونه."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The quantity report could not be opened. Check the selected unit and your access."
+msgstr "تعذر فتح تقرير الكميات. تحقق من الوحدة المحددة وصلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The HR record or report could not be opened. Check your access."
+msgstr "تعذر فتح سجل الموارد البشرية أو التقرير. تحقق من صلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Departments"
+msgstr "الأقسام"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Quick access"
+msgstr "الوصول السريع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Needs attention"
+msgstr "يتطلب المتابعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Search documents"
+msgstr "البحث في المستندات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Refresh"
+msgstr "تحديث"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "More"
+msgstr "المزيد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Export summary CSV"
+msgstr "تصدير الملخص بصيغة CSV"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "This month"
+msgstr "هذا الشهر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Previous month"
+msgstr "الشهر السابق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Year to date"
+msgstr "من بداية السنة حتى اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Custom range"
+msgstr "فترة مخصصة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balances at"
+msgstr "الأرصدة في"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Edit"
+msgstr "تعديل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Unapplied changes. Select Apply filters to update the dashboard."
+msgstr "توجد تغييرات غير مطبقة. اختر تطبيق عوامل التصفية لتحديث لوحة المعلومات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Overdue"
+msgstr "متأخر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View all aging buckets"
+msgstr "عرض جميع فئات أعمار الديون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Selected period"
+msgstr "الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue & profit"
+msgstr "الإيرادات والأرباح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Monthly performance for the selected period"
+msgstr "الأداء الشهري للفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View all →"
+msgstr "عرض الكل ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Net invoiced sales by customer"
+msgstr "صافي المبيعات المفوترة حسب العميل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Delivery status"
+msgstr "حالة التسليم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "· Source & definition"
+msgstr "· المصدر والتعريف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "UTC."
+msgstr "بالتوقيت العالمي المنسق."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "HR views"
+msgstr "عروض الموارد البشرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Overview"
+msgstr "نظرة عامة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Attendance"
+msgstr "الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Time off"
+msgstr "الإجازات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shifts"
+msgstr "الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Loading people information…"
+msgstr "جارٍ تحميل معلومات الموظفين…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "This information could not be loaded. Your other departments remain available."
+msgstr "تعذر تحميل هذه المعلومات. تظل الأقسام الأخرى متاحة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Access to this information is restricted. Dashboard access does not grant access to employee records."
+msgstr "الوصول إلى هذه المعلومات مقيد. صلاحية لوحة المعلومات لا تمنح صلاحية الاطلاع على سجلات الموظفين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "People at a glance"
+msgstr "لمحة عن الموظفين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current snapshot ·"
+msgstr "الوضع الحالي ·"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current workforce"
+msgstr "القوى العاملة الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employees with open attendance"
+msgstr "الموظفون ذوو سجلات الحضور المفتوحة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Approved requests overlapping today"
+msgstr "الطلبات المعتمدة التي تشمل اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Published · selected period"
+msgstr "منشور · الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View details →"
+msgstr "عرض التفاصيل ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Team by department"
+msgstr "الفريق حسب القسم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active authorized employees"
+msgstr "الموظفون النشطون المتاحون حسب صلاحياتك"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View employees →"
+msgstr "عرض الموظفين ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No department records available for this view."
+msgstr "لا توجد سجلات أقسام متاحة لهذا العرض."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Attendance & work records"
+msgstr "سجلات الحضور والعمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current snapshot and selected-period records"
+msgstr "الوضع الحالي وسجلات الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open attendance can include check-ins from previous days. A missing check-in is not an absence or lateness decision."
+msgstr "قد تشمل سجلات الحضور المفتوحة تسجيلات من أيام سابقة. عدم وجود تسجيل حضور لا يعني الغياب أو التأخر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View attendance →"
+msgstr "عرض الحضور ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View time off requests →"
+msgstr "عرض طلبات الإجازة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View shifts →"
+msgstr "عرض الورديات ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Attendance records"
+msgstr "سجلات الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Time off requests"
+msgstr "طلبات الإجازة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shift schedule"
+msgstr "جدول الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee directory"
+msgstr "دليل الموظفين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current work profiles"
+msgstr "الملفات الوظيفية الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Week"
+msgstr "أسبوع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "List"
+msgstr "قائمة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open source records →"
+msgstr "فتح السجلات المصدرية ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View report →"
+msgstr "عرض التقرير ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee or role"
+msgstr "الموظف أو الدور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Search employees…"
+msgstr "البحث عن الموظفين…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All departments"
+msgstr "جميع الأقسام"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All statuses"
+msgstr "جميع الحالات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Assignment"
+msgstr "الإسناد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All shifts"
+msgstr "جميع الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Assigned"
+msgstr "مسندة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Include archived"
+msgstr "تضمين المؤرشف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Clear"
+msgstr "مسح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No results for this selection. Try another period or clear the employee filters."
+msgstr "لا توجد نتائج لهذا الاختيار. جرب فترة أخرى أو امسح عوامل تصفية الموظفين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shift week"
+msgstr "أسبوع الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Continues from previous day"
+msgstr "ممتدة من اليوم السابق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No shifts"
+msgstr "لا توجد ورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "First seven days of the selected period. Use List for all matching shifts. Each continuation belongs to the same shift."
+msgstr "أول سبعة أيام من الفترة المحددة. استخدم القائمة لعرض جميع الورديات المطابقة. الأجزاء الممتدة تنتمي إلى الوردية نفسها."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee work records"
+msgstr "سجلات عمل الموظفين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee"
+msgstr "الموظف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Work location"
+msgstr "موقع العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Check-in"
+msgstr "تسجيل الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Check-out"
+msgstr "تسجيل الانصراف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recorded hours"
+msgstr "الساعات المسجلة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Time off type"
+msgstr "نوع الإجازة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Dates"
+msgstr "التواريخ"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Full request duration"
+msgstr "مدة الطلب كاملة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shift"
+msgstr "الوردية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Role"
+msgstr "الدور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Allocated hours"
+msgstr "الساعات المخصصة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "days"
+msgstr "أيام"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open record →"
+msgstr "فتح السجل ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "One row per attendance session. Open records have no completed worked duration."
+msgstr "صف واحد لكل جلسة حضور. السجلات المفتوحة ليست لها مدة عمل مكتملة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Requests overlap the selected period. Duration is for the full request; days and hours stay separate."
+msgstr "تشمل الطلبات الفترة المحددة أو جزءًا منها. المدة تخص الطلب كاملًا؛ وتُعرض الأيام والساعات بصورة منفصلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Allocated hours follow Planning. Draft shifts are not published to employees."
+msgstr "الساعات المخصصة تتبع تطبيق التخطيط. الورديات المسودة غير منشورة للموظفين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Work profiles only. Additional information follows your HR access rights."
+msgstr "الملفات الوظيفية فقط. تخضع المعلومات الإضافية لصلاحياتك في الموارد البشرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee work profile"
+msgstr "الملف الوظيفي للموظف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Loading employee…"
+msgstr "جارٍ تحميل الموظف…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Manager"
+msgstr "المدير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Work email"
+msgstr "البريد الإلكتروني للعمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Work phone"
+msgstr "هاتف العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Working schedule"
+msgstr "جدول العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employee records"
+msgstr "سجلات الموظف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open employee profile →"
+msgstr "فتح ملف الموظف ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Products & locations"
+msgstr "المنتجات والمواقع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Valuation →"
+msgstr "التقييم ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Forecast →"
+msgstr "التوقعات ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock history →"
+msgstr "سجل حركة المخزون ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Replenishment →"
+msgstr "إعادة التزويد ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product or reference"
+msgstr "المنتج أو المرجع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock date"
+msgstr "تاريخ المخزون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current"
+msgstr "حالي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Use balance cutoff"
+msgstr "استخدام تاريخ الرصيد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "product / location rows"
+msgstr "صفوف المنتجات والمواقع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "· Stock at"
+msgstr "· المخزون في"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "· Current stock"
+msgstr "· المخزون الحالي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Unapplied changes"
+msgstr "تغييرات غير مطبقة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Inventory unavailable. Check the filters and your access."
+msgstr "المخزون غير متاح. تحقق من عوامل التصفية وصلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product / location"
+msgstr "المنتج / الموقع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Warehouse / location"
+msgstr "المستودع / الموقع"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "More quantities"
+msgstr "مزيد من الكميات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sources"
+msgstr "المصادر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Location quantity →"
+msgstr "كمية الموقع ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Warehouse valuation →"
+msgstr "تقييم المستودع ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "One row per product and location. Valuation opens separately for the selected warehouse or company. Quantities in different units are never added together."
+msgstr "صف واحد لكل منتج وموقع. يُفتح التقييم بصورة منفصلة للمستودع أو الشركة المحددة. لا تُجمع الكميات ذات الوحدات المختلفة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/workspace_details.py:0
+msgid "Invalid workspace or page."
+msgstr "مساحة العمل أو الصفحة غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/workspace_details.py:0
+msgid "Invalid workspace."
+msgstr "مساحة العمل غير صالحة."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/workspace_details.py:0
+msgid "This application is not installed."
+msgstr "هذا التطبيق غير مثبت."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/workspace_details.py:0
+msgid "The installed source action does not match this workspace."
+msgstr "إجراء المصدر المثبت لا يتوافق مع مساحة العمل هذه."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/workspace_details.py:0
+msgid "Invalid source record."
+msgstr "سجل المصدر غير صالح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open the source report"
+msgstr "فتح التقرير المصدري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Net movement"
+msgstr "صافي الحركة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View accounts →"
+msgstr "عرض الحسابات ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active account balances are available in the account directory."
+msgstr "أرصدة الحسابات النشطة متاحة في دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "First seven days of the selected period, for the shifts on this page. Use the pages below or List for other matching shifts. Each continuation belongs to the same shift."
+msgstr "أول سبعة أيام من الفترة المحددة، للورديات في هذه الصفحة. استخدم الصفحات أدناه أو القائمة لعرض الورديات المطابقة الأخرى. الأجزاء الممتدة تنتمي إلى الوردية نفسها."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Published unassigned shifts"
+msgstr "الورديات المنشورة غير المسندة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Full requests overlapping today"
+msgstr "الطلبات الكاملة التي تشمل اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Selected period · open coverage"
+msgstr "الفترة المحددة · ورديات بحاجة إلى إسناد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Loading records…"
+msgstr "جارٍ تحميل السجلات…"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Records could not be loaded."
+msgstr "تعذر تحميل السجلات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Awaiting approval"
+msgstr "بانتظار الموافقة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Purchase orders · Current worklist"
+msgstr "أوامر الشراء · قائمة المتابعة الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Expected revenue"
+msgstr "الإيرادات المتوقعة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open opportunities · unweighted"
+msgstr "الفرص المفتوحة · دون ترجيح بالاحتمالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View source records →"
+msgstr "عرض السجلات المصدرية ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recent purchase orders"
+msgstr "أوامر الشراء الأخيرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open opportunities"
+msgstr "الفرص المفتوحة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Confirmed purchases in the selected period · Untaxed values"
+msgstr "المشتريات المؤكدة في الفترة المحددة · القيم دون الضرائب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stages, probability and source records in the selected period"
+msgstr "المراحل والاحتمالية والسجلات المصدرية في الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Order / supplier"
+msgstr "الأمر / المورد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Opportunity / customer"
+msgstr "الفرصة / العميل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Untaxed value"
+msgstr "القيمة دون الضرائب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Probability"
+msgstr "الاحتمالية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current open attendance sessions"
+msgstr "جلسات الحضور المفتوحة حالياً"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "On hand ↓"
+msgstr "الكمية المتوفرة ↓"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open a product’s Sources menu for its forecast and replenishment. One row per product and location. Valuation opens separately for the selected warehouse or company. Quantities in different units are never added together."
+msgstr "افتح قائمة مصادر المنتج لعرض المخزون المتوقع وإعادة التزويد. يُعرض صف لكل منتج وموقع. يُفتح التقييم بشكل منفصل للمستودع أو الشركة المحددة. لا تُجمع الكميات ذات وحدات القياس المختلفة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product name"
+msgstr "اسم المنتج"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sort"
+msgstr "ترتيب حسب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Company valuation →"
+msgstr "تقييم مخزون الشركة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The stock source could not be opened. Check your access."
+msgstr "تعذّر فتح مصدر بيانات المخزون. تحقّق من صلاحياتك."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current employees"
+msgstr "الموظفون الحاليون"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Current snapshot"
+msgstr "الوضع الحالي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Today’s attendance"
+msgstr "الحضور اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No check-in today"
+msgstr "لم يُسجَّل حضور اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Not available"
+msgstr "غير متاح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open attendance can include previous days. No-check-in reporting is not available; a missing check-in is not an absence decision."
+msgstr "قد تشمل سجلات الحضور المفتوحة أيامًا سابقة. تقرير الموظفين الذين لم يسجلوا حضورهم غير متاح؛ وعدم تسجيل الحضور لا يُعدّ حكمًا بالغياب."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Time off & upcoming shifts"
+msgstr "الإجازات والورديات القادمة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Employees on approved leave today"
+msgstr "الموظفون في إجازة معتمدة اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "On approved time off"
+msgstr "في إجازة معتمدة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Apply period"
+msgstr "تطبيق الفترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Purchasing overview"
+msgstr "نظرة عامة على المشتريات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Pipeline overview"
+msgstr "نظرة عامة على الفرص"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Untaxed purchase orders"
+msgstr "أوامر شراء دون ضريبة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open opportunities · weighted by probability"
+msgstr "الفرص المفتوحة · مرجّحة بالاحتمال"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "purchase orders need delivery follow-up."
+msgstr "أوامر شراء تحتاج إلى متابعة التسليم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Check their expected dates with your suppliers."
+msgstr "راجع مواعيد التسليم المتوقعة مع الموردين."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Outstanding bill instalments at"
+msgstr "أقساط الفواتير المستحقة حتى"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sales rankings"
+msgstr "ترتيب المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Products & customers"
+msgstr "المنتجات والعملاء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Rankings follow the selected period"
+msgstr "يتبع الترتيب الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Product ranking measure"
+msgstr "مقياس ترتيب المنتجات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Sales value"
+msgstr "قيمة المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Quantity"
+msgstr "الكمية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Saved views"
+msgstr "طرق العرض المحفوظة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View name"
+msgstr "اسم طريقة العرض"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Save current view"
+msgstr "حفظ طريقة العرض الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Restore saved view"
+msgstr "استعادة طريقة العرض المحفوظة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Save the current department, dates, ranking selections and applied inventory filters on this device."
+msgstr "احفظ القسم الحالي والتواريخ وخيارات الترتيب وفلاتر المخزون المطبّقة على هذا الجهاز."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Only selections are saved. Figures refresh from the source."
+msgstr "تُحفظ الخيارات فقط. تُحدَّث الأرقام من المصدر."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "My executive view"
+msgstr "طريقة العرض التنفيذية الخاصة بي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open attendance can include previous days. No check-in follows the standard latest check-in snapshot; it is not an absence decision."
+msgstr "قد تشمل سجلات الحضور المفتوحة أيامًا سابقة. يعتمد عدم تسجيل الحضور على الحالة الحالية لآخر تسجيل حضور في أودو؛ ولا يُعدّ حكمًا بالغياب."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Recent documents"
+msgstr "المستندات الأخيرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invoices"
+msgstr "الفواتير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank accounts"
+msgstr "الحسابات البنكية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Cash on hand"
+msgstr "النقدية في الصندوق"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Breakdown unavailable"
+msgstr "التفصيل غير متاح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "active accounts"
+msgstr "حسابات نشطة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Active accounts"
+msgstr "الحسابات النشطة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "The approved report does not supply a bank/cash split. Archived accounts are excluded from the account directory."
+msgstr "لا يوفّر التقرير المعتمد تفصيلًا بين الأرصدة البنكية والنقدية في الصندوق. تُستبعد الحسابات المؤرشفة من دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue target"
+msgstr "الإيرادات المستهدفة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Revenue movement"
+msgstr "التغير في الإيرادات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparison unavailable"
+msgstr "المقارنة غير متاحة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparable-period movement is not supplied by the approved source."
+msgstr "لا يوفّر المصدر المعتمد التغير مقارنةً بفترة مماثلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reporting status"
+msgstr "حالة التقارير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "From quantity to source records"
+msgstr "من الكمية إلى السجلات المصدرية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Keep your working view"
+msgstr "الاحتفاظ بطريقة العرض الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Open a row to inspect that product and location. Current quantities use native stock records; historical on-hand uses the selected stock date. Valuation opens separately with its stated warehouse or company scope."
+msgstr "افتح صفًا لفحص المنتج والموقع المحددين. تستند الكميات الحالية إلى سجلات المخزون القياسية، والكمية المتاحة تاريخيًا إلى تاريخ المخزون المحدد. يُفتح التقييم بشكل منفصل وفق نطاق المستودع أو الشركة الموضّح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Applied warehouse, category, stock date, quantity filters and page are retained when you inspect a report and return."
+msgstr "يُحتفَظ بالمستودع والفئة وتاريخ المخزون وفلاتر الكميات والصفحة المطبّقة عند فحص تقرير والعودة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Signed leave report →"
+msgstr "تقرير الإجازات بالساعات ذات الإشارة ←"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Requests overlap the selected period. Duration is for the full request; days and hours stay separate. The signed leave report uses its separate native report period and signed hours."
+msgstr "تتداخل الطلبات مع الفترة المحددة. تخص المدة الطلب كاملًا؛ وتبقى الأيام والساعات منفصلة. يستخدم تقرير الإجازات بالساعات ذات الإشارة فترة التقرير القياسية المستقلة وساعاته الموجبة والسالبة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reserved"
+msgstr "المحجوز"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Category:"
+msgstr "الفئة:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reservations →"
+msgstr "الحجوزات ←"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Current direct-product reservations"
+msgstr "حجوزات المنتج المباشرة الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Reserved is the current native quant reservation for this product and exact location, in its stock unit. Kit component reservations are not converted to kit quantities."
+msgstr "المحجوز هو الحجز الحالي في سجل المخزون لهذا المنتج وفي هذا الموقع تحديدًا، بوحدة مخزونه. لا تُحوَّل حجوزات مكونات الأطقم إلى كميات أطقم."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "First seven days of the selected period. Load more to include all matching shifts in this week, or use List for the full selected period. Each continuation belongs to the same shift."
+msgstr "أول سبعة أيام من الفترة المحددة. استخدم «تحميل المزيد» لإظهار جميع الورديات المطابقة لهذا الأسبوع، أو «قائمة» لعرض الفترة المحددة كاملةً. ينتمي كل جزء ممتد إلى الوردية نفسها."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Shifts loaded:"
+msgstr "الورديات المحمّلة:"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Load more shifts"
+msgstr "تحميل المزيد من الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "All matching shifts for this week are loaded."
+msgstr "تم تحميل جميع الورديات المطابقة لهذا الأسبوع."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "More shifts could not be loaded. The shifts already loaded remain available. Try Load more shifts again."
+msgstr "تعذّر تحميل المزيد من الورديات. تظل الورديات المحمّلة متاحة. أعد المحاولة باستخدام «تحميل المزيد من الورديات»."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No shifts in loaded records"
+msgstr "لا توجد ورديات ضمن السجلات المحمّلة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Comparison not configured"
+msgstr "لم تُضبط المقارنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "A comparable-period definition has not been approved."
+msgstr "لم يُعتمد تعريف لفترة المقارنة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Report warnings"
+msgstr "تحذيرات التقرير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review source report"
+msgstr "راجع التقرير المصدري"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No report warnings"
+msgstr "لا توجد تحذيرات في التقرير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Period close and source completeness have not been assessed."
+msgstr "لم يُقيَّم إقفال الفترة أو اكتمال البيانات المصدرية."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review source report →"
+msgstr "مراجعة التقرير المصدري ←"

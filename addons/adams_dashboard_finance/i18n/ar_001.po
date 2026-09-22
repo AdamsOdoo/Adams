@@ -327,3 +327,49 @@ msgstr "جدول مدفوعات الموردين"
 #: code:addons/adams_dashboard_finance/models/account_report.py:0
 msgid "Unsupported supplier payment window scope."
 msgstr "نطاق فترة مدفوعات الموردين غير مدعوم."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Overdue receivables"
+msgstr "الذمم المدينة المتأخرة"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Overdue payables"
+msgstr "الذمم الدائنة المتأخرة"
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Unknown overdue report scope."
+msgstr "نطاق تقرير المتأخرات غير معروف."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/dashboard.py:0
+msgid "Signed total of the five overdue buckets in the approved aging report. Amounts due today and not yet due are excluded. Credits, payments and historical settlements retain the report treatment."
+msgstr "مجموع فئات التأخر الخمس في تقرير أعمار الديون المعتمد، مع الحفاظ على الإشارات الموجبة والسالبة. لا يشمل المبالغ المستحقة اليوم أو التي لم يحن موعد استحقاقها. تُعامل الأرصدة الدائنة والمدفوعات والتسويات السابقة وفقًا للتقرير."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Unsupported overdue report scope."
+msgstr "نطاق تقرير المتأخرات غير مدعوم."
+
+#. module: adams_dashboard_finance
+#. odoo-python
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Overdue balances"
+msgstr "الأرصدة المتأخرة"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Aging bucket"
+msgstr "فئة أعمار الديون"
+
+#. module: adams_dashboard_finance
+#: code:addons/adams_dashboard_finance/models/account_report.py:0
+msgid "Invalid aging bucket."
+msgstr "فئة أعمار الديون غير صالحة."

@@ -4,11 +4,13 @@ import csv
 import hashlib
 import io
 import json
+from urllib.parse import urlencode
 
 import pytz
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from odoo.tools import html2plaintext
 
 
 # Every source and measure is server-owned. No client-supplied model or domain.
@@ -83,11 +85,24 @@ class ExecutiveDashboard(models.AbstractModel):
         today = fields.Date.context_today(self)
         return {
             'user_id': self.env.uid,
-            'companies': [{'id': c.id, 'name': c.name, 'enabled_sections': self._visible_sections(c)} for c in self.env.companies],
+            'companies': [self._company_identity(c) for c in self.env.companies],
             'can_configure': self.env.user.has_group('base.group_system'),
             'options': {'company_id': self.env.company.id, 'date_from': today.replace(day=1).isoformat(),
                         'date_to': today.isoformat(), 'as_of': today.isoformat()},
         }
+
+    def _company_identity(self, company):
+        # Only called with a record from the validated company context. Bin-size
+        # reads test availability without putting image blobs in RPC responses.
+        company.check_access('read')
+        values = company.with_context(bin_size=True).read(['name', 'logo', 'write_date'])[0]
+        name = values['name']
+        version = str(values['write_date'] or '')
+        return {'id': company.id, 'name': name,
+                'initials': ''.join(part[0] for part in name.split()[:2]).upper(),
+                'logo_url': ('/web/image/res.company/%s/logo?%s' %
+                             (company.id, urlencode({'unique': version}))) if values['logo'] else False,
+                'enabled_sections': self._visible_sections(company)}
 
     def _visible_sections(self, company=None):
         company = company if company is not None else self.env.company
@@ -118,6 +133,13 @@ class ExecutiveDashboard(models.AbstractModel):
         return bounds
 
     def _recent_scope(self, kind, dates):
+        if kind == 'invoices':
+            invoices = self.env['account.move']
+            invoices.check_access('read')
+            invoices.check_field_access_rights('read', ['company_id', 'state', 'move_type', 'invoice_date'])
+            return invoices, [('company_id', '=', self.env.company.id), ('state', '=', 'posted'),
+                              ('move_type', 'in', ['out_invoice', 'out_refund']),
+                              *self._date_bounds(invoices, 'invoice_date', dates)]
         if kind not in ('orders', 'quotations') or 'sale.order' not in self.env:
             raise ValidationError(_('This list is not configured.'))
         orders = self.env['sale.order']
@@ -135,7 +157,7 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('Invalid page.'))
         if 'sale.report' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
-        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', columns)
         domain = [*domain, ('product_id', '!=', False)]
@@ -144,22 +166,31 @@ class ExecutiveDashboard(models.AbstractModel):
             aggregates=['product_uom_qty:sum', 'qty_delivered:sum', 'qty_to_deliver:sum'],
             order='product_id ASC, product_uom_id ASC', offset=offset, limit=26)
         return {'status': 'ready' if rows else 'empty', 'has_more': len(rows) > 25,
-                'rows': [{'id': product.id, 'name': product.display_name, 'unit': unit.display_name,
+                'rows': [{'id': product.id, 'name': product.display_name, 'unit': unit.display_name, 'unit_id': unit.id,
                           'ordered': ordered, 'delivered': delivered, 'remaining': remaining}
                          for product, unit, ordered, delivered, remaining in rows[:25]],
                 'provenance': scoped._provenance('confirmed_sales', domain,
                     'product_uom_qty:sum,qty_delivered:sum,qty_to_deliver:sum')}
 
     @api.model
-    def open_fulfillment(self, options):
+    def open_fulfillment(self, options, product_id=None, unit_id=None):
         scoped, dates = self._scope(options)
         if 'sale.report' not in scoped.env:
             raise ValidationError(_('This report is not configured.'))
-        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         measures = ['product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', ['product_id', 'product_uom_id', *measures])
+        domain = [*domain, ('product_id', '!=', False)]
+        if product_id is not None or unit_id is not None:
+            # A displayed row is a product AND unit group. Never silently open
+            # another unit or aggregate incompatible units in its source action.
+            if type(product_id) is not int or product_id < 1 or type(unit_id) is not int or unit_id < 1:
+                raise ValidationError(_('Choose a valid product and unit from the delivery report.'))
+            domain += [('product_id', '=', product_id), ('product_uom_id', '=', unit_id)]
+            if not report.search(domain, limit=1):
+                raise AccessError(_('The product and unit are unavailable in the selected scope.'))
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
-        action.update(domain=[*domain, ('product_id', '!=', False)], context={**scoped.env.context,
+        action.update(domain=domain, context={**scoped.env.context,
             'pivot_measures': measures, 'pivot_row_groupby': ['product_id', 'product_uom_id'],
             'graph_measure': 'qty_to_deliver', 'group_by': ['product_id', 'product_uom_id']})
         return action
@@ -167,34 +198,49 @@ class ExecutiveDashboard(models.AbstractModel):
     @api.model
     def get_recent_sales(self, kind, options, offset=0):
         scoped, dates = self._scope(options)
-        if kind not in ('orders', 'quotations') or type(offset) is not int or not 0 <= offset <= 100000:
+        if kind not in ('orders', 'quotations', 'invoices') or type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid list or page.'))
-        if 'sale.order' not in scoped.env:
+        if kind != 'invoices' and 'sale.order' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
-        orders, domain = scoped._recent_scope(kind, dates)
-        columns = ['name', 'partner_id', 'user_id', 'date_order', 'validity_date', 'state', 'amount_untaxed', 'currency_id']
-        if 'delivery_status' in orders._fields:
+        documents, domain = scoped._recent_scope(kind, dates)
+        invoice_list = kind == 'invoices'
+        date_field = 'invoice_date' if invoice_list else 'date_order'
+        columns = ['name', 'partner_id', 'state', 'amount_untaxed', 'currency_id', date_field]
+        columns += ['invoice_user_id', 'move_type'] if invoice_list else ['user_id', 'validity_date']
+        if not invoice_list and 'delivery_status' in documents._fields:
             columns.append('delivery_status')
-        orders.check_field_access_rights('read', columns)
-        records = orders.search(domain, order='date_order desc, id desc', limit=26, offset=offset)
+        documents.check_field_access_rights('read', columns)
+        records = documents.search(domain, order=f'{date_field} desc, id desc', limit=26, offset=offset)
         rows = records[:25].read(columns)
-        states = dict(orders._fields['state']._description_selection(scoped.env))
-        delivery_labels = dict(orders._fields['delivery_status']._description_selection(scoped.env)) if 'delivery_status' in columns else {}
+        states = dict(documents._fields['state']._description_selection(scoped.env))
+        delivery_labels = dict(documents._fields['delivery_status']._description_selection(scoped.env)) if 'delivery_status' in columns else {}
+        type_labels = dict(documents._fields['move_type']._description_selection(scoped.env)) if invoice_list else {}
         for row, record in zip(rows, records[:25]):
             row['delivery_label'] = delivery_labels.get(row.get('delivery_status'))
             row.update(state_label=states[row['state']], currency=record.currency_id.name,
-                       digits=record.currency_id.decimal_places,
-                       date_label=fields.Datetime.context_timestamp(record, record.date_order).strftime('%Y-%m-%d %H:%M'))
+                       digits=record.currency_id.decimal_places, res_model=documents._name)
+            if invoice_list:
+                row.update(user_id=row['invoice_user_id'], validity_date=False,
+                           document_type_label=type_labels[row['move_type']],
+                           date_label=fields.Date.to_string(record.invoice_date))
+            else:
+                row['date_label'] = fields.Datetime.context_timestamp(record, record.date_order).strftime('%Y-%m-%d %H:%M')
         return {'status': 'ready' if rows else 'empty', 'rows': rows, 'has_more': len(records) > 25,
-                'offset': offset, 'date_basis': 'date_order', 'timezone': scoped.env.user.tz or 'UTC'}
+                'offset': offset, 'date_basis': date_field, 'timezone': scoped.env.user.tz or 'UTC',
+                'scope_label': (_('Posted invoices and credit notes · Untaxed document values') if invoice_list
+                                else _('Untaxed order values'))}
 
     @api.model
     def open_recent_sale(self, kind, options, record_id=None):
         scoped, dates = self._scope(options)
         orders, domain = scoped._recent_scope(kind, dates)
-        action_id = 'sale.action_orders' if kind == 'orders' else 'sale.action_quotations'
+        action_id = ('account.action_move_out_invoice_type' if kind == 'invoices'
+                     else 'sale.action_orders' if kind == 'orders' else 'sale.action_quotations')
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
-        action.update(domain=domain, context=dict(scoped.env.context))
+        context = dict(scoped.env.context)
+        if kind == 'invoices':
+            context['default_move_type'] = 'out_invoice'
+        action.update(domain=domain, context=context)
         if record_id is not None:
             if type(record_id) is not int or record_id < 1:
                 raise ValidationError(_('Invalid sales record.'))
@@ -294,6 +340,8 @@ class ExecutiveDashboard(models.AbstractModel):
             'cash_flow': _('Net cash movement'),
             'receivables': _('Receivables'),
             'payables': _('Payables'),
+            'receivables_overdue': _('Overdue receivables'),
+            'payables_overdue': _('Overdue payables'),
             'gross_profit': _('Gross profit'),
             'operating_expenses': _('Operating expenses'),
             'gross_margin': _('Gross margin'),
@@ -350,9 +398,10 @@ class ExecutiveDashboard(models.AbstractModel):
                                    'unit': row[3], 'digits': 0 if item.get('unit') == 'count' else result['digits'],
                                    'status': row[4], 'warning': bool(item.get('has_warnings'))})
                 count += 1
-        return {'filename': f'adams-executive-summary-{dates[0]}-{dates[1]}.csv',
+        return {'filename': f'executive-summary-{dates[0]}-{dates[1]}.csv',
                 'content': '\ufeff' + output.getvalue(), 'row_count': count,
                 'print_rows': print_rows, 'company': scoped.env.company.name,
+                'company_identity': scoped._company_identity(scoped.env.company),
                 'currency_digits': scoped.env.company.currency_id.decimal_places,
                 'scope': dict(options), 'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
 
@@ -368,6 +417,19 @@ class ExecutiveDashboard(models.AbstractModel):
             if visible_key not in enabled:
                 continue
             item = {'key': key, 'status': 'not_configured', 'value': None}
+            if key == 'inventory':
+                # No company valuation aggregate has been approved for this
+                # summary. Preserve the working report entry point explicitly.
+                if 'stock.quant' not in scoped.env:
+                    item['status'] = 'not_installed'
+                else:
+                    try:
+                        products, _domain = scoped._stock_scope(dates, 'current')
+                        item.update(status='source_only', source='stock.action_product_stock_view',
+                                    drilldown=True, date_field='current',
+                                    description=_('Open the stock report for quantities and valuation.'))
+                    except AccessError:
+                        item['status'] = 'restricted'
             if key in SOURCES:
                 if SOURCES[key][0] not in scoped.env:
                     item['status'] = 'not_installed'
@@ -411,6 +473,11 @@ class ExecutiveDashboard(models.AbstractModel):
             'pivot_measures': [aggregate.split(':')[0]],
             'graph_measure': aggregate.split(':')[0],
         })
+        if key == 'crm' and action.get('help'):
+            # Dict actions returned by model RPC do not follow the action-load
+            # HTML normalization path. Safe plain text avoids literal markup
+            # without declaring arbitrary configured HTML trusted.
+            action['help'] = html2plaintext(action['help'])
         return action
 
     @api.model
@@ -435,22 +502,41 @@ class ExecutiveDashboard(models.AbstractModel):
                 'digits': scoped.env.company.currency_id.decimal_places,
                 'provenance': scoped._provenance(key, domain, aggregate)}
 
-    @api.model
-    def get_product_quantity_ranking(self, options, unit_id=False):
-        scoped, dates = self._scope(options)
-        report, domain, aggregate, action_id = scoped._native_scope('invoiced_sales', dates)
+    def _product_quantity_scope(self, dates, unit_id):
+        report, domain, aggregate, action_id = self._native_scope('invoiced_sales', dates)
         report.check_field_access_rights('read', ['quantity', 'product_id', 'product_uom_id'])
         units = [unit for unit, in report._read_group(domain, ['product_uom_id'], []) if unit]
         units.sort(key=lambda unit: unit.id)
-        if unit_id and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
+        if unit_id is not None and unit_id is not False and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
             raise ValidationError(_('Choose a unit from this report.'))
         selected = unit_id or (units[0].id if units else False)
+        return report, [*domain, ('product_uom_id', '=', selected), ('product_id', '!=', False)], units, selected, action_id
+
+    @api.model
+    def get_product_quantity_ranking(self, options, unit_id=False):
+        scoped, dates = self._scope(options)
+        report, domain, units, selected, action_id = scoped._product_quantity_scope(dates, unit_id)
         unit = next((unit for unit in units if unit.id == selected), None)
-        rows = report._read_group([*domain, ('product_uom_id', '=', selected), ('product_id', '!=', False)],
-                                  ['product_id'], ['quantity:sum'], order='quantity:sum DESC, product_id ASC', limit=10) if selected else []
+        rows = report._read_group(domain, ['product_id'], ['quantity:sum'],
+                                  order='quantity:sum DESC, product_id ASC', limit=10) if selected else []
         return {'status': 'ready' if rows else 'empty', 'rows': [{'id': product.id, 'label': product.display_name, 'value': quantity} for product, quantity in rows],
                 'units': [{'id': u.id, 'name': u.display_name} for u in units], 'unit_id': selected,
                 'currency': unit.display_name if unit else '', 'digits': 2, 'unit': 'quantity'}
+
+    @api.model
+    def open_product_quantity_report(self, options, product_id=None, unit_id=None):
+        scoped, dates = self._scope(options)
+        report, domain, units, selected, action_id = scoped._product_quantity_scope(dates, unit_id)
+        if product_id is not None:
+            if type(product_id) is not int or product_id < 1:
+                raise ValidationError(_('Invalid product.'))
+            domain.append(('product_id', '=', product_id))
+            if not report.search(domain, limit=1):
+                raise AccessError(_('The product is unavailable in the selected scope.'))
+        action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
+        action.update(domain=domain, context={**scoped.env.context,
+                      'pivot_measures': ['quantity'], 'graph_measure': 'quantity'})
+        return action
 
     @api.model
     def get_trend(self, key, options):

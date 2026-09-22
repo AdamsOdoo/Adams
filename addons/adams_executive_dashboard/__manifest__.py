@@ -1,6 +1,6 @@
 {
     'name': 'Adams Executive Dashboard',
-    'version': '19.0.1.4.2',
+    'version': '19.0.1.5.0',
     'summary': 'Report-first executive workspace',
     'author': 'Adams',
     'license': 'LGPL-3',

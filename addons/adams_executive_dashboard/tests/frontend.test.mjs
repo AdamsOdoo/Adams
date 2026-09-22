@@ -9,6 +9,8 @@ function fixture() {
     const notifications = [];
     let destroy;
     const storage = new Map();
+    const companyEvents = {};
+    const nativeUser = {};
     const services = {
         orm: { call(model, method, args) {
             return new Promise((resolve, reject) => pending.push({ method, args, resolve, reject }));
@@ -22,13 +24,14 @@ function fixture() {
         window: { localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } },
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
-        useState: value => value, useService: key => services[key], _t: value => value,
+        useState: value => value, useService: key => { if (!services[key]) throw new Error(`Service ${key} is not available`); return services[key]; },
+        useBus(bus, event, callback) { companyEvents[event] = callback; }, user: nativeUser, userBus: {}, _t: value => value,
         requestAnimationFrame() {}, registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
     const controller = new Controller();
     controller.setup();
     controller.state.draft = { company_id: 1, date_from: '2026-08-01', date_to: '2026-08-31', as_of: '2026-08-31' };
-    return { controller, pending, notifications, storage, destroy: () => destroy() };
+    return { controller, pending, notifications, storage, companyEvents, nativeUser, destroy: () => destroy() };
 }
 
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
@@ -451,33 +454,22 @@ test('company section settings filter navigation and skip hidden source requests
     assert.equal(controller.state.products,null);
 });
 
-test('scroll tracking uses real sticky height, supports bottom sections and clicked targets', () => {
+test('explicit department navigation persists through scrolling and rejects disabled departments', () => {
     const {controller} = fixture();
-    controller.state.companies=[{id:1,enabled_sections:['finance','sales','hr']}];
-    controller.state.applied={company_id:1};
-    const boxes={finance:{top:-600,bottom:150},sales:{top:155,bottom:900},hr:{top:920,bottom:1050}};
-    const root={scrollTop:600,clientHeight:700,scrollHeight:2000,style:{setProperty(){}},
-        getBoundingClientRect:()=>({top:50,bottom:750}),
-        querySelector:selector=>selector==='.adams_nav'?{getBoundingClientRect:()=>({height:100})}:{getBoundingClientRect:()=>boxes[selector.replace('#adams-','')]}};
-    controller.root.el=root;
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'sales']}];
+    controller.state.applied = {company_id: 1};
+    let scroll;
+    controller.root.el.scrollTo = options => { scroll = options.top; };
+    controller.navigateSection('sales');
+    assert.equal(controller.state.activeSection, 'sales');
+    assert.equal(scroll, 0);
+    controller.root.el.scrollTop = 1400;
     controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    // Filtering can leave only the previous section's footer above the next
-    // heading. The visible content, not that footer, determines the category.
-    boxes.finance={top:-600,bottom:168};boxes.sales={top:200,bottom:900};
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    boxes.finance={top:-600,bottom:400};boxes.sales={top:432,bottom:900};
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'finance');
-    boxes.sales={top:70,bottom:280};boxes.hr={top:300,bottom:430};
-    root.scrollTop=1300;
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'hr');
-    controller.scrollTarget='sales';controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    controller.scrollTarget=null;controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'hr');
+    assert.equal(controller.state.activeSection, 'sales');
+    controller.navigateSection('hr');
+    assert.equal(controller.state.activeSection, 'sales');
+    controller.navigateSection('finance');
+    assert.equal(controller.state.activeSection, 'finance');
 });
 
 test('numbered pagination exposes known pages without inventing an unknown last page', () => {
@@ -584,4 +576,485 @@ test('company settings open for the applied dashboard company', () => {
     controller.openSettings();
     assert.equal(options.additionalContext.default_company_id,2);
     assert.deepEqual([...options.additionalContext.allowed_company_ids],[2]);
+});
+
+// Drain RPCs issued by awaited restoration and its auxiliary loaders. This
+// avoids coupling regressions to a fixed number of microtask turns or calls.
+async function settleRequests(pending, operation, response = () => ({items: [], rows: [], status: 'ready'})) {
+    let finished = false;
+    operation.finally(() => { finished = true; });
+    let cursor = 0;
+    for (let wave = 0; wave < 40; wave++) {
+        while (cursor < pending.length) {
+            const request = pending[cursor++];
+            request.resolve(response(request));
+        }
+        await new Promise(resolve => setImmediate(resolve));
+        if (finished && cursor === pending.length) return operation;
+    }
+    assert.fail('Restoration did not settle after draining its RPCs');
+}
+
+test('stock page one uses applied filters until explicit Apply commits the draft', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.inventory = {status:'ready',offset:25,mode:'current',total_count:345,
+        filters:{search:'',warehouse_id:3,hide_zero:true},rows:[{id:'old'}]};
+    controller.state.stockFilters.search = 'ZZ';
+    const first = controller.pageStock(0);
+    assert.equal(pending[0].args[3].search, '');
+    pending[0].resolve({status:'ready',mode:'current',filters:pending[0].args[3],total_count:345,rows:[{id:'page1'}]});
+    await first;
+    assert.equal(controller.state.inventory.total_count,345);
+    const apply = controller.applyStockFilters();
+    assert.equal(pending[1].args[3].search,'ZZ');
+    pending[1].resolve({status:'empty',mode:'current',filters:pending[1].args[3],total_count:0,rows:[]});
+    await apply;
+    assert.equal(controller.state.inventory.total_count,0);
+});
+
+test('stock cutoff intent overrides a previously entered manual date', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.defaultOptions={date_to:'2026-09-22'};
+    controller.state.stockFilters.at_date='2026-08-20';
+    controller.state.inventory={mode:'historical',filters:{at_date:'2026-08-20'},rows:[]};
+    const cutoff=controller.changeStockMode('cutoff');
+    assert.equal(pending[0].args[2],'historical');
+    assert.equal(pending[0].args[3].at_date,'2026-08-31');
+    pending[0].resolve({status:'ready',rows:[],mode:'historical',as_of:'2026-08-31',filters:pending[0].args[3]});
+    await cutoff;
+    assert.equal(controller.state.inventory.as_of,'2026-08-31');
+});
+
+test('invalid global dates retain the applied scope and successful values without RPCs', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.sections.sales=data(75);
+    const good=controller.state.sections.sales;
+    controller.state.draft.date_from='2026-09-01';
+    await controller.refresh();
+    assert.equal(pending.length,0);
+    assert.equal(controller.state.sections.sales,good);
+    assert.equal(controller.state.applied.date_from,'2026-08-01');
+    assert.ok(controller.state.error);
+});
+
+test('stock request failure clears prior count and date and retry recovers locally', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.sections.sales=data(75);
+    controller.state.inventory={status:'ready',total_count:6,as_of:'2026-08-20',mode:'historical',
+        filters:{at_date:'2026-08-20'},rows:[{id:1}]};
+    const failure=controller.pageStock(25);
+    pending[0].reject(new Error('temporary failure'));
+    await failure;
+    assert.equal(controller.state.inventory.status,'error');
+    assert.equal(controller.state.inventory.total_count,undefined);
+    assert.equal(controller.state.inventory.as_of,undefined);
+    assert.equal(controller.state.inventory.rows.length,0);
+    assert.equal(controller.state.sections.sales.items[0].value,75);
+    const retry=controller.pageStock(0);
+    assert.equal(pending[1].args[3].at_date,'2026-08-20');
+    pending[1].resolve({status:'ready',total_count:1,as_of:'2026-08-20',rows:[{id:2}]});
+    await retry;
+    assert.equal(controller.state.inventory.rows[0].id,2);
+});
+
+test('same-company refresh retains Sales selections and reloads the selected sources', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.recent={kind:'quotations',offset:25,rows:[]};
+    controller.state.ranking={key:'invoiced_margin',rows:[]};
+    controller.state.productMeasure='quantity'; controller.state.productUnit='7';
+    controller.state.rankLimit=10;
+    await settleRequests(pending,controller.refresh(), request => request.method==='get_section'
+        ? {items:[{key:'invoiced_sales',status:'ready',value:55}]}
+        : {status:'ready',rows:[],unit_id:7});
+    assert.equal(pending.find(r=>r.method==='get_recent_sales').args[0],'quotations');
+    assert.ok(pending.some(r=>r.method==='get_breakdown' && r.args[0]==='invoiced_margin'));
+    assert.equal(pending.find(r=>r.method==='get_product_quantity_ranking').args[1],7);
+    assert.equal(controller.state.productUnit,'7');
+    assert.equal(controller.state.rankLimit,10);
+});
+
+test('saved selection restoration reloads stock, search and layout without stored records', async () => {
+    const {controller,pending,storage}=fixture();
+    controller.userId=12; controller.viewKey='selection-test';
+    controller.state.companies=[{id:1}];
+    controller.state.applied={...controller.state.draft};
+    controller.state.sectionOrder=['sales','inventory','finance'];
+    controller.state.inventory={offset:25,mode:'historical',filters:{warehouse_id:3,at_date:'2026-08-20',search:'Shampoo'},rows:[{name:'PRIVATE_STOCK'}]};
+    controller.state.search={query:'Invoice',kind:'invoices',offset:50,groups:[{rows:[{name:'PRIVATE_INVOICE'}]}]};
+    controller.state.employeeProfile={name:'PRIVATE_EMPLOYEE'};
+    controller.state.hrData={filters:{search:'Work'},offset:0,rows:[{name:'PRIVATE_HR'}]};
+    controller.saveView();
+    const encoded=storage.get('selection-test');
+    assert.equal(encoded.includes('PRIVATE_'),false);
+    controller.state.inventory=null; controller.state.search=null; controller.state.sectionOrder=[];
+    await settleRequests(pending,controller.restoreView(), request => request.method==='get_inventory'
+        ? {status:'ready',rows:[],mode:request.args[2],filters:request.args[3]}
+        : request.method==='search_records' ? {groups:[],has_more:false} : {items:[],rows:[],status:'ready'});
+    const stock=pending.find(r=>r.method==='get_inventory');
+    assert.equal(stock.args[1],25); assert.equal(stock.args[3].warehouse_id,3);
+    assert.equal(stock.args[3].at_date,'2026-08-20');
+    assert.equal(controller.state.search.query,'Invoice');
+    assert.equal(controller.state.search.offset,50);
+    assert.deepEqual([...controller.state.sectionOrder],['sales','inventory','finance']);
+});
+
+test('company switching clears identity-bound drawers and ignores late HR/profile results', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.companies=[{id:1,name:'First',logo_url:'/first'},{id:2,name:'Second',logo_url:'/second'}];
+    const hr=controller.loadHR('employees');
+    const profile=controller.openEmployeeProfile(11);
+    controller.state.draft.company_id=2;
+    const refresh=controller.refresh();
+    assert.equal(controller.companyIdentity.name,'Second');
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrData,null);
+    pending[0].resolve({status:'ready',rows:[{name:'First company employee'}]});
+    pending[1].resolve({status:'ready',id:11,name:'First company employee'});
+    for(const request of pending.slice(2))request.resolve({items:[]});
+    await Promise.all([hr,profile,refresh]);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrData,null);
+    assert.equal(controller.companyIdentity.logoUrl,'/second');
+});
+
+test('closed and superseded employee profiles reject their late responses', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const old=controller.openEmployeeProfile(11);
+    const current=controller.openEmployeeProfile(22);
+    pending[1].resolve({status:'ready',id:22}); await current;
+    pending[0].resolve({status:'ready',id:11}); await old;
+    assert.equal(controller.state.employeeProfile.id,22);
+    const closing=controller.openEmployeeProfile(33);
+    controller.closeEmployeeProfile();
+    pending[2].resolve({status:'ready',id:33}); await closing;
+    assert.equal(controller.state.employeeProfile,null);
+});
+
+test('HR optional-source statuses remain distinct and local errors recover', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    for(const status of ['not_installed','restricted','empty']) {
+        const load=controller.loadHR('attendance');
+        pending.at(-1).resolve({status,rows:[],total:0}); await load;
+        assert.equal(controller.state.hrData.status,status);
+    }
+    const failure=controller.loadHR('attendance');
+    pending.at(-1).reject(new Error('backend unavailable')); await failure;
+    assert.equal(controller.state.hrData.status,'error');
+    const recovery=controller.loadHR('attendance');
+    pending.at(-1).resolve({status:'ready',rows:[{id:7}],total:1}); await recovery;
+    assert.equal(controller.state.hrData.status,'ready');
+    assert.equal(controller.state.hrData.rows[0].id,7);
+});
+
+test('HR department selection replaces the unassigned drilldown scope', () => {
+    const {controller}=fixture();
+    controller.state.hrFilters={department_unassigned:true,search:'Engineer'};
+    assert.equal(controller.hrDepartmentSelection,'unassigned');
+    controller.changeHRDepartment({target:{value:'7'}});
+    assert.equal(controller.hrDepartmentSelection,'7');
+    assert.equal(controller.state.hrFilters.department_unassigned,undefined);
+    assert.equal(controller.state.hrFilters.search,'Engineer');
+    controller.changeHRDepartment({target:{value:'unassigned'}});
+    assert.equal(controller.state.hrFilters.department_id,undefined);
+    controller.changeHRDepartment({target:{value:''}});
+    assert.equal(controller.hrDepartmentSelection,'');
+    assert.equal(controller.state.hrFilters.department_unassigned,undefined);
+});
+
+test('native active-company event clears old data even with an invalid draft date', async () => {
+    const {controller,pending,nativeUser,companyEvents}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.draft.date_from='invalid';
+    controller.state.sections.finance=data(999);
+    controller.state.employeeProfile={employee:{id:11}};
+    nativeUser.activeCompany={id:2};
+    companyEvents.ACTIVE_COMPANIES_CHANGED();
+    assert.equal(controller.state.applied.company_id,2);
+    assert.equal(controller.state.draft.date_from,'2026-08-01');
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.sections.finance.items.length,0);
+    for(const request of pending)request.resolve(request.method==='get_bootstrap'
+        ? {options:{company_id:2},companies:[{id:2,name:'Second'}]} : {items:[]});
+    await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(controller.companyIdentity.name,'Second');
+});
+
+test('stock sort changes the whole applied query without applying unsent search drafts', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',offset:25,mode:'current',filters:{sort:'name',search:'Applied',warehouse_id:3},rows:[]};
+    controller.state.stockFilters.search='Unsent';
+    const sort=controller.changeStockSort({target:{value:'qty'}});
+    assert.equal(pending[0].args[1],0);
+    assert.equal(pending[0].args[3].sort,'qty');
+    assert.equal(pending[0].args[3].search,'Applied');
+    pending[0].resolve({status:'ready',rows:[],offset:0,filters:pending[0].args[3]});
+    await sort;
+    assert.equal(controller.navigationState().inventory.filters.sort,'qty');
+    assert.equal(controller.state.stockFilters.search,'Unsent');
+});
+
+test('stock page recovery accepts the server clamped offset and truthful valuation labels', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',offset:25,mode:'current',filters:{sort:'name'},rows:[]};
+    assert.equal(controller.stockValuationLabel({warehouse_id:false}),'Company valuation →');
+    assert.equal(controller.stockValuationLabel({warehouse_id:3}),'Warehouse valuation →');
+    const page=controller.pageStock(25);
+    pending[0].resolve({status:'ready',offset:0,total_count:2,rows:[{id:1},{id:2}]});
+    await page;
+    assert.equal(controller.state.inventory.offset,0);
+    assert.deepEqual([...controller.pageNumbers(controller.state.inventory)],[1]);
+});
+
+test('global replenishment opens a real scoped action and rejects a late stock response', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',mode:'current',filters:{warehouse_id:3},rows:[]};
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const action=controller.openStockSource('replenishment');
+    assert.equal(pending[0].method,'open_inventory_source');
+    assert.equal(pending[0].args[1],'replenishment');
+    assert.equal(pending[0].args[2].warehouse_id,3);
+    controller.state.inventory={status:'loading',rows:[]};
+    pending[0].resolve({type:'ir.actions.act_window'}); await action;
+    assert.equal(opened,0);
+    const current=controller.openStockSource('history');
+    pending[1].resolve({type:'ir.actions.act_window'}); await current;
+    assert.equal(opened,1);
+});
+
+test('reservation source retains the exact row scope and ignores a superseded stock page', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.inventory={status:'ready',mode:'current',filters:{warehouse_id:3},rows:[]};
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const action=controller.openStockReservations({product_id:12,location_id:8});
+    assert.equal(pending[0].method,'open_inventory_reservations');
+    assert.equal(pending[0].args[1],12);
+    assert.equal(pending[0].args[2],8);
+    assert.equal(pending[0].args[3].warehouse_id,3);
+    controller.state.inventory={status:'ready',mode:'historical',rows:[]};
+    pending[0].resolve({type:'ir.actions.act_window'}); await action;
+    assert.equal(opened,0);
+    await controller.openStockReservations({product_id:12,location_id:8});
+    assert.equal(pending.length,1);
+});
+
+test('compact card dates distinguish the applied period from its balance cutoff', () => {
+    const {controller}=fixture();
+    controller.state.applied={company_id:1,date_from:'2026-09-01',date_to:'2026-09-22',as_of:'2026-08-31'};
+    assert.match(controller.metricPeriodLabel({key:'revenue'}), /1.*22.*Sept.*2026/);
+    assert.equal(controller.metricPeriodLabel({key:'cash'}), '31 Aug 2026');
+    assert.equal(controller.metricPeriodLabel({key:'custom',date_field:'as_of'}), '31 Aug 2026');
+});
+
+test('invalid independent HR dates preserve successful rows and issue no RPC', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    const retained={status:'ready',rows:[{id:11}],total:1};
+    controller.state.hrData=retained;
+    for(const period of [
+        {date_from:'2026-02-30',date_to:'2026-03-01'},
+        {date_from:'2026-07-31',date_to:'2026-07-01'},
+        {date_from:'2020-01-01',date_to:'2026-07-31'},
+    ]) {
+        controller.state.hrPeriodDraft=period;
+        await controller.applyHRPeriod();
+        assert.ok(controller.state.hrPeriodError);
+        assert.equal(controller.state.hrData,retained);
+        assert.equal(controller.state.hrPeriodApplied.date_from,'2026-07-01');
+        assert.equal(pending.length,0);
+    }
+});
+
+test('HR overview worklists profiles and sources use applied independent dates, never unsent drafts', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={date_from:'2026-06-01',date_to:'2026-06-30'};
+    const hidden={employee_id:11,department_id:3,status:'open',scope:'current',search:'Private'};
+    const overview=controller.loadHR('overview',0,hidden);
+    assert.deepEqual(Object.keys(pending[0].args[2]),[]);
+    pending[0].resolve({status:'ready',metrics:[],rows:[]}); await overview;
+    const list=controller.loadHR('attendance',25,{employee_id:11});
+    assert.equal(pending[1].args[2].employee_id,11);
+    assert.equal(pending[1].args[3],25);
+    pending[1].resolve({status:'ready',rows:[],total:0}); await list;
+    const profile=controller.openEmployeeProfile(11);
+    pending[2].resolve({status:'ready',employee:{id:11}}); await profile;
+    const source=controller.openHRSource(null,true,'attendance',{employee_id:11});
+    pending[3].resolve({type:'ir.actions.act_window'}); await source;
+    for(const request of pending) {
+        assert.equal(request.args[0].date_from,'2026-07-01',request.method);
+        assert.equal(request.args[0].date_to,'2026-07-31',request.method);
+        assert.equal(request.args[0].company_id,1);
+        assert.equal(request.args[0].as_of,'2026-08-31');
+    }
+    assert.equal(controller.state.hrPeriodDraft.date_from,'2026-06-01');
+});
+
+test('global refresh preserves same-company HR period and saved navigation restores selections without records', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={...controller.state.hrPeriodApplied};
+    controller.state.hrTab='attendance';
+    controller.state.hrData={status:'ready',filters:{employee_id:11},offset:25,rows:[{name:'PRIVATE_HR_RECORD'}]};
+    controller.state.employeeProfile={employee:{name:'PRIVATE_PROFILE'}};
+    const saved=controller.navigationState();
+    assert.equal(JSON.stringify(saved).includes('PRIVATE_'),false);
+    controller.state.draft.date_from='2026-09-01';
+    controller.state.draft.date_to='2026-09-30';
+    await settleRequests(pending,controller.refresh());
+    assert.equal(controller.hrOptions.date_from,'2026-07-01');
+    assert.equal(controller.state.applied.date_from,'2026-09-01');
+    controller.state.hrPeriodApplied={date_from:'2026-06-01',date_to:'2026-06-30'};
+    await settleRequests(pending,controller.restoreNavigation(saved));
+    const request=pending.findLast(request=>request.method==='get_hr_workspace');
+    assert.equal(request.args[0].date_from,'2026-07-01');
+    assert.equal(request.args[1],'attendance');
+    assert.equal(request.args[2].employee_id,11);
+    assert.equal(request.args[3],25);
+    assert.equal(controller.state.hrPeriodDraft.date_to,'2026-07-31');
+    assert.equal(controller.state.employeeProfile,null);
+});
+
+test('rapid HR period changes reject old rows profiles and source navigation', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    const old=controller.loadHR('attendance');
+    const profile=controller.openEmployeeProfile(11);
+    let opened=0; controller.action.doAction=()=>{opened++;};
+    const source=controller.openHRSource(5);
+    controller.state.hrPeriodDraft={date_from:'2026-06-01',date_to:'2026-06-30'};
+    const intermediate=controller.applyHRPeriod();
+    controller.state.hrPeriodDraft={date_from:'2026-05-01',date_to:'2026-05-31'};
+    const current=controller.applyHRPeriod();
+    pending[4].resolve({status:'ready',rows:[{id:55}],total:1}); await current;
+    pending[0].resolve({status:'ready',rows:[{id:77}],total:1});
+    pending[1].resolve({status:'ready',employee:{id:11}});
+    pending[2].resolve({type:'ir.actions.act_window'});
+    pending[3].resolve({status:'ready',rows:[{id:66}],total:1});
+    await Promise.all([old,profile,source,intermediate]);
+    assert.equal(controller.state.hrData.rows[0].id,55);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrPeriodApplied.date_from,'2026-05-01');
+    assert.equal(opened,0);
+    assert.equal(controller.state.opening,false);
+});
+
+test('company change resets independent HR dates to the new applied global period', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.hrPeriodApplied={date_from:'2026-07-01',date_to:'2026-07-31'};
+    controller.state.hrPeriodDraft={date_from:'invalid',date_to:'invalid'};
+    controller.state.hrPeriodError='Previous validation error';
+    controller.state.draft.company_id=2;
+    await settleRequests(pending,controller.refresh());
+    assert.equal(controller.hrOptions.company_id,2);
+    assert.equal(controller.state.hrPeriodApplied.date_from,'2026-08-01');
+    assert.equal(controller.state.hrPeriodDraft.date_to,'2026-08-31');
+    assert.equal(controller.state.hrPeriodError,'');
+});
+
+test('HR week appends complete bounded batches and retains independent list pagination', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',75,{view:'week'});
+    assert.equal(pending[0].args[3],0);
+    pending[0].resolve({status:'ready',offset:0,page_size:100,total:203,has_more:true,rows:Array.from({length:100},(_,i)=>({id:i+1}))});await first;
+    const more=controller.loadMoreHRShifts();
+    assert.equal(controller.state.hrData.rows.length,100);
+    assert.equal(pending[1].args[3],100);
+    await controller.loadMoreHRShifts();assert.equal(pending.length,2);
+    pending[1].resolve({status:'ready',offset:100,page_size:100,total:203,has_more:true,rows:Array.from({length:100},(_,i)=>({id:i+101}))});await more;
+    assert.equal(controller.state.hrData.rows.length,200);
+    const last=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],200);
+    pending[2].resolve({status:'ready',offset:200,page_size:100,total:203,has_more:false,rows:[{id:201},{id:202},{id:203}]});await last;
+    assert.equal(controller.state.hrData.rows.length,203);assert.equal(controller.state.hrData.has_more,false);
+    const list=controller.loadHR('shifts',25,{view:'list'});assert.equal(pending[3].args[3],25);
+    assert.equal(controller.state.hrData.rows.length,0);
+    pending[3].resolve({status:'ready',offset:25,page_size:25,total:26,has_more:false,rows:[{id:26}]});await list;
+    assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[26]);
+});
+
+test('late HR week append cannot replace new filters, periods, tabs or company scope', async () => {
+    for (const change of ['filters','period','tab','company']) {
+        const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+        const initial=controller.loadHR('shifts',0,{view:'week',department_id:2});
+        pending[0].resolve({status:'ready',offset:0,total:2,has_more:true,rows:[{id:1}]});await initial;
+        const stale=controller.loadMoreHRShifts();
+        if(change==='company'){controller.generation++;controller.state.applied.company_id=2;}
+        if(change==='period')controller.state.hrPeriodApplied={date_from:'2026-09-01',date_to:'2026-09-07'};
+        const fresh=controller.loadHR(change==='tab'?'employees':'shifts',0,{view:'week',department_id:3});
+        assert.equal(controller.state.hrData.rows.length,0);
+        pending[2].resolve({status:'ready',offset:0,total:1,has_more:false,rows:[{id:99}]});await fresh;
+        pending[1].resolve({status:'ready',offset:1,total:2,has_more:false,rows:[{id:2}]});await stale;
+        assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),[99],change);
+    }
+});
+
+test('HR week append failure preserves loaded shifts and retries the same offset', async () => {
+    const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',0,{view:'week'});
+    pending[0].resolve({status:'ready',offset:0,total:2,has_more:true,rows:[{id:1}]});await first;
+    const fail=controller.loadMoreHRShifts();pending[1].reject(new Error('temporary'));await fail;
+    assert.equal(controller.state.hrData.load_more_error,true);assert.equal(controller.state.hrData.rows[0].id,1);
+    const retry=controller.loadMoreHRShifts();assert.equal(pending[2].args[3],1);
+    pending[2].resolve({status:'ready',offset:1,total:2,has_more:false,rows:[{id:2}]});await retry;
+    assert.equal(controller.state.hrData.load_more_error,false);assert.equal(controller.state.hrData.rows.length,2);
+});
+
+
+test('HR week restarts when Planning inserts or removes shifts between calendar batches', async () => {
+    for (const change of ['insert', 'remove', 'changed_during_count', 'same_count_reorder']) {
+        const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+        const initial=controller.loadHR('shifts',0,{view:'week',department_id:2});
+        pending[0].resolve({status:'ready',offset:0,page_size:100,total:102,has_more:true,
+            rows:Array.from({length:100},(_,i)=>({id:102-i}))});await initial;
+        const more=controller.loadMoreHRShifts();assert.equal(pending[1].args[3],100);
+        const response = change === 'insert'
+            ? {total:103,offset:100,rows:[{id:3},{id:2},{id:1}]}
+            : change === 'remove' ? {total:2,offset:0,rows:[{id:2},{id:1}]}
+            : change === 'same_count_reorder' ? {total:102,offset:100,rows:[{id:3},{id:1}]}
+            : {total:102,offset:100,rows:[{id:1}]};
+        pending[1].resolve({status:'ready',page_size:100,has_more:false,...response});
+        await new Promise(setImmediate);
+        assert.equal(pending[2].args[3],0,change);
+        assert.equal(pending[2].args[2].department_id,2,change);
+        assert.equal(controller.state.hrData.rows.length,0,change);
+        const fresh = change === 'remove' ? [{id:2},{id:1}] : Array.from({length:100},(_,i)=>({id:103-i}));
+        pending[2].resolve({status:'ready',offset:0,page_size:100,total:response.total,
+            has_more:fresh.length<response.total,rows:fresh});await more;
+        assert.deepEqual(Array.from(controller.state.hrData.rows,row=>row.id),fresh.map(row=>row.id),change);
+        assert.equal(controller.state.hrData.has_more,fresh.length<response.total,change);
+    }
+});
+
+test('HR week admission revocation clears loaded sensitive data instead of offering transient retry', async () => {
+    const {controller,pending}=fixture();controller.state.applied={...controller.state.draft};
+    const first=controller.loadHR('shifts',0,{view:'week'});
+    pending[0].resolve({status:'ready',offset:0,total:102,has_more:true,
+        rows:Array.from({length:100},(_,i)=>({id:i+1,employee_id:[1,'Previously authorized employee']}))});await first;
+    controller.state.employeeProfile={status:'ready',employee:{id:1,name:'Previously authorized employee'}};
+    controller.hrDepartments=[{id:1,name:'Previously authorized department'}];
+    const denied=controller.loadMoreHRShifts();
+    pending[1].reject(Object.assign(new Error('Access denied'),{data:{name:'odoo.exceptions.AccessError'}}));await denied;
+    assert.equal(controller.state.hrData.status,'restricted');
+    assert.equal(controller.state.hrData.rows.length,0);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.hrDepartments.length,0);
+    assert.equal(controller.state.hrData.load_more_error,undefined);
+    await controller.loadMoreHRShifts();assert.equal(pending.length,2);
 });

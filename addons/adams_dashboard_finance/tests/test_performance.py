@@ -90,7 +90,12 @@ class TestDashboardPerformance(AccountTestInvoicingHttpCommon):
             await wait(() => document.querySelector('#adams-finance .adams_metric_groups'), 'Finance did not become usable');
             const first = performance.now();
             const root = document.querySelector('.o_adams_dashboard');
-            const inputs = [...root.querySelectorAll('.adams_filters input')];
+            const period = root.querySelector('.adams_filters select');
+            period.value = 'custom'; period.dispatchEvent(new Event('change', {bubbles:true}));
+            root.querySelector('.adams_balance_scope button').click();
+            await wait(() => root.querySelectorAll('.adams_filters input[type="date"]').length === 3,
+                'Custom period and balance cutoff must expose their native date controls');
+            const inputs = [...root.querySelectorAll('.adams_filters input[type="date"]')];
             const dates = ['2026-08-01','2026-08-31','2026-08-31'];
             const expected = new Intl.NumberFormat(document.documentElement.lang || 'en',
                 {minimumFractionDigits:2, maximumFractionDigits:2}).format(100000);
@@ -102,7 +107,7 @@ class TestDashboardPerformance(AccountTestInvoicingHttpCommon):
                     input.dispatchEvent(new Event('change', {bubbles:true}));
                 });
                 const started = performance.now();
-                root.querySelector('.adams_filters button').click();
+                root.querySelector('.adams_filters button[type="submit"]').click();
                 await wait(() => root.querySelector('#adams-finance > .adams_message[role="status"]'), 'Refresh must clear old Finance values');
                 await wait(() => root.querySelector('#adams-finance .adams_value')?.title === expected,
                     'Refreshed native revenue must equal 100000');
