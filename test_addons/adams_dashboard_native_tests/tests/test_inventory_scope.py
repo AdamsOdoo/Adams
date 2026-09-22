@@ -167,6 +167,8 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
                          'Name sort without quantity predicates must read one product page, not the catalog')
 
     def test_current_reservations_reconcile_native_quants_and_exact_source(self):
+        category = self.env['product.category'].create({'name': 'Reservation category'})
+        self.product.categ_id = category
         child = self.env['stock.location'].create({'name': 'Reservation child', 'usage': 'internal',
             'location_id': self.location.id, 'company_id': self.env.company.id})
         quants = self.env['stock.quant']
@@ -193,6 +195,11 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         historical = self.dashboard.get_inventory(self.options, mode='historical', filters=filters)
         self.assertTrue(historical['rows'])
         self.assertNotIn('reserved_quantity', historical['rows'][0])
+        # Category is optional in this native build: preserve its empty value.
+        self.product.categ_id = False
+        uncategorized = self.dashboard.get_inventory(self.options, filters=filters)['rows'][0]
+        self.assertFalse(uncategorized['categ_id'])
+        self.assertEqual(uncategorized['reserved_quantity'], 3)
         with self.assertRaises(ValidationError):
             self.dashboard.open_inventory_reservations(self.options, True, self.location.id)
         with self.assertRaises(AccessError):

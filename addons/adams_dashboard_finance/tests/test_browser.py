@@ -1,8 +1,11 @@
 """Real Odoo browser acceptance with disposable finance fixtures."""
+import base64
 import hashlib
+import io
 import json
 import logging
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import time
@@ -13,6 +16,7 @@ from unittest.mock import patch
 
 from odoo import Command, fields
 from odoo.tools import config
+from odoo.tools.pdf import PdfReader
 from odoo.tests import new_test_user, tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
@@ -194,6 +198,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         screenshot_source = Path(config['screenshots']) / self.env.cr.dbname / 'screenshots'
         existing_screenshots = set(screenshot_source.glob('*.png'))
         capture_prefixes = []
+        captured_pdfs = []
         viewports = [(320, 900), (390, 900), (768, 900), (1024, 900), (1366, 768), (1440, 900), (1920, 1080)]
         for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
             self.env.user.lang = lang
@@ -523,6 +528,80 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         if observed.get('exceptionDetails'):
                             raise AssertionError(observed['exceptionDetails'])
 
+                    if width == 1440:
+                        # Open the actual dashboard summary through its UI. CDP
+                        # prints this document with its real @media print rules;
+                        # no replacement HTML, report data or mocked window.print.
+                        capture_section('finance')
+                        observed = browser._websocket_request('Runtime.evaluate', params={
+                            'expression': r"""(async () => {
+                                const wait = async (test, message) => {
+                                    for (let i = 0; i < 250; i++) {
+                                        const value = test(); if (value) return value;
+                                        await new Promise(resolve => setTimeout(resolve, 100));
+                                    }
+                                    throw new Error(message);
+                                };
+                                const root = document.querySelector('.o_adams_dashboard');
+                                root.querySelector('.adams_more_wrapper > button').click();
+                                const print = await wait(() => root.querySelector('[data-action="print"]'), 'Print menu must open');
+                                await wait(() => !print.disabled, 'Print action must be enabled');
+                                print.click();
+                                const dialog = await wait(() => root.querySelector('.adams_print_summary[open]'), 'Actual print dialog must open');
+                                await wait(() => dialog.querySelectorAll('tbody tr').length > 0, 'Actual print rows must render');
+                                await document.fonts.ready;
+                                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                                return {url: location.href, viewport: [innerWidth, innerHeight],
+                                    language: document.documentElement.lang, direction: getComputedStyle(root).direction,
+                                    theme: getComputedStyle(root).colorScheme, company: dialog.querySelector(':scope > h2').textContent,
+                                    row_count: dialog.querySelectorAll('tbody tr').length,
+                                    dates: [...dialog.querySelectorAll(':scope > p bdi')].map(node => node.textContent),
+                                    rendered_text: dialog.innerText};
+                            })()""", 'awaitPromise': True, 'returnByValue': True,
+                        })
+                        self.assertFalse(observed.get('exceptionDetails'), observed.get('exceptionDetails'))
+                        print_context = observed['result']['value']
+                        self.assertEqual(print_context['viewport'], [width, height])
+                        self.assertEqual(print_context['company'], self.env.company.name)
+                        self.assertIn(heading, print_context['rendered_text'])
+                        parameters = {'landscape': False, 'displayHeaderFooter': False,
+                            'printBackground': True, 'preferCSSPageSize': True,
+                            'paperWidth': 210 / 25.4, 'paperHeight': 297 / 25.4,
+                            'marginTop': 10 / 25.4, 'marginBottom': 10 / 25.4,
+                            'marginLeft': 10 / 25.4, 'marginRight': 10 / 25.4,
+                            'scale': 1, 'transferMode': 'ReturnAsBase64'}
+                        try:
+                            response = browser._websocket_request('Page.printToPDF', params=parameters)
+                            content = base64.b64decode(response['data'], validate=True)
+                            self.assertTrue(content.startswith(b'%PDF-') and len(content) > 1000,
+                                            'Chrome must return a nonempty actual PDF')
+                            document = PdfReader(io.BytesIO(content))
+                            self.assertGreater(len(document.pages), 0)
+                            page_text = [page.extract_text() or '' for page in document.pages]
+                            self.assertTrue(all(text.strip() for text in page_text),
+                                            'Actual dashboard PDF contains a blank page')
+                            self.assertGreater(len(''.join(page_text).strip()), 80,
+                                               'Actual dashboard PDF is missing its summary text')
+                            captured_pdfs.append({'name': f'dashboard_summary_{lang}_{theme}_{width}.pdf',
+                                'content': content, 'context': print_context, 'print_parameters': parameters,
+                                'page_count': len(document.pages), 'page_text': page_text,
+                                'page_sizes_points': [[float(page.mediabox.width), float(page.mediabox.height)]
+                                                      for page in document.pages]})
+                        finally:
+                            closed = browser._websocket_request('Runtime.evaluate', params={
+                                'expression': r"""(async () => {
+                                    const dialog = document.querySelector('.adams_print_summary[open]');
+                                    if (!dialog) throw new Error('Print dialog unexpectedly disappeared');
+                                    dialog.querySelectorAll('header button')[1].click();
+                                    for (let i = 0; i < 100; i++) {
+                                        if (!dialog.open) return true;
+                                        await new Promise(resolve => setTimeout(resolve, 50));
+                                    }
+                                    throw new Error('Print dialog must close through its UI');
+                                })()""", 'awaitPromise': True, 'returnByValue': True,
+                            })
+                            self.assertFalse(closed.get('exceptionDetails'), closed.get('exceptionDetails'))
+
                     for section in ('sales', 'inventory', 'procurement', 'crm'):
                         setup = ''
                         target = None
@@ -711,6 +790,38 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         os.replace(pending, destination)
         logging.getLogger(__name__).info('ADAMS_DASHBOARD_UI_EVIDENCE: %s (%s verified PNGs)',
                                          destination, len(capture_prefixes))
+
+        # PDFs have their own manifest and do not change PNG matrix coverage.
+        self.assertEqual(len(captured_pdfs), 4, 'Retain English/Arabic × light/dark actual PDFs')
+        pdf_root = Path(config['data_dir']) / 'adams_dashboard_pdf_evidence' / self.env.cr.dbname
+        pdf_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        pdf_root.parent.chmod(0o700)
+        pdf_root.chmod(0o700)
+        pdf_pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=pdf_root))
+        source_directory = Path(__file__).resolve().parent
+        source_sha = subprocess.check_output(
+            ['git', '-C', str(source_directory), 'rev-parse', 'HEAD'], text=True).strip()
+        self.assertEqual(len(source_sha), 40, 'PDF evidence must identify its exact application source')
+        pdf_manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
+                        'application_sha': source_sha, 'test_source': str(Path(__file__).resolve()),
+                        'test_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                        'png_evidence_directory': str(destination), 'files': []}
+        for captured in captured_pdfs:
+            content = captured.pop('content')
+            target = pdf_pending / captured['name']
+            with target.open('xb') as output:
+                output.write(content)
+            target.chmod(0o600)
+            digest = hashlib.sha256(content).hexdigest()
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), digest)
+            pdf_manifest['files'].append(dict(captured, sha256=digest, bytes=len(content)))
+        pdf_manifest_path = pdf_pending / 'manifest.json'
+        pdf_manifest_path.write_text(json.dumps(pdf_manifest, indent=2, ensure_ascii=False) + '\n')
+        pdf_manifest_path.chmod(0o600)
+        pdf_destination = pdf_root / ('run-' + uuid4().hex)
+        os.replace(pdf_pending, pdf_destination)
+        logging.getLogger(__name__).info('ADAMS_DASHBOARD_PDF_EVIDENCE: %s (4 verified actual PDFs)',
+                                         pdf_destination)
 
 
     def test_hidden_sections_are_absent_from_both_navigation_surfaces(self):
