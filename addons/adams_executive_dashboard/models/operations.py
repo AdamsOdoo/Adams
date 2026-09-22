@@ -2,6 +2,7 @@
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 from heapq import nsmallest
+from itertools import islice
 
 import pytz
 
@@ -106,17 +107,22 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         products.check_field_access_rights('read', ['name'])
         warehouse_paths = [(w.view_location_id.parent_path, w.name, w.id) for w in warehouses]
 
+        quantity_filter = any(isinstance(term, (tuple, list)) and term[0] == 'qty_available' for term in domain)
+
+        def expanded_domain(scoped_products):
+            local_domain = []
+            for term in domain:
+                if isinstance(term, (tuple, list)) and term[0] == 'qty_available':
+                    local_domain.extend(scoped_products._search_qty_available(term[1], term[2]))
+                else:
+                    local_domain.append(term)
+            return local_domain
+
         def candidates():
             nonlocal total
             for location in locations:
                 scoped_products = products.with_context(location=location.id, strict=True)
-                local_domain = []
-                for term in domain:
-                    if isinstance(term, (tuple, list)) and term[0] == 'qty_available':
-                        # Native search includes installed historical/kit overrides.
-                        local_domain.extend(scoped_products._search_qty_available(term[1], term[2]))
-                    else:
-                        local_domain.append(term)
+                local_domain = expanded_domain(scoped_products)
                 last_id = 0
                 while True:
                     batch = scoped_products.search([*local_domain, ('id', '>', last_id)], order='id', limit=256)
@@ -134,11 +140,49 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                     if len(batch) < 256:
                         break
 
-        # Keep at most the requested prefix, not an unbounded business dataset.
-        selected_keys = nsmallest(offset + 25, candidates())
-        # Recover gracefully if another operation removed the previous last page.
-        offset = min(offset, ((total - 1) // 25) * 25) if total else 0
-        page = selected_keys[offset:offset + 25]
+        if sort_by == 'name' and not quantity_filter:
+            # Every authorized product/location pair qualifies. Count once and
+            # read only the product window covering this page, in native order.
+            total = products.search_count(domain) * len(locations)
+            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
+            if total:
+                product_start = offset // len(locations)
+                product_end = (min(offset + 25, total) - 1) // len(locations)
+                selected = products.search(domain, order='name, id', offset=product_start,
+                                           limit=product_end - product_start + 1)
+                pairs = ((location.id, product.id) for product in selected for location in locations)
+                page = list(islice(pairs, offset % len(locations), offset % len(locations) + 25))
+            else:
+                page = []
+        elif sort_by == 'name':
+            # Each location contributes only its native ordered prefix. Merge
+            # prefixes using native product collation, never Python casefold.
+            # Incremental merge keeps at most two prefixes in memory.
+            prefix_size = offset + 25
+            retained = []
+            location_rank = {location.id: index for index, location in enumerate(locations)}
+            for location in locations:
+                local_products = products.with_context(location=location.id, strict=True)
+                local_domain = expanded_domain(local_products)
+                count = local_products.search_count(local_domain)
+                total += count
+                if not count:
+                    continue
+                prefix = local_products.search(local_domain, order='name, id', limit=prefix_size)
+                merged = retained + [(location.id, product.id) for product in prefix]
+                ordered_products = products.search([('id', 'in', list({pair[1] for pair in merged}))],
+                                                   order='name, id', limit=prefix_size)
+                product_rank = {product.id: index for index, product in enumerate(ordered_products)}
+                retained = sorted((pair for pair in merged if pair[1] in product_rank),
+                                  key=lambda pair: (product_rank[pair[1]], location_rank[pair[0]]))[:prefix_size]
+            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
+            page = retained[offset:offset + 25]
+        else:
+            # Computed native quantity cannot be SQL ordered. Keep only the
+            # requested prefix while reading candidate quantities in batches.
+            selected_keys = nsmallest(offset + 25, candidates())
+            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
+            page = [(key[-2], key[-1]) for key in selected_keys[offset:offset + 25]]
         rows_by_pair = {}
         for location_id in dict.fromkeys(key[-2] for key in page):
             location = locations.browse(location_id)

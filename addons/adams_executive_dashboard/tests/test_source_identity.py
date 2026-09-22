@@ -26,6 +26,11 @@ class TestDashboardSourceIdentity(AccountTestInvoicingCommon):
         invoice.action_post()
         return invoice
 
+    def test_fulfillment_invalid_page_returns_validation_error(self):
+        for offset in (-1, True, '25'):
+            with self.subTest(offset=offset), self.assertRaises(ValidationError):
+                self.dashboard.get_fulfillment(self.options, offset)
+
     def test_quantity_action_matches_signed_native_ranking_and_measure(self):
         self._quantity_invoice(68)
         self._quantity_invoice(2, 'out_refund')

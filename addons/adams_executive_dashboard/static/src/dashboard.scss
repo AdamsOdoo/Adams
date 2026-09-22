@@ -494,6 +494,7 @@
     .adams_company_scope strong { color:var(--adams-ink); font-size:13px; font-weight:600; max-width:220px; overflow-wrap:anywhere; }
     .adams_filters select { width:auto; border:0; padding-inline-start:0; font-weight:600; background-color:transparent; font-size:13px; }
     .adams_applied_period, .adams_balance_scope { color:var(--adams-sub); font-size:12px; }
+    .adams_applied_period bdi, .adams_balance_scope > bdi { display:inline-block; white-space:nowrap; direction:ltr; unicode-bidi:isolate; }
     .adams_balance_scope { display:flex; align-items:center; gap:6px; margin-inline-start:auto; }
     .adams_balance_scope bdi { color:var(--adams-ink); }
     .adams_balance_scope .btn { padding:2px 0; min-height:0; font-size:12px; }

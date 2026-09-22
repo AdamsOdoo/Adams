@@ -1,5 +1,6 @@
 """Native B01/B05 regressions; must run with stock_account installed."""
 from lxml import etree
+from unittest.mock import patch
 
 from odoo import Command
 from odoo.exceptions import AccessError, ValidationError
@@ -125,3 +126,28 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
             company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
         with self.assertRaises(AccessError):
             self.dashboard.with_user(reader).open_inventory_source(self.options, 'replenishment')
+
+    def test_name_sort_reads_only_page_window_and_matches_native_collation(self):
+        prefix = 'Dashboard bounded read fixture'
+        products = self.env['product.product'].create([
+            {'name': f'{prefix} {name} {index:02}', 'is_storable': True}
+            for index, name in enumerate(['A', 'a', 'Á', 'آ', 'Z'] * 12)])
+        native = products.search([('id', 'in', products.ids)], order='name, id')
+        product_class = type(self.env['product.product'])
+        original_search = product_class.search
+        reads = []
+
+        def tracked_search(records, domain, *args, **kwargs):
+            if any(isinstance(term, (tuple, list)) and len(term) == 3
+                   and term[0] == 'name' and term[2] == prefix for term in domain):
+                reads.append((kwargs.get('offset', 0), kwargs.get('limit')))
+            return original_search(records, domain, *args, **kwargs)
+
+        filters = {'location_id': self.location.id, 'search': prefix,
+                   'hide_zero': False, 'hide_negative': False, 'sort': 'name'}
+        with patch.object(product_class, 'search', tracked_search):
+            page = self.dashboard.get_inventory(self.options, offset=25, filters=filters)
+        self.assertEqual(page['total_count'], 60)
+        self.assertEqual([row['product_id'] for row in page['rows']], native[25:50].ids)
+        self.assertEqual(reads, [(25, 25)],
+                         'Name sort without quantity predicates must read one product page, not the catalog')

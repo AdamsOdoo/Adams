@@ -14,6 +14,12 @@ Candidate `236f63bd36aa7939b9074a2c2d73c9ad4174edf2`, development build **384592
 
 These changes are fixes under test, not passed owner-UAT gates. Staging remains at `9af98d4248090f2be3ceefb5d59bca36258b7c3a`.
 
+## Follow-up candidate: native execution resumed
+
+Candidate `b679bb39732dacaafe1dea884975c0ccfabefbba` first encountered platform error build **38491096**. A supported rebuild on the same source, **38491213**, reached **69 post-tests in 95.88 seconds / 51,468 queries**, then stopped with **1 failure and 4 errors**. Startup/company integration and Sass errors no longer occur. Remaining observed defects: narrow applied-date fragments and translation-function shadowing in denied HR action/profile paths. Corrections preserve the original negative assertions. A related shadowed-name path in fulfillment validation was corrected with its own regression.
+
+Independent review found an avoidable full-catalog scan in default stock name sorting. The corrected name path uses native database order and bounded windows/prefixes, with an additional mixed-script ordering/read-volume regression. Quantity sorting uses native computed quantities and still needs representative timing. Controller suite: **51/51 pass** on the follow-up working tree; no native/visual all-pass claim.
+
 | Check | Observed status | Limit / next evidence |
 |---|---|---|
 | External harness adapter check | PASS: exact pinned clean resources and eight skills | Toolkit runtime qualification is historical; it does not qualify dashboard edits. |

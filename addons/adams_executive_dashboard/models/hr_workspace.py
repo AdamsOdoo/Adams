@@ -251,7 +251,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
         scoped, dates = self._scope(options)
         if type(employee_id) is not int or employee_id < 1:
             raise ValidationError(_('Invalid employee.'))
-        employees, _ = scoped._workforce_scope()
+        employees, employee_domain = scoped._workforce_scope()
         employee = employees.with_context(active_test=False).search([
             ('id', '=', employee_id), ('company_id', '=', scoped.env.company.id)], limit=1)
         if not employee:
@@ -276,7 +276,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 try:
                     with scoped.env.cr.savepoint():
                         filters, interval = scoped._hr_filters(tab, {'employee_id': employee_id}, dates)
-                        source, domain, _, _ = scoped._hr_source_scope(tab, filters, interval)
+                        source, domain, columns, order = scoped._hr_source_scope(tab, filters, interval)
                         item.update(status='ready', count=source.search_count(domain))
                 except AccessError:
                     item['status'] = 'restricted'
@@ -295,7 +295,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
             raise ValidationError(_('This HR application is not installed.'))
         if type(report) is not bool:
             raise ValidationError(_('Invalid HR source.'))
-        source, domain, _, _ = scoped._hr_source_scope(tab, filters, dates)
+        source, domain, columns, order = scoped._hr_source_scope(tab, filters, dates)
         if record_id is not None:
             if type(record_id) is not int or record_id < 1:
                 raise ValidationError(_('Invalid HR record.'))

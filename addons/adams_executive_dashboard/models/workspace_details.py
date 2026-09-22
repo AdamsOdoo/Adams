@@ -22,7 +22,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
             domain = [('company_id', '=', self.env.company.id), ('state', '=', 'purchase'),
                       *self._date_bounds(source, 'date_order', dates)]
             return source, domain, columns, 'date_order desc, id desc', 'purchase.purchase_form_action'
-        source, domain, _, action_id = self._native_scope('crm', dates)
+        source, domain, aggregate, action_id = self._native_scope('crm', dates)
         columns = ['name', 'partner_id', 'user_id', 'stage_id', 'expected_revenue',
                    'prorated_revenue', 'probability', 'date_deadline', 'create_date']
         source.check_field_access_rights('read', columns)
@@ -45,7 +45,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
         return rows
 
     def _workspace_records(self, section, dates, offset):
-        source, domain, columns, order, _ = self._workspace_record_scope(section, dates)
+        source, domain, columns, order, action_id = self._workspace_record_scope(section, dates)
         total = source.search_count(domain)
         offset = min(offset, ((total - 1) // 25) * 25) if total else 0
         records = source.search(domain, order=order, offset=offset, limit=25)
@@ -55,7 +55,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
                 'provenance': {'model': source._name, 'domain': domain, 'source_kind': 'operational_records'}}
 
     def _workspace_amount(self, key, dates, measure=None):
-        source, domain, aggregate, _ = self._native_scope(key, dates)
+        source, domain, aggregate, action_id = self._native_scope(key, dates)
         aggregate = measure or aggregate
         source.check_field_access_rights('read', [aggregate.split(':')[0]])
         value, count = source._read_group(domain, [], [aggregate, '__count'])[0]
@@ -113,7 +113,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
         model = 'purchase.order' if section == 'procurement' else 'crm.lead'
         if model not in scoped.env:
             raise ValidationError(_('This application is not installed.'))
-        source, domain, _, _, action_id = scoped._workspace_record_scope(section, dates)
+        source, domain, columns, order, action_id = scoped._workspace_record_scope(section, dates)
         if record_id is not None:
             if type(record_id) is not int or record_id < 1:
                 raise ValidationError(_('Invalid source record.'))

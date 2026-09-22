@@ -150,7 +150,7 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('Invalid page.'))
         if 'sale.report' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
-        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', columns)
         domain = [*domain, ('product_id', '!=', False)]
@@ -170,7 +170,7 @@ class ExecutiveDashboard(models.AbstractModel):
         scoped, dates = self._scope(options)
         if 'sale.report' not in scoped.env:
             raise ValidationError(_('This report is not configured.'))
-        report, domain, _, action_id = scoped._native_scope('confirmed_sales', dates)
+        report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         measures = ['product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', ['product_id', 'product_uom_id', *measures])
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
