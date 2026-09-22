@@ -451,33 +451,22 @@ test('company section settings filter navigation and skip hidden source requests
     assert.equal(controller.state.products,null);
 });
 
-test('scroll tracking uses real sticky height, supports bottom sections and clicked targets', () => {
+test('explicit department navigation persists through scrolling and rejects disabled departments', () => {
     const {controller} = fixture();
-    controller.state.companies=[{id:1,enabled_sections:['finance','sales','hr']}];
-    controller.state.applied={company_id:1};
-    const boxes={finance:{top:-600,bottom:150},sales:{top:155,bottom:900},hr:{top:920,bottom:1050}};
-    const root={scrollTop:600,clientHeight:700,scrollHeight:2000,style:{setProperty(){}},
-        getBoundingClientRect:()=>({top:50,bottom:750}),
-        querySelector:selector=>selector==='.adams_nav'?{getBoundingClientRect:()=>({height:100})}:{getBoundingClientRect:()=>boxes[selector.replace('#adams-','')]}};
-    controller.root.el=root;
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'sales']}];
+    controller.state.applied = {company_id: 1};
+    let scroll;
+    controller.root.el.scrollTo = options => { scroll = options.top; };
+    controller.navigateSection('sales');
+    assert.equal(controller.state.activeSection, 'sales');
+    assert.equal(scroll, 0);
+    controller.root.el.scrollTop = 1400;
     controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    // Filtering can leave only the previous section's footer above the next
-    // heading. The visible content, not that footer, determines the category.
-    boxes.finance={top:-600,bottom:168};boxes.sales={top:200,bottom:900};
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    boxes.finance={top:-600,bottom:400};boxes.sales={top:432,bottom:900};
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'finance');
-    boxes.sales={top:70,bottom:280};boxes.hr={top:300,bottom:430};
-    root.scrollTop=1300;
-    controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'hr');
-    controller.scrollTarget='sales';controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'sales');
-    controller.scrollTarget=null;controller.syncActiveSection();
-    assert.equal(controller.state.activeSection,'hr');
+    assert.equal(controller.state.activeSection, 'sales');
+    controller.navigateSection('hr');
+    assert.equal(controller.state.activeSection, 'sales');
+    controller.navigateSection('finance');
+    assert.equal(controller.state.activeSection, 'finance');
 });
 
 test('numbered pagination exposes known pages without inventing an unknown last page', () => {
@@ -584,4 +573,180 @@ test('company settings open for the applied dashboard company', () => {
     controller.openSettings();
     assert.equal(options.additionalContext.default_company_id,2);
     assert.deepEqual([...options.additionalContext.allowed_company_ids],[2]);
+});
+
+// Drain RPCs issued by awaited restoration and its auxiliary loaders. This
+// avoids coupling regressions to a fixed number of microtask turns or calls.
+async function settleRequests(pending, operation, response = () => ({items: [], rows: [], status: 'ready'})) {
+    let finished = false;
+    operation.finally(() => { finished = true; });
+    let cursor = 0;
+    for (let wave = 0; wave < 40; wave++) {
+        while (cursor < pending.length) {
+            const request = pending[cursor++];
+            request.resolve(response(request));
+        }
+        await new Promise(resolve => setImmediate(resolve));
+        if (finished && cursor === pending.length) return operation;
+    }
+    assert.fail('Restoration did not settle after draining its RPCs');
+}
+
+test('stock page one uses applied filters until explicit Apply commits the draft', async () => {
+    const {controller, pending} = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.inventory = {status:'ready',offset:25,mode:'current',total_count:345,
+        filters:{search:'',warehouse_id:3,hide_zero:true},rows:[{id:'old'}]};
+    controller.state.stockFilters.search = 'ZZ';
+    const first = controller.pageStock(0);
+    assert.equal(pending[0].args[3].search, '');
+    pending[0].resolve({status:'ready',mode:'current',filters:pending[0].args[3],total_count:345,rows:[{id:'page1'}]});
+    await first;
+    assert.equal(controller.state.inventory.total_count,345);
+    const apply = controller.applyStockFilters();
+    assert.equal(pending[1].args[3].search,'ZZ');
+    pending[1].resolve({status:'empty',mode:'current',filters:pending[1].args[3],total_count:0,rows:[]});
+    await apply;
+    assert.equal(controller.state.inventory.total_count,0);
+});
+
+test('stock cutoff intent overrides a previously entered manual date', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.defaultOptions={date_to:'2026-09-22'};
+    controller.state.stockFilters.at_date='2026-08-20';
+    controller.state.inventory={mode:'historical',filters:{at_date:'2026-08-20'},rows:[]};
+    const cutoff=controller.changeStockMode('cutoff');
+    assert.equal(pending[0].args[2],'historical');
+    assert.equal(pending[0].args[3].at_date,'2026-08-31');
+    pending[0].resolve({status:'ready',rows:[],mode:'historical',as_of:'2026-08-31',filters:pending[0].args[3]});
+    await cutoff;
+    assert.equal(controller.state.inventory.as_of,'2026-08-31');
+});
+
+test('invalid global dates retain the applied scope and successful values without RPCs', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.sections.sales=data(75);
+    const good=controller.state.sections.sales;
+    controller.state.draft.date_from='2026-09-01';
+    await controller.refresh();
+    assert.equal(pending.length,0);
+    assert.equal(controller.state.sections.sales,good);
+    assert.equal(controller.state.applied.date_from,'2026-08-01');
+    assert.ok(controller.state.error);
+});
+
+test('stock request failure clears prior count and date and retry recovers locally', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.sections.sales=data(75);
+    controller.state.inventory={status:'ready',total_count:6,as_of:'2026-08-20',mode:'historical',
+        filters:{at_date:'2026-08-20'},rows:[{id:1}]};
+    const failure=controller.pageStock(25);
+    pending[0].reject(new Error('temporary failure'));
+    await failure;
+    assert.equal(controller.state.inventory.status,'error');
+    assert.equal(controller.state.inventory.total_count,undefined);
+    assert.equal(controller.state.inventory.as_of,undefined);
+    assert.equal(controller.state.inventory.rows.length,0);
+    assert.equal(controller.state.sections.sales.items[0].value,75);
+    const retry=controller.pageStock(0);
+    assert.equal(pending[1].args[3].at_date,'2026-08-20');
+    pending[1].resolve({status:'ready',total_count:1,as_of:'2026-08-20',rows:[{id:2}]});
+    await retry;
+    assert.equal(controller.state.inventory.rows[0].id,2);
+});
+
+test('same-company refresh retains Sales selections and reloads the selected sources', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.recent={kind:'quotations',offset:25,rows:[]};
+    controller.state.ranking={key:'invoiced_margin',rows:[]};
+    controller.state.productMeasure='quantity'; controller.state.productUnit='7';
+    controller.state.rankLimit=10;
+    await settleRequests(pending,controller.refresh(), request => request.method==='get_section'
+        ? {items:[{key:'invoiced_sales',status:'ready',value:55}]}
+        : {status:'ready',rows:[],unit_id:7});
+    assert.equal(pending.find(r=>r.method==='get_recent_sales').args[0],'quotations');
+    assert.ok(pending.some(r=>r.method==='get_breakdown' && r.args[0]==='invoiced_margin'));
+    assert.equal(pending.find(r=>r.method==='get_product_quantity_ranking').args[1],7);
+    assert.equal(controller.state.productUnit,'7');
+    assert.equal(controller.state.rankLimit,10);
+});
+
+test('saved selection restoration reloads stock, search and layout without stored records', async () => {
+    const {controller,pending,storage}=fixture();
+    controller.userId=12; controller.viewKey='selection-test';
+    controller.state.companies=[{id:1}];
+    controller.state.applied={...controller.state.draft};
+    controller.state.sectionOrder=['sales','inventory','finance'];
+    controller.state.inventory={offset:25,mode:'historical',filters:{warehouse_id:3,at_date:'2026-08-20',search:'Shampoo'},rows:[{name:'PRIVATE_STOCK'}]};
+    controller.state.search={query:'Invoice',kind:'invoices',offset:50,groups:[{rows:[{name:'PRIVATE_INVOICE'}]}]};
+    controller.state.employeeProfile={name:'PRIVATE_EMPLOYEE'};
+    controller.state.hrData={filters:{search:'Work'},offset:0,rows:[{name:'PRIVATE_HR'}]};
+    controller.saveView();
+    const encoded=storage.get('selection-test');
+    assert.equal(encoded.includes('PRIVATE_'),false);
+    controller.state.inventory=null; controller.state.search=null; controller.state.sectionOrder=[];
+    await settleRequests(pending,controller.restoreView(), request => request.method==='get_inventory'
+        ? {status:'ready',rows:[],mode:request.args[2],filters:request.args[3]}
+        : request.method==='search_records' ? {groups:[],has_more:false} : {items:[],rows:[],status:'ready'});
+    const stock=pending.find(r=>r.method==='get_inventory');
+    assert.equal(stock.args[1],25); assert.equal(stock.args[3].warehouse_id,3);
+    assert.equal(stock.args[3].at_date,'2026-08-20');
+    assert.equal(controller.state.search.query,'Invoice');
+    assert.equal(controller.state.search.offset,50);
+    assert.deepEqual([...controller.state.sectionOrder],['sales','inventory','finance']);
+});
+
+test('company switching clears identity-bound drawers and ignores late HR/profile results', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    controller.state.companies=[{id:1,name:'First',logo_url:'/first'},{id:2,name:'Second',logo_url:'/second'}];
+    const hr=controller.loadHR('employees');
+    const profile=controller.openEmployeeProfile(11);
+    controller.state.draft.company_id=2;
+    const refresh=controller.refresh();
+    assert.equal(controller.companyIdentity.name,'Second');
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrData,null);
+    pending[0].resolve({status:'ready',rows:[{name:'First company employee'}]});
+    pending[1].resolve({status:'ready',id:11,name:'First company employee'});
+    for(const request of pending.slice(2))request.resolve({items:[]});
+    await Promise.all([hr,profile,refresh]);
+    assert.equal(controller.state.employeeProfile,null);
+    assert.equal(controller.state.hrData,null);
+    assert.equal(controller.companyIdentity.logoUrl,'/second');
+});
+
+test('closed and superseded employee profiles reject their late responses', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const old=controller.openEmployeeProfile(11);
+    const current=controller.openEmployeeProfile(22);
+    pending[1].resolve({status:'ready',id:22}); await current;
+    pending[0].resolve({status:'ready',id:11}); await old;
+    assert.equal(controller.state.employeeProfile.id,22);
+    const closing=controller.openEmployeeProfile(33);
+    controller.closeEmployeeProfile();
+    pending[2].resolve({status:'ready',id:33}); await closing;
+    assert.equal(controller.state.employeeProfile,null);
+});
+
+test('HR optional-source statuses remain distinct and local errors recover', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    for(const status of ['not_installed','restricted','empty']) {
+        const load=controller.loadHR('attendance');
+        pending.at(-1).resolve({status,rows:[],total:0}); await load;
+        assert.equal(controller.state.hrData.status,status);
+    }
+    const failure=controller.loadHR('attendance');
+    pending.at(-1).reject(new Error('backend unavailable')); await failure;
+    assert.equal(controller.state.hrData.status,'error');
+    const recovery=controller.loadHR('attendance');
+    pending.at(-1).resolve({status:'ready',rows:[{id:7}],total:1}); await recovery;
+    assert.equal(controller.state.hrData.status,'ready');
+    assert.equal(controller.state.hrData.rows[0].id,7);
 });

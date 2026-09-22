@@ -1,5 +1,13 @@
 # Executive dashboard — implementation and verification
 
+## Active implementation — September 22, 2026 (supersedes earlier readiness wording)
+
+**NOT YET READY FOR OWNER UAT.** Approved HTML implementation, B01–B13 corrections, the new HR workspace and reusable company branding are in progress on the existing feature. Current working-tree changes have not completed exact-candidate native or visual qualification. Earlier ready statements below describe historical candidates and cannot qualify this work.
+
+See the [active implementation ledger, parity matrix and qualification checkpoint](implementation-20260922/README.md). Final source/build identities, metric and role reconciliation, paired HTML/Odoo screenshots, Arabic/appearance/viewport checks, performance, exports/PDF and independent review remain pending. Keep PR #214 draft and unmerged; main and production remain prohibited. Owner acceptance is separate.
+
+## Historical records (preserved; not current candidate acceptance)
+
 ## Current handoff — 22 September 2026
 
 Technical qualification is complete; ready for owner UAT in authorized staging.

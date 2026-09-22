@@ -4,11 +4,13 @@ import csv
 import hashlib
 import io
 import json
+from urllib.parse import urlencode
 
 import pytz
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from odoo.tools import html2plaintext
 
 
 # Every source and measure is server-owned. No client-supplied model or domain.
@@ -83,11 +85,24 @@ class ExecutiveDashboard(models.AbstractModel):
         today = fields.Date.context_today(self)
         return {
             'user_id': self.env.uid,
-            'companies': [{'id': c.id, 'name': c.name, 'enabled_sections': self._visible_sections(c)} for c in self.env.companies],
+            'companies': [self._company_identity(c) for c in self.env.companies],
             'can_configure': self.env.user.has_group('base.group_system'),
             'options': {'company_id': self.env.company.id, 'date_from': today.replace(day=1).isoformat(),
                         'date_to': today.isoformat(), 'as_of': today.isoformat()},
         }
+
+    def _company_identity(self, company):
+        # Only called with a record from the validated company context. Bin-size
+        # reads test availability without putting image blobs in RPC responses.
+        company.check_access('read')
+        values = company.with_context(bin_size=True).read(['name', 'logo', 'write_date'])[0]
+        name = values['name']
+        version = str(values['write_date'] or '')
+        return {'id': company.id, 'name': name,
+                'initials': ''.join(part[0] for part in name.split()[:2]).upper(),
+                'logo_url': ('/web/image/res.company/%s/logo?%s' %
+                             (company.id, urlencode({'unique': version}))) if values['logo'] else False,
+                'enabled_sections': self._visible_sections(company)}
 
     def _visible_sections(self, company=None):
         company = company if company is not None else self.env.company
@@ -294,6 +309,8 @@ class ExecutiveDashboard(models.AbstractModel):
             'cash_flow': _('Net cash movement'),
             'receivables': _('Receivables'),
             'payables': _('Payables'),
+            'receivables_overdue': _('Overdue receivables'),
+            'payables_overdue': _('Overdue payables'),
             'gross_profit': _('Gross profit'),
             'operating_expenses': _('Operating expenses'),
             'gross_margin': _('Gross margin'),
@@ -350,9 +367,10 @@ class ExecutiveDashboard(models.AbstractModel):
                                    'unit': row[3], 'digits': 0 if item.get('unit') == 'count' else result['digits'],
                                    'status': row[4], 'warning': bool(item.get('has_warnings'))})
                 count += 1
-        return {'filename': f'adams-executive-summary-{dates[0]}-{dates[1]}.csv',
+        return {'filename': f'executive-summary-{dates[0]}-{dates[1]}.csv',
                 'content': '\ufeff' + output.getvalue(), 'row_count': count,
                 'print_rows': print_rows, 'company': scoped.env.company.name,
+                'company_identity': scoped._company_identity(scoped.env.company),
                 'currency_digits': scoped.env.company.currency_id.decimal_places,
                 'scope': dict(options), 'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
 
@@ -368,6 +386,19 @@ class ExecutiveDashboard(models.AbstractModel):
             if visible_key not in enabled:
                 continue
             item = {'key': key, 'status': 'not_configured', 'value': None}
+            if key == 'inventory':
+                # No company valuation aggregate has been approved for this
+                # summary. Preserve the working report entry point explicitly.
+                if 'stock.quant' not in scoped.env:
+                    item['status'] = 'not_installed'
+                else:
+                    try:
+                        products, _domain = scoped._stock_scope(dates, 'current')
+                        item.update(status='source_only', source='stock.action_product_stock_view',
+                                    drilldown=True, date_field='current',
+                                    description=_('Open the stock report for quantities and valuation.'))
+                    except AccessError:
+                        item['status'] = 'restricted'
             if key in SOURCES:
                 if SOURCES[key][0] not in scoped.env:
                     item['status'] = 'not_installed'
@@ -411,6 +442,11 @@ class ExecutiveDashboard(models.AbstractModel):
             'pivot_measures': [aggregate.split(':')[0]],
             'graph_measure': aggregate.split(':')[0],
         })
+        if key == 'crm' and action.get('help'):
+            # Dict actions returned by model RPC do not follow the action-load
+            # HTML normalization path. Safe plain text avoids literal markup
+            # without declaring arbitrary configured HTML trusted.
+            action['help'] = html2plaintext(action['help'])
         return action
 
     @api.model
@@ -435,22 +471,41 @@ class ExecutiveDashboard(models.AbstractModel):
                 'digits': scoped.env.company.currency_id.decimal_places,
                 'provenance': scoped._provenance(key, domain, aggregate)}
 
-    @api.model
-    def get_product_quantity_ranking(self, options, unit_id=False):
-        scoped, dates = self._scope(options)
-        report, domain, aggregate, action_id = scoped._native_scope('invoiced_sales', dates)
+    def _product_quantity_scope(self, dates, unit_id):
+        report, domain, aggregate, action_id = self._native_scope('invoiced_sales', dates)
         report.check_field_access_rights('read', ['quantity', 'product_id', 'product_uom_id'])
         units = [unit for unit, in report._read_group(domain, ['product_uom_id'], []) if unit]
         units.sort(key=lambda unit: unit.id)
-        if unit_id and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
+        if unit_id is not None and unit_id is not False and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
             raise ValidationError(_('Choose a unit from this report.'))
         selected = unit_id or (units[0].id if units else False)
+        return report, [*domain, ('product_uom_id', '=', selected), ('product_id', '!=', False)], units, selected, action_id
+
+    @api.model
+    def get_product_quantity_ranking(self, options, unit_id=False):
+        scoped, dates = self._scope(options)
+        report, domain, units, selected, action_id = scoped._product_quantity_scope(dates, unit_id)
         unit = next((unit for unit in units if unit.id == selected), None)
-        rows = report._read_group([*domain, ('product_uom_id', '=', selected), ('product_id', '!=', False)],
-                                  ['product_id'], ['quantity:sum'], order='quantity:sum DESC, product_id ASC', limit=10) if selected else []
+        rows = report._read_group(domain, ['product_id'], ['quantity:sum'],
+                                  order='quantity:sum DESC, product_id ASC', limit=10) if selected else []
         return {'status': 'ready' if rows else 'empty', 'rows': [{'id': product.id, 'label': product.display_name, 'value': quantity} for product, quantity in rows],
                 'units': [{'id': u.id, 'name': u.display_name} for u in units], 'unit_id': selected,
                 'currency': unit.display_name if unit else '', 'digits': 2, 'unit': 'quantity'}
+
+    @api.model
+    def open_product_quantity_report(self, options, product_id=None, unit_id=None):
+        scoped, dates = self._scope(options)
+        report, domain, units, selected, action_id = scoped._product_quantity_scope(dates, unit_id)
+        if product_id is not None:
+            if type(product_id) is not int or product_id < 1:
+                raise ValidationError(_('Invalid product.'))
+            domain.append(('product_id', '=', product_id))
+            if not report.search(domain, limit=1):
+                raise AccessError(_('The product is unavailable in the selected scope.'))
+        action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
+        action.update(domain=domain, context={**scoped.env.context,
+                      'pivot_measures': ['quantity'], 'graph_measure': 'quantity'})
+        return action
 
     @api.model
     def get_trend(self, key, options):

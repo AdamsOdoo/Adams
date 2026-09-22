@@ -173,6 +173,8 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
                 dashboard.open_report('revenue', self.options)
             with self.assertRaises(AccessError):
                 dashboard.get_financial_trend('revenue', self.options)
+            with self.assertRaises(AccessError):
+                dashboard.get_financial_trends(['revenue', 'gross_profit'], self.options)
         reader.group_ids -= self.env.ref('account.group_account_readonly')
         self.assertEqual(self._item(dashboard=dashboard)['status'], 'restricted')
 
@@ -217,9 +219,11 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         historical = self._item('receivables')
         self.assertEqual(historical['status'], 'ready', historical)
         self.assertAlmostEqual(historical['value'], 60000)
+        self.assertAlmostEqual(self._item('receivables_overdue')['value'], 60000)
         current = self._item('receivables', dict(self.options, as_of='2026-09-30'))
         self.assertEqual(current['status'], 'ready', current)
         self.assertAlmostEqual(current['value'], 0)
+        self.assertAlmostEqual(self._item('receivables_overdue', dict(self.options, as_of='2026-09-30'))['value'], 0)
 
     def test_mapping_rejects_mismatched_report_and_date_basis(self):
         with self.assertRaises(ValidationError), self.cr.savepoint():
@@ -494,6 +498,7 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self.assertEqual(historical['value'], 100)
         self.assertEqual(buckets['period0'], 60)
         self.assertEqual(buckets['period1'], 40)
+        self.assertEqual(self._item('receivables_overdue')['value'], 40)
         settlement = self.env['account.move'].create({
             'date': '2026-09-10', 'journal_id': self.company_data['default_journal_misc'].id,
             'line_ids': [Command.create({'partner_id': self.partner_a.id,
@@ -507,9 +512,11 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         after_settlement = self._item('receivables')
         self.assertEqual(after_settlement['value'], 100)
         self.assertEqual({bucket['key']: bucket['value'] for bucket in after_settlement['aging_buckets']}, buckets)
+        self.assertEqual(self._item('receivables_overdue')['value'], 40)
         current = self._item('receivables', dict(self.options, as_of='2026-09-30'))
         self.assertEqual(current['value'], 60)
         self.assertEqual(current['aging_buckets'][0]['value'], 60)
+        self.assertEqual(self._item('receivables_overdue', dict(self.options, as_of='2026-09-30'))['value'], 0)
 
     def test_native_foreign_invoice_currency_and_backdated_recognition(self):
         self._mapping()
@@ -639,3 +646,146 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
             'finance', dict(self.options, as_of='2026-09-30'))['supplier_windows']}
         self.assertEqual(after, {'supplier_overdue': 0, 'supplier_today': 60,
                                 'supplier_due_7': 0, 'supplier_due_30': 0})
+
+    def test_full_overdue_native_buckets_boundaries_credits_and_maturity_fallback(self):
+        for metric, prefix, move_type, refund_type, account_key, debit, credit in [
+            ('receivables', 'aged_receivable', 'out_invoice', 'out_refund',
+             'default_account_receivable', 7, 0),
+            ('payables', 'aged_payable', 'in_invoice', 'in_refund',
+             'default_account_payable', 0, 7),
+        ]:
+            report = self.env.ref(f'account_reports.{prefix}_report')
+            expression = self.env.ref(f'account_reports.{prefix}_line_total')
+            self._mapping(metric, report=report, expression=expression)
+            for amount, due in [(10, '2026-08-30'), (20, '2026-07-31'),
+                                (30, '2026-07-01'), (40, '2026-06-01'), (50, '2026-05-01'),
+                                (80, '2026-08-31'), (90, '2026-09-01')]:
+                self._invoice(amount, move_type, invoice_date='2026-01-01', due_date=due)
+            self._invoice(200, refund_type, due_date='2026-08-30')
+            self._invoice(999, move_type, posted=False, due_date='2026-08-30')
+            self._invoice(888, move_type, invoice_date='2026-09-01', due_date='2026-09-01')
+            # A standalone journal item has no maturity. Its native fallback is
+            # the accounting date; do not exclude it as an invoice-only scope.
+            account = self.company_data[account_key]
+            entry = self.env['account.move'].create({
+                'date': '2026-08-29', 'journal_id': self.company_data['default_journal_misc'].id,
+                'line_ids': [Command.create({'partner_id': self.partner_a.id,
+                    'account_id': account.id, 'debit': debit, 'credit': credit,
+                    'date_maturity': '2026-08-29'}),
+                    Command.create({'account_id': self.company_data['default_account_assets'].id,
+                                    'debit': credit, 'credit': debit})],
+            })
+            entry.action_post()
+            # The ORM requires maturity on AR/AP lines. Use a rolled-back SQL
+            # legacy-data fixture solely to exercise the report's explicit NULL
+            # fallback (not production code or a dashboard calculation).
+            line = entry.line_ids.filtered(lambda row: row.account_id == account)
+            self.env.flush_all()
+            self.cr.execute('UPDATE account_move_line SET date_maturity = NULL WHERE id = %s', [line.id])
+            line.invalidate_recordset(['date_maturity'])
+            key = metric + '_overdue'
+            item = self._item(key)
+            self.assertEqual(item['status'], 'ready', item)
+            self.assertEqual(item['value'], -43)
+            self.assertEqual(item['source_kind'], 'report_derived')
+            self.assertEqual(item['provenance']['composition']['excluded_bucket'], 'period0')
+            self.assertEqual(len(item['provenance']['composition']['expression_ids']), 5)
+            self.assertEqual(self._item(metric)['value'], 127)
+            action = self.dashboard.open_report(key, self.options)
+            self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
+            self.assertTrue(action['params']['ignore_session'])
+            rebuilt = report.with_context(action['context']).get_options(action['params']['options'])
+            serialized = json.loads(json.dumps(rebuilt))
+            native = report.get_report_information(serialized)
+            group = next(iter(rebuilt['column_groups']))
+            self.assertEqual(native['column_groups_totals'][group][expression.id]['value'], -43)
+            self.assertIn(item['label'], native['report']['name'])
+            # Leaving the scoped action must restore ordinary full aging.
+            full = report.get_options(serialized)
+            self.assertFalse(full.get('forced_domain'))
+            self.assertFalse(full.get('adams_overdue_metric'))
+            self.assertFalse(full.get('report_title'))
+            full_native = report.get_report_information(full)
+            self.assertEqual(full_native['column_groups_totals'][next(iter(full['column_groups']))][expression.id]['value'], 127)
+            printable = report.get_options(dict(serialized, export_mode='print'))
+            self.assertEqual(printable['forced_domain'], rebuilt['forced_domain'])
+            html = report._get_pdf_export_html(printable, report._get_lines(printable))
+            self.assertIn(item['label'], str(html))
+            exported = report.export_to_xlsx(serialized)
+            with zipfile.ZipFile(io.BytesIO(exported['file_content'])) as archive:
+                strings = archive.read('xl/sharedStrings.xml').decode()
+                sheet = ElementTree.fromstring(archive.read('xl/worksheets/sheet1.xml'))
+                ns = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+                numbers = [float(c.find('x:v', ns).text) for c in sheet.findall('.//x:c', ns)
+                           if c.get('t') not in ('s', 'inlineStr') and c.find('x:v', ns) is not None]
+            self.assertEqual(numbers[-1], -43)
+            self.assertIn(item['label'], strings)
+            if metric == 'payables':
+                windows = self.dashboard.get_section('finance', self.options)['supplier_windows']
+                self.assertEqual(next(row['value'] for row in windows if row['key'] == 'supplier_overdue'), 150)
+        summary = self.dashboard.export_summary(self.options)
+        for label in ('Overdue receivables', 'Overdue payables'):
+            self.assertEqual(next(row['value'] for row in summary['print_rows'] if row['metric'] == label), -43)
+            self.assertIn(label + ',-43', summary['content'])
+
+    def test_full_overdue_rejects_changed_scope_mapping_and_denied_user(self):
+        report = self.env.ref('account_reports.aged_receivable_report')
+        mapping = self._mapping('receivables', report=report,
+                                expression=self.env.ref('account_reports.aged_receivable_line_total'))
+        self.assertEqual(self._item('receivables_overdue')['value'], 0)
+        action = self.dashboard.open_report('receivables_overdue', self.options)
+        options = action['params']['options']
+        for changes in [{'all_entries': True}, {'aging_based_on': 'base_on_invoice_date'},
+                        {'aging_interval': 15}, {'forced_domain': []},
+                        {'adams_overdue_metric': 'supplier_overdue'},
+                        {'companies': []}]:
+            with self.assertRaises(ValidationError):
+                report.get_report_information(dict(options, **changes))
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_report('receivables_overdue', self.options, 'partner_id', self.partner_a.id)
+        reader = new_test_user(self.env, login='full_overdue_denied',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user')
+        denied = self._item('receivables_overdue', dashboard=self.dashboard.with_user(reader))
+        self.assertEqual(denied['status'], 'restricted')
+        self.assertIsNone(denied['value'])
+        with self.assertRaises(AccessError):
+            self.dashboard.with_user(reader).open_report('receivables_overdue', self.options)
+        with self.assertRaises(AccessError):
+            report.with_user(reader).get_report_information(options)
+        mapping.definition_note = 'Definition changed; approval must be renewed.'
+        self.assertEqual(self._item('receivables_overdue')['status'], 'not_configured')
+        with self.assertRaises(ValidationError):
+            self.dashboard.open_report('receivables_overdue', self.options)
+        with self.assertRaises(ValidationError):
+            report.get_report_information(options)
+
+    def test_financial_trends_batch_shares_native_report_month_and_preserves_values(self):
+        self._mapping('revenue')
+        self._mapping('gross_profit', expression=self.env.ref('account_reports.account_financial_report_gross_profit0_balance'))
+        self._invoice(100, invoice_date='2026-07-20')
+        self._invoice(25, 'out_refund', invoice_date='2026-08-15')
+        options = dict(self.options, date_from='2026-07-15', date_to='2026-09-10')
+        report_type = type(self.pnl)
+        original = report_type.get_report_information
+        calls = []
+
+        def evaluate(report, prepared):
+            calls.append((report.id, prepared['date']['date_from'], prepared['date']['date_to']))
+            return original(report, prepared)
+
+        with patch.object(report_type, 'get_report_information', evaluate):
+            result = self.dashboard.get_financial_trends(['revenue', 'gross_profit', 'profit'], options)
+        self.assertEqual(calls, [(self.pnl.id, '2026-07-15', '2026-07-31'),
+                                 (self.pnl.id, '2026-08-01', '2026-08-31'),
+                                 (self.pnl.id, '2026-09-01', '2026-09-10')])
+        self.assertEqual(result['company_id'], self.env.company.id)
+        for key in ('revenue', 'gross_profit'):
+            self.assertEqual([row['value'] for row in result['series'][key]['rows']], [100, -25, 0])
+            self.assertEqual(result['series'][key]['generated_at'], result['generated_at'])
+        self.assertEqual(result['series']['profit'], {'status': 'not_configured', 'rows': []})
+        # No persistent cache: native changes are visible on the next request.
+        self._invoice(20, invoice_date='2026-08-20')
+        self.assertEqual(self.dashboard.get_financial_trends(['revenue'], options)['series']['revenue']['rows'][1]['value'], -5)
+        for invalid in ([], 'revenue', ['payables'], [True], ['revenue'] * 7):
+            with self.assertRaises(ValidationError):
+                self.dashboard.get_financial_trends(invalid, options)

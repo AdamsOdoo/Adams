@@ -1,0 +1,19 @@
+# B01–B13 implementation closure ledger
+
+**NOT YET READY FOR OWNER UAT.** No task is closed by this checkpoint. Working changes remain unpublished and unqualified; commit/source/test evidence will be bound after candidate publication. Native and visual qualification for every row is PENDING. Component names are relative to the affected core/finance addon. No customer figures or private evidence are reproduced.
+
+| Task | Priority | Finding/parity | Scope | Working components | Implementation | Remaining decisive evidence |
+|---|---|---|---|---|---|---|
+| B01 | P1 | DASH-DATA-004; DASH-DATA-003 | Stock quantity versus valuation scope and source actions | operations.py; inventory_view.py; dashboard.js/xml | IN_PROGRESS | Native stock/account fixtures, historical/current scopes, roles and actual columns pending |
+| B02 | P1 | DASH-DATA-002 | Full signed overdue AR/AP, separate supplier bill windows | finance models/dashboard.py/account_report.py; tests/test_finance.py | IN_PROGRESS | Independent aging reconciliation, due boundaries, signed credits, action/export/print pending |
+| B03 | P2 | DASH-DATA-001 | Quantity ranking measure/product/UoM retained in source | models/dashboard.py; dashboard.js; test_source_identity.py | IN_PROGRESS | Native pivot/graph measure and browser return pending |
+| B04 | P2 | DASH-FE-001/002/004/007/014 | Applied filters, validation, atomic result/error states | dashboard.js/xml | IN_PROGRESS | Page-one drafts, invalid ranges, stale responses and local recovery pending |
+| B05 | P2/P3 | DASH-PERF-001/002; DASH-FE-012 | Reduce repeated stock/report/trend work | operations.py; dashboard.js; finance models/dashboard.py | IN_PROGRESS | Same-dataset fresh-ORM before/after repetitions and query/network timings pending |
+| B06 | P2/P3 | DASH-FE-003/005/006/013/015; DASH-WORK-001/002 | Restore applied selections/navigation/saved views | dashboard.js/xml | IN_PROGRESS | Back/Forward, source return, reset, invalid saved scope pending |
+| B07 | P2/P3 | DASH-VIS-001/003/004/006; DASH-FE-010; DASH-WORK-003 | Approved HTML hierarchy, stock readability, numbered paging | dashboard.js/xml/scss | IN_PROGRESS | Equal-width paired screenshots, physical scrolling/keyboard and target viewports pending |
+| B08 | P2/P3 | DASH-FE-008/009/011; DASH-VIS-007/009/010; DASH-WORK-004 | Owner wording, appearance, Arabic/RTL and CRM help | dashboard.js/xml/scss; i18n/ar_001.po; models/dashboard.py | IN_PROGRESS | Translation extraction/catalog, actual RTL/contrast and source help pending |
+| B09 | Investigation | DASH-WORK-OBS-001 | Diagnose transient auxiliary failures and verify recovery | dashboard.js async loaders; relevant backend logs | IN_PROGRESS | Historical cause unproven; controlled failure and correlated live evidence pending |
+| B10 | Qualification | Original audit role/configuration coverage gaps | Roles, negative cases, optional sources and permissions | core/finance/native tests and authorized browser fixtures | IN_PROGRESS | Non-admin/no-access/source roles, revoked permissions, companies/currencies pending |
+| B11 | Qualification | DASH-EVID-001; DASH-EVID-004 | Exact-candidate integrated qualification and durable evidence | implementation-status.md; uat-checklist.md; this directory | IN_PROGRESS | Candidate not frozen; all final gates PENDING |
+| B12 | New scope | UI31–UI37 | HR Overview/Attendance/Time off/Shifts/Employees and profiles | models/hr_workspace.py; dashboard.js/xml/scss | IN_PROGRESS | Installed source identity, role/reconciliation/week-list/duration/overnight evidence pending |
+| B13 | New scope | UI38 | Standard active company identity with isolated data | models/dashboard.py; dashboard.js/xml/scss; exports | IN_PROGRESS | Company switch races, authorization, fallback/logo/name changes and print/export evidence pending |

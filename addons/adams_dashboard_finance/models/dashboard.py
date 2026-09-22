@@ -95,6 +95,7 @@ class ExecutiveDashboard(models.AbstractModel):
             scoped._finance_access()
         except AccessError:
             result['items'] = [{'key': key, 'status': 'restricted', 'value': None} for key, _label in METRICS]
+            result['items'].extend(scoped._overdue_items(result['items']))
             result['cash_flow']['status'] = 'restricted'
             return result
 
@@ -156,7 +157,8 @@ class ExecutiveDashboard(models.AbstractModel):
                         bucket = totals.get(expression.id if expression else None, {}).get('value')
                         if type(bucket) not in (int, float) or not math.isfinite(bucket):
                             raise UnsupportedFinancialScope()
-                        buckets.append({'key': label, 'label': column['name'], 'value': bucket})
+                        buckets.append({'key': label, 'label': column['name'], 'value': bucket,
+                                        'expression_id': expression.id})
                     if not buckets:
                         raise UnsupportedFinancialScope()
                 item.update(status='ready', value=value, unit='percentage' if key in RATIO_KEYS else 'currency',
@@ -180,8 +182,67 @@ class ExecutiveDashboard(models.AbstractModel):
                 # them with independent sums or a fabricated zero.
                 item['status'] = 'error'
                 _logger.warning('Financial dashboard metric=%s category=%s', key, type(error).__name__)
+        result['items'].extend(scoped._overdue_items(result['items']))
         result['cash_flow'] = scoped._cash_flow_data(dates)
         result['supplier_windows'] = scoped._supplier_payment_windows(dates)
+        return result
+
+    def _overdue_labels(self):
+        return {'receivables_overdue': _('Overdue receivables'),
+                'payables_overdue': _('Overdue payables')}
+
+    def _overdue_domain(self, cutoff):
+        # Native maturity aging uses COALESCE(date_maturity, date). Do not use
+        # today's residual/reconciled flag: the native engine owns settlement
+        # at the requested historical cutoff, including credits and payments.
+        return ['|', ('date_maturity', '<', cutoff.isoformat()),
+                '&', ('date_maturity', '=', False), ('date', '<', cutoff.isoformat())]
+
+    def _overdue_options(self, mapping, dates, key):
+        if key not in self._overdue_labels() or mapping.metric != key.removesuffix('_overdue'):
+            raise ValidationError(_('Unknown overdue report scope.'))
+        prepared = self._financial_options(mapping.report_id, mapping.metric, dates)
+        prepared['forced_domain'] = self._overdue_domain(dates[2])
+        prepared['adams_overdue_metric'] = key
+        return prepared
+
+    def _overdue_items(self, items):
+        """Approved composition of complete native aging buckets, never ledger sums.
+
+        The standard maturity-based report exposes period0 (not due / due today)
+        and period1..5, but no overdue subtotal. The approved mapping fingerprint
+        covers the underlying expressions and report handler. Reuse that exact
+        evaluation without another report call or a paginated partner sum.
+        """
+        by_key = {item['key']: item for item in items}
+        result = []
+        for key, label in self._overdue_labels().items():
+            base = by_key.get(key.removesuffix('_overdue'), {})
+            item = {'key': key, 'label': label, 'status': base.get('status', 'not_configured'),
+                    'value': None, 'unit': 'currency', 'date_field': 'as_of'}
+            result.append(item)
+            if item['status'] != 'ready':
+                continue
+            buckets = base.get('aging_buckets', [])
+            if (len(buckets) != 6 or {bucket['key'] for bucket in buckets}
+                    != {'period0', 'period1', 'period2', 'period3', 'period4', 'period5'}):
+                item['status'] = 'unsupported_scope'
+                continue
+            overdue = [bucket for bucket in buckets if bucket['key'] != 'period0']
+            provenance = dict(base['provenance'])
+            provenance.pop('fingerprint', None)
+            provenance['composition'] = {'operation': 'sum', 'bucket_keys': [b['key'] for b in overdue],
+                                         'expression_ids': [b['expression_id'] for b in overdue],
+                                         'excluded_bucket': 'period0'}
+            provenance['fingerprint'] = hashlib.sha256(
+                json.dumps(provenance, sort_keys=True, default=str).encode()).hexdigest()
+            item.update(value=sum(bucket['value'] for bucket in overdue), drilldown=True,
+                        source_kind='report_derived', source=base['source'],
+                        source_line=base['source_line'], measure='overdue', provenance=provenance,
+                        has_warnings=base.get('has_warnings', False),
+                        definition=_('Signed total of the five overdue buckets in the approved aging report. '
+                                     'Amounts due today and not yet due are excluded. '
+                                     'Credits, payments and historical settlements retain the report treatment.'))
         return result
 
     def _supplier_window_domain(self, cutoff, window):
@@ -262,39 +323,56 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def get_financial_trend(self, key, options):
+        return self.get_financial_trends([key], options)['series'][key]
+
+    @api.model
+    def get_financial_trends(self, keys, options):
+        """Evaluate each approved report/month once for the requested series."""
         scoped, dates = self._scope(options)
         scoped._finance_access()
-        if key not in BUDGET_KEYS | RATIO_KEYS:
+        allowed = BUDGET_KEYS | RATIO_KEYS
+        if (not isinstance(keys, list) or not keys or len(keys) > len(allowed)
+                or any(not isinstance(key, str) or key not in allowed for key in keys)):
             raise ValidationError(_('This financial trend is not configured.'))
-        mapping = scoped._financial_mapping(key)
-        if not scoped._mapping_ready(mapping):
-            return {'status': 'not_configured', 'rows': []}
-        report = mapping.report_id
-        rows = []
-        for start, stop in scoped._financial_periods(dates):
-            prepared = scoped._financial_options(report, key, [start, stop, dates[2]])
-            info = report.get_report_information(prepared)
-            group = next(iter(prepared['column_groups']))
-            totals = info['column_groups_totals'].get(group, {})
-            value = totals.get(mapping.expression_id.id, {}).get('value')
-            if type(value) not in (int, float) or not math.isfinite(value):
-                raise ValidationError(_('The report returned an unsupported scope.'))
-            status = 'ready'
-            if key in RATIO_KEYS:
-                denominator = totals.get(mapping.denominator_expression_id.id, {}).get('value')
-                if type(denominator) not in (int, float) or not math.isfinite(denominator):
-                    raise ValidationError(_('The report returned an unsupported scope.'))
-                if denominator == 0:
-                    value, status = None, 'undefined_ratio'
-            rows.append({'label': start.strftime('%Y-%m'), 'date_from': start.isoformat(),
-                         'date_to': stop.isoformat(), 'value': value, 'status': status,
-                         'has_warnings': bool(info.get('warnings'))})
+        series, evaluations = {}, {}
         currency = scoped.env.company.currency_id
-        return {'status': 'ready', 'rows': rows, 'currency': currency.name,
-                'digits': currency.decimal_places, 'unit': 'percentage' if key in RATIO_KEYS else 'currency',
-                'source_kind': 'native_report', 'report_id': report.id,
-                'expression_id': mapping.expression_id.id, 'mapping_version': mapping.definition_fingerprint,
-                'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
+        generated_at = fields.Datetime.to_string(fields.Datetime.now())
+        for key in dict.fromkeys(keys):
+            mapping = scoped._financial_mapping(key)
+            if not scoped._mapping_ready(mapping):
+                series[key] = {'status': 'not_configured', 'rows': []}
+                continue
+            report = mapping.report_id
+            rows = []
+            for start, stop in scoped._financial_periods(dates):
+                cache_key = (report.id, start, stop)
+                if cache_key not in evaluations:
+                    prepared = scoped._financial_options(report, key, [start, stop, dates[2]])
+                    evaluations[cache_key] = (prepared, report.get_report_information(prepared))
+                prepared, info = evaluations[cache_key]
+                group = next(iter(prepared['column_groups']))
+                totals = info['column_groups_totals'].get(group, {})
+                value = totals.get(mapping.expression_id.id, {}).get('value')
+                if type(value) not in (int, float) or not math.isfinite(value):
+                    raise ValidationError(_('The report returned an unsupported scope.'))
+                status = 'ready'
+                if key in RATIO_KEYS:
+                    denominator = totals.get(mapping.denominator_expression_id.id, {}).get('value')
+                    if type(denominator) not in (int, float) or not math.isfinite(denominator):
+                        raise ValidationError(_('The report returned an unsupported scope.'))
+                    if denominator == 0:
+                        value, status = None, 'undefined_ratio'
+                rows.append({'label': start.strftime('%Y-%m'), 'date_from': start.isoformat(),
+                             'date_to': stop.isoformat(), 'value': value, 'status': status,
+                             'has_warnings': bool(info.get('warnings'))})
+            series[key] = {'status': 'ready', 'rows': rows, 'currency': currency.name,
+                           'digits': currency.decimal_places,
+                           'unit': 'percentage' if key in RATIO_KEYS else 'currency',
+                           'source_kind': 'native_report', 'report_id': report.id,
+                           'expression_id': mapping.expression_id.id,
+                           'mapping_version': mapping.definition_fingerprint,
+                           'generated_at': generated_at}
+        return {'series': series, 'company_id': scoped.env.company.id, 'generated_at': generated_at}
 
     @api.model
     def open_financial_period(self, key, options, period):
@@ -310,6 +388,22 @@ class ExecutiveDashboard(models.AbstractModel):
 
     @api.model
     def open_report(self, key, options, dimension=None, group_id=None):
+        if key in self._overdue_labels():
+            scoped, dates = self._scope(options)
+            scoped._finance_access()
+            if dimension is not None or group_id is not None:
+                raise ValidationError(_('Use the financial report filters for further analysis.'))
+            mapping = scoped._financial_mapping(key.removesuffix('_overdue'))
+            if not scoped._mapping_ready(mapping):
+                raise ValidationError(_('Review and approve this financial mapping first.'))
+            prepared = scoped._overdue_options(mapping, dates, key)
+            return {'type': 'ir.actions.client', 'tag': 'account_report',
+                    'name': '%s — %s — %s' % (mapping.report_id.display_name,
+                                              scoped._overdue_labels()[key], dates[2].isoformat()),
+                    'keep_journal_groups_options': True,
+                    'context': dict(scoped.env.context, report_id=mapping.report_id.id,
+                                    adams_overdue_metric=key),
+                    'params': {'options': prepared, 'ignore_session': True}}
         if key in {'supplier_overdue', 'supplier_today', 'supplier_due_7', 'supplier_due_30'}:
             scoped, dates = self._scope(options)
             scoped._finance_access()

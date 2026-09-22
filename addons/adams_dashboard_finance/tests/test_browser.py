@@ -101,6 +101,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             for index, stock_product in enumerate(stock_products):
                 self.env['stock.quant']._update_available_quantity(stock_product, location, index + 1)
             self.env.flush_all()
+        employee = False
+        if 'hr.employee' in self.env:
+            self.env.user.group_ids |= self.env.ref('hr.group_hr_user')
+            employee = self.env['hr.employee'].create({'name': '000 Dashboard work profile fixture',
+                                                       'company_id': self.env.company.id})
         today = fields.Date.today()
         self.env['account.move'].create({
             'move_type': 'out_invoice', 'partner_id': self.partner_a.id,
@@ -158,13 +163,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         screenshot_source = Path(config['screenshots']) / self.env.cr.dbname / 'screenshots'
         existing_screenshots = set(screenshot_source.glob('*.png'))
         capture_prefixes = []
+        viewports = [(320, 900), (390, 900), (768, 900), (1024, 900), (1366, 768), (1440, 900), (1920, 1080)]
         for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
             self.env.user.lang = lang
-            for theme, width in product(('light', 'dark'), (320, 390, 768, 1024, 1440, 1920)):
+            for theme, (width, height) in product(('light', 'dark'), viewports):
                 self.env.user.color_scheme = theme
-                self.browser_size = f'{width}x900'
+                self.browser_size = f'{width}x{height}'
                 prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
-                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking', 'polish_sales_lower']
+                            'polish_crm', 'polish_product_ranking', 'polish_order_ranking', 'polish_sales_lower',
+                            'hr_overview', 'hr_attendance', 'hr_time_off', 'hr_shifts', 'hr_employees']
                 if stock_category:
                     prefixes += ['polish_inventory_table', 'polish_inventory_page2']
                 capture_prefixes.extend(f'{prefix}_{lang}_{theme}_{width}_' for prefix in prefixes)
@@ -187,14 +194,17 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const root = document.querySelector('.o_adams_dashboard');
                     if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
                     const surface = getComputedStyle(card).backgroundColor;
-                    if (surface !== (THEME === 'dark' ? 'rgb(38, 42, 54)' : 'rgb(255, 255, 255)')) throw new Error('Card has incorrect theme surface');
-                    if (root.querySelectorAll('.adams_header_actions button').length !== 5) throw new Error('Reference view/export/print controls are missing');
+                    const paper = getComputedStyle(root).getPropertyValue('--adams-paper').trim();
+                    const sample = document.createElement('span'); sample.style.backgroundColor = paper; root.append(sample);
+                    if (surface !== getComputedStyle(sample).backgroundColor) throw new Error('Card must use the selected appearance surface');
+                    sample.remove();
+                    if (root.querySelectorAll('.adams_header > .adams_header_actions button').length !== 3) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
-                    const scopeDates = [...root.querySelectorAll('.adams_scope .adams_date_value')];
+                    const scopeDates = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')];
                     if (scopeDates.length !== 3) throw new Error('Applied filter summary must show three individual dates');
                     if (scopeDates.some(date => date.getClientRects().length !== 1)) throw new Error('Applied filter summary split an individual date');
-                    if (WIDTH < 760) {
+                    if (WIDTH <= 900) {
                         const toggle = root.querySelector('.adams_mobile_menu');
                         toggle.click();
                         const menu = await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must open');
@@ -211,16 +221,21 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (profitability.children.length !== 4) throw new Error('Reference requires four primary profitability cards');
                     if (root.querySelectorAll('.adams_nav button').length !== 6) throw new Error('Reference requires six department tabs');
                     const columns = getComputedStyle(profitability).gridTemplateColumns.split(' ').length;
-                    if ((WIDTH === 390 && columns !== 2) || (WIDTH === 320 && columns !== 1) || (WIDTH >= 1440 && columns !== 4)) throw new Error('Incorrect reference KPI column count');
+                    if ((WIDTH === 390 && columns !== 2) || (WIDTH === 320 && columns !== 2) || (WIDTH >= 1440 && columns !== 4)) throw new Error('Incorrect reference KPI column count');
                     if (!root.querySelector('.adams_profit_grid .adams_performance')) throw new Error('Missing reference performance-context panel');
                     const liquidity = root.querySelector('#adams-group-liquidity');
-                    if (liquidity.querySelector('.adams_grid').children.length !== 3) throw new Error('Reference requires three liquidity cards');
-                    await wait(() => liquidity.querySelector('.adams_bank_row button'), 'Native cash account balances must load automatically');
+                    if (liquidity.querySelector('.adams_grid').children.length !== 2) throw new Error('Approved design requires two liquidity cards');
+                    root.querySelector('.adams_cash_links button').click();
+                    const cashDrawer = await wait(() => root.querySelector('.adams_cash_dialog[open]'), 'Account directory must open');
+                    await wait(() => cashDrawer.querySelector('.adams_bank_row button'), 'Native cash account balances must load');
+                    cashDrawer.querySelector('header button').click();
+                    await wait(() => !cashDrawer.open, 'Account directory must close');
                     if (liquidity.querySelectorAll('.adams_cash_bridge strong').length !== 3) throw new Error('Native cash bridge must show opening, movement and closing');
                     const aging = root.querySelector('#adams-group-working-capital');
                     if (aging.querySelectorAll('.adams_aging_list').length !== 2) throw new Error('Both native aging panels must be visible');
-                    if (!aging.querySelector('.adams_aging_list').innerText.includes(expected)) throw new Error('Native receivable bucket must contain the invoice value');
-                    const windows = aging.querySelectorAll('.adams_supplier_windows .adams_card');
+                    aging.querySelectorAll('.adams_aging_list summary').forEach(summary => summary.click());
+                    if (!aging.querySelector('.adams_aging_list').textContent.includes(expected)) throw new Error('Native receivable bucket must contain the invoice value');
+                    const windows = liquidity.querySelectorAll('.adams_supplier_windows .adams_card');
                     if (windows.length !== 4) throw new Error('Four approved supplier windows must render');
                     const paymentValue = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(129.45);
                     if (windows[2].querySelector('.adams_value').textContent.trim() !== paymentValue ||
@@ -237,30 +252,66 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (drawer.getBoundingClientRect().width > WIDTH + 2) throw new Error('Source drawer exceeds viewport');
                     drawer.querySelector('header button').click();
                     await wait(() => !root.querySelector('dialog[open]'), 'Source drawer must close');
-                    const filter = root.querySelector('.adams_filters button');
+                    const filter = root.querySelector('.adams_balance_scope button');
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');
-                    // Exercise all department navigation in the rendered client.
-                    // Restricted native departments must still reflow correctly.
+                    const navigate = async key => {
+                        if (WIDTH <= 900) {
+                            root.querySelector('.adams_mobile_menu').click();
+                            await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Navigation must open');
+                        }
+                        root.querySelector('.adams_side_link[data-section="' + key + '"]').click();
+                        await wait(() => root.querySelector('#adams-' + key), 'Department must render: ' + key);
+                        await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Department must remain active');
+                        if (root.querySelectorAll('.adams_section').length !== 1) throw new Error('Only the selected department must own the page');
+                    };
+                    const more = async index => {
+                        if (!root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
+                        const menu = await wait(() => root.querySelector('#adams-more-menu'), 'More menu must open');
+                        const button = menu.querySelectorAll('[role="menuitem"]')[index];
+                        if (!button || button.disabled) throw new Error('Requested utility must be available');
+                        button.click();
+                        await new Promise(resolve => requestAnimationFrame(resolve));
+                        if (root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
+                    };
+                    const identity = root.querySelector('.adams_company_brand strong');
+                    if (identity.textContent.trim() !== COMPANY_NAME) throw new Error('Company branding must match standard company name');
+                    const logo = root.querySelector('.adams_company_logo');
+                    if (logo && (getComputedStyle(logo).objectFit !== 'contain' || !logo.src.includes('/web/image/res.company/COMPANY_ID/logo'))) throw new Error('Company logo must use its standard record and preserve aspect ratio');
                     for (const key of ['sales', 'crm', 'inventory', 'procurement', 'hr', 'finance']) {
-                        const keys = ['finance', 'sales', 'crm', 'inventory', 'procurement', 'hr'];
-                        root.querySelectorAll('.adams_nav button')[keys.indexOf(key)].click();
-                        await wait(() => root.querySelector('#adams-' + key)?.querySelector('.adams_section_toggle')?.getAttribute('aria-expanded') === 'true',
-                            'Department must expand: ' + key);
-                        await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Clicked section must remain active: ' + key);
+                        await navigate(key);
                         if (root.scrollWidth > root.clientWidth + 2) throw new Error('Department overflow: ' + key);
                     }
+                    await navigate('sales');
                     const productRank = await wait(() => root.querySelector('.adams_product_ranking .adams_rank_row'), 'Native product ranking must render');
                     if (!productRank.innerText.includes(expected)) throw new Error('Product ranking must retain signed native invoice value');
-                    // Manual scroll must follow the visible section, not the last click.
-                    root.dispatchEvent(new Event('wheel'));
-                    const salesSection = root.querySelector('#adams-sales');
-                    const sticky = root.querySelector('.adams_nav').getBoundingClientRect().height + 16;
-                    root.scrollTop += salesSection.getBoundingClientRect().top - root.getBoundingClientRect().top - sticky;
-                    await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === 'sales', 'Manual scroll must activate Sales');
-                    root.dispatchEvent(new Event('wheel')); root.scrollTop = 0;
-                    await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === 'finance', 'Scroll to top must activate Finance');
-                    const searchInput = root.querySelector('#adams-search');
+                    root.dispatchEvent(new Event('wheel')); root.scrollTop = root.scrollHeight;
+                    await new Promise(resolve => requestAnimationFrame(resolve));
+                    if (root.querySelector('.adams_side_link.active')?.dataset.section !== 'sales') throw new Error('Scrolling must not change the selected department');
+                    root.scrollTop = 0;
+                    await navigate('hr');
+                    const tabs = await wait(() => root.querySelector('.adams_hr_tabs'), 'Five HR views must be available');
+                    if (tabs.querySelectorAll('button').length !== 5) throw new Error('HR must expose five tabs');
+                    for (let index = 0; index < 5; index++) {
+                        tabs.querySelectorAll('button')[index].click();
+                        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                        await wait(() => !root.querySelector('#adams-hr [role="status"]'), 'HR tab must leave loading state');
+                        if (root.querySelector('#adams-hr [role="alert"]')) throw new Error('HR tab returned a backend error');
+                        if (root.scrollWidth > root.clientWidth + 2) throw new Error('HR tab overflows');
+                    }
+                    if (HAS_EMPLOYEE) {
+                        const person = await wait(() => [...root.querySelectorAll('.adams_hr_person')].find(node => node.innerText.includes('000 Dashboard work profile fixture')), 'Authorized employee fixture must appear');
+                        person.click();
+                        const profile = await wait(() => root.querySelector('.adams_employee_dialog[open]'), 'Employee work profile must open');
+                        await wait(() => profile.innerText.includes('000 Dashboard work profile fixture'), 'Profile must show selected employee');
+                        profile.querySelector('header button').click();
+                        await wait(() => !profile.open, 'Employee profile must close');
+                    }
+                    await navigate('finance');
+                    if (WIDTH <= 900) { root.querySelector('.adams_mobile_menu').click(); await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Search navigation must open'); }
+                    root.querySelector('.adams_sidebar button:not([data-section]).adams_side_link').click();
+                    if (root.querySelector('.adams_sidebar.is-open')) root.querySelector('.adams_workspace_close').click();
+                    const searchInput = await wait(() => root.querySelector('#adams-search'), 'Search input must open');
                     searchInput.value = 'Dashboard Search Fixture';
                     searchInput.dispatchEvent(new Event('input', {bubbles: true}));
                     root.querySelector('.adams_global_search').requestSubmit();
@@ -271,7 +322,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     searchDialog.querySelector('header button').click();
                     await wait(() => !searchDialog.open, 'Search drawer must close');
                     if (WIDTH === 1440) {
-                        root.querySelectorAll('.adams_header_actions button')[3].click();
+                        await more(1);
                         const printPreview = await wait(() => root.querySelector('.adams_print_summary[open] tbody tr'), 'Native print preview must render');
                         const printDialog = printPreview.closest('dialog');
                         if (!printDialog.innerText.includes(expected)) throw new Error('Print preview lost formatted native revenue');
@@ -281,22 +332,25 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => !printDialog.open, 'Print preview must close');
                     }
                     if (WIDTH === 1440 && DIRECTION === 'ltr') {
+                        await navigate('sales');
                         // A saved reference view includes both Sales selections.
                         root.querySelectorAll('.adams_recent_tabs button')[1].click();
                         root.querySelectorAll('.adams_rank_tabs button')[1].click();
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1].classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1].classList.contains('active'), 'Sales selections must activate');
-                        root.querySelectorAll('.adams_header_actions button')[0].click();
-                        await wait(() => !root.querySelectorAll('.adams_header_actions button')[1].disabled,
-                            'Saving must enable Restore view');
+                        root.querySelector('.adams_header > .adams_header_actions > button:nth-child(2)').click();
+                        root.querySelector('[aria-controls="adams-more-menu"]').click();
+                        await wait(() => root.querySelectorAll('#adams-more-menu [role="menuitem"]')[2] && !root.querySelectorAll('#adams-more-menu [role="menuitem"]')[2].disabled, 'Saving must enable Restore view');
+                        root.querySelector('[aria-controls="adams-more-menu"]').click();
                         root.querySelectorAll('.adams_recent_tabs button')[0].click();
                         root.querySelectorAll('.adams_rank_tabs button')[0].click();
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[0].classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[0].classList.contains('active'), 'Changed Sales selections must activate');
-                        root.querySelectorAll('.adams_header_actions button')[1].click();
+                        await more(2);
                         await wait(() => root.querySelectorAll('.adams_recent_tabs button')[1]?.classList.contains('active') &&
                             root.querySelectorAll('.adams_rank_tabs button')[1]?.classList.contains('active') &&
                             !root.querySelector('#adams-sales [role="status"]'), 'Saved Sales selections must reload');
+                        await navigate('finance');
                         const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
                         const open = restoredCard.querySelector('button[aria-label="Open report"]');
                         open.click();
@@ -307,7 +361,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         back.click();
                         const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === expected
                             && document.querySelector('.o_adams_dashboard'), 'Financial report return must reload the known native value');
-                        const restoredDates = [...restored.querySelectorAll('.adams_filters input')].map(input => input.value);
+                        const restoredDates = [...restored.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(input => input.textContent.trim());
                         if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
                             throw new Error('Financial report return changed applied dates');
                         const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button'),
@@ -325,10 +379,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card').length === 4,
                             'Payment return must restore the supplier windows');
                     }
-                    if (WIDTH === 768 || WIDTH === 1024) liquidity.scrollIntoView({block: 'start'});
+                    if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
+                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):
@@ -339,7 +393,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # Retain real rendered sections for semantic visual review, not
                     # only the landing screen. This never supplies business values
                     # or changes a test result. Responsive/theme coverage is shared
-                    # with the existing 24-case application journey above.
+                    # with the 28-case application journey above.
                     def capture_section(section, target_selector=None, setup=''):
                         expression = r"""(async () => {
                             const wait = async (test, message) => {
@@ -350,8 +404,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 throw new Error(message);
                             };
                             const root = document.querySelector('.o_adams_dashboard');
-                            const section = root.querySelector('#adams-' + SECTION);
-                            if (!section) throw new Error('Missing visual evidence section');
+                            const navigation = root.querySelector('.adams_side_link[data-section="' + SECTION + '"]');
+                            if (!navigation) throw new Error('Missing department navigation');
+                            if (innerWidth <= 900 && !root.querySelector('.adams_sidebar.is-open')) { root.querySelector('.adams_mobile_menu').click(); await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Evidence navigation must open'); }
+                            navigation.click();
+                            const section = await wait(() => root.querySelector('#adams-' + SECTION), 'Missing visual evidence section');
                             const toggle = section.querySelector('.adams_section_toggle');
                             if (toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
                             await wait(() => !section.querySelector('.adams_message[role="status"]'),
@@ -383,20 +440,17 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             """
                         elif section == 'inventory' and stock_category:
                             setup = """
-                                const explore = section.querySelector(':scope > button.btn-outline-secondary');
-                                if (!explore) throw new Error('Current stock action is missing');
-                                explore.click();
                                 const filters = await wait(() => section.querySelector('.adams_stock_filters'), 'Stock filters must render');
-                                await wait(() => !filters.querySelector('button').disabled, 'Initial stock must settle');
+                                await wait(() => !filters.querySelector('button[type="submit"]').disabled, 'Initial stock must settle');
                                 const category = filters.querySelectorAll('select')[1];
                                 category.value = STOCK_CATEGORY;
                                 category.dispatchEvent(new Event('change', {bubbles:true}));
                                 await new Promise(resolve => requestAnimationFrame(resolve));
                                 filters.requestSubmit();
-                                await wait(() => !filters.querySelector('button').disabled &&
-                                    section.querySelectorAll('.adams_analysis tbody tr').length === 25 &&
+                                await wait(() => !filters.querySelector('button[type="submit"]').disabled &&
+                                    section.querySelectorAll('.adams_stock_table tbody tr').length === 25 &&
                                     section.querySelectorAll('.adams_page_number').length === 2 &&
-                                    [...section.querySelectorAll('.adams_analysis tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
+                                    [...section.querySelectorAll('.adams_stock_table tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
                                     'Filtered native stock must render 25 rows and two numbered pages');
                             """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
                             target = '.adams_stock_filters'
@@ -409,8 +463,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         elif section == 'inventory' and stock_category:
                             # The long first page and its pager cannot fit in one
                             # narrow screenshot; retain both real viewport states.
-                            capture_section(section, '.adams_analysis .adams_table_wrap', r"""
-                                const viewport = section.querySelector('.adams_analysis .adams_table_wrap');
+                            capture_section(section, '.adams_stock_table', r"""
+                                const viewport = section.querySelector('.adams_stock_table');
                                 const firstRow = viewport.querySelector('tbody tr');
                                 const productCell = firstRow.cells[0];
                                 const sourceCell = firstRow.cells[firstRow.cells.length - 1];
@@ -453,14 +507,21 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');
                                 if (!pageTwo) throw new Error('Second stock page is missing');
                                 pageTwo.click();
-                                await wait(() => section.querySelectorAll('.adams_analysis tbody tr').length === 2 &&
+                                await wait(() => section.querySelectorAll('.adams_stock_table tbody tr').length === 2 &&
                                     section.querySelector('.adams_page_number[aria-current="page"]')?.textContent.trim() === '2' &&
-                                    !section.querySelector('.adams_stock_filters button').disabled,
+                                    !section.querySelector('.adams_stock_filters button[type="submit"]').disabled,
                                     'Second stock page must settle with the remaining two fixture rows');
-                                if (!section.querySelector('.adams_analysis tbody').innerText.includes('DASH-VIS-26'))
+                                if (!section.querySelector('.adams_stock_table tbody').innerText.includes('DASH-VIS-26'))
                                     throw new Error('Second stock page lost its final fixture product');
                             """)
                             browser.take_screenshot(prefix=f'polish_inventory_page2_{lang}_{theme}_{width}_').result(timeout=20)
+                    for index, tab in enumerate(('overview', 'attendance', 'time_off', 'shifts', 'employees')):
+                        capture_section('hr', None, f"""
+                            section.querySelectorAll('.adams_hr_tabs button')[{index}].click();
+                            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                            await wait(() => !section.querySelector('[role=\"status\"]'), 'HR screenshot must finish loading');
+                        """)
+                        browser.take_screenshot(prefix=f'hr_{tab}_{lang}_{theme}_{width}_').result(timeout=20)
                     return result
 
                 with patch.object(ChromeBrowser, '_wait_code_ok', capture_success):
@@ -479,7 +540,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 break
             # take_screenshot's file-writing callback may finish just after its Future.
             time.sleep(0.05)
-        self.assertEqual(len(capture_prefixes), 24 * (10 if stock_category else 8))
+        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (15 if stock_category else 13))
         self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
                         'Each matrix view must have exactly one newly saved screenshot')
         retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
@@ -488,7 +549,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         retained_root.chmod(0o700)
         pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=retained_root))
         manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
-                    'matrix_cases': 24, 'screenshots': len(capture_prefixes),
+                    'matrix_cases': len(viewports) * 4, 'viewports': viewports, 'screenshots': len(capture_prefixes),
                     'populated_stock': bool(stock_category), 'files': []}
         for prefix, paths in matched.items():
             source = paths[0]
@@ -496,6 +557,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             content = source.read_bytes()
             self.assertTrue(content.startswith(b'\x89PNG\r\n\x1a\n') and len(content) > 24,
                             'Screenshot is missing its PNG header')
+            expected_width = int(prefix.rstrip('_').rsplit('_', 1)[1])
+            expected_height = dict(viewports)[expected_width]
+            png_size = (int.from_bytes(content[16:20], 'big'), int.from_bytes(content[20:24], 'big'))
+            self.assertEqual(png_size, (expected_width, expected_height),
+                             'Evidence must use the requested real browser viewport')
             destination = pending / source.name
             with destination.open('xb') as output:
                 output.write(content)
@@ -503,7 +569,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             digest = hashlib.sha256(content).hexdigest()
             self.assertEqual(hashlib.sha256(destination.read_bytes()).hexdigest(), digest)
             manifest['files'].append({'prefix': prefix, 'name': source.name,
-                                      'bytes': len(content), 'sha256': digest})
+                                      'bytes': len(content), 'sha256': digest, 'viewport': list(png_size)})
         manifest_path = pending / 'manifest.json'
         manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
         manifest_path.chmod(0o600)

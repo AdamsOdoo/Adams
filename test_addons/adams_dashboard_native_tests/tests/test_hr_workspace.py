@@ -1,0 +1,244 @@
+"""Independent ORM fixtures for HR adapter boundaries and native durations."""
+from datetime import date, timedelta
+from unittest.mock import patch
+
+from odoo import Command, fields
+from odoo.exceptions import AccessError, ValidationError
+from odoo.tests import TransactionCase, new_test_user, tagged
+
+
+@tagged('post_install', '-at_install')
+class TestDashboardHRWorkspace(TransactionCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.env.user.group_ids |= (cls.env.ref('hr.group_hr_manager')
+                                  | cls.env.ref('hr_attendance.group_hr_attendance_manager')
+                                  | cls.env.ref('hr_holidays.group_hr_holidays_manager')
+                                  | cls.env.ref('adams_executive_dashboard.group_dashboard_user'))
+        cls.env.user.tz = 'UTC'
+        cls.dashboard = cls.env['adams.executive.dashboard']
+        cls.options = {'company_id': cls.env.company.id, 'date_from': '2026-08-01',
+                       'date_to': '2026-08-31', 'as_of': '2026-08-31'}
+        cls.employee = cls.env['hr.employee'].create({'name': 'Workspace staff',
+                           'company_id': cls.env.company.id, 'work_email': 'staff@example.test'})
+        cls.reader = new_test_user(cls.env, login='hr_workspace_reader',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user',
+            company_id=cls.env.company.id, company_ids=[Command.set(cls.env.company.ids)])
+
+    def test_dashboard_and_private_hr_boundaries(self):
+        outsider = new_test_user(self.env, login='hr_workspace_outsider', groups='base.group_user')
+        service = self.dashboard.with_user(outsider)
+        for method, args in [('get_hr_workspace', (self.options,)),
+                             ('get_employee_profile', (self.options, self.employee.id)),
+                             ('open_hr_source', (self.options, 'employees'))]:
+            with self.subTest(method=method), self.assertRaises(AccessError):
+                getattr(service, method)(*args)
+        service = self.dashboard.with_user(self.reader)
+        self.assertEqual(service.get_hr_workspace(self.options, 'employees')['status'], 'restricted')
+        with self.assertRaises(AccessError):
+            service.get_employee_profile(self.options, self.employee.id)
+        with self.assertRaises(AccessError):
+            service.open_hr_source(self.options, 'employees', record_id=self.employee.id)
+
+    def test_employee_current_archived_pages_and_private_profile_fields(self):
+        employees = self.env['hr.employee'].create([
+            {'name': f'Bounded staff {n:02}', 'company_id': self.env.company.id} for n in range(27)])
+        filters = {'search': 'Bounded staff'}
+        first = self.dashboard.get_hr_workspace(self.options, 'employees', filters)
+        last = self.dashboard.get_hr_workspace(self.options, 'employees', filters, 25)
+        self.assertEqual(first['total'], 27)
+        self.assertEqual(len(first['rows']), 25)
+        self.assertEqual(len(last['rows']), 2)
+        employees[1:].active = False
+        shrunk = self.dashboard.get_hr_workspace(self.options, 'employees', filters, 25)
+        self.assertEqual(shrunk['offset'], 0)
+        self.assertEqual([row['id'] for row in shrunk['rows']], employees[:1].ids)
+        archived = self.dashboard.get_hr_workspace(self.options, 'employees', {**filters, 'status': 'archived'})
+        self.assertEqual(archived['total'], 26)
+        profile = self.dashboard.get_employee_profile(self.options, self.employee.id)['employee']
+        self.assertEqual(profile['work_email'], 'staff@example.test')
+        self.assertFalse(set(profile) & {'private_email', 'private_phone', 'bank_account_id',
+                                         'identification_id', 'ssnid', 'contract_id', 'wage'})
+
+    def test_employee_exact_id_company_and_revocation(self):
+        other = self.env['res.company'].create({'name': 'Other HR company'})
+        foreign = self.env['hr.employee'].with_company(other).create({
+            'name': self.employee.name, 'company_id': other.id})
+        with self.assertRaises(AccessError):
+            self.dashboard.get_employee_profile(self.options, foreign.id)
+        with self.assertRaises(AccessError):
+            self.dashboard.open_hr_source(self.options, 'employees', record_id=foreign.id)
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_employee_profile(self.options, True)
+        officer = new_test_user(self.env, login='hr_workspace_officer',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user,hr.group_hr_user',
+            company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
+        service = self.dashboard.with_user(officer)
+        self.assertEqual(service.get_employee_profile(self.options, self.employee.id)['employee']['id'], self.employee.id)
+        officer.group_ids -= self.env.ref('hr.group_hr_user')
+        with self.assertRaises(AccessError):
+            service.get_employee_profile(self.options, self.employee.id)
+
+    def test_attendance_overlap_native_duration_and_prior_day_open_snapshot(self):
+        attendance = self.env['hr.attendance']
+        closed = attendance.create({'employee_id': self.employee.id, 'check_in': '2026-07-31 22:00:00',
+                                    'check_out': '2026-08-01 05:00:00'})
+        session = attendance.create({'employee_id': self.employee.id, 'check_in': '2026-08-01 10:00:00',
+                                     'check_out': '2026-08-01 11:00:00'})
+        opened = attendance.create({'employee_id': self.employee.id,
+                                     'check_in': fields.Datetime.now() - timedelta(days=2)})
+        result = self.dashboard.get_hr_workspace(self.options, 'attendance', {'employee_id': self.employee.id})
+        by_id = {row['id']: row for row in result['rows']}
+        self.assertIn(closed.id, by_id)
+        self.assertAlmostEqual(by_id[closed.id]['worked_hours'], closed.worked_hours)
+        self.assertAlmostEqual(by_id[session.id]['worked_hours'], session.worked_hours)
+        current = self.dashboard.get_hr_workspace(self.options, 'attendance',
+                   {'employee_id': self.employee.id, 'scope': 'current', 'status': 'open'})
+        self.assertEqual([row['id'] for row in current['rows']], opened.ids)
+        self.assertIsNone(current['rows'][0]['worked_hours'])
+        action = self.dashboard.open_hr_source(self.options, 'attendance',
+                    {'employee_id': self.employee.id, 'scope': 'current', 'status': 'open'}, opened.id)
+        self.assertEqual(action['res_id'], opened.id)
+        self.assertEqual(attendance.search(action['domain']), opened)
+        self.assertFalse(any(key.startswith('search_default_') for key in action['context']))
+
+    def test_time_off_overlap_keeps_full_native_request_and_signed_report(self):
+        leave_type = self.env['hr.leave.type'].create({'name': 'Workspace leave',
+                            'requires_allocation': 'no', 'leave_validation_type': 'no_validation'})
+        leave = self.env['hr.leave'].create({'employee_id': self.employee.id,
+            'holiday_status_id': leave_type.id, 'request_date_from': '2026-07-30',
+            'request_date_to': '2026-08-04'})
+        result = self.dashboard.get_hr_workspace(self.options, 'time_off', {'employee_id': self.employee.id})
+        row = next(row for row in result['rows'] if row['id'] == leave.id)
+        self.assertEqual(row['duration_unit'], 'days')
+        self.assertEqual(row['duration'], leave.number_of_days)
+        action = self.dashboard.open_hr_source(self.options, 'time_off', {'employee_id': self.employee.id})
+        self.assertIn(leave, self.env['hr.leave'].search(action['domain']))
+        signed = self.dashboard.open_hr_source(self.options, 'time_off', {'employee_id': self.employee.id}, report=True)
+        self.assertEqual(signed['res_model'], 'hr.leave.report')
+        self.assertIn(('employee_id', '=', self.employee.id), signed['domain'])
+        self.assertIn(('state', '=', 'validate'), signed['domain'])
+        self.assertIn(('leave_type', '=', 'request'), signed['domain'])
+        self.assertEqual(signed['context']['pivot_measures'], ['number_of_hours'])
+        if leave.state != 'validate':
+            leave.action_validate()
+        with patch.object(fields.Date, 'context_today', return_value=date(2026, 8, 3)):
+            overview = self.dashboard.get_hr_workspace(self.options)
+        preview = overview['previews']['time_off']
+        self.assertEqual(preview['status'], 'ready')
+        self.assertLessEqual(len(preview['rows']), 5)
+        self.assertIn(leave.id, [row['id'] for row in preview['rows']])
+        self.assertFalse(any('private_name' in row or 'notes' in row for row in preview['rows']))
+
+    def test_filters_reject_injection_and_dates_keep_timezone(self):
+        for filters in ({'model': 'res.users'}, {'employee_id': True}, {'status': 'arbitrary'},
+                        {'date_from': '2026-08-01'}, {'date_from': '2026-09-01', 'date_to': '2026-08-01'}):
+            with self.subTest(filters=filters), self.assertRaises(ValidationError):
+                self.dashboard.get_hr_workspace(self.options, 'attendance', filters)
+        self.env.user.tz = 'America/New_York'
+        result = self.dashboard.get_hr_workspace(self.options, 'attendance',
+            {'date_from': '2026-03-08', 'date_to': '2026-03-08'})
+        self.assertEqual(result['timezone'], 'America/New_York')
+        self.assertIn(('check_in', '<', '2026-03-09 04:00:00'), result['provenance']['domain'])
+        self.assertIn(('check_out', '>=', '2026-03-08 05:00:00'), result['provenance']['domain'])
+
+    def test_optional_planning_distinguishes_missing_from_empty(self):
+        result = self.dashboard.get_hr_workspace(self.options, 'shifts')
+        if 'planning.slot' not in self.env:
+            self.assertEqual(result['status'], 'not_installed')
+            self.assertNotIn('total', result)
+        else:
+            self.assertIn(result['status'], ('ready', 'empty', 'restricted'))
+
+    def test_overview_does_not_inherit_hidden_worklist_filters(self):
+        plain = self.dashboard.get_hr_workspace(self.options)
+        filtered = self.dashboard.get_hr_workspace(self.options, 'overview', {'search': 'NO MATCH'})
+        self.assertEqual(plain['metrics'], filtered['metrics'])
+        employees = next(item for item in plain['metrics'] if item['key'] == 'employees')
+        expected = self.env['hr.employee'].search_count([
+            ('active', '=', True), ('company_id', '=', self.env.company.id)])
+        self.assertEqual(employees['value'], expected)
+
+    def test_profile_omits_individually_denied_work_field(self):
+        employee_type = type(self.env['hr.employee'])
+        original = employee_type.check_field_access_rights
+
+        def restricted(model, operation, field_names):
+            if 'work_email' in field_names:
+                raise AccessError('Field denied by fixture')
+            return original(model, operation, field_names)
+
+        with patch.object(employee_type, 'check_field_access_rights', restricted):
+            profile = self.dashboard.get_employee_profile(self.options, self.employee.id)['employee']
+        self.assertNotIn('work_email', profile)
+        self.assertEqual(profile['name'], self.employee.name)
+
+    def test_overview_optional_failure_keeps_other_sources(self):
+        service_type = type(self.dashboard)
+        original = service_type._hr_source_scope
+
+        def failed(model, tab, filters, dates):
+            if tab == 'attendance':
+                raise RuntimeError('Controlled adapter failure')
+            return original(model, tab, filters, dates)
+
+        with patch.object(service_type, '_hr_source_scope', failed):
+            result = self.dashboard.get_hr_workspace(self.options)
+        metrics = {item['key']: item for item in result['metrics']}
+        self.assertEqual(metrics['checked_in']['status'], 'error')
+        self.assertNotIn('value', metrics['checked_in'])
+        self.assertEqual(metrics['employees']['status'], 'ready')
+
+    def test_planning_week_overlap_native_allocation_and_material_exclusion(self):
+        if 'planning.slot' not in self.env:
+            self.skipTest('Enterprise Planning is not installed in this native test database')
+        self.env.user.group_ids |= self.env.ref('planning.group_planning_manager')
+        slot_model = self.env['planning.slot']
+        common = {'company_id': self.env.company.id, 'state': 'published'}
+        continuing = slot_model.create({**common, 'resource_id': self.employee.resource_id.id,
+            'start_datetime': '2026-07-31 23:00:00', 'end_datetime': '2026-08-01 06:00:00'})
+        vacancy = slot_model.create({**common, 'start_datetime': '2026-08-04 09:00:00',
+                                      'end_datetime': '2026-08-04 17:00:00'})
+        later = slot_model.create({**common, 'start_datetime': '2026-08-20 09:00:00',
+                                    'end_datetime': '2026-08-20 17:00:00'})
+        material = self.env['resource.resource'].create({'name': 'Material', 'resource_type': 'material',
+                                                        'company_id': self.env.company.id})
+        excluded = slot_model.create({**common, 'resource_id': material.id,
+            'start_datetime': '2026-08-04 09:00:00', 'end_datetime': '2026-08-04 17:00:00'})
+        week = self.dashboard.get_hr_workspace(self.options, 'shifts', {'view': 'week'})
+        ids = {row['id'] for row in week['rows']}
+        self.assertTrue({continuing.id, vacancy.id}.issubset(ids))
+        self.assertFalse({later.id, excluded.id} & ids)
+        self.assertEqual(next(row['allocated_hours'] for row in week['rows'] if row['id'] == continuing.id),
+                         continuing.allocated_hours)
+        month = self.dashboard.get_hr_workspace(self.options, 'shifts', {'view': 'list'})
+        self.assertIn(later.id, [row['id'] for row in month['rows']])
+        unassigned = self.dashboard.get_hr_workspace(self.options, 'shifts', {'assignment': 'unassigned'})
+        self.assertTrue(all(not row['assigned'] for row in unassigned['rows']))
+        with self.assertRaises(AccessError):
+            self.dashboard.open_hr_source(self.options, 'shifts', record_id=excluded.id)
+
+    def test_planning_own_reader_cannot_see_other_employee_or_drafts(self):
+        if 'planning.slot' not in self.env:
+            self.skipTest('Enterprise Planning is not installed in this native test database')
+        self.env.user.group_ids |= self.env.ref('planning.group_planning_manager')
+        own_employee = self.env['hr.employee'].create({'name': 'Reader employee',
+            'company_id': self.env.company.id, 'user_id': self.reader.id})
+        common = {'company_id': self.env.company.id, 'start_datetime': '2026-08-10 09:00:00',
+                  'end_datetime': '2026-08-10 17:00:00', 'state': 'published'}
+        slots = self.env['planning.slot']
+        own = slots.create({**common, 'resource_id': own_employee.resource_id.id})
+        other = slots.create({**common, 'resource_id': self.employee.resource_id.id})
+        draft = slots.create({**common, 'resource_id': own_employee.resource_id.id, 'state': 'draft',
+                              'start_datetime': '2026-08-11 09:00:00', 'end_datetime': '2026-08-11 17:00:00'})
+        service = self.dashboard.with_user(self.reader)
+        response = service.get_hr_workspace(self.options, 'shifts', {'status': 'all'})
+        self.assertEqual(response['status'], 'ready')
+        ids = {row['id'] for row in response['rows']}
+        self.assertIn(own.id, ids)
+        self.assertNotIn(other.id, ids)
+        self.assertNotIn(draft.id, ids)
+        for record in (other, draft):
+            with self.subTest(record=record.id), self.assertRaises(AccessError):
+                service.open_hr_source(self.options, 'shifts', {'status': 'all'}, record.id)

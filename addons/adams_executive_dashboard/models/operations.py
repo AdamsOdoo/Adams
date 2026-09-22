@@ -1,5 +1,6 @@
 """Thin adapters for stock services and authorized workforce aggregates."""
 from datetime import datetime, time, timedelta
+from decimal import Decimal
 
 import pytz
 
@@ -17,6 +18,12 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise AccessError(_('Inventory reporting access is required.'))
         products = self.env['product.product'].with_context(active_test=False)
         context = dict(products.env.context)
+        # Source-action context can survive a return to the dashboard. Explicit
+        # dashboard scopes must not inherit a previous location or cutoff.
+        for key in ('location', 'warehouse_id', 'search_warehouse', 'strict',
+                    'from_date', 'to_date', 'lot_id', 'owner_id', 'package_id',
+                    'adams_dashboard_quantity_view_ref'):
+            context.pop(key, None)
         if mode == 'historical':
             if dates[2] > fields.Date.context_today(self):
                 raise ValidationError(_('Historical inventory requires a cutoff no later than today.'))
@@ -94,19 +101,37 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         rows, total = [], 0
         # Page product/location pairs, never product totals. Odoo computes and filters
         # the quantities with strict location semantics, including historical moves.
+        quantity_terms = [term for term in domain
+                          if isinstance(term, (tuple, list)) and term[0] == 'qty_available']
+        # Without a quantity predicate, counts are independent of location.
+        # Compute once; never cache across requests/users/companies.
+        invariant_count = products.search_count(domain) if not quantity_terms else None
+        warehouse_paths = [(w.view_location_id.parent_path, w.name, w.id) for w in warehouses]
         for location in locations:
             scoped_products = products.with_context(location=location.id, strict=True)
-            count = scoped_products.search_count(domain)
+            local_domain = list(domain)
+            if quantity_terms:
+                # Expand the native field search once, retaining installed kit
+                # and historical overrides, then reuse it for count and page.
+                local_domain = []
+                for term in domain:
+                    if isinstance(term, (tuple, list)) and term[0] == 'qty_available':
+                        local_domain.extend(scoped_products._search_qty_available(term[1], term[2]))
+                    else:
+                        local_domain.append(term)
+            count = invariant_count if invariant_count is not None else scoped_products.search_count(local_domain)
             local_offset = max(0, offset - total)
             if len(rows) < 25 and local_offset < count:
-                selected = scoped_products.search(domain, order='default_code, id', offset=local_offset, limit=25 - len(rows))
+                selected = scoped_products.search(local_domain, order='default_code, id', offset=local_offset, limit=25 - len(rows))
                 for row in selected.read(columns):
                     row['product_id'] = row['id']
                     row['id'] = f"{row['id']}:{location.id}"
                     row['location_id'] = location.id
                     row['location_name'] = location.complete_name
-                    row['warehouse_name'] = ', '.join(warehouses.filtered(
-                        lambda w: location.parent_path.startswith(w.view_location_id.parent_path)).mapped('name'))
+                    matched_warehouses = [(name, warehouse_id) for path, name, warehouse_id in warehouse_paths if location.parent_path.startswith(path)]
+                    row['warehouse_name'] = ', '.join(name for name, _ in matched_warehouses)
+                    row['warehouse_id'] = matched_warehouses[0][1] if len(matched_warehouses) == 1 else False
+                    row['digits'] = max(0, -Decimal(str(selected.browse(row['product_id']).uom_id.rounding)).normalize().as_tuple().exponent)
                     rows.append(row)
             total += count
         return {'status': 'ready' if rows else 'empty', 'rows': rows, 'offset': offset,
@@ -127,6 +152,8 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise ValidationError(_('Invalid product.'))
         if type(location_id) is not int or location_id < 1:
             raise ValidationError(_('Invalid stock filter.'))
+        if filters is not None and not isinstance(filters, dict):
+            raise ValidationError(_('Invalid stock filters.'))
         filters = dict(filters or {}, location_id=location_id)
         scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
         products = products.with_context(location=location_id, strict=True)
@@ -134,7 +161,36 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         if not products.search(domain, limit=1):
             raise AccessError(_('The product is unavailable in the selected scope.'))
         action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
-        action.update(domain=domain, context=dict(products.env.context))
+        action.update(name=_('Location quantities'), domain=domain,
+                      context={**products.env.context, 'adams_dashboard_quantity_view_ref': 'stock.product_product_stock_tree'})
+        return action
+
+    @api.model
+    def open_inventory_valuation(self, options, mode='current', filters=None, product_id=None):
+        filters = {} if filters is None else filters
+        scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
+        if 'total_value' not in products._fields:
+            raise ValidationError(_('Inventory valuation is not installed.'))
+        products.check_field_access_rights('read', ['total_value', 'company_currency_id'])
+        # Value and quantity must both use company/warehouse scope. A location
+        # filter never allocates company value to that location's quantity.
+        domain = [term for term in domain
+                  if not (isinstance(term, (tuple, list)) and term[0] == 'qty_available')]
+        if product_id is not None:
+            if type(product_id) is not int or product_id < 1:
+                raise ValidationError(_('Invalid product.'))
+            domain.append(('id', '=', product_id))
+            if not products.search(domain, limit=1):
+                raise AccessError(_('The product is unavailable in the selected scope.'))
+        context = dict(products.env.context)
+        if filters.get('warehouse_id'):
+            warehouse = warehouses.filtered(lambda w: w.id == filters['warehouse_id'])
+            context['warehouse_id'] = warehouse.id
+            name = _('Warehouse valuation — %s', warehouse.display_name)
+        else:
+            name = _('Company valuation — %s', scoped.env.company.display_name)
+        action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
+        action.update(name=name, domain=domain, context=context)
         return action
 
     @api.model
@@ -193,21 +249,21 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise AccessError(_('The record is unavailable in the selected scope.'))
         if route == 'forecast':
             action = product.action_product_forecast_report()
-            action['context'] = {**scoped.env.context, 'active_id': product.id,
+            action['context'] = {**products.env.context, 'active_id': product.id,
                                  'active_model': 'product.product', 'default_product_id': product.id}
             return action
         if route == 'replenishment':
             # The native method opens orderpoints; it does not order or replenish.
             scoped.env['stock.warehouse.orderpoint'].check_access('read')
             action = product.action_view_orderpoints()
-            action['context'] = {**action['context'], **scoped.env.context}
+            action['context'] = {**action['context'], **products.env.context}
             action['domain'] = [('product_id', '=', product.id), ('company_id', '=', scoped.env.company.id)]
             return action
         model, xmlid = ('stock.move.line', 'stock.stock_move_line_action') if route == 'history' else ('stock.quant', 'stock.action_view_quants')
         scoped.env[model].check_access('read')
         action = scoped.env['ir.actions.actions']._for_xml_id(xmlid)
         action.update(domain=[('product_id', '=', product.id), ('company_id', '=', scoped.env.company.id)],
-                      context={**scoped.env.context, 'active_test': False})
+                      context={**products.env.context, 'active_test': False})
         return action
 
     def _workforce_scope(self):
