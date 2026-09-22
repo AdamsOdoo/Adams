@@ -390,11 +390,17 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             action['context'] = {**action['context'], **products.env.context}
             action['domain'] = [('product_id', '=', product.id), ('company_id', '=', scoped.env.company.id)]
             return action
-        model, xmlid = ('stock.move.line', 'stock.stock_move_line_action') if route == 'history' else ('stock.quant', 'stock.action_view_quants')
+        model, xmlid = ('stock.move.line', 'stock.stock_move_line_action') if route == 'history' else ('stock.quant', 'stock.stock_quant_action')
         scoped.env[model].check_access('read')
         action = scoped.env['ir.actions.actions']._for_xml_id(xmlid)
         action.update(domain=[('product_id', '=', product.id), ('company_id', '=', scoped.env.company.id)],
                       context={**products.env.context, 'active_test': False})
+        if route == 'locations':
+            # A server action constructs a new window and discards this domain.
+            # Return the concrete native read-only list with the validated scope.
+            action.update(views=[(scoped.env.ref('stock.view_stock_quant_tree').id, 'list')],
+                          view_mode='list')
+            action['context'].update(create=False, edit=False, delete=False)
         return action
 
     def _workforce_scope(self):

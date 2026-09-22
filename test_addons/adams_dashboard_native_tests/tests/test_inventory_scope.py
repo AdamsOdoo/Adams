@@ -224,3 +224,23 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         self.assertEqual(row['reserved_quantity'], 0)
         action = self.dashboard.open_inventory_reservations(self.options, kit.id, self.location.id)
         self.assertFalse(self.env['stock.quant'].search(action['domain']))
+
+    def test_legacy_product_locations_returns_scoped_window_not_server_action(self):
+        other = self.env['product.product'].create({'name': 'Excluded location product', 'is_storable': True})
+        quants = self.env['stock.quant']
+        quants._update_available_quantity(self.product, self.location, 4)
+        quants._update_available_quantity(other, self.location, 9)
+        action = self.dashboard.open_inventory_product(self.options, self.product.id, 'locations')
+        self.assertEqual(action['type'], 'ir.actions.act_window')
+        self.assertEqual(action['res_model'], 'stock.quant')
+        self.assertEqual(action['views'], [(self.env.ref('stock.view_stock_quant_tree').id, 'list')])
+        self.assertIn(('company_id', '=', self.env.company.id), action['domain'])
+        records = quants.with_context(action['context']).search(action['domain'])
+        self.assertTrue(records)
+        self.assertEqual(records.product_id, self.product)
+        self.assertEqual(records.company_id, self.env.company)
+        self.assertFalse(action['context']['edit'])
+        self.assertFalse(action['context']['create'])
+        self.assertFalse(action['context']['delete'])
+        with self.assertRaises(AccessError):
+            self.dashboard.open_inventory_product(self.options, 2147483647, 'locations')
