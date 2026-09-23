@@ -44,7 +44,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         @api.model
         def fail_once(recordset, options, tab='overview', filters=None, offset=0):
             if (recordset.env.uid == user.id and tab == 'employees'
-                    and (filters or {}).get('search') == employee.name):
+                    and (filters or {}).get('search')):
                 attempts.append({'options': dict(options), 'filters': dict(filters), 'offset': offset})
                 if len(attempts) == 1:
                     # UserError is an expected RPC failure, not an unexpected
@@ -79,8 +79,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             const filters=hr.querySelector('.adams_hr_filters'), search=filters.querySelector('input[type="search"]');
             search.value=EMPLOYEE; search.dispatchEvent(new Event('input',{bubbles:true}));
             await new Promise(resolve=>requestAnimationFrame(resolve));
-            filters.requestSubmit();
-            const error=await wait(()=>hr.querySelector('.adams_message[role="alert"]'), 'One-shot RPC failure must show local HR error');
+            const liveFilters=await wait(()=>root.querySelector('#adams-hr .adams_hr_filters input[type="search"]')?.value===EMPLOYEE &&
+                root.querySelector('#adams-hr .adams_hr_filters'), 'Employee search must remain in the live form');
+            liveFilters.requestSubmit();
+            const error=await wait(()=>root.querySelector('#adams-hr .adams_message[role="alert"]'), 'One-shot RPC failure must show local HR error');
             if(!error.innerText.includes('other departments remain available'))throw new Error('Failure did not remain local');
             root.querySelector('.adams_side_link[data-section="finance"]').click();
             await wait(()=>root.querySelector('#adams-finance'), 'Finance must remain navigable during HR error');
@@ -103,6 +105,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
             self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=75)
         self.assertEqual(len(attempts), 2, 'Exactly one failed request followed by its successful Retry')
         self.assertEqual(attempts[0], attempts[1], 'Retry must preserve the exact company, period, filter and page')
+        self.assertEqual(attempts[1]['filters']['search'], employee.name)
         self.assertEqual(attempts[1]['options']['company_id'], self.env.company.id)
         for key, value in period.items():
             self.assertEqual(attempts[1]['options'][key], value)
@@ -191,8 +194,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         employee = False
         if 'hr.employee' in self.env:
             self.env.user.group_ids |= self.env.ref('hr.group_hr_user')
+            department = self.env['hr.department'].create({
+                'name': 'Dashboard department / قسم العرض', 'company_id': self.env.company.id})
             employee = self.env['hr.employee'].create({'name': '000 Dashboard work profile fixture',
-                                                       'company_id': self.env.company.id})
+                                                       'company_id': self.env.company.id,
+                                                       'department_id': department.id})
         today = fields.Date.today()
         hr_start = today - timedelta(days=1)
         hr_end = today + timedelta(days=6)
@@ -457,11 +463,23 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         }
                     }
                     if (HAS_EMPLOYEE) {
+                        if (![...root.querySelectorAll('.adams_hr_filters select option')].some(node =>
+                            node.textContent.includes('Dashboard department / قسم العرض')))
+                            throw new Error('Populated HR department must render without template errors');
                         const person = await wait(() => [...root.querySelectorAll('.adams_hr_person')].find(node => node.innerText.includes('000 Dashboard work profile fixture')), 'Authorized employee fixture must appear');
                         person.click();
                         const profile = await wait(() => root.querySelector('.adams_employee_dialog[open]'), 'Employee work profile must open');
                         await wait(() => profile.innerText.includes('000 Dashboard work profile fixture'), 'Profile must show selected employee');
-                        profile.querySelector('header button').click();
+                        if (profile.querySelector('#adams-employee-title')?.textContent !== '000 Dashboard work profile fixture')
+                            throw new Error('Employee drawer heading must identify the selected employee');
+                        const footer = profile.querySelector('.adams_hr_profile_footer');
+                        if (!footer || footer.querySelectorAll('button').length !== 2)
+                            throw new Error('Employee drawer must retain separate return and source actions');
+                        for (const button of profile.querySelectorAll('.adams_hr_profile_actions button')) {
+                            if (!button.querySelector('.adams_directional_arrow'))
+                                throw new Error('Employee record actions must expose their navigation direction');
+                        }
+                        footer.querySelector('button').click();
                         await wait(() => !profile.open, 'Employee profile must close');
                     }
                     await navigate('finance');

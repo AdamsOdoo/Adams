@@ -263,8 +263,18 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         locations = self.env['stock.location'].create([
             {'name': 'Existence %s' % label, 'usage': 'internal', 'location_id': self.location.id,
              'company_id': self.env.company.id} for label in ('positive', 'negative', 'zero', 'empty')])
-        for location, quantity in zip(locations[:3], (4, -2, 0)):
+        for location, quantity in zip(locations[:2], (4, -2)):
             self.env['stock.quant']._update_available_quantity(self.product, location, quantity)
+        # The native API rejects a zero delta; add then remove one unit. It
+        # retains a zero quant until its separate cleanup runs, so existence
+        # must not be confused with a positive stock balance.
+        quants = self.env['stock.quant']
+        quants._update_available_quantity(self.product, locations[2], 1)
+        quants._update_available_quantity(self.product, locations[2], -1)
+        zero_quant = quants.search([('product_id', '=', self.product.id),
+                                   ('location_id', '=', locations[2].id)])
+        self.assertTrue(zero_quant)
+        self.assertTrue(all(quant.quantity == 0 for quant in zero_quant))
         scoped, dates = self.dashboard._scope(self.options)
         products, _domain = scoped._stock_scope(dates, 'current')
         candidates = scoped._inventory_nonzero_locations(products, locations, 'current', {'hide_zero': True})
@@ -295,7 +305,7 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
             scoped.with_user(reader)._inventory_nonzero_locations(products.with_user(reader), locations,
                                                                   'current', {'hide_zero': True})
 
-    def test_historical_prefilter_retains_done_move_location_without_current_quants(self):
+    def test_historical_prefilter_retains_done_move_when_quant_prefilter_empty(self):
         location = self.env['stock.location'].create({'name': 'Historical empty now', 'usage': 'internal',
             'location_id': self.location.id, 'company_id': self.env.company.id})
         quants = self.env['stock.quant']
@@ -312,9 +322,15 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         move.move_line_ids.date = move.date
         emptied = quants.search([('product_id', '=', self.product.id), ('location_id', '=', location.id)])
         self.assertTrue(all(quant.quantity == 0 and quant.reserved_quantity == 0 for quant in emptied))
-        emptied.unlink()
         filters = {'location_id': location.id, 'search': self.product.name, 'hide_zero': True,
                    'at_date': '2026-08-31'}
+        # Even when the quant existence query finds nothing, a completed move
+        # after the cutoff keeps this location eligible for native history.
+        scoped, _dates, products, _domain, locations, _warehouses = (
+            self.dashboard._inventory_filter_scope(self.options, 'historical', filters))
+        with patch.object(type(quants), '_read_group', return_value=[]):
+            self.assertEqual(scoped._inventory_nonzero_locations(products, locations, 'historical', filters),
+                             locations)
         self.assertEqual(self.dashboard.get_inventory(self.options, filters=filters)['total_count'], 0)
         historical = self.dashboard.get_inventory(self.options, mode='historical', filters=filters)
         action = self.dashboard.open_inventory_location(self.options, self.product.id, location.id,
