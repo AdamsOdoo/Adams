@@ -932,3 +932,32 @@
     .adams_hr_profile_action_count { font-variant-numeric:tabular-nums; min-width:1ch; }
     .adams_hr_profile_footer { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; flex-shrink:0; padding:16px 24px; border-top:1px solid var(--adams-line); background:var(--adams-paper); }
 }
+
+// Finance first: match the approved KPI/control geometry inside the Odoo shell.
+// Keep this scoped until Finance/Inventory rendered comparisons are reviewed.
+.o_adams_dashboard #adams-finance {
+    .adams_card_top { align-items:center; min-height:20px; }
+    .adams_metric_info { display:inline-flex; align-items:center; justify-content:center;
+        flex:none; margin-inline-start:auto; padding:0; width:20px; height:20px;
+        border:0; background:none; color:var(--adams-sub); }
+    .adams_metric_info .adams_icon { width:15px; height:15px; }
+    .adams_metric_info:hover { color:var(--adams-purple); }
+    .adams_card > .adams_metric_foot { margin-top:13px; padding-top:8px; }
+    .adams_card .adams_warning_marker { margin:8px 0 0; font-size:11px; }
+    .adams_panel_head p { margin-bottom:0; }
+    .adams_chart_legend { margin:0; }
+    .adams_profit_chart { height:218px; padding:14px 20px 20px; }
+    .adams_chart_svg { height:184px; }
+    .adams_chart_table summary { font-weight:550; }
+    .adams_context_row > strong { display:block; font-size:16px; font-weight:650; }
+    .adams_context_row p { margin:6px 0 0; }
+    .adams_context_warning { color:var(--adams-ink); background:var(--adams-attention);
+        padding:6px 8px; border-radius:5px; }
+    .adams_cash_card { background:#19463d; border-color:#19463d; color:#f1faf6; }
+    .adams_cash_card h3, .adams_cash_card .adams_currency,
+    .adams_cash_card .adams_card_date, .adams_cash_card .adams_hint,
+    .adams_cash_card .adams_split_unavailable, .adams_cash_card .adams_metric_info { color:#c1d9d0; }
+    .adams_cash_card .adams_value, .adams_cash_card:not(.adams_available) .adams_value { color:#f1faf6; }
+    .adams_cash_card .adams_source_button, .adams_cash_card .btn-link { color:#def1e7; }
+    .adams_cash_card .adams_cash_split, .adams_cash_card > .adams_metric_foot { border-color:#45685f; }
+}
