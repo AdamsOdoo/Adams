@@ -936,7 +936,7 @@
 // Finance first: match the approved KPI/control geometry inside the Odoo shell.
 // Keep this scoped until Finance/Inventory rendered comparisons are reviewed.
 .o_adams_dashboard #adams-finance {
-    .adams_card_top { align-items:center; min-height:20px; }
+    .adams_card_top { align-items:center; min-height:0; }
     .adams_metric_info { display:inline-flex; align-items:center; justify-content:center;
         flex:none; margin-inline-start:auto; padding:1px 6px; width:27px; height:17px;
         border:0; background:none; color:var(--adams-sub); }
@@ -1019,7 +1019,7 @@
 // Approved Finance balance cards: native amounts/actions, direct aging context.
 .o_adams_dashboard #adams-finance {
     .adams_balance_card { display:block; padding:0; min-height:0; }
-    .adams_balance_card .adams_panel_head h3 { font-size:15px; font-weight:650; }
+    .adams_balance_card .adams_panel_head h3 { font-size:15px; font-weight:650; color:var(--adams-ink); }
     .adams_balance_body { padding:17px 20px; }
     .adams_balance_card .adams_amount { margin:6px 0; }
     .adams_balance_card .adams_value { font-size:29px; line-height:1.5; letter-spacing:-.5px; }
@@ -1027,7 +1027,7 @@
     .adams_cash_card .adams_panel_head h3 { color:#f1faf6; }
     .adams_cash_card .adams_panel_head p { color:#c1d9d0; }
     .adams_cash_links { padding:0; }
-    .adams_balance_card .adams_cash_split { padding:11px 0; margin:0; border-top:1px solid #45685f; font-size:12px; }
+    .adams_balance_card .adams_cash_split { padding:11px 0; margin:0; border-bottom:0; border-top:1px solid #45685f; font-size:12px; }
     .adams_cash_split strong { font-size:14px; }
     .adams_balance_card .adams_hint { margin:11px 0 0; font-size:12px; line-height:1.5; }
     .adams_balance_card .adams_overdue_total { margin:0; padding:12px 0; border-top:0; border-bottom:1px solid var(--adams-line); font-size:13px; }
@@ -1058,7 +1058,7 @@
 .o_adams_dashboard #adams-finance {
     .adams_statement_card { display:block; padding:0; min-height:0; }
     .adams_statement_body { padding:17px 20px; }
-    .adams_statement_body h3 { margin:0; font-size:15px; font-weight:650; line-height:1.5; }
+    .adams_statement_body h3 { color:var(--adams-ink); margin:0; font-size:15px; font-weight:650; line-height:1.5; }
     .adams_statement_label, .adams_statement_caption { font-size:12px; line-height:1.5; color:var(--adams-sub); margin:0; }
     .adams_statement_caption { margin-top:5px; }
     .adams_statement_total { border:0; padding:0; background:none; color:inherit; font-size:24px; font-weight:650; letter-spacing:-.5px; line-height:1.5; margin:6px 0; }
@@ -1101,4 +1101,128 @@
     .adams_stock_applied select { width:auto; min-height:36px; height:36px; font-size:13px; line-height:19.5px; }
     @media(max-width:900px) { .adams_stock_fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
     @media(max-width:650px) { .adams_stock_fields { padding:15px; grid-template-columns:1fr; } .adams_stock_options, .adams_stock_applied { padding-inline:15px; } }
+}
+
+.o_adams_dashboard #adams-finance {
+    #adams-group-working-capital > .adams_grid,
+    #adams-group-liquidity > .adams_grid,
+    #adams-group-financial-position > .adams_grid { gap:16px; }
+    .adams_balance_actions .btn-link, .adams_cash_links .btn-link { display:inline-flex; align-items:center; gap:5px; }
+}
+
+.o_adams_dashboard #adams-finance .adams_supplier_windows > .adams_grid { margin-bottom:18px; }
+
+// Approved Finance responsive geometry; do not inherit the older continuous grid.
+.o_adams_dashboard #adams-finance {
+    .adams_grid_three > .adams_card:last-child { grid-column:auto; }
+    @media(min-width:651px) {
+        #adams-group-working-capital > .adams_grid,
+        #adams-group-financial-position > .adams_grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    }
+    @media(min-width:901px) and (max-width:1100px) {
+        .adams_profit_grid { grid-template-columns:minmax(0,1.35fr) minmax(265px,1fr); }
+    }
+    @media(min-width:651px) and (max-width:900px) {
+        .adams_profit_grid { grid-template-columns:minmax(0,1.3fr) minmax(240px,1fr); }
+    }
+    @media(max-width:650px) {
+        #adams-group-working-capital > .adams_grid,
+        #adams-group-financial-position > .adams_grid,
+        #adams-group-liquidity > .adams_grid { grid-template-columns:1fr; }
+        #adams-group-profitability > .adams_grid,
+        .adams_supplier_windows > .adams_grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+        #adams-group-profitability > .adams_grid > .adams_card,
+        .adams_supplier_windows > .adams_grid > .adams_card { padding:13px 12px 10px; }
+        #adams-group-profitability .adams_amount,
+        .adams_supplier_windows .adams_amount { display:block; }
+        #adams-group-profitability .adams_amount .adams_currency,
+        .adams_supplier_windows .adams_amount .adams_currency { display:block; margin-bottom:4px; }
+        #adams-group-profitability .adams_value,
+        .adams_supplier_windows .adams_value { font-size:24px; }
+        .adams_card_top h3 { font-size:12px; }
+        .adams_margin_note { font-size:11px; }
+        .adams_metric_foot > .adams_source_button { font-size:11px; }
+        .adams_balance_card .adams_panel_head { padding:16px 15px 0; }
+    }
+}
+.o_adams_dashboard #adams-inventory {
+    @media(max-width:1100px) { .adams_stock_fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:650px) {
+        .adams_stock_fields { grid-template-columns:repeat(2,minmax(0,1fr)); padding:14px; gap:10px; }
+        .adams_stock_options, .adams_stock_applied { padding:12px 14px; }
+        .adams_stock_applied { align-items:flex-start; flex-direction:column; gap:4px; }
+    }
+}
+
+.o_adams_dashboard #adams-inventory {
+    .adams_page_controls { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:11px 16px; border-top:1px solid var(--adams-line); margin:0; }
+    .adams_page_context { font-size:12px; color:var(--adams-sub); }
+    .adams_stock_pager { display:flex; align-items:center; gap:4px; }
+    .adams_stock_pager .btn { min-width:30px; height:30px; min-height:30px; border:1px solid var(--adams-line); border-radius:5px; font-size:12px; padding:1px 6px; background:var(--adams-paper); color:var(--adams-ink); }
+    .adams_stock_pager .btn.active { background:var(--adams-purple-soft); border-color:var(--adams-purple); color:var(--adams-purple); font-weight:700; }
+    .adams_stock_pager .adams_icon { width:14px; height:14px; margin:auto; }
+    .adams_page_gap { font-size:12px; color:var(--adams-sub); }
+    @media(max-width:650px) { .adams_page_controls { padding:11px 12px; } .adams_page_context { font-size:11px; } .adams_stock_pager { gap:3px; } .adams_stock_pager .btn { min-width:28px; } }
+}
+.o_adams_dashboard:dir(rtl) #adams-inventory .adams_action_arrow { transform:scaleX(-1); }
+
+// Preserve the approved native-button padding at balance/statement controls.
+.o_adams_dashboard #adams-finance {
+    .adams_balance_card .adams_amount { padding:1px 6px; }
+    .adams_balance_card .adams_panel_head .adams_metric_info { padding:1px 6px; width:30px; height:20px; }
+    .adams_statement_total { padding:1px 6px; }
+}
+.o_adams_dashboard #adams-inventory {
+    .adams_stock_filter_actions .btn:not(.btn-link) { font-size:13px; line-height:19.5px; padding:7px 11px; }
+    .adams_stock_filter_actions .btn:not(.btn-link):not(.btn-primary) { background:var(--adams-paper); border:1px solid var(--adams-line); color:var(--adams-ink); }
+}
+
+// Approved Inventory table: eight complete rows; only horizontal overflow scrolls.
+.o_adams_dashboard #adams-inventory {
+    .adams_stock_table { max-height:none; scrollbar-gutter:auto; overflow-x:auto; overflow-y:visible; scrollbar-width:thin; }
+    .adams_stock_table table, .adams_stock_table table.adams_stock_full { width:100%; min-width:0; border-collapse:collapse; font-size:13px; line-height:19.5px; }
+    .adams_stock_table th, .adams_stock_table td,
+    .adams_stock_table th:nth-child(n+3), .adams_stock_table td:nth-child(n+3) { min-width:0; width:auto; padding:12px 15px; vertical-align:middle; border-bottom:1px solid var(--adams-line); }
+    .adams_stock_table th { position:static; font-size:11px; line-height:16.5px; font-weight:600; white-space:nowrap; padding:10px 15px; background:var(--adams-soft); color:var(--adams-sub); }
+    .adams_stock_table th:nth-child(n+3) { padding:10px 15px; }
+    .adams_stock_table th:first-child, .adams_stock_table td:first-child { min-width:200px; max-width:280px; width:auto; overflow-wrap:normal; }
+    .adams_stock_table th:nth-child(2), .adams_stock_table td:nth-child(2) { min-width:125px; width:auto; overflow-wrap:normal; }
+    .adams_stock_table .adams_stock_category { min-width:0; width:auto; overflow-wrap:normal; color:var(--adams-sub); }
+    .adams_stock_table tr:last-child td { border-bottom:0; }
+    .adams_stock_table td small { display:block; color:var(--adams-sub); font-size:11px; line-height:16.5px; margin-top:2px; }
+    .adams_stock_table .adams_stock_product > .btn-link { display:inline; color:var(--adams-purple); font-weight:600; font-size:13px; line-height:19.5px; min-height:0; padding:0; }
+    .adams_stock_table .adams_stock_quantity, .adams_stock_table .adams_stock_numeric { text-align:end; white-space:nowrap; }
+    .adams_stock_table td.adams_stock_quantity { font-size:14px; line-height:21px; font-weight:650; }
+    .adams_stock_table .adams_stock_quantity bdi { font-weight:650; }
+    .adams_stock_unit { font-size:11px; line-height:16.5px; font-weight:400; color:var(--adams-sub); margin-inline-start:4px; }
+    .adams_stock_table .adams_stock_action_cell, .adams_stock_table th:last-child, .adams_stock_table td:last-child { min-width:0; width:auto; white-space:nowrap; }
+    .adams_stock_direct, .adams_stock_detail_toggle { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; padding:6px; border:0; border-radius:6px; background:none; color:var(--adams-ink); }
+    .adams_stock_detail_toggle { display:none; }
+    .adams_stock_table .adams_stock_mobile_location { display:none !important; }
+    .adams_stock_table .adams_stock_secondary { display:table-cell; }
+    .adams_stock_table .adams_stock_negative { color:#b23843; }
+    .adams_stock_table .adams_stock_detail td { padding:15px; background:var(--adams-soft); white-space:normal; }
+    .adams_stock_detail_grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .adams_stock_detail_grid span { display:block; font-size:11px; color:var(--adams-sub); }
+    .adams_stock_detail_grid b, .adams_stock_detail_value { display:block; font-size:13px; font-weight:600; color:var(--adams-ink); padding:0; border:0; background:none; }
+    .adams_stock_detail > td > .btn-link { display:inline-flex; align-items:center; gap:5px; margin-top:12px; font-size:12px; font-weight:600; }
+    .adams_stock_panel > .adams_hr_scope_note { padding:12px 20px; border:0; margin:0; font-size:12px; line-height:18px; }
+    @media(max-width:900px) {
+        .adams_stock_table .adams_stock_secondary { display:none; }
+        .adams_stock_table .adams_stock_mobile_location { display:block !important; }
+        .adams_stock_table th:first-child, .adams_stock_table td:first-child { min-width:0; max-width:none; width:auto; }
+        .adams_stock_table th.adams_stock_quantity, .adams_stock_table td.adams_stock_quantity { min-width:95px; width:auto; }
+        .adams_stock_table th:last-child, .adams_stock_table td:last-child { width:48px; }
+        .adams_stock_table th, .adams_stock_table td, .adams_stock_table th:nth-child(n+3), .adams_stock_table td:nth-child(n+3) { padding:12px; }
+        .adams_stock_detail_toggle { display:inline-flex; }
+        .adams_stock_direct { display:none; }
+    }
+    @media(max-width:650px) {
+        .adams_stock_table th, .adams_stock_table td, .adams_stock_table th:nth-child(n+3), .adams_stock_table td:nth-child(n+3) { padding:10px 9px; }
+        .adams_stock_table th.adams_stock_quantity, .adams_stock_table td.adams_stock_quantity { min-width:81px; }
+        .adams_stock_table th:last-child, .adams_stock_table td:last-child { width:34px; }
+        .adams_stock_table .adams_stock_product > .btn-link { font-size:12px; }
+        .adams_stock_unit { display:block; font-size:10px; }
+        .adams_stock_detail_grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    }
 }

@@ -4847,3 +4847,43 @@ msgstr "تغيّرت عوامل التصفية — طبّق للتحديث"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Invalid page size."
 msgstr "حجم الصفحة غير صالح."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Archived accounts are excluded."
+msgstr "الحسابات المؤرشفة مستبعدة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "as shown in"
+msgstr "كما هو موضح في"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock actions"
+msgstr "إجراءات المخزون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Show details for %s"
+msgstr "عرض تفاصيل %s"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "View stock for %s"
+msgstr "عرض مخزون %s"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Not shown at a past date"
+msgstr "غير معروض في تاريخ سابق"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Stock pagination"
+msgstr "صفحات المخزون"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Historical on-hand quantities are shown. Reservation and available columns are not shown as historical measures."
+msgstr "تُعرض الكميات الموجودة في التاريخ المحدد. لا تُعرض أعمدة المحجوز والمتاح كمقاييس تاريخية."

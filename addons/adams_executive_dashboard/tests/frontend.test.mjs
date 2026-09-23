@@ -1096,4 +1096,20 @@ test('stock dashboard pages use the returned size and retain position and totals
     await request;
     assert.equal(controller.currentPage(controller.state.inventory),2);
     assert.deepEqual([...controller.pageNumbers(controller.state.inventory)],[1,2,3,4]);
+    assert.deepEqual([...controller.stockPageNumbers()].map(row=>row.number),[1,2,3,4]);
+    controller.state.inventory.offset=0;
+    assert.deepEqual([...controller.stockPageNumbers()].map(row=>row.number),[1,2,null,4]);
+});
+
+
+test('stock date displays today while preserving current versus historical requests', () => {
+    const {controller}=fixture();
+    controller.defaultOptions={date_to:'2026-09-23'};
+    controller.state.stockFilters.at_date='';
+    assert.equal(controller.stockDateValue,'2026-09-23');
+    controller.changeStockDate({target:{value:'2026-09-20'}});
+    assert.equal(controller.state.stockFilters.at_date,'2026-09-20');
+    assert.equal(controller.stockDateValue,'2026-09-20');
+    controller.changeStockDate({target:{value:'2026-09-23'}});
+    assert.equal(controller.state.stockFilters.at_date,'');
 });

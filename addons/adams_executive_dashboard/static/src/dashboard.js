@@ -180,7 +180,7 @@ export class ExecutiveDashboard extends Component {
             detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
             recent: selection(this.state.recent, ['kind', 'offset']),
             ranking: selection(this.state.ranking, ['key']), rankLimit: this.state.rankLimit, productMeasure: this.state.productMeasure, productUnit: this.state.productUnit,
-            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode', 'filters']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
+            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode', 'filters', 'expandedRow']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
     }
 
     async restoreNavigation(saved) {
@@ -219,6 +219,7 @@ export class ExecutiveDashboard extends Component {
         }
         await Promise.all(jobs);
         if (this.alive && generation === this.generation) {
+            if (saved.inventory?.expandedRow && this.state.inventory?.rows?.some(row => row.id === saved.inventory.expandedRow)) this.state.inventory.expandedRow = saved.inventory.expandedRow;
             this.restoreScroll = Number.isFinite(saved.scroll) ? Math.max(0, saved.scroll) : 0;
             this.state.restored = true;
         }
@@ -396,6 +397,15 @@ export class ExecutiveDashboard extends Component {
         const start = Math.max(1, Math.min(current - 2, total - 4));
         return [...new Set([1, ...Array.from({length: Math.min(5, total - start + 1)}, (_, i) => start + i), ...(data?.total_count !== undefined ? [total] : [])])];
     }
+
+    stockPageNumbers() {
+        const page = this.currentPage(this.state.inventory), total = this.stockTotalPages;
+        const numbers = [...new Set([1, page - 1, page, page + 1, total])].filter(n => n > 0 && n <= total).sort((a,b) => a-b);
+        return numbers.flatMap((number,index) => index && number - numbers[index-1] > 1
+            ? [{key:'gap-'+number, number:null}, {key:'page-'+number, number}]
+            : [{key:'page-'+number, number}]);
+    }
+    get stockTotalPages() { return Math.max(1, Math.ceil((this.state.inventory?.total_count || 0) / (this.state.inventory?.page_size || 8))); }
 
     // Owl template expressions resolve bare constructors and globals through ctx.
     // Keep these computations on the component so a populated optional view
@@ -1071,12 +1081,32 @@ export class ExecutiveDashboard extends Component {
         return this.refresh();
     }
     formatStockQuantity(value, row) { return this.quantity(value, row?.digits ?? 2); }
+    get stockQuantityColumns() { return [
+        {key:'reserved_quantity',label:_t('Reserved')},{key:'free_qty',label:_t('Available')},
+        {key:'incoming_qty',label:_t('Incoming')},{key:'outgoing_qty',label:_t('Outgoing')},
+        {key:'virtual_available',label:_t('Forecasted')}]; }
+    stockRowLabel(row, detail=false) { return detail ? _t('Show details for %s', row.name || row.display_name) : _t('View stock for %s', row.name || row.display_name); }
+    toggleStockRow(row) { this.state.inventory.expandedRow = this.state.inventory.expandedRow === row.id ? null : row.id; }
+    openStockQuantity(row, key) {
+        if (key === 'reserved_quantity') return this.openStockReservations(row);
+        if (key === 'free_qty') return this.openStockRow(row);
+        return this.openStockSource('forecast',row);
+    }
+    get stockDateValue() { return this.state.stockFilters.at_date || this.defaultOptions?.date_to || ''; }
+    changeStockDate(event) { this.state.stockFilters.at_date = event.target.value === this.defaultOptions?.date_to ? '' : event.target.value; }
+    get stockDateLabel() {
+        const value=this.state.inventory?.as_of || this.defaultOptions?.date_to;
+        if (!value) return '';
+        const language=(user.context?.lang || document.documentElement.lang || 'en').replaceAll('_','-');
+        return new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language,
+            {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
+    }
     get stockFiltersDirty() { const applied = this.state.inventory?.filters; return Boolean(applied && Object.keys(this.state.stockFilters).some(key=>String(this.state.stockFilters[key] || '') !== String(applied[key] || ''))); }
     clearStockFilters() { this.state.stockFilters={sort:'name',warehouse_id:'',category_id:'',search:'',hide_zero:true,hide_negative:false,at_date:''}; this.state.stockMode='current'; return this.applyStockFilters(); }
     changeStockMode(mode) {
         this.state.stockMode = mode;
         if (mode === 'current') this.state.stockFilters.at_date = '';
-        if (mode === 'cutoff') this.state.stockFilters.at_date = this.state.applied.as_of;
+        if (mode === 'cutoff') this.state.stockFilters.at_date = this.state.applied.as_of === this.defaultOptions?.date_to ? '' : this.state.applied.as_of;
         if (mode !== 'custom') return this.applyStockFilters();
     }
     applyStockFilters() {

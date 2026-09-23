@@ -789,9 +789,9 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 filters.requestSubmit();
                                 await wait(() => !filters.querySelector('button[type="submit"]').disabled &&
                                     section.querySelectorAll('.adams_stock_table tbody tr').length === 8 &&
-                                    section.querySelectorAll('.adams_page_number').length === 4 &&
+                                    section.querySelectorAll('.adams_page_number').length === 3 &&
                                     [...section.querySelectorAll('.adams_stock_table tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
-                                    'Filtered native stock must render eight rows and four numbered pages');
+                                    'Filtered native stock must render eight rows and a compact four-page navigator');
                             """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
                             target = '.adams_stock_filters'
                         capture_section(section, target, setup)
@@ -841,22 +841,24 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const sourceCell = firstRow.cells[firstRow.cells.length - 1];
                                 const categoryHeader = viewport.querySelector('thead th.adams_stock_category');
                                 const categoryCell = firstRow.querySelector('td.adams_stock_category');
-                                const inlineCategory = productCell.querySelector('.adams_stock_mobile_category');
-                                const sourceMenu = sourceCell.querySelector('details.adams_stock_actions');
-                                if (!categoryHeader || !categoryCell || !inlineCategory ||
-                                    !categoryCell.textContent.includes('Dashboard visual stock') ||
-                                    !sourceMenu?.querySelector('summary') ||
-                                    !sourceMenu.querySelector('button'))
-                                    throw new Error('Native Category and Source data columns must retain product/category and source records');
-                                if (innerWidth === 1440 && getComputedStyle(root).colorScheme === 'light') {
-                                    if (getComputedStyle(categoryHeader).display === 'none' ||
-                                        getComputedStyle(categoryCell).display === 'none' ||
-                                        getComputedStyle(inlineCategory).display !== 'none')
-                                        throw new Error('Desktop stock must render Category as its own column');
+                                const direct = sourceCell.querySelector('button.adams_stock_direct');
+                                const expand = sourceCell.querySelector('button.adams_stock_detail_toggle');
+                                if (!categoryHeader || !categoryCell || !direct || !expand ||
+                                    !categoryCell.textContent.includes('Dashboard visual stock'))
+                                    throw new Error('Category, direct stock action and detail control must remain available');
+                                if (innerWidth > 900 && getComputedStyle(categoryCell).display === 'none')
+                                    throw new Error('Desktop stock must render Category as its own column');
+                                if (innerWidth <= 900) {
+                                    if (getComputedStyle(categoryCell).display !== 'none' || getComputedStyle(expand).display === 'none')
+                                        throw new Error('Narrow stock must expose expandable product details');
+                                    expand.click();
+                                    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+                                    const detail=section.querySelector('.adams_stock_detail');
+                                    if (!detail?.textContent.includes('Dashboard visual stock') || expand.getAttribute('aria-expanded') !== 'true')
+                                        throw new Error('Expanded stock details must retain the real category');
+                                    expand.click();
+                                    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
                                 }
-                                if (innerWidth <= 1100 && (getComputedStyle(categoryCell).display !== 'none' ||
-                                    getComputedStyle(inlineCategory).display === 'none'))
-                                    throw new Error('Narrow stock must retain Category within Product details');
                                 const rtl = getComputedStyle(viewport).direction === 'rtl';
                                 const origin = viewport.scrollLeft;
                                 const visibleBounds = () => {

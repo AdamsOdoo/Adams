@@ -75,3 +75,13 @@ Specific data/presentation conflict: the service exposes a boolean for report wa
 No final package was generated from this unqualified candidate. The owner guide remains conditional on Finance/Inventory parity and source-bound staging deployment.
 
 The capture helper now takes an unchanged-viewport image before cropping the measured dashboard region. It refuses a region outside the viewport instead of trimming overflow. This addresses a suspected screenshot-induced scrollbar/layout-width change; the revised capture still requires its own native run. No comparison is accepted on that assumption alone.
+
+
+## Continuation: direct Finance port and Inventory gate preparation
+
+- Latest verified native candidate: acc665c07a4152b2477baf501ca2495db0be836b /38541387.121/122 tests passed; only the reference working-capital viewport-fit capture assertion failed. Finance rendering/report journeys completed after correcting the6391bbcf nested-template registration defect.
+- Published e86f24b354f0ca34a37f61c755d65c1a6ebc6306 adds Inventory filter geometry, an optional validated eight-row service page used by the dashboard, unchanged25-row default for existing callers, and native ordering/page-recovery assertions.66 frontend tests pass. Build38542595 passed122/122 native tests (449.25s;123,967queries) and produced Finance/Inventory captures; visual review remains open.
+- Four Finance actual regions and the profitability reference were produced by38541387; profitability, working capital and liquidity were inspected privately. Grid gaps, header color, duplicate divider borders, Unicode arrows and a KPI half-pixel minimum-height difference were identified; follow-up scoped fixes remain under verification.
+- The capture harness now records independent metadata and calls the existing comparator for Finance and Inventory regions. It retains original images, produces overlays/diffs, and reports environment mismatches instead of normalizing them away. No accepted complete pair matrix yet.
+- Specific unresolved navigation conflict: the prototype Inventory header Forecast has no product scope, but the native forecast requires a product. Existing row-level forecast remains source-backed. The header still exposes Stock history rather than silently inventing an unscoped forecast destination. This difference is not waived.
+- Staging is unchanged. Finance/Inventory gate remains open; later departments/shared component propagation and final package remain pending.

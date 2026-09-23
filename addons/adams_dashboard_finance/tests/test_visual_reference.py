@@ -168,7 +168,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 while(scroller && !(scroller.scrollHeight>scroller.clientHeight &&
                     /auto|scroll/.test(getComputedStyle(scroller).overflowY)))scroller=scroller.parentElement;
                 scroller=scroller || document.scrollingElement;
-                scroller.scrollTop += start.getBoundingClientRect().top - 16;
+                const shellBottom=document.querySelector('.o_main_navbar')?.getBoundingClientRect().bottom || 0;
+                const scrollTop=scroller===document.scrollingElement ? 0 : scroller.getBoundingClientRect().top;
+                scroller.scrollTop += start.getBoundingClientRect().top - Math.max(shellBottom,scrollTop,0) - 16;
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                 const a=start.getBoundingClientRect(), b=end.getBoundingClientRect();
                 return {x:Math.floor(a.x),y:Math.floor(a.y),width:Math.ceil(a.width),
@@ -273,9 +275,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             selected = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
                     [...document.querySelectorAll('nav button')].find(x=>x.textContent.trim()==='Inventory').click();
+                    document.querySelector('#content').style.width=CONTENT_WIDTH+'px';
                     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                     return document.querySelectorAll('.stock-table tbody tr').length;
-                })()""", 'awaitPromise':True,'returnByValue':True})
+                })()""".replace('CONTENT_WIDTH', str(captures['odoo-profitability']['clip']['width'])), 'awaitPromise':True,'returnByValue':True})
             self.assertFalse(selected.get('exceptionDetails'),str(selected))
             self.assertEqual(selected['result']['value'],8)
             capture(browser, 'reference-stock-filters', '#content > .section-heading', '.stock-summary')
@@ -300,7 +303,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
                     'fixture': 'synthetic Finance values; no source reconciliation claim',
                     'viewport': [1440, 900], 'theme': 'light', 'language': 'en_US',
-                    'adjustments': ['UI07: remove comparison note and Revenue movement row'],
+                    'adjustments': ['UI07: remove comparison note and Revenue movement row',
+                                    'UI08: signed bank/cash classification from standard journals; synthetic values retain the approved split',
+                                    'UI20: Procurement monetary/count decision deferred; not represented in these captures',
+                                    'Company: standard authorized test-company name and logo'],
                     'state_normalization': ['authorized test company/logo', 'synthetic Finance values', 'no report warnings'],
                     'content_width': captures['odoo-profitability']['clip']['width'],
                     'captures': captures, 'company': self.env.company.name,
