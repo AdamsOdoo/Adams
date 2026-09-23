@@ -300,6 +300,19 @@ class TestDashboardFinance(AccountTestInvoicingCommon):
         self.assertEqual(action['params']['options']['filter_search_bar'], cash.code)
         self.assertEqual(action['context']['allowed_company_ids'], [self.env.company.id])
 
+    def test_cash_journal_breakdown_refuses_unlinked_account(self):
+        self._cash_mapping()
+        account = self._cash_account('990091')
+        self._cash_entry(account, 37, '2026-08-10')
+        result = self.dashboard.get_section('finance', self.options)
+        cash = next(item for item in result['items'] if item['key'] == 'cash')
+        self.assertEqual(cash['status'], 'ready', cash)
+        breakdown = result['cash_breakdown']
+        self.assertEqual(breakdown['status'], 'ambiguous', breakdown)
+        self.assertGreaterEqual(breakdown['unlinked_accounts'], 1)
+        self.assertNotIn('bank', breakdown)
+        self.assertNotIn('cash', breakdown)
+
     def test_native_cash_company_currency_is_distinct_from_account_currency(self):
         self._cash_mapping()
         foreign_currency = self.env.ref('base.EUR')
