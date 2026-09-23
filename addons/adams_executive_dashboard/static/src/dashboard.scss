@@ -1063,7 +1063,7 @@
     .adams_statement_caption { margin-top:5px; }
     .adams_statement_total { border:0; padding:0; background:none; color:inherit; font-size:24px; font-weight:650; letter-spacing:-.5px; line-height:1.5; margin:6px 0; }
     .adams_statement_top { display:flex; justify-content:space-between; align-items:start; gap:8px; }
-    .adams_statement_top .adams_source_button { display:inline-flex; align-items:center; gap:5px; padding:2px 0; font-size:12px; font-weight:600; line-height:18px; }
+    .adams_statement_top .adams_source_button { min-height:0; display:inline-flex; align-items:center; gap:5px; padding:2px 0; font-size:12px; font-weight:600; line-height:18px; }
     .adams_statement_top .adams_icon { width:14px; height:14px; }
     .adams_statement_card .adams_cash_bridge { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid var(--adams-line); margin-top:15px; padding:14px 0 0; gap:10px; }
     .adams_statement_card .adams_cash_bridge span { font-size:12px; line-height:1.5; }
@@ -1190,7 +1190,7 @@
     .adams_stock_table .adams_stock_category { min-width:0; width:auto; overflow-wrap:normal; color:var(--adams-sub); }
     .adams_stock_table tr:last-child td { border-bottom:0; }
     .adams_stock_table td small { display:block; color:var(--adams-sub); font-size:11px; line-height:16.5px; margin-top:2px; }
-    .adams_stock_table .adams_stock_product > .btn-link { display:inline; color:var(--adams-purple); font-weight:600; font-size:13px; line-height:19.5px; min-height:0; padding:0; border:0; border-radius:0; background:transparent; }
+    .adams_stock_table .adams_stock_product > .btn-link { vertical-align:baseline; display:inline; color:var(--adams-purple); font-weight:600; font-size:13px; line-height:19.5px; min-height:0; padding:0; border:0; border-radius:0; background:transparent; }
     .adams_stock_table .adams_stock_quantity, .adams_stock_table .adams_stock_numeric { text-align:end; white-space:nowrap; }
     .adams_stock_table td.adams_stock_quantity { font-size:14px; line-height:21px; font-weight:650; }
     .adams_stock_table .adams_stock_quantity bdi { font-weight:650; }
@@ -1204,8 +1204,8 @@
     .adams_stock_table .adams_stock_detail td { padding:15px; background:var(--adams-soft); white-space:normal; }
     .adams_stock_detail_grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
     .adams_stock_detail_grid span { display:block; font-size:11px; color:var(--adams-sub); }
-    .adams_stock_detail_grid b, .adams_stock_detail_value { display:block; font-size:13px; font-weight:600; color:var(--adams-ink); padding:0; border:0; background:none; }
-    .adams_stock_detail > td > .btn-link { display:inline-flex; align-items:center; gap:5px; margin-top:12px; font-size:12px; font-weight:600; }
+    .adams_stock_detail_grid b, .adams_stock_detail_value { display:block; font-size:13px; font-weight:700; color:var(--adams-ink); padding:0; border:0; background:none; }
+    .adams_stock_detail > td > .btn-link { border:0; padding:2px 0; min-height:0; background:transparent; display:inline-flex; align-items:center; gap:5px; margin-top:12px; font-size:12px; font-weight:600; }
     .adams_stock_panel > .adams_hr_scope_note { padding:12px 20px; border:0; margin:0; font-size:12px; line-height:18px; }
     @media(max-width:900px) {
         .adams_stock_table .adams_stock_secondary { display:none; }
@@ -1230,22 +1230,24 @@
 // Approved Finance account drawer; native dialog retains keyboard/focus behavior.
 .o_adams_dashboard .adams_cash_dialog[open], .o_adams_dashboard .adams_finance_source[open] { display:flex; flex-direction:column; }
 .o_adams_dashboard .adams_cash_dialog, .o_adams_dashboard .adams_finance_source {
+    border-inline-start:0;
     > .adams_panel_head { position:static; padding:22px 24px; gap:16px; align-items:flex-start; }
     > header p { font-size:12px; line-height:18px; color:var(--adams-sub); margin:0 0 4px; }
     h2 { font-size:17px; line-height:25.5px; letter-spacing:-.25px; font-weight:650; margin:0; }
     .adams_drawer_close { display:inline-grid; place-items:center; width:34px; height:34px; padding:0; border:0; border-radius:6px; background:transparent; flex:none; }
-    .adams_cash_body, .adams_source_body { padding:22px 24px; overflow:auto; flex:1; }
+    .adams_cash_body, .adams_source_body { line-height:1.5; padding:22px 24px; overflow:auto; flex:1; }
     .adams_cash_caption { font-size:12px; color:var(--adams-sub); margin:0; }
     .adams_drawer_value { font-size:32px; font-weight:650; letter-spacing:-.5px; margin:9px 0 18px; line-height:48px; }
     .adams_currency { font-size:11px; letter-spacing:.3px; font-weight:500; color:var(--adams-sub); }
     .adams_cash_table { width:100%; border-collapse:collapse; font-size:13px; line-height:19.5px; }
-    .adams_cash_table th { text-align:start; font-size:11px; font-weight:600; color:var(--adams-sub); background:var(--adams-soft); padding:10px 15px; border-bottom:1px solid var(--adams-line); }
+    .adams_cash_table th { line-height:16.5px; text-align:start; font-size:11px; font-weight:600; color:var(--adams-sub); background:var(--adams-soft); padding:10px 15px; border-bottom:1px solid var(--adams-line); }
     .adams_cash_table td { padding:12px 15px; border-bottom:1px solid var(--adams-line); }
     .adams_cash_table tr:last-child td { border-bottom:0; }
-    .adams_cash_table .adams_bank_row { display:table-row; }
+    .adams_cash_table .adams_bank_row { display:table-row; border:0; padding:0; }
     .adams_cash_table .adams_cash_numeric { text-align:end; white-space:nowrap; }
     .adams_cash_account { color:var(--adams-purple); font-weight:600; padding:0; border:0; background:transparent; text-align:start; }
     .adams_cash_callout { padding:13px 15px; background:var(--adams-soft); border:1px solid var(--adams-line); border-radius:8px; font-size:12px; margin-top:18px; }
+    .adams_drawer_footer .adams_action_arrow { width:18px; height:18px; }
     .adams_drawer_footer { padding:16px 24px; border-top:1px solid var(--adams-line); display:flex; justify-content:space-between; gap:8px; }
 }
 
@@ -1257,10 +1259,30 @@
 }
 
 .o_adams_dashboard #adams-finance {
-    .btn-link { border:0; border-radius:0; background:transparent; }
+    .btn-link { vertical-align:baseline; border:0; border-radius:0; background:transparent; }
     .adams_balance_card .adams_cash_split { align-items:stretch; }
 }
 .o_adams_dashboard #adams-inventory {
     > .adams_group_heading .btn-link { display:inline-flex; align-items:center; gap:5px; border:0; border-radius:0; background:transparent; min-height:0; padding:2px 0; font-size:12px; line-height:18px; font-weight:600; color:var(--adams-purple); }
     .adams_stock_fields input, .adams_stock_fields select, .adams_stock_applied select { box-shadow:none; }
+}
+
+.o_adams_dashboard #adams-inventory .adams_stock_empty {
+    padding:55px 25px; text-align:center; color:var(--adams-sub);
+    .adams_icon { display:block; width:30px; height:30px; margin:0 auto 12px; }
+    h3 { color:var(--adams-ink); font-size:15px; line-height:22.5px; font-weight:650; margin:0 0 5px; }
+    p { font-size:13px; line-height:19.5px; margin:0 0 17px; }
+}
+
+.o_adams_dashboard #adams-finance {
+    .adams_chart_table[open] > summary { margin-bottom:10px; }
+    .adams_chart_table, .adams_aging_list {
+        .adams_table_wrap { margin:0; border:0; border-radius:0; }
+        .table { margin:0; width:100%; border-collapse:collapse; font-size:13px; line-height:19.5px; }
+        .table th { background:var(--adams-soft); color:var(--adams-sub); font-size:11px; font-weight:600; line-height:16.5px; padding:10px 15px; white-space:nowrap; }
+        .table td { font-size:13px; line-height:19.5px; padding:12px 15px; border-bottom:1px solid var(--adams-line); }
+        .table tr:last-child td { border-bottom:0; }
+        .table .btn-link { display:inline; font-size:13px; line-height:19.5px; font-weight:600; padding:0; min-height:0; border:0; white-space:nowrap; }
+    }
+    .adams_chart_table .table th:not(:first-child), .adams_chart_table .table td:not(:first-child) { text-align:end; }
 }

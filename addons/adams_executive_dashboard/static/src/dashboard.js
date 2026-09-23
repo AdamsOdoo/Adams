@@ -1085,6 +1085,7 @@ export class ExecutiveDashboard extends Component {
         {key:'reserved_quantity',label:_t('Reserved')},{key:'free_qty',label:_t('Available')},
         {key:'incoming_qty',label:_t('Incoming')},{key:'outgoing_qty',label:_t('Outgoing')},
         {key:'virtual_available',label:_t('Forecasted')}]; }
+    get stockDetailColumns() { const columns=this.stockQuantityColumns; return this.state.inventory?.mode === 'historical' ? columns.slice(0,2) : [...columns.slice(2),...columns.slice(0,2)]; }
     stockRowLabel(row, detail=false) { return detail ? _t('Show details for %s', row.name || row.display_name) : _t('View stock for %s', row.name || row.display_name); }
     toggleStockRow(row) { this.state.inventory.expandedRow = this.state.inventory.expandedRow === row.id ? null : row.id; }
     openStockQuantity(row, key) {

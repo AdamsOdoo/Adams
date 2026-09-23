@@ -1,6 +1,14 @@
 # UX v2 visual fidelity — blocking acceptance gate
 
-## Current technical visual gate — closed, 22 September 2026
+## Approved HTML implementation gate — open, 23 September 2026
+
+The current owner instruction supersedes all readiness language below. **Finance/Inventory parity is not yet accepted.** The immutable reference hash is `36ec95831f3f1e82e0709594d5c177938e3b3805ccd763b1e59c13933b2d7f4a`. Reference and actual captures are separate; the comparator produces overlays/diffs without changing baselines or masking defects.
+
+Development `762f0bfd941392e53d71a63a6cda97a767dece49` /38545131 passed122 native tests. Its private pairs identify residual inherited button borders and forecast source-button minimum height; follow-up fixes and Finance drawer comparisons are in progress. `08e01c68c017390e6e5a1db1df33443f150a7254` is the subsequent development candidate, pending qualification. No staging visual pass is claimed.
+
+Representative controlled cases cover1920×1080,1440×900,1366×768 and768×1080; Light, Dark and Arabic/RTL; loaded cards/tables, Finance account/source drawers, Inventory empty state and narrow expanded rows. These are being added to the native harness and remain pending execution/review. Real-data authorization and final staging validation are separate required gates.
+
+## Historical technical visual gate — 22 September 2026
 
 Exact successor `948a006a`, build38418408, passes the full 240-image bilingual,
 native-theme, six-width matrix. A separate reviewer inspected all 40 contact sheets

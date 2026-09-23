@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from odoo import api
+from odoo import api, Command
 from odoo.tests import tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.tools import config
@@ -30,12 +30,28 @@ from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 @tagged('post_install', '-at_install', 'dashboard_visual_reference')
 class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
     def test_finance_populated_reference_capture(self):
+        self._capture_reference((1440, 900), 'light', 'en_US')
+
+    def test_finance_inventory_representative_appearances(self):
+        # Representative cases, not a full state/viewport/language cross-product.
+        for viewport, theme, language in [
+                ((1920,1080), 'light', 'en_US'),
+                ((1366,768), 'light', 'en_US'),
+                ((768,1080), 'dark', 'en_US'),
+                ((1440,900), 'dark', 'ar_001')]:
+            with self.subTest(viewport=viewport, theme=theme, language=language):
+                self._capture_reference(viewport, theme, language)
+
+    def _capture_reference(self, viewport, theme, language):
         reference = Path(__file__).resolve().parents[3] / 'docs/executive-dashboard/reference/Adams_Dashboard_UI_Proposal.html'
         raw = reference.read_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(),
                          '36ec95831f3f1e82e0709594d5c177938e3b3805ccd763b1e59c13933b2d7f4a')
         self.env.user.group_ids |= self.env.ref('adams_executive_dashboard.group_dashboard_user')
-        self.env.user.write({'lang': 'en_US', 'tz': 'UTC'})
+        lang = self.env['res.lang'].with_context(active_test=False).search([('code','=',language)])
+        if not lang.active:
+            self.env['base.language.install'].create({'lang_ids':[Command.set(lang.ids)]}).lang_install()
+        self.env.user.write({'lang':language, 'tz':'UTC', 'color_scheme':theme})
         self.env.company.currency_id = self.env.ref('base.EGP')
         model = type(self.env['adams.executive.dashboard'])
         original_section, original_bootstrap = model.get_section, model.get_bootstrap
@@ -157,7 +173,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         target = Path(config['data_dir']) / 'adams_dashboard_reference_evidence'
         target.mkdir(mode=0o700, exist_ok=True)
         output = Path(tempfile.mkdtemp(prefix='finance-', dir=target))
-        self.browser_size = '1440x900'
+        self.browser_size = f'{viewport[0]}x{viewport[1]}'
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
         original_wait = ChromeBrowser._wait_code_ok
         captures = {}
@@ -166,6 +182,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         def capture(browser, name, selector, end_selector=None):
             expression = r"""(async () => {
                 await document.fonts.ready;
+                await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                 await Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{})));
                 const start=document.querySelector(SELECTOR), end=document.querySelector(END);
                 if(!start || !end)throw new Error('Missing capture region');
@@ -202,6 +219,18 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             path.write_bytes(content)
             path.chmod(0o600)
             captures[name] = {'file': path.name, 'sha256': hashlib.sha256(content).hexdigest(), 'clip': clip}
+            styles = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(()=>{
+                    const box=CAPTURE_BOX, scope=document.querySelector('dialog[open], .drawer') || document.body;
+                    return [...scope.querySelectorAll('h1,h2,h3,button,input,select,th,td,small,p,summary')].filter(e=>{
+                        const r=e.getBoundingClientRect(); return r.width && r.height && r.top>=box.y-1 && r.bottom<=box.y+box.height+1 && r.left>=box.x-1 && r.right<=box.x+box.width+1;
+                    }).slice(0,100).map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {
+                        tag:e.tagName,classes:e.className,text:e.textContent.trim().slice(0,100),
+                        rect:[r.x-box.x,r.y-box.y,r.width,r.height],
+                        styles:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','padding','margin','borderWidth','borderRadius','verticalAlign','display'].map(k=>[k,s[k]]))};});
+                })()""".replace('CAPTURE_BOX',json.dumps(clip)), 'returnByValue':True})
+            captures[name]['computed_styles'] = styles['result']['value']
+
             environments[name] = browser._websocket_request('Runtime.evaluate', params={
                 'expression': '''JSON.stringify({browser:navigator.userAgent,
                     fonts:{family:getComputedStyle(document.querySelector('.o_adams_dashboard') || document.body).fontFamily,
@@ -226,6 +255,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 'expression': "document.querySelector('.adams_finance_source header button').click()"})
 
             capture(browser, 'odoo-working-capital', '#adams-group-working-capital')
+            if viewport == (1440,900) and theme == 'light':
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('.adams_chart_table summary').click(); document.querySelector('.adams_aging_list summary').click()"})
+                capture(browser, 'odoo-chart-table', '.adams_chart_table')
+                capture(browser, 'odoo-aging-expanded', '.adams_aging_list')
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('.adams_chart_table summary').click(); document.querySelector('.adams_aging_list summary').click()"})
+
             capture(browser, 'odoo-liquidity', '#adams-group-liquidity')
             capture(browser, 'odoo-balance-sheet', '#adams-group-financial-position')
             opened = browser._websocket_request('Runtime.evaluate', params={
@@ -252,6 +289,23 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.assertFalse(selection.get('exceptionDetails'), str(selection))
             capture(browser, 'odoo-stock-filters', '#adams-inventory > .adams_group_heading', '.adams_stock_applied')
             capture(browser, 'odoo-stock-table', '.adams_stock_table', '#adams-inventory .adams_page_controls')
+            if viewport[0] <= 900:
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('.adams_stock_detail_toggle').click()"})
+                capture(browser, 'odoo-stock-expanded', '.adams_stock_table tbody > tr:first-child', '.adams_stock_detail')
+            empty = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(async()=>{
+                    const input=document.querySelector('.adams_stock_fields input[type=search]');
+                    input.value='NO-MATCH-VISUAL-FIXTURE'; input.dispatchEvent(new Event('input',{bubbles:true}));
+                    document.querySelector('.adams_stock_filters').requestSubmit();
+                    for(let i=0;i<100;i++){
+                        if(document.querySelector('.adams_stock_empty'))return true;
+                        await new Promise(r=>setTimeout(r,50));
+                    }throw new Error('Empty Inventory state did not render');
+                })()""", 'awaitPromise':True,'returnByValue':True})
+            self.assertFalse(empty.get('exceptionDetails'),str(empty))
+            capture(browser, 'odoo-stock-empty', '.adams_stock_empty')
+
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
             browser._websocket_request('Page.navigate', params={
@@ -275,12 +329,13 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 COMPANY_FIXTURES[0].name=COMPANY_NAME;
                 COMPANY_FIXTURES[0].logo=COMPANY_LOGO;
                 state.companyKey=COMPANY_FIXTURES[0].key;
+                state.theme=REFERENCE_THEME; state.lang=REFERENCE_LANGUAGE;
                 render();
                 // Match dashboard content width; keep the approved component CSS unchanged.
                 document.querySelector('#content').style.width=CONTENT_WIDTH+'px';
                 // UI07 only: remove unsupported comparison, preserve the note slot.
                 document.querySelector('.kpi-note').textContent='';
-                const movement=[...document.querySelectorAll('.focus-row')].find(x=>x.textContent.includes('Revenue movement'));
+                const movement=[...document.querySelectorAll('.focus-row')].find(x=>x.textContent.includes(t('Revenue movement')));
                 if(movement)movement.remove();
                 // Same source state, not a layout waiver: this fixture has no report warnings.
                 const warning=document.querySelector('.focus-row:last-child .pill');
@@ -297,6 +352,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             setup = setup.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace(
                 'COMPANY_LOGO', json.dumps('data:image/png;base64,' + logo if logo else ''))
             setup = setup.replace('CONTENT_WIDTH', str(captures['odoo-profitability']['clip']['width']))
+            setup = setup.replace('REFERENCE_THEME',json.dumps(theme)).replace('REFERENCE_LANGUAGE',json.dumps('ar' if language=='ar_001' else 'en'))
             ready = browser._websocket_request('Runtime.evaluate', params={
                 'expression': setup, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
@@ -308,6 +364,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 'expression': "document.querySelector('.drawer [data-action=close]').click()"})
 
             capture(browser, 'reference-working-capital', '#reference-working-capital', '#content > .grid-3')
+            if viewport == (1440,900) and theme == 'light':
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('#content > .grid-2 details summary').click(); document.querySelector('#content > .grid-3 details summary').click()"})
+                capture(browser, 'reference-chart-table', '#content > .grid-2 details')
+                capture(browser, 'reference-aging-expanded', '#content > .grid-3 details')
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('#content > .grid-2 details summary').click(); document.querySelector('#content > .grid-3 details summary').click()"})
+
             capture(browser, 'reference-liquidity', '#reference-liquidity', '#reference-supplier-note')
             capture(browser, 'reference-balance-sheet', '#reference-balance-sheet', '#content > .grid-3:last-child')
             browser._websocket_request('Runtime.evaluate', params={
@@ -321,7 +385,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
 
             selected = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
-                    [...document.querySelectorAll('nav button')].find(x=>x.textContent.trim()==='Inventory').click();
+                    document.querySelector('nav button[data-tab=inventory]').click();
                     document.querySelector('#content').style.width=CONTENT_WIDTH+'px';
                     await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                     return document.querySelectorAll('.stock-table tbody tr').length;
@@ -330,6 +394,17 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.assertEqual(selected['result']['value'],8)
             capture(browser, 'reference-stock-filters', '#content > .section-heading', '.stock-summary')
             capture(browser, 'reference-stock-table', '#content .table-wrap', '#content .table-wrap + div')
+            if viewport[0] <= 900:
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('[data-stock-detail]').click(); document.querySelector('#content').style.width=CONTENT_WIDTH+'px'".replace('CONTENT_WIDTH',str(captures['odoo-profitability']['clip']['width']))})
+                capture(browser, 'reference-stock-expanded', '.stock-table tbody > tr:first-child', '.stock-detail')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': """const input=document.querySelector('#stockSearch');
+                    input.value='NO-MATCH-VISUAL-FIXTURE'; input.dispatchEvent(new Event('input',{bubbles:true}));
+                    document.querySelector('#stockForm').requestSubmit();
+                    document.querySelector('#content').style.width=CONTENT_WIDTH+'px';""".replace('CONTENT_WIDTH',str(captures['odoo-profitability']['clip']['width']))})
+            capture(browser, 'reference-stock-empty', '#content .empty')
+
             return result
 
         code = r"""(async () => {
@@ -349,7 +424,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=60)
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
                     'fixture': 'synthetic Finance values; no source reconciliation claim',
-                    'viewport': [1440, 900], 'theme': 'light', 'language': 'en_US',
+                    'viewport': list(viewport), 'theme': theme, 'language': language,
                     'adjustments': ['UI07: remove comparison note and Revenue movement row',
                                     'UI08: signed bank/cash classification from standard journals; synthetic values retain the approved split',
                                     'UI20: Procurement monetary/count decision deferred; not represented in these captures',
@@ -364,18 +439,21 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         # Independent manifests feed the same enforced comparison utility used by review.
         # Visible differences remain review-required; this diagnostic test cannot certify parity.
         refs, acts = [], []
-        for region in ('profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table'):
+        regions = ['profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table', 'stock-empty']
+        if viewport[0] <= 900: regions.append('stock-expanded')
+        if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded'])
+        for region in regions:
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'
                 image = captures[name]
                 destination.append(dict(json.loads(environments[name]),
                     id=region, file=image['file'], sha256=image['sha256'],
                     box=[0,0,image['clip']['width'],image['clip']['height']],
-                    theme='light', language='en_US', content_width=manifest['content_width'],
+                    theme=theme, language=language, content_width=manifest['content_width'],
                     company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
-                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':region.endswith('drawer')},
-                    data={'fixture':'approved-inventory-synthetic-v1','rows':stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series},
-                    state='loaded', region=region))
+                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else ''},
+                    data={'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series},
+                    state='empty' if region=='stock-empty' else 'expanded' if (region.endswith(('drawer','expanded')) or region=='chart-table') else 'loaded', region=region))
         reference_manifest = output / 'reference.json'
         actual_manifest = output / 'odoo.json'
         reference_manifest.write_text(json.dumps({'role':'approved-reference',

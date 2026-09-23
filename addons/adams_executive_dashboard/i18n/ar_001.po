@@ -4912,3 +4912,13 @@ msgstr "المقياس / عوامل التصفية"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Overdue items only · due today excluded"
 msgstr "البنود المتأخرة فقط · باستثناء المستحق اليوم"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Forecast by product — current stock"
+msgstr "التوقع حسب المنتج — المخزون الحالي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Try another product or include zero quantities."
+msgstr "جرّب منتجًا آخر أو أدرج الكميات الصفرية."
