@@ -326,6 +326,9 @@
     .adams_metric_arrow::after { content: ''; position: absolute; inset: 0; cursor: pointer; }
     .adams_metric_arrow:disabled::after { cursor: wait; }
     .adams_metric_arrow:focus-visible::after { outline: 3px solid var(--adams-focus); outline-offset: -3px; border-radius: var(--adams-radius); }
+    // The arrow covers empty card space. Keep the card's own controls above
+    // that hit area so a partner ledger, overdue total or bank link stays distinct.
+    .adams_card button:not(.adams_metric_arrow), .adams_card summary { position: relative; z-index: 1; }
     .adams_metric_foot, .adams_aging_list { position: relative; z-index: 1; }
     .adams_cash_card .adams_metric_foot { background: #214a40; border-color: #315c50; color: #bdd6ca; }
     .adams_cash_card .adams_source_button, .adams_cash_card .adams_metric_arrow { color: #d8e9e0; }

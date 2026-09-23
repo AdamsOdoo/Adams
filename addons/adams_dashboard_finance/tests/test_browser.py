@@ -277,6 +277,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 'company_id': self.env.company.id, 'metric': metric,
                 'report_id': self.env.ref(f'account_reports.{prefix}_report').id,
                 'expression_id': self.env.ref(f'account_reports.{prefix}_line_total').id,
+                'partner_ledger_report_id': self.env.ref('account_reports.partner_ledger_report').id,
                 'definition_note': 'Disposable browser aging fixture; not customer accounting policy.',
             })
             aging_mapping.action_approve()
@@ -312,6 +313,16 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             await new Promise(resolve => setTimeout(resolve, 100));
                         }
                         throw new Error(message);
+                    };
+                    // DOM click() ignores covering elements. Test the real browser
+                    // hit target before clicking a control inside a card-wide link.
+                    const assertHitTarget = async (control, label) => {
+                        control.scrollIntoView({block: 'center', inline: 'nearest'});
+                        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                        const rect = control.getBoundingClientRect();
+                        const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        if (!rect.width || !rect.height || !target || (target !== control && !control.contains(target)))
+                            throw new Error(label + ' is covered by a different hit target: ' + (target?.className || target?.tagName));
                     };
                     const heading = HEADING;
                     const expected = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(100);
@@ -353,7 +364,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (!root.querySelector('.adams_profit_grid .adams_performance')) throw new Error('Missing reference performance-context panel');
                     const liquidity = root.querySelector('#adams-group-liquidity');
                     if (liquidity.querySelector('.adams_grid').children.length !== 2) throw new Error('Approved design requires two liquidity cards');
-                    root.querySelector('.adams_cash_links button').click();
+                    const bankLink = root.querySelector('.adams_cash_links button');
+                    if (WIDTH === 1440 && DIRECTION === 'ltr' && THEME === 'light')
+                        await assertHitTarget(bankLink, 'Bank View accounts');
+                    bankLink.click();
                     const cashDrawer = await wait(() => root.querySelector('.adams_cash_dialog[open]'), 'Account directory must open');
                     await wait(() => cashDrawer.querySelector('.adams_bank_row button'), 'Native cash account balances must load');
                     cashDrawer.querySelector('header button').click();
@@ -361,7 +375,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (liquidity.querySelectorAll('.adams_cash_bridge strong').length !== 3) throw new Error('Native cash bridge must show opening, movement and closing');
                     const aging = root.querySelector('#adams-group-working-capital');
                     if (aging.querySelectorAll('.adams_aging_list').length !== 2) throw new Error('Both native aging panels must be visible');
-                    aging.querySelectorAll('.adams_aging_list summary').forEach(summary => summary.click());
+                    for (const summary of aging.querySelectorAll('.adams_aging_list summary')) {
+                        if (WIDTH === 1440 && DIRECTION === 'ltr' && THEME === 'light')
+                            await assertHitTarget(summary, 'Aging buckets');
+                        summary.click();
+                    }
                     if (!aging.querySelector('.adams_aging_list').textContent.includes(expected)) throw new Error('Native receivable bucket must contain the invoice value');
                     const windows = liquidity.querySelectorAll('.adams_supplier_windows .adams_card');
                     if (windows.length !== 4) throw new Error('Four approved supplier windows must render');
@@ -373,6 +391,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         if (getComputedStyle(date).direction !== 'ltr') throw new Error('ISO date ranges must preserve order in RTL');
                     }
                     const source = card.querySelector('.adams_source_button');
+                    if (WIDTH === 1440 && DIRECTION === 'ltr' && THEME === 'light')
+                        await assertHitTarget(source, 'Source & definition');
                     source.click();
                     const drawer = await wait(() => root.querySelector('dialog[open]'), 'Source drawer must open');
                     if (!drawer.innerText.includes(expected)) throw new Error('Source drawer must retain precise native value');
@@ -578,6 +598,37 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         paymentBack.click();
                         await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card').length === 4,
                             'Payment return must restore the supplier windows');
+                        if (THEME === 'light') {
+                            const receivableCard = () => [...document.querySelectorAll('#adams-group-working-capital .adams_card')]
+                                .find(node => node.querySelector('h3')?.textContent.trim() === 'Receivables');
+                            const overdue = await wait(() => receivableCard()?.querySelector('.adams_overdue_total button'),
+                                'Approved receivable mapping must expose the overdue action');
+                            await assertHitTarget(overdue, 'Overdue receivables');
+                            overdue.click();
+                            await wait(() => !document.querySelector('.o_adams_dashboard') &&
+                                document.body.innerText.includes('Aged Receivable') &&
+                                document.body.innerText.includes('Based on Due Date'),
+                                'Overdue control must open the native receivables aging report');
+                            const overdueBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                                'Overdue report must expose the dashboard breadcrumb');
+                            overdueBack.click();
+                            const ledger = await wait(() => [...(receivableCard()?.querySelectorAll('button') || [])]
+                                .find(button => button.textContent.includes('Partner Ledger')),
+                                'Approved receivable mapping must expose Partner Ledger');
+                            await assertHitTarget(ledger, 'Partner Ledger');
+                            ledger.click();
+                            await wait(() => !document.querySelector('.o_adams_dashboard') &&
+                                document.body.innerText.includes('Partner Ledger') &&
+                                document.body.innerText.includes('Dashboard Search Fixture'),
+                                'Partner Ledger control must show the native report and accounting partner');
+                            if (document.body.innerText.includes('Based on Due Date'))
+                                throw new Error('Partner Ledger link opened Aged Receivable instead');
+                            const ledgerBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                                'Partner Ledger must expose the dashboard breadcrumb');
+                            ledgerBack.click();
+                            await wait(() => receivableCard()?.querySelector('.adams_overdue_total button'),
+                                'Partner Ledger return must restore Receivables');
+                        }
                     }
                     if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
