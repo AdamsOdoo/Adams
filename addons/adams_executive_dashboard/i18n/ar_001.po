@@ -2509,7 +2509,9 @@ msgstr "لم يتم إعداد هذا التقرير الأصلي."
 
 #. module: adams_executive_dashboard
 #. odoo-python
+#. odoo-javascript
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Unassigned"
 msgstr "غير معيّن"
 
