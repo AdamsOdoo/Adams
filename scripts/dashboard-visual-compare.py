@@ -71,20 +71,29 @@ def compare(reference_path, actual_path, output):
         ap, ai = load_capture(actual_path, act)
         if rp == ap:
             raise ValueError(f'{name}: implementation cannot serve as its own baseline')
-        if ri.size != ai.size:
-            raise ValueError(f'{name}: region dimensions differ; do not resize to conceal geometry')
         pairs.append((name, ri, ai))
     output.mkdir(parents=True, mode=0o700)
     results = []
     for name, ref, act in pairs:
-        delta = ImageChops.difference(ref, act)
+        sizes = {'reference': ref.size, 'odoo': act.size}
+        size_differs = ref.size != act.size
+        # Preserve both original regions. Pad only comparison canvases; never resize
+        # or crop away overflow. Different dimensions always require review.
+        width, height = max(ref.width, act.width), max(ref.height, act.height)
+        ref_canvas = Image.new('RGB', (width, height), '#ff00ff')
+        act_canvas = Image.new('RGB', (width, height), '#ff00ff')
+        ref_canvas.paste(ref, (0, 0))
+        act_canvas.paste(act, (0, 0))
+        delta = ImageChops.difference(ref_canvas, act_canvas)
         bounds = delta.getbbox()
         ref.save(output / f'{name}-reference.png')
         act.save(output / f'{name}-odoo.png')
-        Image.blend(ref, act, .5).save(output / f'{name}-overlay.png')
+        Image.blend(ref_canvas, act_canvas, .5).save(output / f'{name}-overlay.png')
         ImageEnhance.Contrast(delta).enhance(3).save(output / f'{name}-diff.png')
-        results.append({'id': name, 'status': 'review-required' if bounds else 'exact',
-                        'difference_bounds': bounds,
+        results.append({'id': name, 'status': 'review-required' if bounds or size_differs else 'exact',
+                        'difference_bounds': bounds, 'original_sizes': sizes,
+                        'geometry_differs': size_differs,
+                        'padding': 'magenta outside original bounds; no scaling',
                         'review': 'Inspect typography, geometry, spacing, controls, wrapping and overflow. '
                                   'Rendering variation requires a written explanation; no percentage waives defects.'})
     report = {'reference_manifest_sha256': digest(reference_path),

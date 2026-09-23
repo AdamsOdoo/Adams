@@ -780,6 +780,16 @@ export class ExecutiveDashboard extends Component {
         } catch { if (this.alive && generation === this.generation && marker === this.profitabilityRequest) for (const key of keys) this.state.financialTrends[key] = {status: 'error', rows: []}; }
     }
 
+    get partialChartMonth() {
+        const end = this.state.applied?.date_to;
+        if (!end) return null;
+        const date = new Date(end + 'T00:00:00Z');
+        const next = new Date(date); next.setUTCDate(date.getUTCDate() + 1);
+        if (next.getUTCMonth() !== date.getUTCMonth()) return null;
+        return {key: end.slice(0, 7), label: new Intl.DateTimeFormat(document.documentElement.lang || 'en',
+            {month: 'long', timeZone: 'UTC'}).format(date)};
+    }
+
     profitabilityChart() {
         const keys = ['revenue', 'gross_profit', 'profit'];
         const data = keys.map(key => this.state.financialTrends[key]);
@@ -801,7 +811,7 @@ export class ExecutiveDashboard extends Component {
             const value = minimum + (maximum - minimum) * index / 3;
             return { label: number(value), y: scale(value) };
         }), rows: labels.sort().map((label, monthIndex) => ({ label,
-            displayLabel: new Intl.DateTimeFormat(document.documentElement.lang || 'en', {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')),
+            displayLabel: new Intl.DateTimeFormat(document.documentElement.lang || 'en', {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')) + (this.partialChartMonth?.key === label ? '*' : ''),
             x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
             series: keys.map((key, index) => {
                 const row = data[index].rows.find(value => value.label === label);

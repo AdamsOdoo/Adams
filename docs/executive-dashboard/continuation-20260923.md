@@ -6,7 +6,7 @@ Status: **incomplete; Finance/Inventory gate blocked and unpassed**.
 
 Recovered HEAD: `91bbf98877b63892a4d6483c63ab9611a15f1b0d`, clean checkout.
 Current application change: `638af7eabd0186612856b7df8d9b59fd0c3d7506`,
-both dashboard manifests19.0.1.7.0. This preserves the later fixes preceding the
+Subsequent Finance geometry fixes are at `b9a9cbb076700c4210b2143696c0336a216974a7`; later context/caption edits in this checkpoint also require native/rendered verification. Both dashboard manifests19.0.1.7.0. This preserves the later fixes preceding the
 session. PR214 is open, draft, unmerged. Main/production were not changed.
 
 | Candidate | Development build | Observed outcome |
@@ -14,7 +14,9 @@ session. PR214 is open, draft, unmerged. Main/production were not changed.
 | `9bfeb484` | 38532237 | One native browser failure: obsolete arrow selector after Finance information-icon change. |
 | `f9479bad` | 38533011 | Odoo.sh done/Warning, not Failed. Revenue value drilldown assertion corrected, including real hit-target check. Actual restricted-role chart Retry recovered to an explicit unavailable state; no application console errors observed in that check. |
 | `ed16c0b9` | 38533796 | Odoo.sh Platform error; no usable paired capture. |
-| `638af7ea` | 38534410 | Odoo.sh Platform error; current presentation not rendered/qualified. |
+| `638af7ea` | 38534410 | Odoo.sh Platform error. |
+| `b1d92f77` | 38534772 | Initial populated Finance captures produced. One native print-label assertion failed. |
+| `08c8d486` | 38535653 | Corrected reference crop produced. Equivalent PDF-label assertion failed. Both label assertions corrected in b9a9cbb0. |
 
 Staging remains `af0d2327184e96dfb3eecd65de3a79c4747d6045`, installed
 core/finance19.0.1.6.0, upgrade build38524406, live hostname38326320:
@@ -37,13 +39,12 @@ The exact approved HTML is preserved outside addon assets, with its SHA-256 and
 explicit reference-adjustment record. Comparison tooling keeps independent
 baselines, validates matched metadata and image hashes, and emits pairs,
 overlays and diffs without percentage-based acceptance. The initial native
-Finance capture fixture is test-transaction-only; it still needs a successful
-run and completed state normalization. It is not a deployed mock dashboard.
+Finance capture fixture is test-transaction-only; it produced private images in both38534772 and38535653. Completed state normalization and accepted comparison remain outstanding. It is not a deployed mock dashboard.
 
 Local checks on the application changes:65/65 frontend tests; XML parse; Python
 compile; whitespace check. Comparator checks covered identical images, a visible
 difference, and rejection of mismatched states. These checks do not replace
-visual or real-data acceptance. The source-bound native gate for638af7ea is blocked.
+visual or real-data acceptance. The b9a9cbb0 native gate was running at this checkpoint; later context/caption edits still require native verification.
 
 ## Unresolved deviations and delivery limits
 
@@ -59,9 +60,16 @@ visual or real-data acceptance. The source-bound native gate for638af7ea is bloc
 | Data and navigation | Presentation changes preserve backend calculations, but current-candidate report reconciliation, permissions and retained-context journeys still need native/live execution. |
 | Deployment/package | No verified19.0.1.7.0 staging candidate or final installable package. Do not package or present an unqualified build as the finished deliverable. |
 
-Resume with the existing native build harness when the platform error is resolved;
-inspect the initial Finance pair, fix differences and repeat. Complete Inventory
+Continue with the existing native build harness; inspect the next Finance pair, fix differences and repeat. The earlier platform errors no longer explain the current acceptance gap. Complete Inventory
 before propagating shared changes. Do not rerun the historical audit, reset to an
 old SHA, broaden the backlog, or reopen UI07/UI08/UI20 decisions. Use the short
 current owner guide at the top of `uat-checklist.md` only after qualification and
 deployment. Business screenshots/raw logs remain outside this public repository.
+
+## Latest rendered findings
+
+Private diagnostic pairs for b1d92f77 and08c8d486 were opened and inspected. The first reference crop used viewport rather than document coordinates;08c8d486 fixes that. The comparison remains unaccepted: component heights/spacing and source-state text differ, and complete content-width/state normalization is not yet verified. Finance-only heading line heights, footer padding and margin notes were corrected in b9a9cbb0. Later edits port the context panel, keep a real source-scope action, and add a date-derived partial-month marker/currency caption.
+
+Specific data/presentation conflict: the service exposes a boolean for report warnings; it cannot truthfully identify every warning as the prototype's “Draft entries exist.” The implementation uses “Report warnings”/“No report warnings” or the restricted/unavailable state. This is recorded as an unresolved reference-state qualification issue, not silently waived or relabelled as draft entries. Native report options explicitly retain posted entries only.
+
+No final package was generated from this unqualified candidate. The owner guide remains conditional on Finance/Inventory parity and source-bound staging deployment.

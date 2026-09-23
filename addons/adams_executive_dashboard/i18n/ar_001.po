@@ -4712,3 +4712,38 @@ msgstr "من الإيرادات"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Budget not configured"
 msgstr "لم يتم إعداد ميزانية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "What changed, and what to check"
+msgstr "ما الذي تغيّر وما الذي يجب مراجعته"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "No target configured"
+msgstr "لم يتم إعداد هدف"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "A target appears here when an approved budget is available."
+msgstr "يظهر الهدف هنا عند توفر ميزانية معتمدة."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "These figures include posted entries only."
+msgstr "تشمل هذه الأرقام القيود المرحلة فقط."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review reporting scope →"
+msgstr "مراجعة نطاق التقرير ←"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Monthly performance"
+msgstr "الأداء الشهري"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "is a partial month"
+msgstr "شهر جزئي"
