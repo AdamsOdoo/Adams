@@ -481,6 +481,9 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 if (!weekday || weekday === date || /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(weekday)) throw new Error('Shift headings must have a localized weekday distinct from the date');
                             }
                         }
+                        if (index === 4 && DIRECTION === 'rtl' &&
+                            root.querySelector('.adams_hr_filters option[value="unassigned"]')?.textContent.trim() !== 'غير معيّن')
+                            throw new Error('Arabic employee department filter must translate Unassigned');
                     }
                     if (HAS_EMPLOYEE) {
                         if (![...root.querySelectorAll('.adams_hr_filters select option')].some(node =>
