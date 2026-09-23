@@ -326,6 +326,9 @@
     .adams_metric_arrow::after { content: ''; position: absolute; inset: 0; cursor: pointer; }
     .adams_metric_arrow:disabled::after { cursor: wait; }
     .adams_metric_arrow:focus-visible::after { outline: 3px solid var(--adams-focus); outline-offset: -3px; border-radius: var(--adams-radius); }
+    // The arrow covers empty card space. Keep the card's own controls above
+    // that hit area so a partner ledger, overdue total or bank link stays distinct.
+    .adams_card button:not(.adams_metric_arrow), .adams_card summary { position: relative; z-index: 1; }
     .adams_metric_foot, .adams_aging_list { position: relative; z-index: 1; }
     .adams_cash_card .adams_metric_foot { background: #214a40; border-color: #315c50; color: #bdd6ca; }
     .adams_cash_card .adams_source_button, .adams_cash_card .adams_metric_arrow { color: #d8e9e0; }
@@ -668,6 +671,15 @@
     #adams-inventory .adams_stock_table th:nth-child(2), #adams-inventory .adams_stock_table td:nth-child(2) { min-width:125px; width:auto; }
     #adams-inventory .adams_stock_table th:nth-child(n+3), #adams-inventory .adams_stock_table td:nth-child(n+3) { min-width:76px; padding-inline:10px; }
     #adams-inventory .adams_stock_table td:last-child { white-space:normal; }
+    .adams_stock_mobile_category { display:none !important; }
+    @media (min-width:1101px) {
+        #adams-inventory .adams_stock_table table { min-width:760px; }
+        #adams-inventory .adams_stock_table table.adams_stock_full { min-width:1180px; }
+        #adams-inventory .adams_stock_table th:first-child, #adams-inventory .adams_stock_table td:first-child { min-width:240px; width:24%; }
+        #adams-inventory .adams_stock_table th:nth-child(2), #adams-inventory .adams_stock_table td:nth-child(2) { min-width:165px; width:15%; }
+        #adams-inventory .adams_stock_table .adams_stock_category { min-width:140px; width:12%; overflow-wrap:anywhere; }
+        #adams-inventory .adams_stock_table th:last-child, #adams-inventory .adams_stock_table td:last-child { min-width:100px; }
+    }
     .adams_stock_quantity { text-align:end; }
     .adams_stock_quantity bdi { font-weight:600; }
     .adams_stock_actions { font-size:12px; }
@@ -685,9 +697,9 @@
     .adams_hr_tabs ~ .adams_group_heading p { display:block; }
     @media (max-width:1100px) {
         #adams-inventory .adams_stock_table .adams_stock_secondary { display:none; }
-        .adams_stock_mobile_location, .adams_stock_mobile_details { display:block !important; }
+        .adams_stock_mobile_category, .adams_stock_mobile_location, .adams_stock_mobile_details { display:block !important; }
         #adams-inventory .adams_stock_table th:first-child, #adams-inventory .adams_stock_table td:first-child { min-width:0; width:55%; }
-        #adams-inventory .adams_stock_table th:nth-child(3), #adams-inventory .adams_stock_table td:nth-child(3) { min-width:65px; width:20%; }
+        #adams-inventory .adams_stock_table th.adams_stock_quantity, #adams-inventory .adams_stock_table td.adams_stock_quantity { min-width:65px; width:20%; }
         #adams-inventory .adams_stock_table th:last-child, #adams-inventory .adams_stock_table td:last-child { min-width:58px; width:25%; }
         .adams_stock_mobile_details { margin-top:8px; font-size:12px; white-space:normal; }
         .adams_stock_mobile_details summary { color:var(--adams-purple); cursor:pointer; }
