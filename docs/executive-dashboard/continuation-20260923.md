@@ -44,7 +44,7 @@ Finance capture fixture is test-transaction-only; it produced private images in 
 Local checks on the application changes:65/65 frontend tests; XML parse; Python
 compile; whitespace check. Comparator checks covered identical images, a visible
 difference, and rejection of mismatched states. These checks do not replace
-visual or real-data acceptance. The b9a9cbb0 native gate was running at this checkpoint; later context/caption edits still require native verification.
+visual or real-data acceptance. Build38536432 at b9a9cbb0 completed with Odoo.sh done/Warning, not Failed. Application source ea4d1ab4c33cb24f3e394ae23014c17c6ebb9575/build38536975 contains the later context/caption edits; its native verification was still pending at this checkpoint.
 
 ## Unresolved deviations and delivery limits
 
@@ -73,3 +73,5 @@ Private diagnostic pairs for b1d92f77 and08c8d486 were opened and inspected. The
 Specific data/presentation conflict: the service exposes a boolean for report warnings; it cannot truthfully identify every warning as the prototype's “Draft entries exist.” The implementation uses “Report warnings”/“No report warnings” or the restricted/unavailable state. This is recorded as an unresolved reference-state qualification issue, not silently waived or relabelled as draft entries. Native report options explicitly retain posted entries only.
 
 No final package was generated from this unqualified candidate. The owner guide remains conditional on Finance/Inventory parity and source-bound staging deployment.
+
+The capture helper now takes an unchanged-viewport image before cropping the measured dashboard region. It refuses a region outside the viewport instead of trimming overflow. This addresses a suspected screenshot-induced scrollbar/layout-width change; the revised capture still requires its own native run. No comparison is accepted on that assumption alone.

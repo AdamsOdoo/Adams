@@ -6,6 +6,7 @@ This records discrepancies; it deliberately does not assert visual acceptance.
 """
 import base64
 import hashlib
+import io
 import json
 import logging
 from pathlib import Path
@@ -13,6 +14,8 @@ import tempfile
 import time
 import subprocess
 from unittest.mock import patch
+
+from PIL import Image
 
 from odoo import api
 from odoo.tests import tagged
@@ -84,16 +87,25 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 start.scrollIntoView({block:'start'});
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                 const a=start.getBoundingClientRect(), b=end.getBoundingClientRect();
-                return {x:Math.floor(a.x + window.scrollX),y:Math.floor(a.y + window.scrollY),width:Math.ceil(a.width),
+                return {x:Math.floor(a.x),y:Math.floor(a.y),width:Math.ceil(a.width),
                         height:Math.ceil(b.bottom-a.top),scale:1};
             })()""".replace('SELECTOR', json.dumps(selector)).replace('END', json.dumps(end_selector or selector))
             measured = browser._websocket_request('Runtime.evaluate', params={
                 'expression': expression, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(measured.get('exceptionDetails'), str(measured))
             clip = measured['result']['value']
+            # Capture the existing viewport without asking Chrome to resize its
+            # document surface (which can remove a scrollbar and reflow the grid).
             image = browser._websocket_request('Page.captureScreenshot', params={
-                'format': 'png', 'clip': clip, 'captureBeyondViewport': True})
-            content = base64.b64decode(image['data'])
+                'format': 'png', 'captureBeyondViewport': False})
+            viewport = Image.open(io.BytesIO(base64.b64decode(image['data'])))
+            x, y, width, height = (clip[key] for key in ('x', 'y', 'width', 'height'))
+            self.assertTrue(0 <= x < x + width <= viewport.width and
+                            0 <= y < y + height <= viewport.height,
+                            'Capture region must fit the unchanged viewport; never trim overflow')
+            cropped = io.BytesIO()
+            viewport.crop((x, y, x + width, y + height)).save(cropped, format='PNG')
+            content = cropped.getvalue()
             path = output / f'{name}.png'
             path.write_bytes(content)
             path.chmod(0o600)
