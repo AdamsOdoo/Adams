@@ -1157,7 +1157,7 @@ export class ExecutiveDashboard extends Component {
     }
     async openStockSource(kind, row = null) {
         if (row?.product_id) return this.openReport('inventory_product', kind, row.product_id);
-        if (!['history', 'replenishment'].includes(kind) || this.state.opening || !this.state.inventory) return;
+        if (!['history', 'replenishment', 'forecast'].includes(kind) || this.state.opening || !this.state.inventory) return;
         const generation = this.generation, data = this.state.inventory;
         this.state.opening = true;
         try {

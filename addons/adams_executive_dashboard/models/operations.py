@@ -398,9 +398,19 @@ class ExecutiveDashboardOperations(models.AbstractModel):
 
     @api.model
     def open_inventory_source(self, options, route, filters=None):
-        if route not in ('history', 'replenishment'):
+        if route not in ('history', 'replenishment', 'forecast'):
             raise ValidationError(_('Select a product for its forecast.'))
         scoped, dates, products, product_domain, locations, _warehouses = self._inventory_filter_scope(options, 'current', {} if filters is None else filters)
+        if route == 'forecast':
+            # The native Stock report exposes each product's Forecast action.
+            # There is no arbitrary-period aggregate forecast calculation here.
+            products.check_field_access_rights('read', ['virtual_available'])
+            context = dict(products.env.context, location=locations.ids, default_is_storable=True)
+            if filters and filters.get('warehouse_id'):
+                context['warehouse_id'] = filters['warehouse_id']
+            action = scoped.env['ir.actions.actions']._for_xml_id('stock.action_product_stock_view')
+            action.update(name=_('Forecast by product — current stock'), domain=product_domain, context=context)
+            return action
         model, xmlid = (('stock.move.line', 'stock.stock_move_line_action') if route == 'history'
                         else ('stock.warehouse.orderpoint', 'stock.action_orderpoint'))
         records = scoped.env[model]

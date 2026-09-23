@@ -840,7 +840,8 @@ test('global replenishment opens a real scoped action and rejects a late stock r
     controller.state.inventory={status:'loading',rows:[]};
     pending[0].resolve({type:'ir.actions.act_window'}); await action;
     assert.equal(opened,0);
-    const current=controller.openStockSource('history');
+    const current=controller.openStockSource('forecast');
+    assert.equal(pending[1].args[1],'forecast');
     pending[1].resolve({type:'ir.actions.act_window'}); await current;
     assert.equal(opened,1);
 });

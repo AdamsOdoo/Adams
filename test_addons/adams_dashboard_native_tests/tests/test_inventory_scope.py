@@ -145,13 +145,25 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
             self.assertIn(('location_id', 'in', expected_locations.ids), action['domain'])
             if route == 'history':
                 self.assertIn(('location_dest_id', 'in', expected_locations.ids), action['domain'])
+        forecast = self.dashboard.open_inventory_source(self.options, 'forecast',
+            {'warehouse_id':self.warehouse.id, 'search':self.product.name})
+        self.assertEqual(forecast['res_model'], 'product.product')
+        self.assertEqual(forecast['context']['allowed_company_ids'], self.env.company.ids)
+        self.assertEqual(forecast['context']['warehouse_id'], self.warehouse.id)
+        self.assertEqual(forecast['context']['location'], expected_locations.ids)
+        self.assertNotIn('to_date', forecast['context'])
+        products = self.env['product.product'].with_context(forecast['context'])
+        self.assertEqual(products.search(forecast['domain']), self.product)
+        native_view = self.env.ref('stock.product_product_stock_tree')
+        self.assertIn('action_product_forecast_report', native_view.arch_db)
         with self.assertRaises(ValidationError):
-            self.dashboard.open_inventory_source(self.options, 'forecast')
+            self.dashboard.open_inventory_source(self.options, 'unsupported')
         reader = new_test_user(self.env, login='global_stock_source_reader',
             groups='base.group_user,adams_executive_dashboard.group_dashboard_user',
             company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
-        with self.assertRaises(AccessError):
-            self.dashboard.with_user(reader).open_inventory_source(self.options, 'replenishment')
+        for route in ('replenishment', 'forecast'):
+            with self.assertRaises(AccessError):
+                self.dashboard.with_user(reader).open_inventory_source(self.options, route)
 
     def test_name_sort_reads_only_page_window_and_matches_native_collation(self):
         prefix = 'Dashboard bounded read fixture'

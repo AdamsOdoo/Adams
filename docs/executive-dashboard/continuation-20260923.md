@@ -85,3 +85,10 @@ The capture helper now takes an unchanged-viewport image before cropping the mea
 - The capture harness now records independent metadata and calls the existing comparator for Finance and Inventory regions. It retains original images, produces overlays/diffs, and reports environment mismatches instead of normalizing them away. No accepted complete pair matrix yet.
 - Specific unresolved navigation conflict: the prototype Inventory header Forecast has no product scope, but the native forecast requires a product. Existing row-level forecast remains source-backed. The header still exposes Stock history rather than silently inventing an unscoped forecast destination. This difference is not waived.
 - Staging is unchanged. Finance/Inventory gate remains open; later departments/shared component propagation and final package remain pending.
+
+
+## Finance/Inventory iteration: 762f0bfd
+
+Development build38545131 passed122/122 native tests (448.25s;124,050queries), source762f0bfd941392e53d71a63a6cda97a767dece49. Inventory rows, compact pagination, mobile details and current/historical date behavior now use the approved layout with existing authorized services.67 frontend tests pass. Private comparison capture folder is finance-phx1l3xi. Review remains open. Finance source/account drawers are being directly ported and added to separate paired captures; no staging promotion or visual acceptance yet.
+
+Forecast navigation resolution (pending native qualification): Odoo19 `stock.action_product_stock_view` uses `product_product_stock_tree`, whose Forecast button calls `action_product_forecast_report`. The header now opens this standard product report, named “Forecast by product — current stock”, with authorized company, internal warehouse locations and product/category/search/quantity filters. It does not claim a historical or arbitrary-period forecast. Product forecasting remains a native action. The selected dashboard dates and page remain retained on return. This replaces the previously recorded Stock history substitution; verify the journey before closing the deviation.

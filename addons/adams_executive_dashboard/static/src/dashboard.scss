@@ -713,7 +713,7 @@
         .adams_stock_mobile_details dl { margin:8px 0 0; }
         .adams_stock_mobile_details dl div { display:flex; justify-content:space-between; gap:8px; }
         .adams_stock_mobile_details dt { font-weight:400; }
-        .adams_stock_mobile_details dd { margin:0; }
+        .adams_stock_mobile_details dd { margin:0; font-size:14px; }
     }
     @media (max-width:650px) {
         .adams_sales_unified { grid-template-columns:1fr; }
@@ -1190,7 +1190,7 @@
     .adams_stock_table .adams_stock_category { min-width:0; width:auto; overflow-wrap:normal; color:var(--adams-sub); }
     .adams_stock_table tr:last-child td { border-bottom:0; }
     .adams_stock_table td small { display:block; color:var(--adams-sub); font-size:11px; line-height:16.5px; margin-top:2px; }
-    .adams_stock_table .adams_stock_product > .btn-link { display:inline; color:var(--adams-purple); font-weight:600; font-size:13px; line-height:19.5px; min-height:0; padding:0; }
+    .adams_stock_table .adams_stock_product > .btn-link { display:inline; color:var(--adams-purple); font-weight:600; font-size:13px; line-height:19.5px; min-height:0; padding:0; border:0; border-radius:0; background:transparent; }
     .adams_stock_table .adams_stock_quantity, .adams_stock_table .adams_stock_numeric { text-align:end; white-space:nowrap; }
     .adams_stock_table td.adams_stock_quantity { font-size:14px; line-height:21px; font-weight:650; }
     .adams_stock_table .adams_stock_quantity bdi { font-weight:650; }
@@ -1225,4 +1225,42 @@
         .adams_stock_unit { display:block; font-size:10px; }
         .adams_stock_detail_grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     }
+}
+
+// Approved Finance account drawer; native dialog retains keyboard/focus behavior.
+.o_adams_dashboard .adams_cash_dialog[open], .o_adams_dashboard .adams_finance_source[open] { display:flex; flex-direction:column; }
+.o_adams_dashboard .adams_cash_dialog, .o_adams_dashboard .adams_finance_source {
+    > .adams_panel_head { position:static; padding:22px 24px; gap:16px; align-items:flex-start; }
+    > header p { font-size:12px; line-height:18px; color:var(--adams-sub); margin:0 0 4px; }
+    h2 { font-size:17px; line-height:25.5px; letter-spacing:-.25px; font-weight:650; margin:0; }
+    .adams_drawer_close { display:inline-grid; place-items:center; width:34px; height:34px; padding:0; border:0; border-radius:6px; background:transparent; flex:none; }
+    .adams_cash_body, .adams_source_body { padding:22px 24px; overflow:auto; flex:1; }
+    .adams_cash_caption { font-size:12px; color:var(--adams-sub); margin:0; }
+    .adams_drawer_value { font-size:32px; font-weight:650; letter-spacing:-.5px; margin:9px 0 18px; line-height:48px; }
+    .adams_currency { font-size:11px; letter-spacing:.3px; font-weight:500; color:var(--adams-sub); }
+    .adams_cash_table { width:100%; border-collapse:collapse; font-size:13px; line-height:19.5px; }
+    .adams_cash_table th { text-align:start; font-size:11px; font-weight:600; color:var(--adams-sub); background:var(--adams-soft); padding:10px 15px; border-bottom:1px solid var(--adams-line); }
+    .adams_cash_table td { padding:12px 15px; border-bottom:1px solid var(--adams-line); }
+    .adams_cash_table tr:last-child td { border-bottom:0; }
+    .adams_cash_table .adams_bank_row { display:table-row; }
+    .adams_cash_table .adams_cash_numeric { text-align:end; white-space:nowrap; }
+    .adams_cash_account { color:var(--adams-purple); font-weight:600; padding:0; border:0; background:transparent; text-align:start; }
+    .adams_cash_callout { padding:13px 15px; background:var(--adams-soft); border:1px solid var(--adams-line); border-radius:8px; font-size:12px; margin-top:18px; }
+    .adams_drawer_footer { padding:16px 24px; border-top:1px solid var(--adams-line); display:flex; justify-content:space-between; gap:8px; }
+}
+
+.o_adams_dashboard .adams_finance_source .adams_definition_list {
+    margin:0;
+    > div { padding:12px 0; border-bottom:1px solid var(--adams-line); }
+    dt { color:var(--adams-sub); font-size:12px; font-weight:400; margin-bottom:3px; }
+    dd { margin:0; font-size:14px; }
+}
+
+.o_adams_dashboard #adams-finance {
+    .btn-link { border:0; border-radius:0; background:transparent; }
+    .adams_balance_card .adams_cash_split { align-items:stretch; }
+}
+.o_adams_dashboard #adams-inventory {
+    > .adams_group_heading .btn-link { display:inline-flex; align-items:center; gap:5px; border:0; border-radius:0; background:transparent; min-height:0; padding:2px 0; font-size:12px; line-height:18px; font-weight:600; color:var(--adams-purple); }
+    .adams_stock_fields input, .adams_stock_fields select, .adams_stock_applied select { box-shadow:none; }
 }

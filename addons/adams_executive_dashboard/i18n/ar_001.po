@@ -4887,3 +4887,28 @@ msgstr "صفحات المخزون"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Historical on-hand quantities are shown. Reservation and available columns are not shown as historical measures."
 msgstr "تُعرض الكميات الموجودة في التاريخ المحدد. لا تُعرض أعمدة المحجوز والمتاح كمقاييس تاريخية."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balance ·"
+msgstr "الرصيد ·"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Archived accounts are excluded. Click an account to inspect its General Ledger at the same cutoff."
+msgstr "الحسابات المؤرشفة مستبعدة. انقر على حساب للاطلاع على دفتر الأستاذ العام في تاريخ الرصيد نفسه."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "What this means"
+msgstr "ما يعنيه هذا"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Measure / filters"
+msgstr "المقياس / عوامل التصفية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Overdue items only · due today excluded"
+msgstr "البنود المتأخرة فقط · باستثناء المستحق اليوم"

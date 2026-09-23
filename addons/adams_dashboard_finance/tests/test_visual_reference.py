@@ -76,6 +76,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         item['aging_buckets'] = [{'key': f'period{i}', 'label': name, 'value': value}
                                                  for i, (name, value) in enumerate(zip(names, buckets))]
                         item['partner_ledger'] = True
+                for item in result['items']:
+                    if item['key'] == 'revenue':
+                        item.update(source='Profit & Loss', definition='Revenue from posted entries in the selected period.',
+                                    source_line='Existing approved Odoo report definition')
                 result['cash_breakdown'] = {'status': 'ready', 'bank': 600000, 'cash': 40000}
                 result['cash_flow'] = {'status': 'ready', 'source': 'Cash Flow Statement',
                                        'bridge': {key: {'value': value} for key, value in zip(
@@ -106,10 +110,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     'as_of': '2026-09-22', 'rows': [
                         {'id': i+1, 'name': name, 'code': str(1010+i), 'active': True,
                          'currency': 'EGP', 'journals': [name], 'balance': value,
-                         'balance_status': 'ready', 'balance_currency': 'EGP', 'balance_digits': 2}
+                         'balance_status': 'ready', 'balance_currency': 'EGP', 'balance_digits': 2, 'drilldown':True}
                         for i, (name, value) in enumerate(zip(
-                            ['Operating bank','Reserve bank','Bank overdraft','Cash on hand'],
-                            [450000,200000,-50000,40000]))]}
+                            ['Main bank account','Bank overdraft','Retail cash','Office petty cash'],
+                            [607200,-7200,28000,12000]))]}
 
         # Approved sample records exist only inside this native test transaction.
         products = ast.literal_eval(re.search(r"const PRODUCTS=(\[.*?\]);", raw.decode(), re.S).group(1))
@@ -161,6 +165,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
 
         def capture(browser, name, selector, end_selector=None):
             expression = r"""(async () => {
+                await document.fonts.ready;
+                await Promise.all(document.getAnimations().map(animation=>animation.finished.catch(()=>{})));
                 const start=document.querySelector(SELECTOR), end=document.querySelector(END);
                 if(!start || !end)throw new Error('Missing capture region');
                 start.scrollIntoView({block:'start'});
@@ -206,9 +212,35 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         def after_render(browser, *args, **kwargs):
             result = original_wait(browser, *args, **kwargs)
             capture(browser, 'odoo-profitability', '#adams-group-profitability')
+            opened = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(async()=>{
+                    document.querySelector('#adams-group-profitability .adams_source_button').click();
+                    for(let i=0;i<100;i++){
+                        if(document.querySelector('.adams_finance_source[open]'))return true;
+                        await new Promise(r=>setTimeout(r,50));
+                    }throw new Error('Source drawer did not open');
+                })()""", 'awaitPromise':True,'returnByValue':True})
+            self.assertFalse(opened.get('exceptionDetails'),str(opened))
+            capture(browser, 'odoo-source-drawer', '.adams_finance_source[open]')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('.adams_finance_source header button').click()"})
+
             capture(browser, 'odoo-working-capital', '#adams-group-working-capital')
             capture(browser, 'odoo-liquidity', '#adams-group-liquidity')
             capture(browser, 'odoo-balance-sheet', '#adams-group-financial-position')
+            opened = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(async()=>{
+                    document.querySelector('.adams_cash_links button').click();
+                    for(let i=0;i<100;i++){
+                        if(document.querySelector('.adams_cash_dialog[open] .adams_bank_row'))return true;
+                        await new Promise(r=>setTimeout(r,50));
+                    }throw new Error('Cash drawer did not load');
+                })()""", 'awaitPromise':True,'returnByValue':True})
+            self.assertFalse(opened.get('exceptionDetails'),str(opened))
+            capture(browser, 'odoo-cash-drawer', '.adams_cash_dialog[open]')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('.adams_cash_dialog header button').click()"})
+
             selection = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
                     document.querySelector('.adams_side_link[data-section="inventory"]').click();
@@ -269,9 +301,24 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 'expression': setup, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
             capture(browser, 'reference-profitability', '#content > .section-heading', '#content > .grid-2')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('[data-source=revenue]').click(); document.querySelector('.drawer .eyebrow').textContent=companyName(); document.querySelector('.drawer .callout').remove()"})
+            capture(browser, 'reference-source-drawer', '.drawer')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('.drawer [data-action=close]').click()"})
+
             capture(browser, 'reference-working-capital', '#reference-working-capital', '#content > .grid-3')
             capture(browser, 'reference-liquidity', '#reference-liquidity', '#reference-supplier-note')
             capture(browser, 'reference-balance-sheet', '#reference-balance-sheet', '#content > .grid-3:last-child')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('[data-action=accounts]').click()"})
+            # The review-only eyebrow is excluded; the authorized company remains.
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('.drawer .eyebrow').textContent=companyName()"})
+            capture(browser, 'reference-cash-drawer', '.drawer')
+            browser._websocket_request('Runtime.evaluate', params={
+                'expression': "document.querySelector('.drawer [data-action=close]').click()"})
+
             selected = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
                     [...document.querySelectorAll('nav button')].find(x=>x.textContent.trim()==='Inventory').click();
@@ -306,7 +353,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     'adjustments': ['UI07: remove comparison note and Revenue movement row',
                                     'UI08: signed bank/cash classification from standard journals; synthetic values retain the approved split',
                                     'UI20: Procurement monetary/count decision deferred; not represented in these captures',
-                                    'Company: standard authorized test-company name and logo'],
+                                    'Company: standard authorized test-company name and logo',
+                                    'Exclude prototype review eyebrow and source-destination explanation callout'],
                     'state_normalization': ['authorized test company/logo', 'synthetic Finance values', 'no report warnings'],
                     'content_width': captures['odoo-profitability']['clip']['width'],
                     'captures': captures, 'company': self.env.company.name,
@@ -316,7 +364,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         # Independent manifests feed the same enforced comparison utility used by review.
         # Visible differences remain review-required; this diagnostic test cannot certify parity.
         refs, acts = [], []
-        for region in ('profitability', 'working-capital', 'liquidity', 'balance-sheet', 'stock-filters', 'stock-table'):
+        for region in ('profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table'):
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'
                 image = captures[name]
@@ -325,7 +373,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     box=[0,0,image['clip']['width'],image['clip']['height']],
                     theme='light', language='en_US', content_width=manifest['content_width'],
                     company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
-                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':False},
+                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':region.endswith('drawer')},
                     data={'fixture':'approved-inventory-synthetic-v1','rows':stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series},
                     state='loaded', region=region))
         reference_manifest = output / 'reference.json'
