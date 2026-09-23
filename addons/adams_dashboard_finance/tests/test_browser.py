@@ -525,7 +525,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const printPreview = await wait(() => root.querySelector('.adams_print_summary[open] tbody tr'), 'Native print preview must render');
                         const printDialog = printPreview.closest('dialog');
                         if (!printDialog.innerText.includes(expected)) throw new Error('Print preview lost formatted native revenue');
-                        if (!printDialog.innerText.includes(heading)) throw new Error('Print preview lost translated native revenue label');
+                        const printRevenueLabel = DIRECTION === 'rtl' ? 'الإيرادات المحاسبية' : 'Accounting revenue';
+                        if (!printDialog.innerText.includes(printRevenueLabel)) throw new Error('Print preview lost translated native revenue label');
                         if (printDialog.scrollWidth > printDialog.clientWidth + 2) throw new Error('Print preview overflow');
                         printDialog.querySelectorAll('header button')[1].click();
                         await wait(() => !printDialog.open, 'Print preview must close');

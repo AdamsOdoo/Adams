@@ -84,7 +84,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 start.scrollIntoView({block:'start'});
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                 const a=start.getBoundingClientRect(), b=end.getBoundingClientRect();
-                return {x:Math.floor(a.x),y:Math.floor(a.y),width:Math.ceil(a.width),
+                return {x:Math.floor(a.x + window.scrollX),y:Math.floor(a.y + window.scrollY),width:Math.ceil(a.width),
                         height:Math.ceil(b.bottom-a.top),scale:1};
             })()""".replace('SELECTOR', json.dumps(selector)).replace('END', json.dumps(end_selector or selector))
             measured = browser._websocket_request('Runtime.evaluate', params={
