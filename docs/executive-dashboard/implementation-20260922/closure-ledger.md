@@ -6,6 +6,8 @@
 
 The exact staged application is **`28b37d90d77571383b37e70212681e9730d5cf40`**, running build **38326320** with matching two addon trees and installed versions **19.0.1.5.0**. The final dashboard-only upgrade succeeded at **2026-09-23 06:16:25 UTC** after the manual **05:34:26 UTC** backup. Its translation-and-test-only change followed backend candidate `efcf40aa` / staging `44fdbe43`; the underlying calculation code stayed the same. The earlier staged **34/34 independent read-only probes** therefore support that unchanged backend, while the final published/deployed tree identities and browser/Arabic behavior are separately qualified on the final source. Do not label the old probe archive as a 34-check rerun on `28b37d`.
 
+**23 September owner addendum:** UI07 comparison removal and UI08 strict journal classification are now in a development candidate, with only local static/frontend checks recorded so far. UI20 money-versus-count is deferred; staged counts remain. The B01–B13 evidence below is bound to the prior exact build and has not been expanded to qualify the new tree. See [recovery evidence](../client-demo-recovery-20260923.md), [install guide](../install-odoo19-enterprise.md) and [future work](../future-work-20260923.md).
+
 | Evidence boundary | Observed result and limit |
 |---|---|
 | Exact source and native/browser tests | Feature `b9461b76` / build38514095 120/120 native pass; 65/65 frontend pass; 28 bilingual/theme/viewport native browser cases, 532 PNGs/four PDFs captured. Staging `28b37d90`/build38326320 clean matching addon trees and both installed versions19.0.1.5.0 after a backed-up dashboard-only upgrade. |

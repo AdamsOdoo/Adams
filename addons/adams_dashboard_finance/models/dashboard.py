@@ -86,7 +86,8 @@ class ExecutiveDashboard(models.AbstractModel):
             return super().get_section(section, options)
         scoped, dates = self._scope(options)
         currency = scoped.env.company.currency_id
-        result = {'items': [], 'supplier_windows': [], 'cash_flow': {'status': 'not_configured', 'rows': []}, 'company_id': scoped.env.company.id,
+        result = {'items': [], 'supplier_windows': [], 'cash_flow': {'status': 'not_configured', 'rows': []},
+                  'cash_breakdown': {'status': 'not_configured'}, 'company_id': scoped.env.company.id,
                   'currency': currency.name, 'digits': currency.decimal_places,
                   'generated_at': fields.Datetime.to_string(fields.Datetime.now())}
         if 'finance' not in scoped._visible_sections():
@@ -97,6 +98,7 @@ class ExecutiveDashboard(models.AbstractModel):
             result['items'] = [{'key': key, 'status': 'restricted', 'value': None} for key, _label in METRICS]
             result['items'].extend(scoped._overdue_items(result['items']))
             result['cash_flow']['status'] = 'restricted'
+            result['cash_breakdown']['status'] = 'restricted'
             return result
 
         evaluations = {}
@@ -183,6 +185,8 @@ class ExecutiveDashboard(models.AbstractModel):
                 item['status'] = 'error'
                 _logger.warning('Financial dashboard metric=%s category=%s', key, type(error).__name__)
         result['items'].extend(scoped._overdue_items(result['items']))
+        cash = next(item for item in result['items'] if item['key'] == 'cash')
+        result['cash_breakdown'] = scoped._cash_journal_breakdown(dates, cash)
         result['cash_flow'] = scoped._cash_flow_data(dates)
         result['supplier_windows'] = scoped._supplier_payment_windows(dates)
         return result
@@ -521,6 +525,80 @@ class ExecutiveDashboard(models.AbstractModel):
         # A one-day period at the cutoff produces the native closing balance.
         return self._financial_options(mapping.cash_detail_report_id, 'revenue',
                                        (dates[2], dates[2], dates[2]))
+
+    def _cash_journal_breakdown(self, dates, cash):
+        """Classify native closing balances only if the entire report reconciles.
+
+        A journal's default account supplies identity, never a balance. The
+        General Ledger engine supplies each signed balance at the same cutoff.
+        Ambiguous/unlinked accounts and differing report scope block the split.
+        """
+        if cash['status'] != 'ready':
+            return {'status': cash['status']}
+        try:
+            mapping = self._cash_detail_mapping()
+            if not mapping:
+                return {'status': 'not_configured'}
+            accounts = self.env['account.account'].with_context(active_test=False)
+            journals = self.env['account.journal'].with_context(active_test=False)
+            accounts.check_access('read')
+            journals.check_access('read')
+            accounts.check_field_access_rights('read', ['account_type', 'active', 'company_ids'])
+            journals.check_field_access_rights('read', ['active', 'type', 'company_id', 'default_account_id'])
+            records = accounts.search([
+                ('company_ids', 'in', [self.env.company.id]),
+                ('account_type', '=', 'asset_cash'), ('active', '=', True),
+            ], order='id', limit=201)
+            if len(records) > 200:
+                return {'status': 'unsupported_scope', 'reason': 'account_limit'}
+            links = journals.search([
+                ('company_id', '=', self.env.company.id), ('active', '=', True),
+                ('type', 'in', ['bank', 'cash']), ('default_account_id', 'in', records.ids),
+            ])
+            types = {account.id: set() for account in records}
+            for journal in links:
+                types[journal.default_account_id.id].add(journal.type)
+            unlinked = sum(not kinds for kinds in types.values())
+            shared = sum(len(kinds) > 1 for kinds in types.values())
+            if unlinked or shared:
+                return {'status': 'ambiguous', 'unlinked_accounts': unlinked,
+                        'shared_accounts': shared}
+            balances = {}
+            if records:
+                report = mapping.cash_detail_report_id
+                expression = mapping.cash_detail_expression_id
+                prepared = self._cash_options(mapping, dates)
+                prepared['forced_domain'] = [('account_id', 'in', records.ids)]
+                self.env.flush_all()
+                report._init_currency_table(prepared)
+                warnings = {}
+                native = report._compute_expression_totals_for_each_column_group(
+                    expression, prepared, groupby_to_expand='account_id', warnings=warnings)
+                group = next(iter(prepared['column_groups']))
+                balances = dict(native[group][expression]['value'])
+                for account in records:
+                    if account.id not in balances:
+                        single = dict(prepared, forced_domain=[('account_id', '=', account.id)])
+                        scalar = report._compute_expression_totals_for_each_column_group(
+                            expression, single, warnings=warnings)
+                        balances[account.id] = scalar[group][expression]['value']
+            if any(type(value) not in (int, float) or not math.isfinite(value)
+                   for value in balances.values()):
+                raise UnsupportedFinancialScope()
+            total = sum(balances.values())
+            currency = self.env.company.currency_id
+            if not currency.is_zero(total - cash['value']):
+                return {'status': 'unreconciled', 'reason': 'native_total_mismatch'}
+            return {'status': 'ready',
+                    'bank': sum(balances[account_id] for account_id, kinds in types.items()
+                                if kinds == {'bank'}),
+                    'cash': sum(balances[account_id] for account_id, kinds in types.items()
+                                if kinds == {'cash'}),
+                    'as_of': dates[2].isoformat(), 'currency': currency.name,
+                    'source': mapping.cash_detail_report_id.display_name}
+        except (AccessError, UnsupportedFinancialScope, UserError, KeyError, TypeError, ValueError) as error:
+            _logger.warning('Cash journal breakdown category=%s', type(error).__name__)
+            return {'status': 'restricted' if isinstance(error, AccessError) else 'unreconciled'}
 
     @api.model
     def get_cash_directory(self, options, offset=0, search=""):

@@ -1,0 +1,8 @@
+# Executive Dashboard future work — client-demo cutoff
+
+1. **UI20:** decide whether Procurement attention cards should retain the current native approval/late-receipt **order counts** or show a carefully defined financial amount. Until specified and reconciled, keep labelled counts and no invented totals.
+2. Complete actual side-by-side visual review of the exact HTML and changed Odoo candidate at the same dashboard content width, including six departments, five HR views, RTL/light/dark, menus, dialogs, focus, narrow/zoom and scroll. The prototype review bar and simulated Odoo bar are not product UI. Resolve the ranked deltas in `client-demo-recovery-20260923.md` and record unavoidable differences.
+3. Qualify UI08's journal classification against native signed totals on real development and staging data, including shared/unlinked/archived accounts, missing mapping, user rights, multiple currencies, pagination and execution time. No amount is shown unless the strict reconciliation passes.
+4. Prove fresh installation, prior-version upgrade and clean uninstall on an isolated Enterprise Odoo 19 database; repeat identity/mapping checks with a second company/localization. Current staging has just one authorized company.
+5. If populated HR workflows are needed in a live client demo, arrange an authorized development fixture with Attendances, Time Off and Planning installed. Do not install those apps or fabricate records in staging merely to fill cards.
+6. Run the changed candidate's full native/browser/print/export and staging gate once, after visual review. Prior build `38514095` and stage build `38326320` qualify only the preceding source.

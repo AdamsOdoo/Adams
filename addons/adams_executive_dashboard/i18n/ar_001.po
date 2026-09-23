@@ -4658,3 +4658,45 @@ msgstr "العودة إلى لوحة المعلومات"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Open employee profile"
 msgstr "فتح ملف الموظف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Targets and report status"
+msgstr "المستهدفات وحالة التقارير"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank/cash split needs review: "
+msgstr "يحتاج توزيع الأرصدة البنكية والنقدية إلى مراجعة: "
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid " unlinked and "
+msgstr " حسابات غير مرتبطة و"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid " shared accounts. View accounts for details."
+msgstr " حسابات مشتركة. اعرض الحسابات للتفاصيل."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank/cash split does not reconcile to the approved report. Review the account and journal definitions."
+msgstr "لا يتطابق توزيع الأرصدة البنكية والنقدية مع التقرير المعتمد. راجع تعريفات الحسابات واليوميات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Signed closing balances from bank and cash journals at the selected cutoff; reconciled to the approved report."
+msgstr "أرصدة ختامية بإشاراتها من اليوميات البنكية والنقدية عند تاريخ القطع المحدد؛ تمت مطابقتها مع التقرير المعتمد."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank/cash breakdown requires an approved account report mapping and access. Archived accounts are excluded from the account directory."
+msgstr "يتطلب تفصيل الأرصدة البنكية والنقدية ربطًا معتمدًا بالتقرير المحاسبي وصلاحية وصول. تُستبعد الحسابات المؤرشفة من دليل الحسابات."

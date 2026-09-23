@@ -1,0 +1,29 @@
+# Client demo recovery — 23 September 2026
+
+## Source and evidence boundary
+
+The approved HTML is `Adams_Dashboard_UI_Proposal.html`, SHA-256 `36ec95831f3f1e82e0709594d5c177938e3b3805ccd763b1e59c13933b2d7f4a`. The pre-change application is PR #214 HEAD `640437644545ca6d7905009603589527acf35283` with addon trees `78710c2fc2334379aedc44939968d9a4e818f8ab` / `a01fdad4fcc866e02093c3c115d4c71432902313`. Staging is still build `38326320`, application `28b37d90d77571383b37e70212681e9730d5cf40`, versions `19.0.1.5.0` until a separately qualified upgrade. Private paired captures and signed data remain outside this repository. This document describes a changed development candidate; it does not extend earlier native or staging evidence to the new tree.
+
+## Ranked visual and interaction deltas
+
+| Priority | Paired visual observation at 1366 px | Development action and qualification boundary |
+|---|---|---|
+| 1 | Finance warning banner occupies a full row; the prototype places report status within the context panel. Accounting warnings must remain visible. The Odoo chart has one actual month for the chosen period; the prototype has six fictional months. | Retain the true report warning and signed actuals. A full warning hierarchy and chart geometry comparison is pending a rendered candidate. Never fill missing months with sample data. |
+| 2 | Sales rankings begin about 60 px lower, with a last-updated note between cards and rankings; captions and bars are denser. Inventory similarly has an intervening timestamp and a taller filter/table stack. | Move the timestamp to the section footer, preserving its provenance. Recheck both screens at equal content width and natural data length. |
+| 3 | Inventory's live table is much wider than the prototype because real multilingual product/location identities and distinct free-to-use measures require additional columns. | Retain the report columns and horizontal scroll; physically verify on desktop, RTL and narrow widths before accepting the layout. |
+| 4 | Procurement uses labelled native order counts while the mockup shows monetary cards. CRM and HR show true empty/missing-app states and real names. | Keep the real source worklists and capability states. UI20's monetary choice is deferred. |
+| 5 | The Odoo host bar, profile/company controls, warning banner and signed/unusual values differ from the simulated prototype shell/sample data. | Keep Odoo host UI and real data. Treat remaining styling differences as open visual review, not 1:1 parity. |
+
+The private evidence contains 15 pre-change HTML/Odoo pairs across all six departments, five HR views, one employee profile and four Arabic/dark combinations. The selected HTML's bytes were hash verified, but this session's cloud browser blocked its local HTTP preview and the published review Site required sign-in. Interaction with the **exact HTML** has not been established in this session. Historical paired screenshots cannot prove the changed candidate's rendered layout. A candidate Odoo screenshot gate remains required before staging.
+
+## Settled choices implemented in the development candidate
+
+- **UI07:** remove the comparable-period percentage/status row entirely. Retain native report margins, target availability and warnings. No new comparison formula.
+- **UI08:** use active Bank/Cash journals' default accounts to classify active `asset_cash` accounts. Read their signed closing balances from the mapped native General Ledger at the same company/cutoff/currency. Display bank/cash numbers only when every account is uniquely classified and their sum reconciles to the approved native cash headline within currency rounding. Shared/unlinked accounts are explicitly counted; unreconciled or inaccessible results display no invented amounts. Existing account directory and report actions remain. The code path needs native test, staged reconciliation and performance qualification before release.
+- **UI20:** retain clearly labelled approval/late-receipt order-count worklists. The monetary alternative is deferred.
+
+## Demo route and present limit
+
+[Staging entry](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004): Finance source/warnings/cash and Partner Ledger; Sales rankings and source records; Inventory filter/rows and stock sources; Procurement approval and late-receipt lists; CRM records/capabilities; HR Overview and Employees/profile followed by Attendance, Time off and Shifts capability states. Verify CSV and standard report export with the authorized account. This route currently describes the **prior staged application**, not the changed candidate.
+
+Staging has one authorized company and no Attendances, Time Off or Planning. It can show honest missing-app states but cannot demo populated shifts or leave. Source-specific owner visual/financial acceptance, separate clean Enterprise install/upgrade, and any updated staging deployment remain open. Keep PR #214 draft; do not merge or touch main/production.
