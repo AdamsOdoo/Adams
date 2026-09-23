@@ -406,7 +406,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
             capture(browser, 'reference-workspace-header', '.main > .heading', '.filterbar')
             if viewport[0] > 900:
-                capture(browser, 'reference-workspace-navigation', '.sidebar', '.sidebar > .nav:last-of-type')
+                capture(browser, 'reference-workspace-navigation', '.sidebar', '.sidebar > div.nav')
             capture(browser, 'reference-profitability', '#content > .section-heading', '#content > .grid-2')
             browser._websocket_request('Runtime.evaluate', params={
                 'expression': "document.querySelector('[data-source=revenue]').click(); document.querySelector('.drawer .eyebrow').textContent=companyName(); document.querySelector('.drawer .callout').remove()"})

@@ -1278,6 +1278,7 @@
 
 .o_adams_dashboard #adams-inventory .adams_stock_empty {
     padding:55px 25px; text-align:center; color:var(--adams-sub);
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:36px; padding:7px 12px; border:1px solid var(--adams-line); border-radius:6px; background:var(--adams-paper); color:var(--adams-ink); font-size:13px; line-height:19.5px; font-weight:550; white-space:nowrap; }
     .adams_icon { display:block; width:30px; height:30px; margin:0 auto 12px; }
     h3 { color:var(--adams-ink); font-size:15px; line-height:22.5px; font-weight:650; margin:0 0 5px; }
     p { font-size:13px; line-height:19.5px; margin:0 0 17px; }
@@ -1298,6 +1299,8 @@
 
 // Qualify the shared header with Finance/Inventory before propagation.
 .o_adams_dashboard.adams_reference_surface {
+    // Keep the same content width when a filtered worklist becomes empty.
+    scrollbar-gutter:stable;
     .adams_header_actions .adams_icon { width:18px; height:18px; }
     .adams_filters { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:11px 14px; }
     .adams_filters > label { flex-direction:row; min-width:0; margin:0; }
@@ -1444,7 +1447,8 @@
     top:42px; width:200px; min-width:0; z-index:50;
     .btn { display:flex; align-items:center; justify-content:flex-start; gap:10px;
         padding:9px 11px; font-size:13px; font-weight:400; line-height:19.5px;
-        border:0; border-radius:5px; min-height:0; background:none; }
+        border:0; border-radius:5px; min-height:0; background:none; color:var(--adams-ink); }
     .btn:hover { background:var(--adams-soft); }
     .adams_icon { width:18px; height:18px; }
 }
+.o_adams_dashboard #adams-inventory .adams_stock_action_cell .adams_icon { width:18px; height:18px; }
