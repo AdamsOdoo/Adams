@@ -2,12 +2,13 @@
 
 ## 23 September — current visual closure candidate (not ready for approval)
 
-PR214 remains draft/open/unmerged. Current deployed development source is `dc783590875566c0fe64aca696e45cdddf9cd98a`, build38564209, modules19.0.1.7.0. Odoo.sh completed with Warning and generated all five independent Finance/Inventory reference cases. The detailed final aggregate test count is not yet recovered from this build's log; do not infer a count from the status badge. Local focused frontend checks now pass69/69, including native CSS-direction keyboard navigation.
+Development source `5671bb68432c62605a5df3bff94900146c050748`, build38566486, modules19.0.1.7.0 passed **125/125 native tests** (259.54s,107,717queries; final log19:35:01UTC). The reduced representative matrix retains English/Arabic exports, authorization and report-return checks.69 focused frontend tests pass locally.
 
-Visual inspection confirms corrected narrow header/card wrapping, RTL arrows, margin notes, Arabic subtitle, forecast caption and source company order. Remaining measured defects are Finance caption/date isolation, aging-label text order and native Inventory control resets (date-segment padding, tabular digits, flex button alignment and sort radius). Their source corrections are being qualified. Finance/Inventory gate remains open; remaining-department parity and final staging validation have not been completed.
+Independent captures confirm the corrected department SVGs, More menu and wide-screen Inventory empty-state width/button. The remaining sidebar mismatch is quick-access label wrapping: the immutable reference uses `white-space:nowrap`; the scoped correction is being qualified. The Finance/Inventory gate remains OPEN until that correction and outstanding representative comparisons are reviewed. No remaining department is claimed visually accepted.
 
-Staging remains the prior1.6.0 candidate. Production/main were not changed. The owner guide now includes a short acceptance journey and explicitly warns against treating the old staging build as this delivery.
+A bounded Sales paging correction is prepared for the approved six-row list: permitted source scope stays unchanged, the existing25-row default remains available, totals are authoritative and an out-of-range page recovers after records leave the scope. Its native regression is pending. No shared presentation propagation has begun.
 
+Staging remains `af0d2327184e96dfb3eecd65de3a79c4747d6045`, versions19.0.1.6.0. No staging upgrade from this continuation occurred. PR214 remains draft/open/unmerged; production/main unchanged. Remaining delivery: accepted department/HR comparisons, exact-candidate staging upgrade, real authorized journeys/source reconciliation, console/asset/version checks, private evidence retention and final package/owner guide.
 
 ## Active implementation — 23 September 2026
 

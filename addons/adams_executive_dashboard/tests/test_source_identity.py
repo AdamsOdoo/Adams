@@ -112,3 +112,20 @@ class TestDashboardSourceIdentity(AccountTestInvoicingCommon):
             company_id=self.env.company.id, company_ids=[Command.set(self.env.company.ids)])
         with self.assertRaises(AccessError):
             self.dashboard.with_user(reader).get_recent_sales('invoices', self.options)
+
+    def test_recent_six_row_pages_recover_after_scope_shrinks(self):
+        invoices = [self._quantity_invoice(1) for _ in range(8)]
+        first = self.dashboard.get_recent_sales('invoices', self.options, page_size=6)
+        second = self.dashboard.get_recent_sales('invoices', self.options, offset=6, page_size=6)
+        self.assertEqual((first['total_count'], len(first['rows']), first['has_more']), (8, 6, True))
+        self.assertEqual((second['offset'], len(second['rows']), second['has_more']), (6, 2, False))
+        self.assertEqual({row['id'] for row in first['rows'] + second['rows']}, {record.id for record in invoices})
+        for invoice in invoices[:3]:
+            invoice.button_draft()
+        recovered = self.dashboard.get_recent_sales('invoices', self.options, offset=6, page_size=6)
+        self.assertEqual((recovered['offset'], recovered['total_count'], len(recovered['rows'])), (0, 5, 5))
+        empty = self.dashboard.get_recent_sales('invoices', {**self.options, 'date_from':'2026-08-01', 'date_to':'2026-08-02'}, offset=6, page_size=6)
+        self.assertEqual((empty['offset'], empty['total_count'], empty['status']), (0, 0, 'empty'))
+        for invalid in (True, 0, 7, '6'):
+            with self.subTest(page_size=invalid), self.assertRaises(ValidationError):
+                self.dashboard.get_recent_sales('invoices', self.options, page_size=invalid)
