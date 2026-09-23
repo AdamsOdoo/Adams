@@ -121,6 +121,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             setup = r"""(async () => {
                 for(let i=0;i<200 && !document.querySelector('.kpis');i++)await new Promise(r=>setTimeout(r,50));
                 if(!document.querySelector('.kpis'))throw new Error('Reference did not render');
+                // Match dashboard content width; keep the approved component CSS unchanged.
+                document.querySelector('#content').style.width=CONTENT_WIDTH+'px';
                 // UI07 only: remove unsupported comparison, preserve the note slot.
                 document.querySelector('.kpi-note').textContent='';
                 const movement=[...document.querySelectorAll('.focus-row')].find(x=>x.textContent.includes('Revenue movement'));
@@ -128,6 +130,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 await document.fonts.ready;
                 return document.querySelectorAll('.kpis:first-of-type .kpi').length;
             })()"""
+            setup = setup.replace('CONTENT_WIDTH', str(captures['odoo-profitability']['clip']['width']))
             ready = browser._websocket_request('Runtime.evaluate', params={
                 'expression': setup, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
@@ -152,6 +155,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     'fixture': 'synthetic Finance values; no source reconciliation claim',
                     'viewport': [1440, 900], 'theme': 'light', 'language': 'en_US',
                     'adjustments': ['UI07: remove comparison note and Revenue movement row'],
+                    'content_width': captures['odoo-profitability']['clip']['width'],
                     'captures': captures, 'company': self.env.company.name,
                     'source_sha': subprocess.check_output(['git', '-C', str(reference.parent), 'rev-parse', 'HEAD'], text=True).strip(),
                     'database': self.env.cr.dbname}

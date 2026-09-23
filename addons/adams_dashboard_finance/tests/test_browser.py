@@ -722,7 +722,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         print_context = observed['result']['value']
                         self.assertEqual(print_context['viewport'], [width, height])
                         self.assertEqual(print_context['company'], self.env.company.name)
-                        self.assertIn(heading, print_context['rendered_text'])
+                        self.assertIn('الإيرادات المحاسبية' if lang == 'ar_001' else 'Accounting revenue',
+                                      print_context['rendered_text'])
                         parameters = {'landscape': False, 'displayHeaderFooter': False,
                             'printBackground': True, 'preferCSSPageSize': True,
                             'paperWidth': 210 / 25.4, 'paperHeight': 297 / 25.4,

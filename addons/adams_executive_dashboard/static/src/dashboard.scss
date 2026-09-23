@@ -980,3 +980,16 @@
     .adams_chart_legend .gross_profit { background:#79a697; }
     .adams_chart_legend .profit { background:var(--adams-purple); }
 }
+
+// UI07 removes the unsupported movement content, including its empty text height.
+// Preserve the approved margin note spacing and unbold percentage treatment.
+.o_adams_dashboard #adams-finance {
+    .adams_margin_note { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:0; }
+    .adams_margin_value { color:var(--adams-green); font-weight:400; direction:ltr; unicode-bidi:isolate; }
+}
+
+// Explicitly neutralize Odoo heading/button inheritance at the approved Finance surfaces.
+.o_adams_dashboard #adams-finance {
+    .adams_group_heading h3, .adams_panel_head h3 { line-height:1.5; }
+    .adams_metric_foot > .adams_source_button { padding:2px 0; }
+}
