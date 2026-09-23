@@ -387,7 +387,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     sample.remove();
                     if (root.querySelectorAll('.adams_header > .adams_header_actions button').length !== 3) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
-                    if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow at ' + WIDTH + ': ' + JSON.stringify([...root.querySelectorAll('*')].filter(node => {const r=node.getBoundingClientRect(),b=root.getBoundingClientRect();return r.width && (r.right>b.right+2 || r.left<b.left-2) && getComputedStyle(node).position!=='fixed';}).slice(0,8).map(node=>({tag:node.tagName,classes:node.className,width:node.getBoundingClientRect().width}))));
                     const scopeDates = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')];
                     if (scopeDates.length !== 2 || scopeDates.some(date => !date.textContent.trim())) throw new Error('Applied filter summary must retain the approved period range and balance cutoff');
                     if (scopeDates.some(date => getComputedStyle(date.parentElement).display !== 'none' && date.getClientRects().length !== 1)) throw new Error('Visible applied period or cutoff must not wrap internally');
@@ -627,6 +627,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const open = restoredCard.querySelector('button.adams_value');
                         if (!open || open.disabled) throw new Error('Revenue value must open its native report');
                         await assertHitTarget(open, 'Revenue value');
+                        const datesBeforeReport = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(node => node.textContent.trim());
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
@@ -636,7 +637,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === headlineExpected
                             && document.querySelector('.o_adams_dashboard'), 'Financial report return must reload the known native value');
                         const restoredDates = [...restored.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(input => input.textContent.trim());
-                        if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
+                        if (JSON.stringify(restoredDates) !== JSON.stringify(datesBeforeReport))
                             throw new Error('Financial report return changed applied dates');
                         const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button.adams_value'),
                             'Payment window drilldown must load after financial report return');
@@ -687,7 +688,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
+                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):

@@ -1353,3 +1353,15 @@
 
 .o_adams_dashboard #adams-finance #adams-group-profitability > .adams_grid > .adams_card,
 .o_adams_dashboard #adams-finance .adams_supplier_windows > .adams_grid > .adams_card { min-height:0; }
+
+.o_adams_dashboard #adams-inventory {
+    .adams_stock_detail_grid span { line-height:16.5px; }
+    .adams_stock_detail_grid b, .adams_stock_detail_value { display:inline; line-height:19.5px; vertical-align:baseline; }
+    .adams_stock_detail > td > .btn-link { line-height:18px; }
+    @media(max-width:900px) { .adams_stock_table .adams_stock_detail td { padding:12px; } }
+    @media(max-width:650px) { .adams_stock_table .adams_stock_detail td { padding:10px 9px; } }
+}
+
+.o_adams_dashboard #adams-finance .adams_balance_card .adams_overdue_total .btn-link { font-size:14px; line-height:21px; }
+
+.o_adams_dashboard #adams-finance .adams_statement_total bdi { white-space:nowrap; }
