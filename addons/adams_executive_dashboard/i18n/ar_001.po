@@ -4797,3 +4797,38 @@ msgstr "القيود المرحلة"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "As of"
 msgstr "كما في"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Cash flow for the selected period"
+msgstr "التدفق النقدي للفترة المحددة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Unpaid supplier bills"
+msgstr "فواتير الموردين غير المدفوعة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Includes the next 7 days"
+msgstr "يشمل الأيام السبعة القادمة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Supplier bill instalments"
+msgstr "أقساط فواتير الموردين"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Forecast for"
+msgstr "التوقع للفترة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "This is separate from the recorded bank and cash balance."
+msgstr "هذا منفصل عن رصيد البنك والنقد المسجل."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Supplier bill payments are a different scope from full payable aging; credits and other entries can make the totals differ."
+msgstr "نطاق مدفوعات فواتير الموردين مختلف عن أعمار الدائنين الكاملة؛ قد تؤدي الإشعارات الدائنة والقيود الأخرى إلى اختلاف الإجماليات."

@@ -42,7 +42,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         values = {'revenue': 1284000, 'gross_profit': 464800, 'profit': 182400,
                   'operating_expenses': 282400, 'gross_margin': 36.2, 'net_margin': 14.2,
                   'cash': 640000, 'receivables': 286400, 'payables': 198600,
-                  'receivables_overdue': 68400, 'payables_overdue': 41200}
+                  'receivables_overdue': 68400, 'payables_overdue': 41200,
+                  'assets': 3850000, 'liabilities': 1200000, 'equity': 2650000, 'standard_forecast': 87500}
         series = {'revenue': [1020000, 1150000, 1070000, 1350000, 1142360, 1284000],
                   'gross_profit': [340000, 370000, 350000, 490000, 413672, 464800],
                   'profit': [125000, 148000, 131000, 199000, 162160, 182400]}
@@ -72,6 +73,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                                                  for i, (name, value) in enumerate(zip(names, buckets))]
                         item['partner_ledger'] = True
                 result['cash_breakdown'] = {'status': 'ready', 'bank': 600000, 'cash': 40000}
+                result['cash_flow'] = {'status': 'ready', 'source': 'Cash Flow Statement',
+                                       'bridge': {key: {'value': value} for key, value in zip(
+                                           ['opening_balance', 'net_increase', 'closing_balance'],
+                                           [518000, 122000, 640000])}}
+                for item in result['items']:
+                    if item['key'] == 'standard_forecast': item['source'] = 'Executive Summary'
+                for item, value in zip(result['supplier_windows'], [36300,12500,64700,159400]):
+                    item.update(status='ready', value=value, drilldown=True, has_warnings=False)
                 result['currency'], result['digits'] = 'EGP', 2
             return result
 
@@ -141,6 +150,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             result = original_wait(browser, *args, **kwargs)
             capture(browser, 'odoo-profitability', '#adams-group-profitability')
             capture(browser, 'odoo-working-capital', '#adams-group-working-capital')
+            capture(browser, 'odoo-liquidity', '#adams-group-liquidity')
+            capture(browser, 'odoo-balance-sheet', '#adams-group-financial-position')
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
             browser._websocket_request('Page.navigate', params={
@@ -175,6 +186,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 const warning=document.querySelector('.focus-row:last-child .pill');
                 warning.textContent='No report warnings'; warning.classList.remove('amber');
                 document.querySelector('#content > .grid-3').previousElementSibling.id='reference-working-capital';
+                document.querySelector('#content > .grid-2.equal').previousElementSibling.id='reference-liquidity';
+                document.querySelector('#content > .grid-2.equal').nextElementSibling.nextElementSibling.nextElementSibling.id='reference-supplier-note';
+                document.querySelector('#content > .grid-3:last-child').previousElementSibling.id='reference-balance-sheet';
                 await document.fonts.ready;
                 return document.querySelectorAll('.kpis:first-of-type .kpi').length;
             })()"""
@@ -188,6 +202,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
             capture(browser, 'reference-profitability', '#content > .section-heading', '#content > .grid-2')
             capture(browser, 'reference-working-capital', '#reference-working-capital', '#content > .grid-3')
+            capture(browser, 'reference-liquidity', '#reference-liquidity', '#reference-supplier-note')
+            capture(browser, 'reference-balance-sheet', '#reference-balance-sheet', '#content > .grid-3:last-child')
             return result
 
         code = r"""(async () => {

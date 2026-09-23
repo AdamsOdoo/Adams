@@ -1053,3 +1053,31 @@
 }
 
 .o_adams_dashboard:dir(rtl) #adams-finance .adams_action_arrow { transform:scaleX(-1); }
+
+// Remaining approved Finance statement surfaces retain native report actions.
+.o_adams_dashboard #adams-finance {
+    .adams_statement_card { display:block; padding:0; min-height:0; }
+    .adams_statement_body { padding:17px 20px; }
+    .adams_statement_body h3 { margin:0; font-size:15px; font-weight:650; line-height:1.5; }
+    .adams_statement_label, .adams_statement_caption { font-size:12px; line-height:1.5; color:var(--adams-sub); margin:0; }
+    .adams_statement_caption { margin-top:5px; }
+    .adams_statement_total { border:0; padding:0; background:none; color:inherit; font-size:24px; font-weight:650; letter-spacing:-.5px; line-height:1.5; margin:6px 0; }
+    .adams_statement_top { display:flex; justify-content:space-between; align-items:start; gap:8px; }
+    .adams_statement_top .adams_source_button { display:inline-flex; align-items:center; gap:5px; padding:2px 0; font-size:12px; font-weight:600; line-height:18px; }
+    .adams_statement_top .adams_icon { width:14px; height:14px; }
+    .adams_statement_card .adams_cash_bridge { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid var(--adams-line); margin-top:15px; padding:14px 0 0; gap:10px; }
+    .adams_statement_card .adams_cash_bridge span { font-size:12px; line-height:1.5; }
+    .adams_statement_card .adams_cash_bridge strong { font-size:17px; line-height:1.5; margin:5px 0 0; }
+    .adams_positive { color:var(--adams-green); }
+    .adams_forecast_context { padding:13px 0 0; }
+    .adams_forecast_context strong { display:block; font-size:22px; font-weight:650; letter-spacing:-.3px; margin:3px 0; line-height:1.5; }
+    .adams_forecast_context p { font-size:12px; line-height:1.5; color:var(--adams-sub); margin:0; }
+    .adams_group_report { display:inline-flex; align-items:center; gap:5px; padding:2px 0; min-height:0; font-size:12px; font-weight:600; line-height:18px; }
+    .adams_supplier_windows { padding:0; }
+    .adams_supplier_windows > .adams_hint { margin:0; font-size:12px; line-height:1.5; }
+    @media(max-width:650px) {
+        .adams_statement_body { padding:15px; }
+        .adams_statement_card .adams_cash_bridge { gap:5px; }
+        .adams_statement_card .adams_cash_bridge strong { font-size:15px; }
+    }
+}

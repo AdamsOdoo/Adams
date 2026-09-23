@@ -523,6 +523,11 @@ export class ExecutiveDashboard extends Component {
         return language.startsWith('en') && !balance ? label.replace(/\bSept\b/g, 'Sep') : label;
     }
 
+    supplierWindowLabel(item) {
+        return {supplier_overdue: _t('Overdue'), supplier_today: _t('Today'),
+            supplier_due_7: _t('Next 7 days'), supplier_due_30: _t('Next 30 days')}[item.key] || item.label;
+    }
+
     supplierWindow(key) {
         return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
     }

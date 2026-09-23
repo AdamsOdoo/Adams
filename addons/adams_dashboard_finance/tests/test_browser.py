@@ -591,7 +591,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const restoredDates = [...restored.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(input => input.textContent.trim());
                         if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
                             throw new Error('Financial report return changed applied dates');
-                        const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button'),
+                        const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button.adams_value'),
                             'Payment window drilldown must load after financial report return');
                         paymentOpen.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
