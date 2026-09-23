@@ -4832,3 +4832,18 @@ msgstr "هذا منفصل عن رصيد البنك والنقد المسجل."
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Supplier bill payments are a different scope from full payable aging; credits and other entries can make the totals differ."
 msgstr "نطاق مدفوعات فواتير الموردين مختلف عن أعمار الدائنين الكاملة؛ قد تؤدي الإشعارات الدائنة والقيود الأخرى إلى اختلاف الإجماليات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Search products…"
+msgstr "البحث عن المنتجات…"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Filters changed — Apply to update"
+msgstr "تغيّرت عوامل التصفية — طبّق للتحديث"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Invalid page size."
+msgstr "حجم الصفحة غير صالح."

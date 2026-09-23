@@ -1085,3 +1085,15 @@ test('native user Arabic language governs week and metric dates even when host H
     assert.match(days[0].label, /[\u0600-\u06ff]/);
     assert.match(controller.metricPeriodLabel({key:'cash'}), /[\u0600-\u06ff]/);
 });
+
+
+test('stock dashboard pages use the returned size and retain position and totals', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const request=controller.pageStock(8);
+    assert.equal(pending[0].args[4],8);
+    pending[0].resolve({status:'ready',offset:8,page_size:8,total_count:27,has_more:true,rows:[]});
+    await request;
+    assert.equal(controller.currentPage(controller.state.inventory),2);
+    assert.deepEqual([...controller.pageNumbers(controller.state.inventory)],[1,2,3,4]);
+});

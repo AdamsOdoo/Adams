@@ -148,7 +148,8 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                      (field, 'in', locations.ids)], [field], []))
         return locations.filtered(lambda location: location.id in occupied)
 
-    def _get_inventory_locations(self, options, offset, mode, filters):
+    def _get_inventory_locations(self, options, offset, mode, filters, page_size=25):
+        offset = (offset // page_size) * page_size
         scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
         columns = ['display_name', 'default_code', 'qty_available', 'uom_id', 'active', 'categ_id']
         if mode == 'current':
@@ -197,21 +198,21 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             # Every authorized product/location pair qualifies. Count once and
             # read only the product window covering this page, in native order.
             total = products.search_count(domain) * len(locations)
-            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
+            offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
             if total:
                 product_start = offset // len(locations)
-                product_end = (min(offset + 25, total) - 1) // len(locations)
+                product_end = (min(offset + page_size, total) - 1) // len(locations)
                 selected = products.search(domain, order='name, id', offset=product_start,
                                            limit=product_end - product_start + 1)
                 pairs = ((location.id, product.id) for product in selected for location in locations)
-                page = list(islice(pairs, offset % len(locations), offset % len(locations) + 25))
+                page = list(islice(pairs, offset % len(locations), offset % len(locations) + page_size))
             else:
                 page = []
         elif sort_by == 'name':
             # Each location contributes only its native ordered prefix. Merge
             # prefixes using native product collation, never Python casefold.
             # Incremental merge keeps at most two prefixes in memory.
-            prefix_size = offset + 25
+            prefix_size = offset + page_size
             retained = []
             location_rank = {location.id: index for index, location in enumerate(locations)}
             for location in candidate_locations:
@@ -228,14 +229,14 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                 product_rank = {product.id: index for index, product in enumerate(ordered_products)}
                 retained = sorted((pair for pair in merged if pair[1] in product_rank),
                                   key=lambda pair: (product_rank[pair[1]], location_rank[pair[0]]))[:prefix_size]
-            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
-            page = retained[offset:offset + 25]
+            offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
+            page = retained[offset:offset + page_size]
         else:
             # Computed native quantity cannot be SQL ordered. Keep only the
             # requested prefix while reading candidate quantities in batches.
-            selected_keys = nsmallest(offset + 25, candidates())
-            offset = min(offset, ((total - 1) // 25) * 25) if total else 0
-            page = [(key[-2], key[-1]) for key in selected_keys[offset:offset + 25]]
+            selected_keys = nsmallest(offset + page_size, candidates())
+            offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
+            page = [(key[-2], key[-1]) for key in selected_keys[offset:offset + page_size]]
         # Read the native quant reservation measure only for displayed pairs.
         # This is a current direct-product snapshot, never a kit-equivalent
         # calculation or a subtraction of rounded product availability fields.
@@ -268,7 +269,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                 rows_by_pair[(location_id, product_id)] = row
         rows = [rows_by_pair[(key[-2], key[-1])] for key in page]
         return {'status': 'ready' if rows else 'empty', 'rows': rows, 'offset': offset,
-                'total_count': total, 'has_more': offset + len(rows) < total, 'mode': mode,
+                'total_count': total, 'page_size': page_size, 'has_more': offset + len(rows) < total, 'mode': mode,
                 'filters': filters, 'by_location': True, 'date_basis': mode,
                 'as_of': dates[2].isoformat() if mode == 'historical' else False,
                 'company_id': scoped.env.company.id, 'currency': scoped.env.company.currency_id.name,
@@ -349,14 +350,16 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         return action
 
     @api.model
-    def get_inventory(self, options, offset=0, mode='current', filters=None):
+    def get_inventory(self, options, offset=0, mode='current', filters=None, page_size=25):
+        if type(page_size) is not int or page_size not in (8, 25):
+            raise ValidationError(_('Invalid page size.'))
         scoped, dates = self._scope(options)
         if type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid page.'))
         if 'stock.quant' not in scoped.env:
             return {'status': 'not_installed', 'rows': [], 'mode': mode}
         if filters is not None:
-            return self._get_inventory_locations(options, offset, mode, filters)
+            return self._get_inventory_locations(options, offset, mode, filters, page_size)
         products, domain = scoped._stock_scope(dates, mode)
         columns = ['display_name', 'qty_available', 'uom_id', 'active']
         if mode == 'current':

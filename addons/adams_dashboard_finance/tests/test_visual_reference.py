@@ -5,8 +5,11 @@ responses are not application fixtures and are never loaded in normal requests.
 This records discrepancies; it deliberately does not assert visual acceptance.
 """
 import base64
+import ast
+import re
 import hashlib
 import io
+import importlib.util
 import json
 import logging
 from pathlib import Path
@@ -38,6 +41,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         original_section, original_bootstrap = model.get_section, model.get_bootstrap
         original_trends = model.get_financial_trends
         original_directory = model.get_cash_directory
+        original_inventory = model.get_inventory
         user_id = self.env.uid
         values = {'revenue': 1284000, 'gross_profit': 464800, 'profit': 182400,
                   'operating_expenses': 282400, 'gross_margin': 36.2, 'net_margin': 14.2,
@@ -107,6 +111,45 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                             ['Operating bank','Reserve bank','Bank overdraft','Cash on hand'],
                             [450000,200000,-50000,40000]))]}
 
+        # Approved sample records exist only inside this native test transaction.
+        products = ast.literal_eval(re.search(r"const PRODUCTS=(\[.*?\]);", raw.decode(), re.S).group(1))
+        warehouse_names = ['Main warehouse', 'Retail store', 'Online fulfilment']
+        category_names = ['Hair Care', 'Body Care', 'Grooming', 'Skin Care', 'Gift Sets']
+        stock_rows = []
+        for i, product in enumerate(products):
+            for j, warehouse in enumerate(warehouse_names):
+                index = i * 3 + j
+                qty = 0 if index % 11 == 0 else -12 if index % 17 == 0 else (i*43+j*19+37)%217
+                reserved = min((i*7+j*3)%19, max(0, qty))
+                stock_rows.append({'id': f'{i}-{j}', 'product_id': i+1, 'name': product[1],
+                    'display_name': product[1], 'default_code': product[0],
+                    'categ_id': [category_names.index(product[2])+1,product[2]],
+                    'warehouse_id':j+1, 'warehouse_name':warehouse, 'location_id':index+1,
+                    'location_name':f"WH / Stock / {'A' if i<9 else 'B'}-{i%4+1}" if j==0 else 'Retail / Stock' if j==1 else 'Online / Picking',
+                    'qty_available':qty, 'reserved_quantity':reserved, 'free_qty':qty-reserved,
+                    'incoming_qty':24, 'outgoing_qty':(i*7+j*3)%19, 'virtual_available':qty+24-(i*7+j*3)%19,
+                    'uom_id':[1,'PCS'], 'digits':0})
+
+        @api.model
+        def inventory(records, options, offset=0, mode='current', filters=None, page_size=25):
+            if records.env.uid != user_id:
+                return original_inventory(records, options, offset, mode, filters, page_size)
+            records._scope(options)
+            filters = dict(filters or {})
+            rows = [dict(row) for row in stock_rows if
+                (not filters.get('hide_zero') or row['qty_available'] != 0) and
+                (not filters.get('hide_negative') or row['qty_available'] >= 0) and
+                (not filters.get('warehouse_id') or row['warehouse_id'] == filters['warehouse_id']) and
+                (not filters.get('category_id') or row['categ_id'][0] == filters['category_id']) and
+                filters.get('search','').lower() in (row['name']+' '+row['default_code']+' '+row['location_name']).lower()]
+            rows.sort(key=lambda row: (-row['qty_available'],row['name'],row['location_name']) if filters.get('sort')=='qty' else (row['name'],row['location_name']))
+            total=len(rows); offset=min(offset,((total-1)//8)*8) if total else 0
+            return {'status':'ready' if total else 'empty', 'rows':rows[offset:offset+8],
+                'offset':offset,'page_size':8,'total_count':total,'has_more':offset+8<total,
+                'mode':mode,'filters':filters,'by_location':True,'as_of':False,
+                'warehouses':[{'id':i+1,'name':name} for i,name in enumerate(warehouse_names)],
+                'categories':[{'id':i+1,'name':name} for i,name in enumerate(category_names)]}
+
         target = Path(config['data_dir']) / 'adams_dashboard_reference_evidence'
         target.mkdir(mode=0o700, exist_ok=True)
         output = Path(tempfile.mkdtemp(prefix='finance-', dir=target))
@@ -114,12 +157,18 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
         original_wait = ChromeBrowser._wait_code_ok
         captures = {}
+        environments = {}
 
         def capture(browser, name, selector, end_selector=None):
             expression = r"""(async () => {
                 const start=document.querySelector(SELECTOR), end=document.querySelector(END);
                 if(!start || !end)throw new Error('Missing capture region');
                 start.scrollIntoView({block:'start'});
+                let scroller=start.parentElement;
+                while(scroller && !(scroller.scrollHeight>scroller.clientHeight &&
+                    /auto|scroll/.test(getComputedStyle(scroller).overflowY)))scroller=scroller.parentElement;
+                scroller=scroller || document.scrollingElement;
+                scroller.scrollTop += start.getBoundingClientRect().top - 16;
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
                 const a=start.getBoundingClientRect(), b=end.getBoundingClientRect();
                 return {x:Math.floor(a.x),y:Math.floor(a.y),width:Math.ceil(a.width),
@@ -137,7 +186,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             x, y, width, height = (clip[key] for key in ('x', 'y', 'width', 'height'))
             self.assertTrue(0 <= x < x + width <= viewport.width and
                             0 <= y < y + height <= viewport.height,
-                            'Capture region must fit the unchanged viewport; never trim overflow')
+                            f'Capture region must fit the unchanged viewport; never trim overflow: {name} {clip} viewport={viewport.size}')
             cropped = io.BytesIO()
             viewport.crop((x, y, x + width, y + height)).save(cropped, format='PNG')
             content = cropped.getvalue()
@@ -145,6 +194,12 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             path.write_bytes(content)
             path.chmod(0o600)
             captures[name] = {'file': path.name, 'sha256': hashlib.sha256(content).hexdigest(), 'clip': clip}
+            environments[name] = browser._websocket_request('Runtime.evaluate', params={
+                'expression': '''JSON.stringify({browser:navigator.userAgent,
+                    fonts:{family:getComputedStyle(document.querySelector('.o_adams_dashboard') || document.body).fontFamily,
+                        available:['Inter','Segoe UI','Arial'].map(f=>[f,document.fonts.check('14px '+JSON.stringify(f))])},
+                    zoom:visualViewport.scale,device_scale:devicePixelRatio,
+                    viewport:[innerWidth,innerHeight]})''', 'returnByValue': True})['result']['value']
 
         def after_render(browser, *args, **kwargs):
             result = original_wait(browser, *args, **kwargs)
@@ -152,6 +207,17 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             capture(browser, 'odoo-working-capital', '#adams-group-working-capital')
             capture(browser, 'odoo-liquidity', '#adams-group-liquidity')
             capture(browser, 'odoo-balance-sheet', '#adams-group-financial-position')
+            selection = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(async()=>{
+                    document.querySelector('.adams_side_link[data-section="inventory"]').click();
+                    for(let i=0;i<200;i++){
+                        if(document.querySelectorAll('.adams_stock_table tbody tr').length===8)return true;
+                        await new Promise(r=>setTimeout(r,50));
+                    }throw new Error('Populated Inventory fixture failed to render');
+                })()""", 'awaitPromise':True,'returnByValue':True})
+            self.assertFalse(selection.get('exceptionDetails'), str(selection))
+            capture(browser, 'odoo-stock-filters', '#adams-inventory > .adams_group_heading', '.adams_stock_applied')
+            capture(browser, 'odoo-stock-table', '.adams_stock_table', '#adams-inventory .adams_page_controls')
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
             browser._websocket_request('Page.navigate', params={
@@ -204,6 +270,16 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             capture(browser, 'reference-working-capital', '#reference-working-capital', '#content > .grid-3')
             capture(browser, 'reference-liquidity', '#reference-liquidity', '#reference-supplier-note')
             capture(browser, 'reference-balance-sheet', '#reference-balance-sheet', '#content > .grid-3:last-child')
+            selected = browser._websocket_request('Runtime.evaluate', params={
+                'expression': """(async()=>{
+                    [...document.querySelectorAll('nav button')].find(x=>x.textContent.trim()==='Inventory').click();
+                    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+                    return document.querySelectorAll('.stock-table tbody tr').length;
+                })()""", 'awaitPromise':True,'returnByValue':True})
+            self.assertFalse(selected.get('exceptionDetails'),str(selected))
+            self.assertEqual(selected['result']['value'],8)
+            capture(browser, 'reference-stock-filters', '#content > .section-heading', '.stock-summary')
+            capture(browser, 'reference-stock-table', '#content .table-wrap', '#content .table-wrap + div')
             return result
 
         code = r"""(async () => {
@@ -219,7 +295,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             throw new Error('Populated Finance fixture failed to render');
         })().catch(e=>console.error(e));"""
         with patch.object(model, 'get_bootstrap', bootstrap), patch.object(model, 'get_section', section), \
-                patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
+                patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(model, 'get_inventory', inventory), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
             self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=60)
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
                     'fixture': 'synthetic Finance values; no source reconciliation claim',
@@ -231,4 +307,38 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     'source_sha': subprocess.check_output(['git', '-C', str(reference.parent), 'rev-parse', 'HEAD'], text=True).strip(),
                     'database': self.env.cr.dbname}
         (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+        # Independent manifests feed the same enforced comparison utility used by review.
+        # Visible differences remain review-required; this diagnostic test cannot certify parity.
+        refs, acts = [], []
+        for region in ('profitability', 'working-capital', 'liquidity', 'balance-sheet', 'stock-filters', 'stock-table'):
+            for side, destination in (('reference', refs), ('odoo', acts)):
+                name = f'{side}-{region}'
+                image = captures[name]
+                destination.append(dict(json.loads(environments[name]),
+                    id=region, file=image['file'], sha256=image['sha256'],
+                    box=[0,0,image['clip']['width'],image['clip']['height']],
+                    theme='light', language='en_US', content_width=manifest['content_width'],
+                    company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
+                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':False},
+                    data={'fixture':'approved-inventory-synthetic-v1','rows':stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series},
+                    state='loaded', region=region))
+        reference_manifest = output / 'reference.json'
+        actual_manifest = output / 'odoo.json'
+        reference_manifest.write_text(json.dumps({'role':'approved-reference',
+            'html_sha256':manifest['html_sha256'], 'adjustments':manifest['adjustments'],
+            'state_normalization':manifest['state_normalization'], 'captures':refs}, indent=2))
+        versions = {module.name:module.installed_version for module in self.env['ir.module.module'].search(
+            [('name','in',['adams_executive_dashboard','adams_dashboard_finance'])])}
+        actual_manifest.write_text(json.dumps({'role':'actual-odoo', 'source_sha':manifest['source_sha'],
+            'build':self.env.cr.dbname, 'module_versions':versions, 'captures':acts}, indent=2))
+        for path in (output / 'manifest.json', reference_manifest, actual_manifest): path.chmod(0o600)
+        tool = reference.parents[3] / 'scripts/dashboard-visual-compare.py'
+        spec = importlib.util.spec_from_file_location('dashboard_visual_compare', tool)
+        comparator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(comparator)
+        try:
+            comparator.compare(reference_manifest, actual_manifest, output / 'comparison')
+        except ValueError as error:
+            # A mismatched environment must stay explicit, never normalized away.
+            (output / 'comparison-blocked.txt').write_text(str(error) + '\n')
         logging.getLogger(__name__).info('ADAMS_REFERENCE_CAPTURE: %s', output)

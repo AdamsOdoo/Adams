@@ -100,6 +100,13 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         for row in actual:
             native = products.browse(row['product_id']).with_context(location=row['location_id'], strict=True)
             self.assertEqual(row['qty_available'], native.qty_available)
+        # The approved dashboard has eight-row pages; source ordering/totals stay identical.
+        compact = [self.dashboard.get_inventory(self.options, offset=offset, filters=filters, page_size=8)
+                   for offset in (0, 8, 16, 24)]
+        self.assertEqual([len(page['rows']) for page in compact], [8, 8, 8, 3])
+        self.assertEqual([page['page_size'] for page in compact], [8] * 4)
+        self.assertEqual([row['id'] for page in compact for row in page['rows']], [row['id'] for row in actual])
+        self.assertEqual([page['has_more'] for page in compact], [True, True, True, False])
         names = self.dashboard.get_inventory(self.options, filters=dict(filters, sort='name'))
         self.assertEqual([row['product_id'] for row in names['rows'][:2]], [products[0].id, products[0].id])
         # A removed final page returns the last valid page, including its offset.
@@ -110,6 +117,11 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         self.assertEqual(recovered['offset'], 0)
         self.assertEqual(recovered['total_count'], 2)
         self.assertEqual(len(recovered['rows']), 2)
+        compact_recovered = self.dashboard.get_inventory(self.options, offset=24, filters=filters, page_size=8)
+        self.assertEqual(compact_recovered['offset'], 0)
+        self.assertEqual(compact_recovered['total_count'], 2)
+        with self.assertRaises(ValidationError):
+            self.dashboard.get_inventory(self.options, filters=filters, page_size=100000)
         with self.assertRaises(ValidationError):
             self.dashboard.get_inventory(self.options, filters=dict(filters, sort='standard_price'))
 

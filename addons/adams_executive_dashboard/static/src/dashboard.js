@@ -390,8 +390,9 @@ export class ExecutiveDashboard extends Component {
     }
 
     pageNumbers(data) {
-        const current = Math.floor((data?.offset || 0) / 25) + 1;
-        const total = Number.isInteger(data?.total_count) ? Math.max(1, Math.ceil(data.total_count / 25)) : current + (data?.has_more ? 1 : 0);
+        const size = data?.page_size || 25;
+        const current = Math.floor((data?.offset || 0) / size) + 1;
+        const total = Number.isInteger(data?.total_count) ? Math.max(1, Math.ceil(data.total_count / size)) : current + (data?.has_more ? 1 : 0);
         const start = Math.max(1, Math.min(current - 2, total - 4));
         return [...new Set([1, ...Array.from({length: Math.min(5, total - start + 1)}, (_, i) => start + i), ...(data?.total_count !== undefined ? [total] : [])])];
     }
@@ -400,7 +401,7 @@ export class ExecutiveDashboard extends Component {
     // Keep these computations on the component so a populated optional view
     // never attempts to invoke ctx.String, ctx.Math or ctx.Object.
     get searchKindKeys() { return Object.keys(this.searchKinds); }
-    currentPage(data) { return Math.floor((data?.offset || 0) / 25) + 1; }
+    currentPage(data) { return Math.floor((data?.offset || 0) / (data?.page_size || 25)) + 1; }
     visibleRowEnd(data) { return Math.min(data.offset + data.rows.length, data.total); }
     chartMinimumWidth(chart) { return Math.max(340, chart.rows.length * 104); }
     chartHitHeight(series) { return Math.max(16, series.height + 8); }
@@ -959,7 +960,7 @@ export class ExecutiveDashboard extends Component {
             const args = [{ ...this.state.applied }, offset];
             if (kind === 'cash') { args.push(search); }
             if (['inventory', 'procurement'].includes(kind)) { args.push(mode); }
-            if (kind === 'inventory') args.push(stockFilters);
+            if (kind === 'inventory') args.push(stockFilters, 8);
             const data = await this.orm.call('adams.executive.dashboard', method, args);
             if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
                 this.state[stateKey] = { ...data, offset: Number.isInteger(data.offset) ? data.offset : offset };

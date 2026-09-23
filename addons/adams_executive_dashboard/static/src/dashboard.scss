@@ -1081,3 +1081,24 @@
         .adams_statement_card .adams_cash_bridge strong { font-size:15px; }
     }
 }
+
+// Inventory's approved filter rows, scoped away from native Odoo forms.
+.o_adams_dashboard #adams-inventory {
+    .adams_stock_panel .adams_stock_filters { display:block; padding:0; margin:0; border:0; background:transparent; border-radius:0; }
+    .adams_stock_fields { display:grid; grid-template-columns:minmax(160px,1.3fr) repeat(3,minmax(130px,1fr)); gap:12px; padding:16px 20px; border-bottom:1px solid var(--adams-line); }
+    .adams_stock_fields label { display:flex; flex-direction:column; gap:5px; color:var(--adams-sub); font-size:12px; line-height:18px; font-weight:400; }
+    .adams_stock_fields input, .adams_stock_fields select { width:100%; height:36px; min-height:36px; font-size:13px; line-height:19.5px; border-radius:6px; }
+    .adams_stock_options { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; background:var(--adams-soft); border-bottom:1px solid var(--adams-line); flex-wrap:wrap; }
+    .adams_stock_checks { display:flex; gap:15px; flex-wrap:wrap; }
+    .adams_stock_checks .adams_check { display:flex; align-items:center; flex:none; gap:6px; font-size:12px; font-weight:400; line-height:18px; min-height:0; cursor:pointer; color:var(--adams-ink); }
+    .adams_stock_checks input { accent-color:var(--adams-purple); width:15px; height:15px; margin:0; }
+    .adams_stock_filter_actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .adams_stock_filter_actions .btn { font-size:12px; line-height:18px; min-height:36px; border-radius:6px; }
+    .adams_stock_filter_actions .btn-link { min-height:0; padding:2px 0; font-weight:600; }
+    .adams_stock_applied { display:flex; align-items:center; justify-content:space-between; padding:13px 20px; font-size:12px; line-height:18px; color:var(--adams-sub); gap:12px; }
+    .adams_stock_applied strong { color:var(--adams-ink); }
+    .adams_stock_applied label { display:flex; align-items:center; gap:8px; margin:0; }
+    .adams_stock_applied select { width:auto; min-height:36px; height:36px; font-size:13px; line-height:19.5px; }
+    @media(max-width:900px) { .adams_stock_fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:650px) { .adams_stock_fields { padding:15px; grid-template-columns:1fr; } .adams_stock_options, .adams_stock_applied { padding-inline:15px; } }
+}

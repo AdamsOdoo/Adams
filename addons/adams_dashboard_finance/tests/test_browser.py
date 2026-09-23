@@ -788,10 +788,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 await new Promise(resolve => requestAnimationFrame(resolve));
                                 filters.requestSubmit();
                                 await wait(() => !filters.querySelector('button[type="submit"]').disabled &&
-                                    section.querySelectorAll('.adams_stock_table tbody tr').length === 25 &&
-                                    section.querySelectorAll('.adams_page_number').length === 2 &&
+                                    section.querySelectorAll('.adams_stock_table tbody tr').length === 8 &&
+                                    section.querySelectorAll('.adams_page_number').length === 4 &&
                                     [...section.querySelectorAll('.adams_stock_table tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
-                                    'Filtered native stock must render 25 rows and two numbered pages');
+                                    'Filtered native stock must render eight rows and four numbered pages');
                             """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
                             target = '.adams_stock_filters'
                         capture_section(section, target, setup)
@@ -896,12 +896,12 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');
                                 if (!pageTwo) throw new Error('Second stock page is missing');
                                 pageTwo.click();
-                                await wait(() => section.querySelectorAll('.adams_stock_table tbody tr').length === 2 &&
+                                await wait(() => section.querySelectorAll('.adams_stock_table tbody tr').length === 8 &&
                                     section.querySelector('.adams_page_number[aria-current="page"]')?.textContent.trim() === '2' &&
                                     !section.querySelector('.adams_stock_filters button[type="submit"]').disabled,
-                                    'Second stock page must settle with the remaining two fixture rows');
-                                if (!section.querySelector('.adams_stock_table tbody').innerText.includes('DASH-VIS-26'))
-                                    throw new Error('Second stock page lost its final fixture product');
+                                    'Second stock page must settle with eight fixture rows');
+                                if (!section.querySelector('.adams_stock_table tbody').innerText.includes('DASH-VIS-08'))
+                                    throw new Error('Second stock page lost its first fixture product');
                             """)
                             browser.take_screenshot(prefix=f'polish_inventory_page2_{lang}_{theme}_{width}_').result(timeout=20)
                     for index, tab in enumerate(('overview', 'attendance', 'time_off', 'shifts', 'employees')):
