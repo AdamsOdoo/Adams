@@ -1,5 +1,21 @@
 # Adams For Men dashboard — staging UAT
 
+## Current continuation — blocked, not ready for acceptance
+
+Use [implementation status](implementation-status.md) for the current source/build identity. Application `638af7eabd0186612856b7df8d9b59fd0c3d7506` (module versions19.0.1.7.0) has not reached a usable verified development build: build38534410 reported an Odoo.sh Platform error, following the same failure on38533796. Staging still has19.0.1.6.0 and has not received this iteration. Historical checked boxes below do not qualify the new candidate.
+
+The owner decisions are settled for this delivery: UI07 removes comparable-period claims, UI08 uses standard Bank/Cash journals with signed unique-account values, and UI20 remains deferred with truthful Procurement worklists. Do not request those decisions again.
+
+Short owner guide, **to use after the development visual gate and staging deployment pass**:
+
+1. Confirm company/logo, period and balance cutoff, then compare Finance to the paired approved reference. Open the revenue value, return, expand the chart table and open a month. Check the matching scope and retained dashboard state.
+2. In Inventory, apply warehouse/category/search, move to page2, open a product/location source and return. Narrow the filters and verify page/total recovery. Test no results and Clear.
+3. Walk Sales rankings/recent records; Procurement approval/late worklists; CRM opportunity rows. Verify each destination and retained filters.
+4. In HR, exercise Overview, Attendance, Time off, Shifts (Week/List) and Employees/work profile. Missing applications or restricted sources must stay honest. Do not install applications or widen permissions for review.
+5. Check the representative desktop/narrow, light/dark and Arabic/RTL pairs. Report clipping, misplaced controls or missing content as unresolved defects. Test counts alone are insufficient.
+
+## Historical candidate information (superseded)
+
 ## Final implementation candidate and staged testing
 
 **STAGING AVAILABLE FOR OWNER HANDS-ON TESTING — NOT YET READY FOR FORMAL OWNER UAT.** Final published application feature **`b9461b76f3b1a1e1085fda87d55f6ef66ecca9b9`** has dashboard addon trees `adams_executive_dashboard` **`78710c2fc2334379aedc44939968d9a4e818f8ab`** and `adams_dashboard_finance` **`a01fdad4fcc866e02093c3c115d4c71432902313`**. Development build **38514095** passed **120/120 native post-tests** (403.75s, 118,807 queries), **65/65 focused frontend tests**, and its native browser matrix completed **28 English/Arabic × light/dark × seven-viewport cases**, retaining **532 actual Odoo screenshots and four actual dashboard PDFs**. The native PDF/browser output was captured; screenshot count is not by itself a full pixel parity sign-off.

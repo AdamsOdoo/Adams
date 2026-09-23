@@ -74,7 +74,7 @@ def compare(reference_path, actual_path, output):
         if ri.size != ai.size:
             raise ValueError(f'{name}: region dimensions differ; do not resize to conceal geometry')
         pairs.append((name, ri, ai))
-    output.mkdir(parents=True)
+    output.mkdir(parents=True, mode=0o700)
     results = []
     for name, ref, act in pairs:
         delta = ImageChops.difference(ref, act)
