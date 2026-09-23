@@ -24,6 +24,7 @@ from odoo import api, Command
 from odoo.tests import tagged
 from odoo.tests.common import ChromeBrowser
 from odoo.tools import config
+from odoo.tools.translate import code_translations
 from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 
@@ -180,6 +181,24 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         environments = {}
 
         def capture(browser, name, selector, end_selector=None):
+            if language == 'ar_001' and name.startswith('reference-'):
+                # Contract UI27 requires completed Odoo Arabic, not the partial
+                # prototype vocabulary. Normalize content only, never geometry.
+                messages = code_translations.get_web_translations('adams_executive_dashboard', language)['messages']
+                catalog = {message['id']: message['string'] for message in messages if message['string']}
+                localized = browser._websocket_request('Runtime.evaluate', params={
+                    'expression': r"""(()=>{
+                        const catalog=CATALOG;
+                        const escaped=Object.keys(catalog).sort((a,b)=>b.length-a.length).map(key=>key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+                        const pattern=new RegExp('(?<![A-Za-z])(?:'+escaped.join('|')+')(?![A-Za-z])','g');
+                        const formatter=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+                        const start=new Date('2026-09-01T12:00:00Z'), end=new Date('2026-09-22T12:00:00Z');
+                        const localize=text=>text.replace(/1–22 Sep 2026/g,formatter.formatRange(start,end)).replace(/22 Sept 2026/g,formatter.format(end)).replace(pattern,source=>catalog[source]);
+                        const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+                        let node;while((node=walker.nextNode()))if(!['SCRIPT','STYLE'].includes(node.parentElement?.tagName))node.textContent=localize(node.textContent);
+                        for(const element of document.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attribute of ['placeholder','title','aria-label'])if(element.hasAttribute(attribute))element.setAttribute(attribute,localize(element.getAttribute(attribute)));
+                    })()""".replace('CATALOG',json.dumps(catalog)), 'returnByValue':True})
+                self.assertFalse(localized.get('exceptionDetails'), str(localized))
             expression = r"""(async () => {
                 await document.fonts.ready;
                 await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
@@ -434,7 +453,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                                     'UI20: Procurement monetary/count decision deferred; not represented in these captures',
                                     'Company: standard authorized test-company name and logo',
                                     'Exclude prototype review eyebrow and source-destination explanation callout'],
-                    'state_normalization': ['authorized test company/logo', 'synthetic Finance values', 'no report warnings'],
+                    'state_normalization': ['authorized test company/logo/menu', 'synthetic Finance values', 'no report warnings'] + (['UI27: completed Arabic catalog and native Arabic period/cutoff content; reference geometry unchanged'] if language == 'ar_001' else []),
+                    'arabic_catalog_sha256': hashlib.sha256((reference.parents[3] / 'addons/adams_executive_dashboard/i18n/ar_001.po').read_bytes()).hexdigest() if language == 'ar_001' else None,
                     'content_width': captures['odoo-profitability']['clip']['width'],
                     'captures': captures, 'company': self.env.company.name,
                     'source_sha': subprocess.check_output(['git', '-C', str(reference.parent), 'rev-parse', 'HEAD'], text=True).strip(),

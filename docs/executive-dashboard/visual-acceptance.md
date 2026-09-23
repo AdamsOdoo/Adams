@@ -181,3 +181,8 @@ Final live staging 06a5274b: inspected retained English light/dark, Arabic dark,
 ### 23 September controlled header normalization
 
 The reference company menu now contains the disposable user's actual authorized company names and selected company, rather than the prototype's three unrelated company profiles. This corrects an unmatched content state that changed the native select's intrinsic width; the approved select CSS and baseline HTML remain unchanged. Current source/capture manifests must be used to qualify this adjustment. No implementation pixels replace reference captures.
+
+
+### UI27 Arabic integration required by the implementation contract
+
+The contract expressly requires completed Odoo Arabic and native locale behavior instead of the prototype's partial translation. The existing approved Arabic dictionary is retained in the application. Missing frontend catalog markers are corrected. For Arabic controlled comparison, the reference's text and date content is normalized through that completed catalog and native date formatter; no HTML structure, style, width, masking or baseline pixels are replaced. The manifest records the catalog SHA256 and this content-only adjustment. Arabic geometry, sign ordering, arrows and chart chronology remain acceptance requirements, not translation waivers. The Finance chart now explicitly retains chronological left-to-right ordering under Odoo's RTL asset processing.

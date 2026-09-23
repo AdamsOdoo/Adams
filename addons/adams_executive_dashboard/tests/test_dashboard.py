@@ -24,7 +24,9 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
                        'Explore delivery quantities', 'Not configured',
                        'View bills →', 'View overdue receivables →', 'Approvals & late receipts →',
                        'Search results', 'Print preview', 'Valuation:', 'Active employees:',
-                       'Budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings'):
+                       'Budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings',
+                       'What changed, and what to check', 'No target configured', 'Monthly performance',
+                       'Try another product or include zero quantities.', 'The company could not be switched. Try again.'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)

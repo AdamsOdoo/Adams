@@ -165,7 +165,7 @@
         <div class="adams_chart_legend"><span><i class="revenue"/>Revenue</span><span><i class="gross_profit"/>Gross profit</span><span><i class="profit"/>Net profit</span></div>
         <t t-set="chart" t-value="profitabilityChart()"/>
         <div t-if="chart.status !== 'ready'" class="adams_chart_empty"><span t-if="chart.status === 'loading'">Loading reports…</span><span t-elif="chart.status === 'idle'">Load the approved report values to view this chart.</span><span t-else="">Chart unavailable. Review report access and approved definitions.</span><button t-if="chart.status !== 'loading'" class="btn btn-link" t-on-click="loadProfitabilityChart">Retry</button></div>
-        <t t-else=""><div class="adams_profit_chart" role="group" aria-label="Signed monthly revenue, gross profit and net profit. Exact values are available in the table below.">
+        <t t-else=""><div class="adams_profit_chart" dir="ltr" style="direction:ltr" role="group" aria-label="Signed monthly revenue, gross profit and net profit. Exact values are available in the table below.">
             <div class="adams_chart_y_axis" aria-hidden="true"><span t-foreach="chart.ticks.slice().reverse()" t-as="tick" t-key="tick_index" t-esc="tick.label"/></div>
             <div class="adams_chart_plot" t-att-style="'min-width:' + (chart.rows.length * 37) + 'px'">
                 <span t-if="chart.zero &lt; 193" class="adams_chart_baseline" t-att-style="'top:' + ((chart.zero - 19) / 174 * 100) + '%'" aria-hidden="true"/>
