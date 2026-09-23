@@ -387,6 +387,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     sample.remove();
                     if (root.querySelectorAll('.adams_header > .adams_header_actions button').length !== 3) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
+                    const actionArrow = root.querySelector('.adams_action_arrow');
+                    if (DIRECTION === 'rtl' && !getComputedStyle(actionArrow).transform.startsWith('matrix(-1')) throw new Error('Native RTL action arrows must point left even when Odoo has no DOM dir attribute');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow at ' + WIDTH + ': ' + JSON.stringify([...root.querySelectorAll('*')].filter(node => {const r=node.getBoundingClientRect(),b=root.getBoundingClientRect();return r.width && (r.right>b.right+2 || r.left<b.left-2) && getComputedStyle(node).position!=='fixed';}).slice(0,8).map(node=>({tag:node.tagName,classes:node.className,width:node.getBoundingClientRect().width}))));
                     const scopeDates = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')];
                     if (scopeDates.length !== 2 || scopeDates.some(date => !date.textContent.trim())) throw new Error('Applied filter summary must retain the approved period range and balance cutoff');

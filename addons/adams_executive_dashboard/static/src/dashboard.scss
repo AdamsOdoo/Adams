@@ -987,7 +987,12 @@
 // Preserve the approved margin note spacing and unbold percentage treatment.
 .o_adams_dashboard #adams-finance {
     .adams_margin_note { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:0; }
-    .adams_margin_value { color:var(--adams-green); font-weight:400; }
+    .adams_margin_value {
+        color:var(--adams-green); font-weight:400;
+        /* rtl:ignore */
+        direction:ltr;
+        unicode-bidi:isolate; display:inline-block;
+    }
 }
 
 // Explicitly neutralize Odoo heading/button inheritance at the approved Finance surfaces.
@@ -1054,6 +1059,7 @@
     @media(max-width:650px) { .adams_balance_body { padding:15px; } }
 }
 
+.o_rtl .o_adams_dashboard #adams-finance .adams_action_arrow,
 .o_adams_dashboard:dir(rtl) #adams-finance .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
 
 // Remaining approved Finance statement surfaces retain native report actions.
@@ -1166,6 +1172,7 @@
     .adams_page_gap { font-size:12px; color:var(--adams-sub); }
     @media(max-width:650px) { .adams_page_controls { padding:11px 12px; } .adams_page_context { font-size:11px; } .adams_stock_pager { gap:3px; } .adams_stock_pager .btn { min-width:28px; } }
 }
+.o_rtl .o_adams_dashboard #adams-inventory .adams_action_arrow,
 .o_adams_dashboard:dir(rtl) #adams-inventory .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
 
 // Preserve the approved native-button padding at balance/statement controls.
@@ -1368,6 +1375,7 @@
 
 .o_adams_dashboard #adams-finance .adams_statement_total bdi { white-space:nowrap; }
 
+.o_rtl .o_adams_dashboard .adams_finance_source .adams_action_arrow,
 .o_adams_dashboard:dir(rtl) .adams_finance_source .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
 
 // Retain the approved mobile tabs and header geometry instead of the legacy
@@ -1388,3 +1396,12 @@
     .adams_balance_actions { gap:0; }
     .adams_balance_actions .btn-link, .adams_cash_links .btn-link { white-space:nowrap; flex-shrink:0; }
 }
+
+.o_adams_dashboard #adams-inventory {
+    .adams_stock_filter_actions .btn:not(.btn-link) { font-size:13px; line-height:19.5px; }
+    .adams_stock_fields select, .adams_stock_applied select { line-height:19.5px; }
+    .adams_stock_detail > td > .btn-link .adams_icon { width:14px; height:14px; }
+}
+
+// Match the approved signed movement span without forcing paragraph direction.
+.o_adams_dashboard #adams-finance .adams_cash_bridge .adams_positive { unicode-bidi:isolate; }

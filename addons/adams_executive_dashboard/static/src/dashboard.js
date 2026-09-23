@@ -653,7 +653,7 @@ export class ExecutiveDashboard extends Component {
         const current = buttons.indexOf(event.target);
         if (current < 0) return;
         event.preventDefault();
-        const rtl = document.documentElement.dir === 'rtl';
+        const rtl = getComputedStyle(event.currentTarget).direction === 'rtl';
         const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
             (current + delta + buttons.length) % buttons.length;

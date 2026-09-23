@@ -2,7 +2,19 @@
 
 Status: **incomplete; Finance/Inventory gate blocked and unpassed**.
 
-## Source and environment
+## Current continuation checkpoint — 18:25 UTC
+
+Current feature source `81e76b213d22db282fdb001431224cc4d40a9cf4`, tree `a112280910d3ba75db0147b96214a76df8cfbc82`. Local checkout matches the published feature. Native qualification is running. Both dashboard modules remain19.0.1.7.0. Staging is unchanged at the1.6.0 candidate below; no production/main changes.
+
+Latest completed native run: `f2abbf62aa8e41a075c06b4fb719eb9fcc04caa7` /38562106,124/124 tests,460.59s,127,212queries. Its separate websocket access error during synthetic capture is recorded in implementation-status.md and is not waived by that passing count.
+
+Inspected independent overlays at1920×1080,1440×900 and1366×768 show close structural alignment for Finance profitability/chart, working capital, liquidity/forecast/supplier windows, source drawer, expanded aging/chart tables and Inventory rows/pagination. Narrow balance-sheet no-wrap and expanded-stock-row typography are corrected. Narrow header and working-capital wrapping, dark source button and Arabic catalog/direction defects are addressed in81e76b2 but still require rendered acceptance. Finance/Inventory gate stays **OPEN** until those comparisons and material residual differences are resolved.
+
+The Arabic root cause includes Odoo19's translation-import converter recognizing the double-quoted module import; the previous single-quoted import fell back to global translations. A native transpiler regression now checks module context. UI27 completed translation/native locale adjustments are content-only and separately recorded; the immutable HTML hash is unchanged.
+
+Remaining immediate work: qualify81e76b2 native/visual evidence; finish Finance/Inventory residuals; then port/compare remaining departments and all HR tabs using the proven components, followed by dashboard-only staging upgrade, real authorized journeys/source checks, source/asset/module identity, console/RPC verification, final owner guide and installable package. Earlier status sections below are historical and do not close this gate.
+
+## Historical source and environment
 
 Recovered HEAD: `91bbf98877b63892a4d6483c63ab9611a15f1b0d`, clean checkout.
 Current application change: `638af7eabd0186612856b7df8d9b59fd0c3d7506`,

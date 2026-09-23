@@ -197,10 +197,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         const formatter=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
                         const start=new Date('2026-09-01T12:00:00Z'), end=new Date('2026-09-22T12:00:00Z');
                         const localize=text=>{
-                            text=text.replace(/1–22 Sep 2026/g,formatter.formatRange(start,end)).replace(/22 Sept 2026/g,formatter.format(end));
+                            text=text.replace(/1–22 Sep 2026/g,'\u2066'+formatter.formatRange(start,end)+'\u2069').replace(/22 Sept 2026/g,'\u2066'+formatter.format(end)+'\u2069');
                             // Do not partially translate source definitions or business names.
                             // Translate complete labels and fully covered compound UI captions.
-                            const remainder=text.replace(pattern,'').replace(/\b(?:EGP|September|Apr|May|Jun|Jul|Aug|Sept)\b/g,'');
+                            const remainder=text.replace(pattern,'').replace(/\b(?:EGP|Executive Summary|September|Apr|May|Jun|Jul|Aug|Sept|Not overdue)\b/g,'');
                             if(/[A-Za-z]/.test(remainder))return text;
                             return text.replace(pattern,source=>catalog[source]).replace(/\bSeptember\b/g,new Intl.DateTimeFormat('ar-001',{month:'long',timeZone:'UTC'}).format(end));
                         };

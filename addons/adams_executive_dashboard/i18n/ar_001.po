@@ -4976,7 +4976,7 @@ msgstr "تعذّر تبديل الشركة. حاول مرة أخرى."
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Your financial position, with a clear path to the numbers."
-msgstr "وضعك المالي، مع مسار واضح إلى الأرقام."
+msgstr "نظرة واضحة على أعمالك، مع الوصول إلى التقارير الداعمة."
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
