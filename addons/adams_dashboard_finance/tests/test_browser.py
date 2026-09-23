@@ -831,6 +831,22 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const firstRow = viewport.querySelector('tbody tr');
                                 const productCell = firstRow.cells[0];
                                 const sourceCell = firstRow.cells[firstRow.cells.length - 1];
+                                const categoryHeader = viewport.querySelector('thead th.adams_stock_category');
+                                const categoryCell = firstRow.querySelector('td.adams_stock_category');
+                                const inlineCategory = productCell.querySelector('.adams_stock_mobile_category');
+                                if (!categoryHeader || !categoryCell || !inlineCategory ||
+                                    !categoryCell.textContent.includes('Dashboard visual stock') ||
+                                    sourceCell.querySelector('summary')?.textContent.trim() !== 'Sources')
+                                    throw new Error('Native Category and Source data columns must retain product/category and source records');
+                                if (innerWidth === 1440 && getComputedStyle(root).colorScheme === 'light') {
+                                    if (getComputedStyle(categoryHeader).display === 'none' ||
+                                        getComputedStyle(categoryCell).display === 'none' ||
+                                        getComputedStyle(inlineCategory).display !== 'none')
+                                        throw new Error('Desktop stock must render Category as its own column');
+                                }
+                                if (innerWidth <= 1100 && (getComputedStyle(categoryCell).display !== 'none' ||
+                                    getComputedStyle(inlineCategory).display === 'none'))
+                                    throw new Error('Narrow stock must retain Category within Product details');
                                 const rtl = getComputedStyle(viewport).direction === 'rtl';
                                 const origin = viewport.scrollLeft;
                                 const visibleBounds = () => {
