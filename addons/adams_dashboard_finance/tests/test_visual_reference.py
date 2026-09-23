@@ -60,6 +60,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         original_directory = model.get_cash_directory
         original_inventory = model.get_inventory
         user_id = self.env.uid
+        messages = code_translations.get_web_translations('adams_executive_dashboard', language)['messages']
+        catalog = {message['id']: message['string'] for message in messages if message['string']}
+        localized_label = lambda label: catalog.get(label, label)
         values = {'revenue': 1284000, 'gross_profit': 464800, 'profit': 182400,
                   'operating_expenses': 282400, 'gross_margin': 36.2, 'net_margin': 14.2,
                   'cash': 640000, 'receivables': 286400, 'payables': 198600,
@@ -90,7 +93,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         buckets = ([218000,31000,12000,7400,9000,9000] if item['key'] == 'receivables'
                                    else [157400,18000,9000,6200,4000,4000])
                         names = ['Not overdue','1–30 days','31–60 days','61–90 days','91–120 days','Over 120 days']
-                        item['aging_buckets'] = [{'key': f'period{i}', 'label': name, 'value': value}
+                        item['aging_buckets'] = [{'key': f'period{i}', 'label': localized_label(name), 'value': value}
                                                  for i, (name, value) in enumerate(zip(names, buckets))]
                         item['partner_ledger'] = True
                 for item in result['items']:
@@ -98,7 +101,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         item.update(source='Profit & Loss', definition='Revenue from posted entries in the selected period.',
                                     source_line='Existing approved Odoo report definition')
                 result['cash_breakdown'] = {'status': 'ready', 'bank': 600000, 'cash': 40000}
-                result['cash_flow'] = {'status': 'ready', 'source': 'Cash Flow Statement',
+                result['cash_flow'] = {'status': 'ready', 'source': localized_label('Cash Flow Statement'),
                                        'bridge': {key: {'value': value} for key, value in zip(
                                            ['opening_balance', 'net_increase', 'closing_balance'],
                                            [518000, 122000, 640000])}}
@@ -193,7 +196,21 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         const pattern=new RegExp('(?<![A-Za-z])(?:'+escaped.join('|')+')(?![A-Za-z])','g');
                         const formatter=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
                         const start=new Date('2026-09-01T12:00:00Z'), end=new Date('2026-09-22T12:00:00Z');
-                        const localize=text=>text.replace(/1–22 Sep 2026/g,formatter.formatRange(start,end)).replace(/22 Sept 2026/g,formatter.format(end)).replace(pattern,source=>catalog[source]);
+                        const localize=text=>{
+                            text=text.replace(/1–22 Sep 2026/g,formatter.formatRange(start,end)).replace(/22 Sept 2026/g,formatter.format(end));
+                            // Do not partially translate source definitions or business names.
+                            // Translate complete labels and fully covered compound UI captions.
+                            const remainder=text.replace(pattern,'').replace(/\b(?:EGP|September|Apr|May|Jun|Jul|Aug|Sept)\b/g,'');
+                            if(/[A-Za-z]/.test(remainder))return text;
+                            return text.replace(pattern,source=>catalog[source]).replace(/\bSeptember\b/g,new Intl.DateTimeFormat('ar-001',{month:'long',timeZone:'UTC'}).format(end));
+                        };
+                        for(const label of document.querySelectorAll('.chart .month')) {
+                            const index=['Apr','May','Jun','Jul','Aug','Sep*'].indexOf(label.textContent.trim());
+                            if(index>=0)label.textContent=new Intl.DateTimeFormat('ar-001',{month:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2026,index+3,1)))+(index===5?'*':'');
+                        }
+                        document.querySelectorAll('.chart .y-axis span').forEach((label,index)=>{
+                            label.textContent=new Intl.NumberFormat('ar-001',{notation:'compact',maximumFractionDigits:1}).format([1500000,1000000,500000,0][index]);
+                        });
                         const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
                         let node;while((node=walker.nextNode()))if(!['SCRIPT','STYLE'].includes(node.parentElement?.tagName))node.textContent=localize(node.textContent);
                         for(const element of document.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attribute of ['placeholder','title','aria-label'])if(element.hasAttribute(attribute))element.setAttribute(attribute,localize(element.getAttribute(attribute)));
@@ -246,7 +263,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     }).slice(0,100).map(e=>{const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {
                         tag:e.tagName,classes:e.className,text:e.textContent.trim().slice(0,100),
                         rect:[r.x-box.x,r.y-box.y,r.width,r.height],
-                        styles:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','padding','margin','borderWidth','borderRadius','verticalAlign','display'].map(k=>[k,s[k]]))};});
+                        styles:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','padding','margin','borderWidth','borderRadius','verticalAlign','display','direction','textAlign','transform','fontVariantNumeric'].map(k=>[k,s[k]]))};});
                 })()""".replace('CAPTURE_BOX',json.dumps(clip)), 'returnByValue':True})
             captures[name]['computed_styles'] = styles['result']['value']
 

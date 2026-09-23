@@ -3,6 +3,7 @@ from odoo.exceptions import AccessError, ValidationError
 from odoo.tests import new_test_user, tagged
 from odoo.tools import file_open
 from odoo.tools.translate import code_translations
+from odoo.tools.js_transpiler import transpile_javascript
 import sass
 import csv
 import io
@@ -25,11 +26,20 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
                        'View bills →', 'View overdue receivables →', 'Approvals & late receipts →',
                        'Search results', 'Print preview', 'Valuation:', 'Active employees:',
                        'Budget:', 'Matching orders:', 'Sold product ranking', 'Dashboard Settings',
+                       'View report', 'View accounts', 'Next 7 days', 'Next 30 days', 'Valuation', 'Replenishment',
                        'What changed, and what to check', 'No target configured', 'Monthly performance',
                        'Try another product or include zero quantities.', 'The company could not be switched. Try again.'):
             with self.subTest(source=source):
                 self.assertTrue(translations.get(source))
                 self.assertNotEqual(translations[source], source)
+
+    def test_dashboard_translations_keep_their_module_context(self):
+        path = 'adams_executive_dashboard/static/src/dashboard.js'
+        with file_open(path, 'r') as source:
+            compiled = transpile_javascript('/' + path, source.read())
+        # Odoo19's converter recognizes double-quoted translation imports.
+        # Falling back to global terms changed Reserved/Incoming and subtitles.
+        self.assertIn('appTranslateFn(str, "adams_executive_dashboard", ...args)', compiled)
 
     @classmethod
     def setUpClass(cls):

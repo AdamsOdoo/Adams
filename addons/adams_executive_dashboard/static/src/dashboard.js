@@ -4,7 +4,7 @@ import { registry } from '@web/core/registry';
 import { useService, useBus } from '@web/core/utils/hooks';
 import { user, userBus } from '@web/core/user';
 import { useSetupAction } from '@web/search/action_hook';
-import { _t } from '@web/core/l10n/translation';
+import { _t } from "@web/core/l10n/translation";
 
 export class ExecutiveDashboard extends Component {
     static template = 'adams_executive_dashboard.Dashboard';
@@ -528,6 +528,8 @@ export class ExecutiveDashboard extends Component {
         if (['crm','procurement'].includes(key) && !this.state.workspaceDetails[key]) void this.loadWorkspaceDetails(key);
     }
 
+    get formatLocale() { return (user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-'); }
+
     metricPeriodLabel(item) {
         const scope = this.state.applied;
         if (!scope) return '';
@@ -606,7 +608,7 @@ export class ExecutiveDashboard extends Component {
     printNow() { window.print(); }
 
     printValue(row) {
-        return row.value === null ? '—' : new Intl.NumberFormat(document.documentElement.lang || 'en', {
+        return row.value === null ? '—' : new Intl.NumberFormat(this.formatLocale, {
             minimumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
             maximumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
         }).format(row.value);
@@ -765,12 +767,12 @@ export class ExecutiveDashboard extends Component {
 
     headline(item, section, fullValue = false) {
         if (fullValue && typeof item.value === 'number') {
-            return new Intl.NumberFormat(document.documentElement.lang || 'en', {
+            return new Intl.NumberFormat(this.formatLocale, {
                 minimumFractionDigits: 0, maximumFractionDigits: section.digits,
             }).format(item.value);
         }
         if (typeof item.value !== 'number' || Math.abs(item.value) < 1000000) return this.formatted(item, section);
-        return new Intl.NumberFormat(document.documentElement.lang || 'en', {
+        return new Intl.NumberFormat(this.formatLocale, {
             notation: 'compact', maximumFractionDigits: 2,
         }).format(item.value);
     }
@@ -829,7 +831,7 @@ export class ExecutiveDashboard extends Component {
         const date = new Date(end + 'T00:00:00Z');
         const next = new Date(date); next.setUTCDate(date.getUTCDate() + 1);
         if (next.getUTCMonth() !== date.getUTCMonth()) return null;
-        return {key: end.slice(0, 7), label: new Intl.DateTimeFormat(document.documentElement.lang || 'en',
+        return {key: end.slice(0, 7), label: new Intl.DateTimeFormat(this.formatLocale,
             {month: 'long', timeZone: 'UTC'}).format(date)};
     }
 
@@ -848,13 +850,13 @@ export class ExecutiveDashboard extends Component {
         const scale = value => 19 + (maximum - value) / (maximum - minimum) * 174;
         const zero = scale(0);
         const width = Math.max(680, labels.length * 104);
-        const number = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {
+        const number = value => new Intl.NumberFormat(this.formatLocale, {
             notation: 'compact', maximumFractionDigits: 1 }).format(value);
         return { status: 'ready', zero, width, ticks: Array.from({ length: 4 }, (_, index) => {
             const value = minimum + (maximum - minimum) * index / 3;
             return { label: number(value), y: scale(value) };
         }), rows: labels.sort().map((label, monthIndex) => ({ label,
-            displayLabel: new Intl.DateTimeFormat(document.documentElement.lang || 'en', {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')) + (this.partialChartMonth?.key === label ? '*' : ''),
+            displayLabel: new Intl.DateTimeFormat(this.formatLocale, {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')) + (this.partialChartMonth?.key === label ? '*' : ''),
             x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
             series: keys.map((key, index) => {
                 const row = data[index].rows.find(value => value.label === label);
@@ -879,7 +881,7 @@ export class ExecutiveDashboard extends Component {
 
     formatted(item, section) {
         if (item.value === null) { return this.statusLabels[item.status] || '—'; }
-        return new Intl.NumberFormat(document.documentElement.lang || 'en', {
+        return new Intl.NumberFormat(this.formatLocale, {
             maximumFractionDigits: item.key === 'orders' ? 0 : section.digits,
             minimumFractionDigits: item.key === 'orders' ? 0 : section.digits,
         }).format(item.value);
@@ -1193,7 +1195,7 @@ export class ExecutiveDashboard extends Component {
         } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The quantity report could not be opened. Check the selected unit and your access.'), {type:'warning'}); }
         finally { if (this.alive) this.state.opening = false; }
     }
-    quantity(value, digits = 2) { return Number.isFinite(value) ? new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: digits}).format(value) : '—'; }
+    quantity(value, digits = 2) { return Number.isFinite(value) ? new Intl.NumberFormat(this.formatLocale, {maximumFractionDigits: digits}).format(value) : '—'; }
     get hrOptions() { return {...this.state.applied, ...this.state.hrPeriodApplied}; }
     get hrLoading() { return this.state.hrData?.status === 'loading'; }
     get hrPeriodDirty() { return ['date_from','date_to'].some(key => this.state.hrPeriodDraft[key] !== this.state.hrPeriodApplied?.[key]); }

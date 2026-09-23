@@ -18,6 +18,7 @@
         --adams-paper: #222732; --adams-bg: #181c24; --adams-ink: #eff0f5;
         --adams-sub: #afb6c6; --adams-line: #3b4250; --adams-soft: #292f3b;
         --adams-purple: #d5a9cb; --adams-purple-soft: #3b2f3e;
+        --adams-button: #d5a9cb; --adams-button-hover: #e4c5dd;
         --adams-green: #88d5b3; --adams-green-soft: #233e35; --adams-focus: #95bdec;
     }
 }
@@ -354,7 +355,7 @@
 }
 
 .o_adams_dashboard {
-    .adams_chart_svg { width: 100%; min-width: 340px; height: auto; display: block; direction: ltr; }
+    .adams_chart_svg { width: 100%; min-width: 340px; height: auto; display: block; /* rtl:ignore */ direction: ltr; }
     .adams_chart_svg text { fill: var(--adams-sub); font-size: var(--adams-helper); }
     .adams_chart_gridline { stroke: var(--adams-line); }
     .adams_chart_zero { stroke: var(--adams-sub); stroke-width: 1.2; }
@@ -471,6 +472,7 @@
         --adams-bg: #181c24; --adams-paper: #222732; --adams-soft: #292f3b;
         --adams-ink: #eff0f5; --adams-sub: #afb6c6; --adams-line: #3b4250;
         --adams-purple: #d5a9cb; --adams-purple-soft: #3b2f3e;
+        --adams-button: #d5a9cb; --adams-button-hover: #e4c5dd;
         --adams-green: #88d5b3; --adams-green-soft: #233e35;
         --adams-attention: #3d3325; --adams-attention-line: #786541;
         --adams-focus: #95bdec;
@@ -508,7 +510,7 @@
     .adams_company_scope strong { color:var(--adams-ink); font-size:13px; font-weight:600; max-width:220px; overflow-wrap:anywhere; }
     .adams_filters select { width:auto; border:0; padding-inline-start:0; font-weight:600; background-color:transparent; font-size:13px; }
     .adams_applied_period, .adams_balance_scope { color:var(--adams-sub); font-size:12px; }
-    .adams_applied_period bdi, .adams_balance_scope > bdi { display:inline-block; white-space:nowrap; direction:ltr; unicode-bidi:isolate; }
+    .adams_applied_period bdi, .adams_balance_scope > bdi { display:inline-block; white-space:nowrap; /* rtl:ignore */ direction:ltr; unicode-bidi:isolate; }
     .adams_balance_scope { display:flex; align-items:center; gap:6px; margin-inline-start:auto; }
     .adams_balance_scope bdi { color:var(--adams-ink); }
     .adams_balance_scope .btn { padding:2px 0; min-height:0; font-size:12px; }
@@ -534,7 +536,7 @@
     .adams_currency { font-size:11px; font-weight:500; letter-spacing:.3px; }
     .adams_value { padding:0; border:0; background:none; color:inherit; font-size:28px; font-weight:650; line-height:1.25; letter-spacing:-.65px; text-align:start; min-width:0; }
     button.adams_value:hover { color:var(--adams-purple); }
-    .adams_value bdi, .adams_overdue_total bdi { direction:ltr; unicode-bidi:isolate; }
+    .adams_value bdi, .adams_overdue_total bdi { /* rtl:ignore */ direction:ltr; unicode-bidi:isolate; }
     .adams_margin_note { margin:11px 0 0; min-height:18px; font-size:12px; }
     .adams_card_date { font-size:11px; margin:13px 0 0; padding-top:8px; border-top:1px solid var(--adams-line); }
     .adams_metric_foot { margin:0; padding-top:3px; border:0; font-size:11px; gap:8px; }
@@ -964,7 +966,7 @@
 
 // The approved chart's actual grid/bar structure, bound to signed report rows.
 .o_adams_dashboard #adams-finance {
-    .adams_profit_chart { display:grid; grid-template-columns:38px minmax(0,1fr); gap:8px; direction:ltr; height:218px; padding:14px 20px 20px; }
+    .adams_profit_chart { display:grid; grid-template-columns:38px minmax(0,1fr); gap:8px; /* rtl:ignore */ direction:ltr; height:218px; padding:14px 20px 20px; }
     .adams_chart_y_axis { display:flex; flex-direction:column; justify-content:space-between; font-size:10px; color:var(--adams-sub); padding-bottom:24px; text-align:end; }
     .adams_chart_plot { position:relative; border-bottom:1px solid var(--adams-line); display:flex; gap:4px; align-items:end; justify-content:space-around; margin-bottom:24px; background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),var(--adams-line) calc(25% - 1px),var(--adams-line) 25%); }
     .adams_chart_bar_group { display:flex; justify-content:center; gap:5px; height:100%; width:13%; position:relative; }
@@ -985,7 +987,7 @@
 // Preserve the approved margin note spacing and unbold percentage treatment.
 .o_adams_dashboard #adams-finance {
     .adams_margin_note { display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-height:0; }
-    .adams_margin_value { color:var(--adams-green); font-weight:400; direction:ltr; unicode-bidi:isolate; }
+    .adams_margin_value { color:var(--adams-green); font-weight:400; }
 }
 
 // Explicitly neutralize Odoo heading/button inheritance at the approved Finance surfaces.
@@ -1052,7 +1054,7 @@
     @media(max-width:650px) { .adams_balance_body { padding:15px; } }
 }
 
-.o_adams_dashboard:dir(rtl) #adams-finance .adams_action_arrow { transform:scaleX(-1); }
+.o_adams_dashboard:dir(rtl) #adams-finance .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
 
 // Remaining approved Finance statement surfaces retain native report actions.
 .o_adams_dashboard #adams-finance {
@@ -1164,7 +1166,7 @@
     .adams_page_gap { font-size:12px; color:var(--adams-sub); }
     @media(max-width:650px) { .adams_page_controls { padding:11px 12px; } .adams_page_context { font-size:11px; } .adams_stock_pager { gap:3px; } .adams_stock_pager .btn { min-width:28px; } }
 }
-.o_adams_dashboard:dir(rtl) #adams-inventory .adams_action_arrow { transform:scaleX(-1); }
+.o_adams_dashboard:dir(rtl) #adams-inventory .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
 
 // Preserve the approved native-button padding at balance/statement controls.
 .o_adams_dashboard #adams-finance {
@@ -1365,3 +1367,24 @@
 .o_adams_dashboard #adams-finance .adams_balance_card .adams_overdue_total .btn-link { font-size:14px; line-height:21px; }
 
 .o_adams_dashboard #adams-finance .adams_statement_total bdi { white-space:nowrap; }
+
+.o_adams_dashboard:dir(rtl) .adams_finance_source .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
+
+// Retain the approved mobile tabs and header geometry instead of the legacy
+// sidebar-toggle slot. Native Odoo's surrounding navigation remains available.
+.o_adams_dashboard.adams_reference_surface {
+    .adams_header > .adams_mobile_menu { display:none; }
+    .adams_header { flex-wrap:nowrap; }
+    @media(max-width:650px) {
+        .adams_header { flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+        .adams_header > div:first-child { flex:initial; }
+        .adams_header_actions { width:auto; margin-inline-start:0; justify-content:flex-start; gap:5px; }
+    }
+}
+.o_adams_dashboard #adams-finance .adams_balance_card {
+    .adams_panel_head { flex-wrap:nowrap; }
+    .adams_panel_head > div { flex:0 1 auto; overflow-wrap:normal; }
+    .adams_panel_head .adams_metric_info { flex-shrink:0; }
+    .adams_balance_actions { gap:0; }
+    .adams_balance_actions .btn-link, .adams_cash_links .btn-link { white-space:nowrap; flex-shrink:0; }
+}

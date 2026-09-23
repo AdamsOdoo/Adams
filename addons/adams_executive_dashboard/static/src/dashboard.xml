@@ -19,7 +19,7 @@
     <button t-if="state.canConfigure" class="btn adams_settings_link" t-on-click="openSettings">Dashboard Settings</button>
 </aside>
 <div class="adams_content">
-<nav t-if="referenceSurface" class="adams_nav adams_reference_mobile_tabs" aria-label="Dashboard sections"><button t-foreach="visibleSections" t-as="entry" t-key="entry.key" t-att-class="{'active': state.activeSection === entry.key}" t-att-aria-current="state.activeSection === entry.key ? 'page' : undefined" t-on-click="() =&gt; this.navigateSection(entry.key)"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="entry.icon"/></t><span t-esc="entry.short"/></button></nav>
+<nav t-if="referenceSurface" class="adams_nav adams_reference_mobile_tabs" aria-label="Dashboard sections"><button t-foreach="visibleSections" t-as="entry" t-key="entry.key" t-att-data-section="entry.key" t-att-class="{'active': state.activeSection === entry.key}" t-att-aria-current="state.activeSection === entry.key ? 'page' : undefined" t-on-click="() =&gt; this.navigateSection(entry.key)"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="entry.icon"/></t><span t-esc="entry.short"/></button></nav>
 <header class="adams_header">
     <div><span class="adams_eyebrow">Executive workspace</span><h1 t-esc="activeDepartment.short"/><p t-esc="activeDepartment.description"/></div>
     <div class="adams_header_actions">

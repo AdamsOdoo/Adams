@@ -392,17 +392,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (scopeDates.length !== 2 || scopeDates.some(date => !date.textContent.trim())) throw new Error('Applied filter summary must retain the approved period range and balance cutoff');
                     if (scopeDates.some(date => getComputedStyle(date.parentElement).display !== 'none' && date.getClientRects().length !== 1)) throw new Error('Visible applied period or cutoff must not wrap internally');
                     if (WIDTH <= 900) {
-                        const toggle = root.querySelector('.adams_mobile_menu');
-                        toggle.click();
-                        const menu = await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must open');
-                        await wait(() => menu.contains(document.activeElement), 'Mobile navigation must receive focus');
-                        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
-                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Escape must dismiss mobile navigation');
-                        if (document.activeElement !== toggle) throw new Error('Mobile navigation must return focus');
-                        toggle.click();
-                        await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must reopen');
-                        root.querySelector('.adams_workspace_close').click();
-                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Close control must dismiss mobile navigation');
+                        const tabs = root.querySelector('.adams_reference_mobile_tabs');
+                        const active = tabs?.querySelector('button.active');
+                        if (!active || !tabs.getBoundingClientRect().height) throw new Error('Approved mobile department tabs must be visible');
+                        active.focus();
+                        if (document.activeElement !== active) throw new Error('Mobile department tabs must be keyboard focusable');
                     }
                     const profitability = root.querySelector('#adams-group-profitability > .adams_grid');
                     if (profitability.children.length !== 4) throw new Error('Reference requires four primary profitability cards');
@@ -452,11 +446,18 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');
                     const navigate = async key => {
-                        if (WIDTH <= 900) {
-                            root.querySelector('.adams_mobile_menu').click();
-                            await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Navigation must open');
+                        const mobileTabs = root.querySelector('.adams_reference_mobile_tabs');
+                        if (WIDTH <= 900 && mobileTabs) {
+                            const tab = [...mobileTabs.querySelectorAll('button')].find(button => button.dataset.section === key);
+                            if (!tab) throw new Error('Missing approved mobile department tab: ' + key);
+                            tab.click();
+                        } else {
+                            if (WIDTH <= 900) {
+                                root.querySelector('.adams_mobile_menu').click();
+                                await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Navigation must open');
+                            }
+                            root.querySelector('.adams_side_link[data-section="' + key + '"]').click();
                         }
-                        root.querySelector('.adams_side_link[data-section="' + key + '"]').click();
                         await wait(() => root.querySelector('#adams-' + key), 'Department must render: ' + key);
                         await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Department must remain active');
                         if (root.querySelectorAll('.adams_section').length !== 1) throw new Error('Only the selected department must own the page');
@@ -554,7 +555,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => !profile.open, 'Employee profile must close');
                     }
                     await navigate('finance');
-                    if (WIDTH <= 900) { root.querySelector('.adams_mobile_menu').click(); await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Search navigation must open'); }
+                    if (WIDTH > 900) {
                     root.querySelector('.adams_sidebar button:not([data-section]).adams_side_link').click();
                     if (root.querySelector('.adams_sidebar.is-open')) root.querySelector('.adams_workspace_close').click();
                     const searchInput = await wait(() => root.querySelector('#adams-search'), 'Search input must open');
@@ -567,6 +568,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (searchDialog.scrollWidth > searchDialog.clientWidth + 2) throw new Error('Search drawer overflow');
                     searchDialog.querySelector('header button').click();
                     await wait(() => !searchDialog.open, 'Search drawer must close');
+                    }
                     if (WIDTH === 1440) {
                         await more('print');
                         const printPreview = await wait(() => root.querySelector('.adams_print_summary[open] tbody tr'), 'Native print preview must render');
