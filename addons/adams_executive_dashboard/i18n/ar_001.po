@@ -4922,3 +4922,8 @@ msgstr "التوقع حسب المنتج — المخزون الحالي"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Try another product or include zero quantities."
 msgstr "جرّب منتجًا آخر أو أدرج الكميات الصفرية."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "The company could not be switched. Try again."
+msgstr "تعذّر تبديل الشركة. حاول مرة أخرى."

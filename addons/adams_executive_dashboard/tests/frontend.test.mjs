@@ -1114,3 +1114,21 @@ test('stock date displays today while preserving current versus historical reque
     controller.changeStockDate({target:{value:'2026-09-23'}});
     assert.equal(controller.state.stockFilters.at_date,'');
 });
+
+
+test('dashboard company selector delegates only authorized choices to the native company API', async () => {
+    const {controller,nativeUser}=fixture();
+    nativeUser.allowedCompanies=[{id:1,name:'First'},{id:2,name:'Second'}];
+    nativeUser.activeCompany={id:1};
+    const calls=[];
+    nativeUser.activateCompanies=async(ids,options)=>calls.push({ids:[...ids],...options});
+    await controller.changeDashboardCompany({target:{value:'999'}});
+    await controller.changeDashboardCompany({target:{value:'1'}});
+    assert.equal(calls.length,0);
+    await controller.changeDashboardCompany({target:{value:'2'}});
+    assert.deepEqual(calls,[{ids:[2],includeChildCompanies:false,reload:false}]);
+    assert.equal(controller.state.companySwitchPending,false);
+    nativeUser.activateCompanies=async()=>{throw new Error('switch failed');};
+    await controller.changeDashboardCompany({target:{value:'2'}});
+    assert.equal(controller.state.companySwitchPending,false);
+});

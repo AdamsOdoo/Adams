@@ -240,6 +240,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
 
         def after_render(browser, *args, **kwargs):
             result = original_wait(browser, *args, **kwargs)
+            capture(browser, 'odoo-workspace-header', '.adams_header', '.adams_filters')
             capture(browser, 'odoo-profitability', '#adams-group-profitability')
             opened = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
@@ -333,6 +334,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 render();
                 // Match dashboard content width; keep the approved component CSS unchanged.
                 document.querySelector('#content').style.width=CONTENT_WIDTH+'px';
+                document.querySelector('.main > .heading').style.width=CONTENT_WIDTH+'px';
+                document.querySelector('.filterbar').style.width=CONTENT_WIDTH+'px';
                 // UI07 only: remove unsupported comparison, preserve the note slot.
                 document.querySelector('.kpi-note').textContent='';
                 const movement=[...document.querySelectorAll('.focus-row')].find(x=>x.textContent.includes(t('Revenue movement')));
@@ -356,6 +359,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             ready = browser._websocket_request('Runtime.evaluate', params={
                 'expression': setup, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
+            capture(browser, 'reference-workspace-header', '.main > .heading', '.filterbar')
             capture(browser, 'reference-profitability', '#content > .section-heading', '#content > .grid-2')
             browser._websocket_request('Runtime.evaluate', params={
                 'expression': "document.querySelector('[data-source=revenue]').click(); document.querySelector('.drawer .eyebrow').textContent=companyName(); document.querySelector('.drawer .callout').remove()"})
@@ -439,7 +443,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         # Independent manifests feed the same enforced comparison utility used by review.
         # Visible differences remain review-required; this diagnostic test cannot certify parity.
         refs, acts = [], []
-        regions = ['profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table', 'stock-empty']
+        regions = ['workspace-header','profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table', 'stock-empty']
         if viewport[0] <= 900: regions.append('stock-expanded')
         if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded'])
         for region in regions:

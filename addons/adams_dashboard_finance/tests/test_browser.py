@@ -25,6 +25,53 @@ from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 @tagged('post_install', '-at_install')
 class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
+    def test_browser_company_selector_preserves_period_and_authorized_scope(self):
+        companies = self.env.company | self.env['res.company'].create({'name': 'Dashboard second authorized company'})
+        user = new_test_user(self.env, login='dashboard_company_navigation',
+            groups='base.group_user,base.group_multi_company,account.group_account_readonly,adams_executive_dashboard.group_dashboard_user',
+            company_id=companies[0].id, company_ids=[Command.set(companies.ids)], lang='en_US', tz='UTC')
+        model = type(self.env['adams.executive.dashboard'])
+        original = model.get_section
+        requests = []
+
+        @api.model
+        def track_scope(records, section, options):
+            if records.env.uid == user.id and section == 'finance':
+                requests.append((records.env.company.id, dict(options)))
+            return original(records, section, options)
+
+        self.browser_size = '1440x900'
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        code = r"""(async () => {
+            const wait = async (fn, message) => {
+                for (let i=0;i<250;i++) { if(fn())return; await new Promise(r=>setTimeout(r,100)); }
+                throw new Error(message);
+            };
+            await wait(()=>document.querySelector('.adams_company_select'), 'Company selector must render');
+            const root=document.querySelector('.o_adams_dashboard'), origin=performance.timeOrigin;
+            const period=()=>root.querySelector('.adams_applied_period')?.textContent.trim();
+            const initialPeriod=period();
+            const allowed=[...root.querySelector('.adams_company_select').options].map(o=>Number(o.value));
+            if(JSON.stringify(allowed.sort())!==JSON.stringify(COMPANIES.map(c=>c.id).sort()))throw new Error('Selector must contain exactly authorized companies');
+            for(const company of [COMPANIES[1],COMPANIES[0]]) {
+                const select=root.querySelector('.adams_company_select');
+                select.value=String(company.id);select.dispatchEvent(new Event('change',{bubbles:true}));
+                await wait(()=>root.querySelector('.adams_company_brand strong')?.textContent.trim()===company.name &&
+                    root.querySelector('.adams_company_select')?.value===String(company.id) &&
+                    !root.querySelector('.adams_company_select').disabled, 'Authorized company identity must refresh');
+                if(period()!==initialPeriod)throw new Error('Company switch lost applied period');
+                if(root.querySelector('.adams_side_link[aria-current="page"]')?.dataset.section!=='finance')throw new Error('Company switch lost department');
+            }
+            if(performance.timeOrigin!==origin || document.querySelector('.o_adams_dashboard')!==root)throw new Error('Company selector reloaded the dashboard');
+            console.log('test successful');
+        })().catch(error=>console.error(error));""".replace('COMPANIES', json.dumps([{'id': c.id, 'name': c.name} for c in companies]))
+        with patch.object(model, 'get_section', track_scope):
+            self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=75)
+        self.assertTrue(any(company_id == companies[1].id for company_id, _options in requests))
+        for company_id, options in requests:
+            self.assertEqual(options['company_id'], company_id)
+        self.assertEqual(len({(options['date_from'], options['date_to'], options['as_of']) for _company_id, options in requests}), 1)
+
     def test_browser_hr_retry_preserves_scope_after_one_rpc_failure(self):
         if 'hr.employee' not in self.env:
             self.skipTest('HR is optional; this browser recovery fixture requires installed HR')

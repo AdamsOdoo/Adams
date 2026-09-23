@@ -386,6 +386,21 @@ export class ExecutiveDashboard extends Component {
         return this.state.sections.finance?.items.find(item => item.key === key);
     }
 
+    get referenceSurface() { return ['finance','inventory'].includes(this.state.activeSection); }
+    get dashboardCompanies() { return user.allowedCompanies || this.state.companies; }
+    async changeDashboardCompany(event) {
+        const companyId=Number(event.target.value);
+        if (!this.dashboardCompanies.some(company=>company.id===companyId) || companyId===user.activeCompany?.id || this.state.companySwitchPending) return;
+        this.state.companySwitchPending=true;
+        try {
+            // Native user API updates the Odoo shell and emits the existing
+            // ACTIVE_COMPANIES_CHANGED event; its handler refreshes source data.
+            await user.activateCompanies([companyId], {includeChildCompanies:false,reload:false});
+        } catch {
+            this.notification.add(_t('The company could not be switched. Try again.'), {type:'warning'});
+        } finally { if(this.alive) this.state.companySwitchPending=false; }
+    }
+
     get filtersDirty() {
         return this.state.applied && ['company_id', 'date_from', 'date_to', 'as_of'].some(key => String(this.state.draft[key]) !== String(this.state.applied[key]));
     }

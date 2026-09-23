@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <templates xml:space="preserve">
     <t t-name="adams_executive_dashboard.Dashboard">
-        <main class="o_adams_dashboard" t-ref="root" t-on-keydown="workspaceKeydown">
+        <main class="o_adams_dashboard" t-att-class="{'adams_reference_surface': referenceSurface}" t-ref="root" t-on-keydown="workspaceKeydown">
             <aside t-ref="workspaceMenu" id="adams-workspace-menu" class="adams_sidebar" t-att-class="{'is-open': state.sidebarOpen}" aria-label="Executive workspace">
     <button class="adams_workspace_close btn" t-on-click="closeWorkspace" aria-label="Close workspace navigation">×</button>
     <div class="adams_company_brand" t-att-class="{'long-name': companyIdentity.name.length &gt; 25}">
@@ -23,8 +23,8 @@
     <div><span class="adams_eyebrow">Executive workspace</span><h1 t-esc="activeDepartment.short"/><p t-esc="activeDepartment.description"/></div>
     <div class="adams_header_actions">
         <button class="btn" t-on-click="refresh" t-att-disabled="!state.applied"><t t-call="adams_executive_dashboard.Icon"><t t-set="iconName" t-value="'refresh'"/></t>Refresh</button>
-        <button class="btn" data-action="views" t-on-click="openSavedViews" t-att-disabled="!state.applied"><t t-if="state.activeViewName" t-esc="state.activeViewName"/><t t-else="">Saved views</t></button>
-        <div class="adams_more_wrapper"><button class="btn" t-on-click="toggleMore" aria-controls="adams-more-menu" t-att-aria-expanded="state.moreOpen ? 'true' : 'false'">More <span aria-hidden="true">⌄</span></button>
+        <button class="btn" data-action="views" t-on-click="openSavedViews" t-att-disabled="!state.applied"><svg t-if="referenceSurface" class="adams_icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z"/></svg><t t-if="state.activeViewName" t-esc="state.activeViewName"/><t t-else="">Saved views</t></button>
+        <div class="adams_more_wrapper"><button class="btn" t-on-click="toggleMore" aria-controls="adams-more-menu" t-att-aria-expanded="state.moreOpen ? 'true' : 'false'"><svg t-if="referenceSurface" class="adams_icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>More <span t-if="!referenceSurface" aria-hidden="true">⌄</span></button>
         <div t-if="state.moreOpen" class="adams_more_menu" id="adams-more-menu" role="menu">
             <button role="menuitem" data-action="export" class="btn" t-on-click="exportSummary" t-att-disabled="!state.applied || state.exporting">Export summary CSV</button>
             <button role="menuitem" data-action="print" class="btn" t-on-click="printDashboard" t-att-disabled="!state.applied || state.exporting">Print summary</button>
@@ -66,10 +66,10 @@
             </dialog>
             <t t-if="state.companies.length"><p t-if="!visibleSections.length" class="alert alert-info">No dashboard sections are enabled for this company.</p>
                 <form t-if="state.activeSection !== 'hr'" class="adams_filters" t-on-submit.prevent="refresh">
-                    <label class="adams_company_scope">Company<strong t-esc="companyIdentity.name"/></label>
-                    <label>Period<select class="form-select" t-att-value="state.periodPreset" t-on-change="changePeriod"><option value="month">This month</option><option value="previous">Previous month</option><option value="ytd">Year to date</option><option value="custom">Custom range</option></select></label>
-                    <span class="adams_applied_period" t-if="state.applied"><bdi t-esc="state.applied.date_from"/> – <bdi t-esc="state.applied.date_to"/></span>
-                    <span class="adams_balance_scope">Balances at <bdi t-if="state.applied" t-esc="state.applied.as_of"/><button class="btn btn-link" type="button" t-on-click="() =&gt; state.cutoffOpen = !state.cutoffOpen" t-att-aria-expanded="state.cutoffOpen ? 'true' : 'false'">Edit</button></span>
+                    <label class="adams_company_scope">Company<select t-if="referenceSurface" class="adams_company_select" t-att-value="state.applied?.company_id" t-on-change="changeDashboardCompany" t-att-disabled="state.companySwitchPending"><option t-foreach="dashboardCompanies" t-as="company" t-key="company.id" t-att-value="company.id" t-esc="company.name"/></select><strong t-else="" t-esc="companyIdentity.name"/></label><span t-if="referenceSurface" class="adams_filter_divider"/>
+                    <label><svg t-if="referenceSurface" class="adams_icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg>Period<select class="form-select" t-att-value="state.periodPreset" t-on-change="changePeriod"><option value="month">This month</option><option value="previous">Previous month</option><option value="ytd">Year to date</option><option value="custom">Custom range</option></select></label>
+                    <span class="adams_applied_period" t-if="state.applied"><bdi t-if="referenceSurface" t-esc="financePeriodLabel({key:'revenue'})"/><t t-else=""><bdi t-esc="state.applied.date_from"/> – <bdi t-esc="state.applied.date_to"/></t></span>
+                    <span class="adams_balance_scope">Balances at <bdi t-if="state.applied" t-esc="referenceSurface ? metricPeriodLabel({key:'cash'}) : state.applied.as_of"/><button class="btn btn-link" type="button" t-on-click="() =&gt; state.cutoffOpen = !state.cutoffOpen" t-att-aria-expanded="state.cutoffOpen ? 'true' : 'false'">Edit</button></span>
                     <div class="adams_custom_dates" t-if="state.periodPreset === 'custom' || state.cutoffOpen">
                         <label t-if="state.periodPreset === 'custom'">From<input class="form-control" type="date" t-model="state.draft.date_from" required="required"/></label>
                         <label t-if="state.periodPreset === 'custom'">To<input class="form-control" type="date" t-model="state.draft.date_to" required="required"/></label>
