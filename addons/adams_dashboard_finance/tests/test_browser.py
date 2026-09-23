@@ -575,7 +575,9 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             !root.querySelector('#adams-sales [role="status"]'), 'Reset must preserve the stored view for explicit restoration');
                         await navigate('finance');
                         const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
-                        const open = restoredCard.querySelector('button[aria-label="Open report"]');
+                        const open = restoredCard.querySelector('button.adams_value');
+                        if (!open || open.disabled) throw new Error('Revenue value must open its native report');
+                        await assertHitTarget(open, 'Revenue value');
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
