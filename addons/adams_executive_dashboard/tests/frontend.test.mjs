@@ -26,6 +26,7 @@ function fixture() {
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
         useState: value => value, useService: key => { if (!services[key]) throw new Error(`Service ${key} is not available`); return services[key]; },
         useBus(bus, event, callback) { companyEvents[event] = callback; }, user: nativeUser, userBus: {}, _t: value => value,
+        getComputedStyle: element => ({direction: element.direction || 'ltr'}),
         requestAnimationFrame() {}, registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
     const controller = new Controller();
@@ -1131,4 +1132,21 @@ test('dashboard company selector delegates only authorized choices to the native
     nativeUser.activateCompanies=async()=>{throw new Error('switch failed');};
     await controller.changeDashboardCompany({target:{value:'2'}});
     assert.equal(controller.state.companySwitchPending,false);
+});
+
+
+test('keyboard tabs follow rendered Odoo direction without a DOM dir attribute', () => {
+    const { controller } = fixture();
+    const selected = [];
+    const buttons = [0, 1, 2].map(index => ({focus() {}, click() { selected.push(index); }}));
+    const group = {direction: 'rtl', querySelectorAll: () => buttons};
+    const press = key => controller.switchTabs({key, target: buttons[1], currentTarget: group, preventDefault() {}});
+    press('ArrowRight');
+    press('ArrowLeft');
+    press('Home');
+    press('End');
+    assert.deepEqual(selected, [0, 2, 0, 2]);
+    group.direction = 'ltr';
+    press('ArrowRight');
+    assert.equal(selected.at(-1), 2);
 });

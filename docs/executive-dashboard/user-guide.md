@@ -5,21 +5,47 @@ Company configuration and deployment qualification are recorded in the implement
 The dashboard uses Odoo reports; a successful calculation is not confirmation
 that the accounts are complete or the period is closed.
 
+## Short owner review (after the final candidate is staged)
+
+The current staging URL below is not yet the approved-HTML delivery. Wait for the
+implementation-status entry to identify the final staged source/build and module
+versions before using this sequence for acceptance.
+
+1. Open Finance. Compare its cards, chart, cash/aging panels and an opened source
+   drawer with the supplied matching reference pairs. Check the active company,
+   reporting period and separate balance cutoff.
+2. Open a value and a chart month in their Odoo reports. Confirm matching scope;
+   return through the dashboard breadcrumb and check your selections.
+3. Open Inventory. Apply a product/warehouse/category filter, change stock date,
+   move between pages and expand a row. Check totals, unavailable directions and
+   the corresponding native stock destination. Clear the filter and check recovery.
+4. Visit Sales, Procurement and CRM. Exercise their ranking/list selections and
+   record links. Check that money, counts and quantities retain truthful labels.
+5. Visit all five HR tabs and an employee work profile. Verify your normal HR
+   permissions; missing applications must remain explicitly unavailable.
+6. Repeat representative screens in native Dark appearance and Arabic, then at
+   a narrower window. Report any clipping, unexpected wrapping or lost context.
+
+The detailed control/source mapping is in
+[control-journeys-20260923.md](control-journeys-20260923.md). Final evidence and
+unresolved deviations belong to the exact candidate's implementation-status entry.
+
 ## Open and filter
 
 For the authorized UAT, use [Adams For Men staging](https://adamsmen-staging-38326320.dev.odoo.com/odoo/action-1004).
 This is the existing neutralized business database, with EGP company currency.
 Production is not part of this handoff.
 
-Open **Executive Dashboard** from Odoo's app menu. Select one authorized company,
-period start/end and balance cutoff, then **Apply filters**. Changing the input fields
-alone does not change the displayed scope. The applied dates are shown beneath the
-filters. Period cards and balance cards have different date meanings.
+Open **Executive Dashboard** from Odoo's app menu. In Finance and Inventory,
+select an authorized company and a period from the top filter bar. Use **Edit**
+for custom dates and the balance cutoff, then apply the selection. Period values
+and balance values have different date meanings; read the scope displayed next
+to the relevant group. Unapplied drafts do not change report scope.
 
-Use the sidebar or the enabled department tabs. Finance and Sales start expanded;
-supporting departments start compact. Expansion preferences are remembered per
-user. On mobile, the menu receives focus when opened. Close it with × or Escape.
-Dates and mixed-script account codes retain their order in Arabic.
+Use the department sidebar, or the department tabs on narrower screens. The active
+department is highlighted. Returning from a report restores meaningful filters
+and navigation context while reloading authorized values. In Arabic, mixed-script
+numbers and dates remain readable within the right-to-left layout.
 
 Supplier-payment drilldowns identify their window and balance cutoff in the
 action title. XLSX filters and PDF headings retain that same scope.
@@ -37,10 +63,9 @@ the first page and reload current authorized records. **Restore view** revalidat
 current values. **Reset view** returns to the default reporting dates and layout;
 it does not delete the saved view or modify business records.
 
-Finance shortcuts jump to Profitability, Liquidity, Working capital and Financial
-position. The Management attention strip opens existing payment/collection
-reports and purchasing worklists. It is not a custom alert scoring system. Use
-**Show details** to expand it on mobile.
+Finance displays profitability, cash and working capital, cash movement and the
+balance sheet directly. Use **More** for supporting actions and **Source &
+definition** to inspect the meaning of a figure before opening its report.
 
 Full rankings open in a side drawer. Escape closes drawers; source controls remain
 separate from the card's report link. Chart bars and exact-value table cells open
@@ -50,7 +75,7 @@ Left/Right and Home/End keyboard navigation.
 ## Investigate a value
 
 Use **Source & definition** for the exact value, source, scope and retrieval
-information. Large headlines can be abbreviated; the source drawer retains precision.
+information. Finance and Inventory show the approved full-value presentation; the source drawer retains exact precision and scope.
 Use a card or supported row's report control to investigate in Odoo. Return
 with the **Executive Dashboard** breadcrumb to restore applied filters and selected
 lists while fetching fresh values. Transactional actions remain in Odoo.

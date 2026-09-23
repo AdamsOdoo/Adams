@@ -1405,3 +1405,33 @@
 
 // Match the approved signed movement span without forcing paragraph direction.
 .o_adams_dashboard #adams-finance .adams_cash_bridge .adams_positive { unicode-bidi:isolate; }
+
+// Approved period-label keeps the whole caption isolated and left-to-right.
+.o_adams_dashboard #adams-finance .adams_period_chip {
+    /* rtl:ignore */
+    direction:ltr;
+    unicode-bidi:isolate;
+}
+
+// Measured native form resets: approved controls inherit tabular digits and
+// center their content with flex, not the Bootstrap inline-block baseline.
+.o_adams_dashboard.adams_reference_surface {
+    button, input, select { font-variant-numeric:inherit; }
+}
+.o_adams_dashboard #adams-inventory .adams_stock_filter_actions .btn:not(.btn-link) {
+    display:inline-flex; align-items:center; justify-content:center; gap:7px; vertical-align:baseline;
+}
+.o_adams_dashboard #adams-inventory .adams_stock_applied select { border-radius:6px; }
+
+// Bootstrap clears the browser's date-segment padding and changes its display.
+// Restore the same native date widget used by the approved HTML, scoped here.
+.o_adams_dashboard #adams-inventory .adams_stock_fields input[type=date] {
+    &::-webkit-datetime-edit { display:revert; padding:revert; }
+    &::-webkit-datetime-edit-fields-wrapper,
+    &::-webkit-datetime-edit-text,
+    &::-webkit-datetime-edit-minute,
+    &::-webkit-datetime-edit-hour-field,
+    &::-webkit-datetime-edit-day-field,
+    &::-webkit-datetime-edit-month-field,
+    &::-webkit-datetime-edit-year-field { padding:revert; }
+}

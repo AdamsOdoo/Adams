@@ -16,6 +16,7 @@ from pathlib import Path
 import tempfile
 import time
 import subprocess
+import zipfile
 from unittest.mock import patch
 
 from PIL import Image
@@ -514,4 +515,12 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         except ValueError as error:
             # A mismatched environment must stay explicit, never normalized away.
             (output / 'comparison-blocked.txt').write_text(str(error) + '\n')
+        # Retain independently generated images and manifests together for download.
+        # This archive contains only transaction-local synthetic review evidence.
+        archive_path = output.with_suffix('.zip')
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for evidence in sorted(output.rglob('*')):
+                if evidence.is_file():
+                    archive.write(evidence, evidence.relative_to(output.parent))
+        archive_path.chmod(0o600)
         logging.getLogger(__name__).info('ADAMS_REFERENCE_CAPTURE: %s', output)

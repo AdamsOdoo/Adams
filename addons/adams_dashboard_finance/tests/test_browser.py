@@ -10,7 +10,6 @@ from pathlib import Path
 import tempfile
 import time
 from uuid import uuid4
-from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -336,10 +335,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         existing_screenshots = set(screenshot_source.glob('*.png'))
         capture_prefixes = []
         captured_pdfs = []
-        viewports = [(320, 900), (390, 900), (768, 900), (1024, 900), (1366, 768), (1440, 900), (1920, 1080)]
+        # Representative coverage requested by the owner, not the full cross-product.
+        # Preserve all seven widths, both languages/appearances, and both 1440px
+        # export/report-return branches. Independent reference comparisons are separate.
+        cases = {
+            'en_US': [('light', (320, 900)), ('dark', (768, 900)),
+                      ('light', (1366, 768)), ('light', (1440, 900)), ('light', (1920, 1080))],
+            'ar_001': [('dark', (390, 900)), ('light', (1024, 900)), ('dark', (1440, 900))],
+        }
+        viewports = sorted({viewport for selected in cases.values() for _theme, viewport in selected})
+        matrix_cases = sum(len(selected) for selected in cases.values())
         for lang, heading, direction in [('en_US', 'Revenue', 'ltr'), ('ar_001', 'الإيرادات', 'rtl')]:
             self.env.user.lang = lang
-            for theme, (width, height) in product(('light', 'dark'), viewports):
+            for theme, (width, height) in cases[lang]:
                 self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x{height}'
                 prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
@@ -992,7 +1000,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 break
             # take_screenshot's file-writing callback may finish just after its Future.
             time.sleep(0.05)
-        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (16 + (2 if stock_category else 0) + (1 if employee else 0)))
+        self.assertEqual(len(capture_prefixes), matrix_cases * (16 + (2 if stock_category else 0) + (1 if employee else 0)))
         self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
                         'Each matrix view must have exactly one newly saved screenshot')
         retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
@@ -1001,7 +1009,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         retained_root.chmod(0o700)
         pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=retained_root))
         manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
-                    'matrix_cases': len(viewports) * 4, 'viewports': viewports, 'screenshots': len(capture_prefixes),
+                    'matrix_cases': matrix_cases, 'cases': cases, 'viewports': viewports, 'screenshots': len(capture_prefixes),
                     'populated_stock': bool(stock_category), 'files': []}
         for prefix, paths in matched.items():
             source = paths[0]

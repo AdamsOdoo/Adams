@@ -1,5 +1,14 @@
 # Executive dashboard — implementation and verification
 
+## 23 September — current visual closure candidate (not ready for approval)
+
+PR214 remains draft/open/unmerged. Current deployed development source is `dc783590875566c0fe64aca696e45cdddf9cd98a`, build38564209, modules19.0.1.7.0. Odoo.sh completed with Warning and generated all five independent Finance/Inventory reference cases. The detailed final aggregate test count is not yet recovered from this build's log; do not infer a count from the status badge. Local focused frontend checks now pass69/69, including native CSS-direction keyboard navigation.
+
+Visual inspection confirms corrected narrow header/card wrapping, RTL arrows, margin notes, Arabic subtitle, forecast caption and source company order. Remaining measured defects are Finance caption/date isolation, aging-label text order and native Inventory control resets (date-segment padding, tabular digits, flex button alignment and sort radius). Their source corrections are being qualified. Finance/Inventory gate remains open; remaining-department parity and final staging validation have not been completed.
+
+Staging remains the prior1.6.0 candidate. Production/main were not changed. The owner guide now includes a short acceptance journey and explicitly warns against treating the old staging build as this delivery.
+
+
 ## Active implementation — 23 September 2026
 
 **INCOMPLETE — Finance/Inventory visual gate NOT PASSED.** Recovered HEAD was `91bbf98877b63892a4d6483c63ab9611a15f1b0d`, initially clean. PR214 remains draft, open and unmerged. Production/main were not changed.
