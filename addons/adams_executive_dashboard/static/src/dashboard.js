@@ -34,7 +34,7 @@ export class ExecutiveDashboard extends Component {
         ];
         this.sections.sort((a, b) => ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(a.key) - ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(b.key));
         this.labels = {
-            revenue: _t('Accounting revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'), cash_flow: _t('Net cash movement'),
+            revenue: _t('Revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'), cash_flow: _t('Net cash movement'),
             receivables: _t('Receivables'), payables: _t('Payables'), receivables_overdue: _t('Overdue receivables'), payables_overdue: _t('Overdue payables'),
             gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
@@ -720,7 +720,12 @@ export class ExecutiveDashboard extends Component {
 
     closeSource() { this.state.source = null; }
 
-    headline(item, section) {
+    headline(item, section, fullValue = false) {
+        if (fullValue && typeof item.value === 'number') {
+            return new Intl.NumberFormat(document.documentElement.lang || 'en', {
+                minimumFractionDigits: 0, maximumFractionDigits: section.digits,
+            }).format(item.value);
+        }
         if (typeof item.value !== 'number' || Math.abs(item.value) < 1000000) return this.formatted(item, section);
         return new Intl.NumberFormat(document.documentElement.lang || 'en', {
             notation: 'compact', maximumFractionDigits: 2,
@@ -792,10 +797,11 @@ export class ExecutiveDashboard extends Component {
         const width = Math.max(680, labels.length * 104);
         const number = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {
             notation: 'compact', maximumFractionDigits: 1 }).format(value);
-        return { status: 'ready', zero, width, ticks: Array.from({ length: 5 }, (_, index) => {
-            const value = minimum + (maximum - minimum) * index / 4;
+        return { status: 'ready', zero, width, ticks: Array.from({ length: 4 }, (_, index) => {
+            const value = minimum + (maximum - minimum) * index / 3;
             return { label: number(value), y: scale(value) };
         }), rows: labels.sort().map((label, monthIndex) => ({ label,
+            displayLabel: new Intl.DateTimeFormat(document.documentElement.lang || 'en', {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')),
             x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
             series: keys.map((key, index) => {
                 const row = data[index].rows.find(value => value.label === label);

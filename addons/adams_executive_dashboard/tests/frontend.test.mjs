@@ -254,6 +254,9 @@ test('large headline abbreviation retains exact detail formatting and native sig
     assert.equal(controller.headline({value: -2330000}, {digits: 2}), '-2.33M');
     assert.equal(controller.formatted({value: -2330000}, {digits: 2}), '-2,330,000.00');
     assert.equal(controller.headline({value: 0}, {digits: 2}), '0.00');
+    assert.equal(controller.headline({value: -2330000}, {digits: 2}, true), '-2,330,000');
+    assert.equal(controller.headline({value: 129.45}, {digits: 2}, true), '129.45');
+    assert.equal(controller.headline({value: 0}, {digits: 2}, true), '0');
     assert.equal(controller.headline({value: null, status: 'restricted'}, {digits: 2}), 'Access restricted');
 });
 

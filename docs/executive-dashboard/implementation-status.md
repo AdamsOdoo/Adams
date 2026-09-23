@@ -1,5 +1,21 @@
 # Executive dashboard — implementation and verification
 
+## Active implementation — 23 September 2026
+
+**IN PROGRESS — Finance/Inventory visual gate NOT PASSED.** This section supersedes the historical candidate identities below. Recovered PR HEAD was `91bbf98877b63892a4d6483c63ab9611a15f1b0d`; the initial checkout had no unpublished changes. Existing later fixes were preserved. PR #214 remains draft, open and unmerged; production/main were not changed.
+
+- `9bfeb484` changed Finance source icons, warning placement, chart report action and cash colors. Build38532237 failed one native browser assertion that still clicked the removed arrow.
+- `f9479bad` corrected that assertion to use the visible revenue value and verify its hit target. Development build38533011 reached done with Odoo.sh Warning, not Failed. This is not visual acceptance.
+- `ed16c0b9` added native populated Finance/reference capture. Build38533796 failed with Odoo.sh **Platform error** before usable capture evidence was available.
+- The current source iteration uses module versions **19.0.1.7.0**, full signed Finance amounts without unnecessary zero decimals, approved bar-chart markup, and source-backed margin/budget notes. It requires a new successful native run and paired review.
+- Staging was recovered at `af0d2327184e96dfb3eecd65de3a79c4747d6045`, dashboard versions19.0.1.6.0, upgraded build38524406 on hostname38326320. No staging deployment from this iteration has occurred.
+
+The immutable [approved HTML and adjustment record](reference/README.md) are now checked in outside addon assets. `scripts/dashboard-visual-compare.py` generates independent pairs, overlays and diffs and rejects mismatched capture metadata. Its synthetic checks passed for identical pixels, a visible change, and state-mismatch rejection. **The comparison tool has not yet established Finance/Inventory parity.** The native test fixture is transaction-scoped, uses actual Owl/Odoo assets and is absent from normal application requests. Running a second native Chromium test process alongside the live development server exceeded that container's process limit; those ad-hoc test processes ended and the temporary test file/import were removed. Use the supported build test process.
+
+Outstanding acceptance work is concrete: run and inspect matched populated Finance captures; resolve discrepancies; add matched Inventory filters/table/pagination captures; pass that gate before propagating shared styling; complete all department/HR-tab pairs and journeys, RTL/themes/viewports, real-data reconciliation, and final source-bound staging verification. No empty/restricted screen, historical test count, or screenshot count is being offered as parity evidence.
+
+## Earlier candidate records (historical)
+
 ## Final implementation candidate and staged testing
 
 **STAGING AVAILABLE FOR OWNER HANDS-ON TESTING — NOT YET READY FOR FORMAL OWNER UAT.** Final published application feature **`b9461b76f3b1a1e1085fda87d55f6ef66ecca9b9`** has dashboard addon trees `adams_executive_dashboard` **`78710c2fc2334379aedc44939968d9a4e818f8ab`** and `adams_dashboard_finance` **`a01fdad4fcc866e02093c3c115d4c71432902313`**. Development build **38514095** passed **120/120 native post-tests** (403.75s, 118,807 queries), **65/65 focused frontend tests**, and its native browser matrix completed **28 English/Arabic × light/dark × seven-viewport cases**, retaining **532 actual Odoo screenshots and four actual dashboard PDFs**. The native PDF/browser output was captured; screenshot count is not by itself a full pixel parity sign-off.

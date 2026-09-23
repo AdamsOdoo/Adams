@@ -961,3 +961,22 @@
     .adams_cash_card .adams_source_button, .adams_cash_card .btn-link { color:#def1e7; }
     .adams_cash_card .adams_cash_split, .adams_cash_card > .adams_metric_foot { border-color:#45685f; }
 }
+
+// The approved chart's actual grid/bar structure, bound to signed report rows.
+.o_adams_dashboard #adams-finance {
+    .adams_profit_chart { display:grid; grid-template-columns:38px minmax(0,1fr); gap:8px; direction:ltr; height:218px; padding:14px 20px 20px; }
+    .adams_chart_y_axis { display:flex; flex-direction:column; justify-content:space-between; font-size:10px; color:var(--adams-sub); padding-bottom:24px; text-align:end; }
+    .adams_chart_plot { position:relative; border-bottom:1px solid var(--adams-line); display:flex; gap:4px; align-items:end; justify-content:space-around; margin-bottom:24px; background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),var(--adams-line) calc(25% - 1px),var(--adams-line) 25%); }
+    .adams_chart_bar_group { display:flex; justify-content:center; gap:5px; height:100%; width:13%; position:relative; }
+    .adams_chart_column, .adams_chart_missing { position:relative; width:30%; min-width:9px; max-width:26px; flex-shrink:0; }
+    .adams_chart_column { border:0; border-radius:3px 3px 0 0; padding:0; opacity:.88; cursor:pointer; background:var(--adams-green); }
+    .adams_chart_column.gross_profit { background:#79a697; }
+    .adams_chart_column.profit { background:var(--adams-purple); }
+    .adams_chart_column:hover { opacity:.55; }
+    .adams_chart_month { position:absolute; top:calc(100% + 7px); font-size:11px; color:var(--adams-sub); white-space:nowrap; }
+    .adams_chart_baseline { position:absolute; inset-inline:0; border-top:1px solid var(--adams-sub); pointer-events:none; }
+    .adams_chart_legend i { width:8px; height:8px; }
+    .adams_chart_legend .revenue { background:var(--adams-green); }
+    .adams_chart_legend .gross_profit { background:#79a697; }
+    .adams_chart_legend .profit { background:var(--adams-purple); }
+}

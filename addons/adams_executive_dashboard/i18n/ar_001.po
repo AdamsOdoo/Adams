@@ -4700,3 +4700,15 @@ msgstr "أرصدة ختامية بإشاراتها من اليوميات الب�
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Bank/cash breakdown requires an approved account report mapping and access. Archived accounts are excluded from the account directory."
 msgstr "يتطلب تفصيل الأرصدة البنكية والنقدية ربطًا معتمدًا بالتقرير المحاسبي وصلاحية وصول. تُستبعد الحسابات المؤرشفة من دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "of revenue"
+msgstr "من الإيرادات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Budget not configured"
+msgstr "لم يتم إعداد ميزانية"

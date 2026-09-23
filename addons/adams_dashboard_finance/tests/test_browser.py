@@ -290,7 +290,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         capture_prefixes = []
         captured_pdfs = []
         viewports = [(320, 900), (390, 900), (768, 900), (1024, 900), (1366, 768), (1440, 900), (1920, 1080)]
-        for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
+        for lang, heading, direction in [('en_US', 'Revenue', 'ltr'), ('ar_001', 'الإيرادات', 'rtl')]:
             self.env.user.lang = lang
             for theme, (width, height) in product(('light', 'dark'), viewports):
                 self.env.user.color_scheme = theme
@@ -326,9 +326,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     };
                     const heading = HEADING;
                     const expected = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(100);
+                    const headlineExpected = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: 2}).format(100);
                     const card = await wait(() => [...document.querySelectorAll('.adams_card')]
                         .find(node => node.querySelector('h3')?.textContent.trim() === heading &&
-                            node.querySelector('.adams_value')?.textContent.trim() === expected),
+                            node.querySelector('.adams_value')?.textContent.trim() === headlineExpected),
                         'Native revenue fixture must render 100.00 in the selected language');
                     const root = document.querySelector('.o_adams_dashboard');
                     if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
@@ -584,7 +585,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         const back = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
                             'Native financial report must expose dashboard breadcrumb');
                         back.click();
-                        const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === expected
+                        const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === headlineExpected
                             && document.querySelector('.o_adams_dashboard'), 'Financial report return must reload the known native value');
                         const restoredDates = [...restored.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(input => input.textContent.trim());
                         if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
