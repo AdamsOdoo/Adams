@@ -834,9 +834,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const categoryHeader = viewport.querySelector('thead th.adams_stock_category');
                                 const categoryCell = firstRow.querySelector('td.adams_stock_category');
                                 const inlineCategory = productCell.querySelector('.adams_stock_mobile_category');
+                                const sourceMenu = sourceCell.querySelector('details.adams_stock_actions');
                                 if (!categoryHeader || !categoryCell || !inlineCategory ||
                                     !categoryCell.textContent.includes('Dashboard visual stock') ||
-                                    sourceCell.querySelector('summary')?.textContent.trim() !== 'Sources')
+                                    !sourceMenu?.querySelector('summary') ||
+                                    !sourceMenu.querySelector('button'))
                                     throw new Error('Native Category and Source data columns must retain product/category and source records');
                                 if (innerWidth === 1440 && getComputedStyle(root).colorScheme === 'light') {
                                     if (getComputedStyle(categoryHeader).display === 'none' ||
