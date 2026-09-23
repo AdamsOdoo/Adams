@@ -327,9 +327,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 for(let i=0;i<200 && !document.querySelector('.kpis');i++)await new Promise(r=>setTimeout(r,50));
                 if(!document.querySelector('.kpis'))throw new Error('Reference did not render');
                 // UI/company data normalization uses the authorized disposable test company.
-                COMPANY_FIXTURES[0].name=COMPANY_NAME;
-                COMPANY_FIXTURES[0].logo=COMPANY_LOGO;
-                state.companyKey=COMPANY_FIXTURES[0].key;
+                const profile=COMPANY_FIXTURES[0];
+                COMPANY_FIXTURES.splice(0,COMPANY_FIXTURES.length,...REFERENCE_COMPANIES.map(company=>({...profile,key:String(company.id),name:company.name,logo:COMPANY_LOGO})));
+                state.companyKey=String(REFERENCE_COMPANY_ID);
                 state.theme=REFERENCE_THEME; state.lang=REFERENCE_LANGUAGE;
                 render();
                 // Match dashboard content width; keep the approved component CSS unchanged.
@@ -352,7 +352,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             })()"""
             logo = self.env.company.logo
             if isinstance(logo, bytes): logo = logo.decode()
-            setup = setup.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace(
+            setup = setup.replace('REFERENCE_COMPANIES', json.dumps([{'id':company.id,'name':company.name} for company in self.env.user.company_ids])).replace('REFERENCE_COMPANY_ID', str(self.env.company.id)).replace(
                 'COMPANY_LOGO', json.dumps('data:image/png;base64,' + logo if logo else ''))
             setup = setup.replace('CONTENT_WIDTH', str(captures['odoo-profitability']['clip']['width']))
             setup = setup.replace('REFERENCE_THEME',json.dumps(theme)).replace('REFERENCE_LANGUAGE',json.dumps('ar' if language=='ar_001' else 'en'))

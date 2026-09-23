@@ -176,3 +176,8 @@ remain recorded in the UAT/release matrix, not silently relabelled as passed.
 Live staging review subsequently found English server-generated print labels; ef01fbe6 fixes their Python translation registration and asserts actual Arabic CSV and preview content. Earlier preview evidence is explicitly retained as a defect, not a pass.
 
 Final live staging 06a5274b: inspected retained English light/dark, Arabic dark, Arabic print, native search, Finance chart/context and Sales screenshots. Native preference changes control the workspace theme; English/Dark restored. Both previews render 27 rows without horizontal overflow. These current visual checks support owner UAT readiness; they do not claim the blocked HTML-browser pass or owner pixel/visual signoff.
+
+
+### 23 September controlled header normalization
+
+The reference company menu now contains the disposable user's actual authorized company names and selected company, rather than the prototype's three unrelated company profiles. This corrects an unmatched content state that changed the native select's intrinsic width; the approved select CSS and baseline HTML remain unchanged. Current source/capture manifests must be used to qualify this adjustment. No implementation pixels replace reference captures.

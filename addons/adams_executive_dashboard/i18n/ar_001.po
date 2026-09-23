@@ -4927,3 +4927,13 @@ msgstr "جرّب منتجًا آخر أو أدرج الكميات الصفرية
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "The company could not be switched. Try again."
 msgstr "تعذّر تبديل الشركة. حاول مرة أخرى."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Your financial position, with a clear path to the numbers."
+msgstr "وضعك المالي، مع مسار واضح إلى الأرقام."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Find each product, its location and the quantity available."
+msgstr "اعثر على كل منتج وموقعه والكمية المتاحة منه."

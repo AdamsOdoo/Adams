@@ -90,7 +90,7 @@ class TestDashboardPerformance(AccountTestInvoicingHttpCommon):
             await wait(() => document.querySelector('#adams-finance .adams_metric_groups'), 'Finance did not become usable');
             const first = performance.now();
             const root = document.querySelector('.o_adams_dashboard');
-            const period = root.querySelector('.adams_filters select');
+            const period = root.querySelector('.adams_period_select');
             period.value = 'custom'; period.dispatchEvent(new Event('change', {bubbles:true}));
             root.querySelector('.adams_balance_scope button').click();
             await wait(() => root.querySelectorAll('.adams_filters input[type="date"]').length === 3,

@@ -1277,7 +1277,7 @@
 .o_adams_dashboard #adams-finance {
     .adams_chart_table[open] > summary { margin-bottom:10px; }
     .adams_chart_table, .adams_aging_list {
-        .adams_table_wrap { margin:0; border:0; border-radius:0; }
+        .adams_table_wrap { margin:0; border:0; border-radius:0; scrollbar-gutter:auto; max-height:none; }
         .table { margin:0; width:100%; border-collapse:collapse; font-size:13px; line-height:19.5px; }
         .table th { background:var(--adams-soft); color:var(--adams-sub); font-size:11px; font-weight:600; line-height:16.5px; padding:10px 15px; white-space:nowrap; }
         .table td { font-size:13px; line-height:19.5px; padding:12px 15px; border-bottom:1px solid var(--adams-line); }
@@ -1306,4 +1306,41 @@
         .adams_balance_scope { width:100%; border-top:1px solid var(--adams-line); padding-top:8px; }
         .adams_filters select { max-width:160px; }
     }
+}
+
+// Measured reference corrections: retain browser-native select/date geometry.
+.o_adams_dashboard #adams-inventory {
+    > .adams_group_heading h2 { font-size:17px; line-height:25.5px; font-weight:650; }
+    .adams_stock_fields input, .adams_stock_fields select, .adams_stock_applied select { padding:7px 9px; height:auto; appearance:auto; background-image:none; }
+    .adams_stock_fields select, .adams_stock_applied select { line-height:normal; }
+    .adams_stock_filter_actions .btn:not(.btn-link) { padding:7px 12px; }
+    .adams_stock_filter_actions .btn-link { border:0; background:transparent; }
+    .adams_stock_direct, .adams_stock_detail_toggle { width:34px; height:34px; }
+}
+.o_adams_dashboard .adams_finance_source .adams_drawer_footer .btn {
+    display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap;
+}
+
+.o_adams_dashboard.adams_reference_surface {
+    .adams_reference_mobile_tabs { display:none; }
+    @media(max-width:900px) {
+        .adams_reference_mobile_tabs { position:static; top:auto; display:flex; gap:4px; overflow:auto; padding:8px 18px; margin:-22px -20px 20px; border-bottom:1px solid var(--adams-line); background:var(--adams-paper); scrollbar-width:thin; }
+        .adams_reference_mobile_tabs button { display:flex; align-items:center; gap:6px; padding:8px 12px; border:0; border-radius:6px; white-space:nowrap; font-size:13px; background:none; color:var(--adams-ink); }
+        .adams_reference_mobile_tabs button.active { background:var(--adams-purple-soft); color:var(--adams-purple); font-weight:600; }
+    }
+}
+.o_adams_dashboard #adams-finance {
+    @media(min-width:651px) and (max-width:1100px) {
+        #adams-group-profitability > .adams_grid > .adams_card, .adams_supplier_windows > .adams_grid > .adams_card { padding:14px; }
+        #adams-group-profitability .adams_value, .adams_supplier_windows .adams_value { font-size:25px; }
+    }
+    @media(min-width:651px) and (max-width:900px) {
+        #adams-group-profitability > .adams_grid, .adams_supplier_windows > .adams_grid { gap:10px; }
+        #adams-group-profitability .adams_value, .adams_supplier_windows .adams_value { font-size:24px; }
+        .adams_card_top h3 { font-size:12px; }
+    }
+}
+
+.o_adams_dashboard.adams_reference_surface .adams_filters select {
+    appearance:auto; background-image:none; line-height:normal;
 }

@@ -389,8 +389,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
                     if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
                     const scopeDates = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')];
-                    if (scopeDates.length !== 3) throw new Error('Applied filter summary must show three individual dates');
-                    if (scopeDates.some(date => date.getClientRects().length !== 1)) throw new Error('Applied filter summary split an individual date');
+                    if (scopeDates.length !== 2 || scopeDates.some(date => !date.textContent.trim())) throw new Error('Applied filter summary must retain the approved period range and balance cutoff');
+                    if (scopeDates.some(date => getComputedStyle(date.parentElement).display !== 'none' && date.getClientRects().length !== 1)) throw new Error('Visible applied period or cutoff must not wrap internally');
                     if (WIDTH <= 900) {
                         const toggle = root.querySelector('.adams_mobile_menu');
                         toggle.click();
