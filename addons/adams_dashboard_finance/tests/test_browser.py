@@ -473,6 +473,15 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         if (root.querySelectorAll('.adams_section').length !== 1) throw new Error('Only the selected department must own the page');
                     };
                     const more = async action => {
+                        if (action === 'restore' && root.classList.contains('adams_reference_surface')) {
+                            root.querySelector('.adams_header [data-action="views"]').click();
+                            const dialog = await wait(() => root.querySelector('.adams_views_dialog[open]'), 'Saved views must open for restore');
+                            const restore = dialog.querySelector('[data-action="restore"]');
+                            if (restore.disabled) throw new Error('Saved view restoration must be available');
+                            restore.click();
+                            await wait(() => !dialog.open, 'Restore must close saved views');
+                            return;
+                        }
                         if (!root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
                         const menu = await wait(() => root.querySelector('#adams-more-menu'), 'More menu must open');
                         const button = menu.querySelector('[data-action="' + action + '"]');
@@ -1039,7 +1048,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                          destination, len(capture_prefixes))
 
         # PDFs have their own manifest and do not change PNG matrix coverage.
-        self.assertEqual(len(captured_pdfs), 4, 'Retain English/Arabic × light/dark actual PDFs')
+        expected_pdfs = {f'dashboard_summary_{lang}_{theme}_{width}.pdf'
+                         for lang, selected in cases.items() for theme, (width, _height) in selected
+                         if width == 1440}
+        self.assertEqual({item['name'] for item in captured_pdfs}, expected_pdfs,
+                         'Retain every representative native PDF, including both languages')
         pdf_root = Path(config['data_dir']) / 'adams_dashboard_pdf_evidence' / self.env.cr.dbname
         pdf_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         pdf_root.parent.chmod(0o700)

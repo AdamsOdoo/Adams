@@ -278,6 +278,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         def after_render(browser, *args, **kwargs):
             result = original_wait(browser, *args, **kwargs)
             capture(browser, 'odoo-workspace-header', '.adams_header', '.adams_filters')
+            if viewport[0] > 900:
+                capture(browser, 'odoo-workspace-navigation', '.adams_sidebar', '.adams_sidebar > a[href="#adams-trust"]')
+            if viewport == (1440,900) and theme == 'light':
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('[aria-controls=adams-more-menu]').click()"})
+                capture(browser, 'odoo-more-menu', '#adams-more-menu')
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('[aria-controls=adams-more-menu]').click()"})
             capture(browser, 'odoo-profitability', '#adams-group-profitability')
             opened = browser._websocket_request('Runtime.evaluate', params={
                 'expression': """(async()=>{
@@ -397,6 +405,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 'expression': setup, 'awaitPromise': True, 'returnByValue': True})
             self.assertFalse(ready.get('exceptionDetails'), str(ready))
             capture(browser, 'reference-workspace-header', '.main > .heading', '.filterbar')
+            if viewport[0] > 900:
+                capture(browser, 'reference-workspace-navigation', '.sidebar', '.sidebar > .nav:last-of-type')
             capture(browser, 'reference-profitability', '#content > .section-heading', '#content > .grid-2')
             browser._websocket_request('Runtime.evaluate', params={
                 'expression': "document.querySelector('[data-source=revenue]').click(); document.querySelector('.drawer .eyebrow').textContent=companyName(); document.querySelector('.drawer .callout').remove()"})
@@ -445,6 +455,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     document.querySelector('#stockForm').requestSubmit();
                     document.querySelector('#content').style.width=CONTENT_WIDTH+'px';""".replace('CONTENT_WIDTH',str(captures['odoo-profitability']['clip']['width']))})
             capture(browser, 'reference-stock-empty', '#content .empty')
+            if viewport == (1440,900) and theme == 'light':
+                browser._websocket_request('Runtime.evaluate', params={
+                    'expression': "document.querySelector('nav button[data-tab=finance]').click(); document.querySelector('[data-action=menu]').click(); document.querySelector('.main > .heading').style.width=CONTENT_WIDTH+'px';".replace('CONTENT_WIDTH',str(captures['odoo-profitability']['clip']['width']))})
+                capture(browser, 'reference-more-menu', '.menu')
 
             return result
 
@@ -482,8 +496,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         # Visible differences remain review-required; this diagnostic test cannot certify parity.
         refs, acts = [], []
         regions = ['workspace-header','profitability', 'working-capital', 'liquidity', 'balance-sheet', 'cash-drawer', 'source-drawer', 'stock-filters', 'stock-table', 'stock-empty']
+        if viewport[0] > 900: regions.append('workspace-navigation')
         if viewport[0] <= 900: regions.append('stock-expanded')
-        if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded'])
+        if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded','more-menu'])
         for region in regions:
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'

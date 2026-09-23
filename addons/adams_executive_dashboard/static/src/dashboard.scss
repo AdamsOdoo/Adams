@@ -1435,3 +1435,16 @@
     &::-webkit-datetime-edit-month-field,
     &::-webkit-datetime-edit-year-field { padding:revert; }
 }
+
+.o_adams_dashboard.adams_reference_surface .adams_sidebar > nav > .adams_side_link:last-child { margin-bottom:0; }
+
+.o_adams_dashboard.adams_reference_surface .adams_sidebar .adams_icon { width:18px; height:18px; }
+
+.o_adams_dashboard.adams_reference_surface .adams_more_menu {
+    top:42px; width:200px; min-width:0; z-index:50;
+    .btn { display:flex; align-items:center; justify-content:flex-start; gap:10px;
+        padding:9px 11px; font-size:13px; font-weight:400; line-height:19.5px;
+        border:0; border-radius:5px; min-height:0; background:none; }
+    .btn:hover { background:var(--adams-soft); }
+    .adams_icon { width:18px; height:18px; }
+}
