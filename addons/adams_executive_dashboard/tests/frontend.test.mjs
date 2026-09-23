@@ -36,6 +36,16 @@ function fixture() {
 
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
 
+test('populated Owl views keep global constructors out of template expressions', () => {
+    const template = readFileSync(new URL('../static/src/dashboard.xml', import.meta.url), 'utf8');
+    assert.doesNotMatch(template, /(?:String\(|Object\.keys\(|Math\.)/);
+    const { controller } = fixture();
+    assert.deepEqual(Array.from(controller.searchKindKeys), ['all', 'invoices', 'bills', 'orders', 'quotations']);
+    assert.equal(controller.currentPage({ offset: 25 }), 2);
+    assert.equal(controller.visibleRowEnd({ offset: 25, rows: [{ id: 26 }], total: 26 }), 26);
+    assert.equal(controller.chartHitHeight({ height: 0 }), 16);
+});
+
 test('late old-company responses cannot replace current-company results', async () => {
     const { controller, pending } = fixture();
     const old = controller.refresh();
@@ -1057,4 +1067,18 @@ test('HR week admission revocation clears loaded sensitive data instead of offer
     assert.equal(controller.hrDepartments.length,0);
     assert.equal(controller.state.hrData.load_more_error,undefined);
     await controller.loadMoreHRShifts();assert.equal(pending.length,2);
+});
+
+
+test('native user Arabic language governs week and metric dates even when host HTML stays English', () => {
+    const {controller, nativeUser} = fixture();
+    nativeUser.context = {lang:'ar_001'};
+    controller.state.applied = {date_from:'2026-09-21',date_to:'2026-09-27',as_of:'2026-09-22'};
+    controller.state.hrData = {date_from:'2026-09-21',date_to:'2026-09-27',rows:[]};
+    const days = controller.hrWeekDays;
+    assert.equal(days.length,7);
+    assert.equal(days[0].date,'2026-09-21');
+    assert.equal(days[0].label,new Intl.DateTimeFormat('ar-001',{weekday:'short',timeZone:'UTC'}).format(new Date('2026-09-21T12:00:00Z')));
+    assert.match(days[0].label, /[\u0600-\u06ff]/);
+    assert.match(controller.metricPeriodLabel({key:'cash'}), /[\u0600-\u06ff]/);
 });

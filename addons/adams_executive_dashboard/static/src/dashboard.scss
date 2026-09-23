@@ -321,7 +321,7 @@
     .btn-outline-secondary { color: var(--adams-sub); border-color: var(--adams-line); }
     .btn-outline-secondary:hover { color: var(--adams-ink); background: var(--adams-soft); border-color: var(--adams-sub); }
     .btn-link { color: var(--adams-green); }
-    .btn-primary:hover { color: #fff; background: var(--adams-button-hover); border-color: var(--adams-button-hover); }
+    .btn-primary:hover { color: var(--adams-paper); background: var(--adams-button-hover); border-color: var(--adams-button-hover); }
     .adams_card:has(.adams_metric_arrow:not(:disabled)):hover { border-color: var(--adams-purple); }
     .adams_metric_arrow::after { content: ''; position: absolute; inset: 0; cursor: pointer; }
     .adams_metric_arrow:disabled::after { cursor: wait; }
@@ -873,7 +873,7 @@
 // Approved KPI footer: one compact date/source row, never a tinted button strip.
 .o_adams_dashboard {
     .adams_card { min-height:164px; }
-    .adams_card > .adams_metric_foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; min-height:0; margin:13px 0 0; padding:10px 0 0; border:0; border-top:1px solid var(--adams-line); background:transparent; font-size:11px; }
+    .adams_card > .adams_metric_foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; min-height:0; margin:auto 0 0; padding:10px 0 0; border:0; border-top:1px solid var(--adams-line); background:transparent; font-size:11px; }
     .adams_metric_foot > .adams_card_date { border:0; margin:0; padding:0; font-size:11px; color:var(--adams-sub); }
     .adams_metric_foot > .adams_source_button { flex:0 0 auto; width:auto; min-height:0; border:0; padding:0; background:transparent; color:var(--adams-purple); font-size:11px; font-weight:600; line-height:1.5; }
     .adams_metric_foot > .adams_source_button:hover { text-decoration:underline; text-underline-offset:3px; }
@@ -883,4 +883,21 @@
     .adams_nav .adams_trust_link { color:var(--adams-purple); }
     .btn-link:hover, .adams_panel_head .btn-link:hover { color:var(--adams-purple); text-decoration:underline; }
     @media(max-width:650px) { .adams_card > .adams_metric_foot { gap:6px 8px; } }
+}
+
+// Employee drawer follows the approved work-profile hierarchy and action footer.
+.o_adams_dashboard .adams_employee_dialog {
+    &[open] { display:flex; flex-direction:column; }
+    > .adams_panel_head { flex-shrink:0; }
+    #adams-employee-title { font-size:16px; font-weight:650; line-height:1.4; margin:0; }
+    .adams_hr_profile_close { border:0; background:transparent; color:var(--adams-ink); font-size:24px; line-height:1; min-width:36px; padding:4px; }
+    .adams_hr_profile_close:hover { background:var(--adams-soft); }
+    .adams_source_body { flex:1; }
+    .adams_hr_profile_head h3, .adams_source_body > h3 { font-size:15px; font-weight:650; line-height:1.4; }
+    .adams_hr_profile_head p { margin:3px 0 7px; font-size:12px; }
+    .adams_hr_profile_status { display:inline-block; padding:2px 7px; border-radius:4px; background:var(--adams-green-soft); color:var(--adams-green); font-size:11px; font-weight:600; }
+    .adams_hr_profile_status.archived { background:var(--adams-soft); color:var(--adams-sub); }
+    .adams_hr_profile_actions .btn { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:8px 12px; color:var(--adams-ink); border-color:var(--adams-line); }
+    .adams_hr_profile_action_count { font-variant-numeric:tabular-nums; min-width:1ch; }
+    .adams_hr_profile_footer { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; flex-shrink:0; padding:16px 24px; border-top:1px solid var(--adams-line); background:var(--adams-paper); }
 }

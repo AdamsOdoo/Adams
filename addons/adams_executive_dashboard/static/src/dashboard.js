@@ -391,6 +391,15 @@ export class ExecutiveDashboard extends Component {
         return [...new Set([1, ...Array.from({length: Math.min(5, total - start + 1)}, (_, i) => start + i), ...(data?.total_count !== undefined ? [total] : [])])];
     }
 
+    // Owl template expressions resolve bare constructors and globals through ctx.
+    // Keep these computations on the component so a populated optional view
+    // never attempts to invoke ctx.String, ctx.Math or ctx.Object.
+    get searchKindKeys() { return Object.keys(this.searchKinds); }
+    currentPage(data) { return Math.floor((data?.offset || 0) / 25) + 1; }
+    visibleRowEnd(data) { return Math.min(data.offset + data.rows.length, data.total); }
+    chartMinimumWidth(chart) { return Math.max(340, chart.rows.length * 104); }
+    chartHitHeight(series) { return Math.max(16, series.height + 8); }
+
     setAllSections(collapsed) {
         for (const section of this.visibleSections) this.state.collapsed[section.key] = collapsed;
         try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional storage. */ }
@@ -491,7 +500,7 @@ export class ExecutiveDashboard extends Component {
     metricPeriodLabel(item) {
         const scope = this.state.applied;
         if (!scope) return '';
-        const language = document.documentElement.lang || 'en';
+        const language = (user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-');
         const formatter = new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language, {
             day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
         });
@@ -996,7 +1005,7 @@ export class ExecutiveDashboard extends Component {
         if (!start) return [];
         const end=this.state.hrData?.date_to || this.state.applied?.date_to || start;
         const length=Math.min(7,Math.max(1,Math.floor((Date.parse(end)-Date.parse(start))/86400000)+1));
-        const weekday = new Intl.DateTimeFormat(document.documentElement.lang || 'en', {weekday: 'short', timeZone: 'UTC'});
+        const weekday = new Intl.DateTimeFormat((user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-'), {weekday: 'short', timeZone: 'UTC'});
         return Array.from({length}, (_,index)=>{const value=new Date(start+'T12:00:00Z'); value.setUTCDate(value.getUTCDate()+index); const date=value.toISOString().slice(0,10); return {date,label:weekday.format(value), rows:(this.state.hrData?.rows || []).filter(row => row.start_datetime_label?.slice(0,10)<=date && (row.end_datetime_label?.slice(0,10)>date || (row.end_datetime_label?.slice(0,10)===date && row.end_datetime_label?.slice(11,16)!=='00:00'))).map(row=>({...row,continuation:row.start_datetime_label.slice(0,10)<date}))};});
     }
     openEmployeeRecords(tab) { const id=this.state.employeeProfile?.employee?.id; if (!id) return; this.closeEmployeeProfile(); this.state.hrFilters={employee_id:id}; return this.loadHR(tab,0,this.state.hrFilters); }
