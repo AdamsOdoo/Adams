@@ -871,10 +871,21 @@
 
 // Native date inputs keep intrinsic minimum widths unless explicitly reset.
 .o_adams_dashboard #adams-hr .adams_hr_period {
+    align-items:center; min-height:72px; padding:11px 14px; border:1px solid var(--adams-line);
+    border-radius:9px; background:var(--adams-paper);
+    .adams_hr_company_scope { display:flex; align-items:center; gap:9px; min-width:300px;
+        padding-inline-end:15px; border-inline-end:1px solid var(--adams-line);
+        color:var(--adams-sub); font-size:12px; }
+    .adams_hr_company_scope strong { color:var(--adams-ink); font-size:13px; }
+    label { display:flex; flex-direction:row; align-items:center; gap:8px; }
     label, input { min-width:0; min-inline-size:0; }
+    @media(max-width:900px) { .adams_hr_company_scope { min-width:0; width:100%; border-inline-end:0; } }
     @media(max-width:450px) {
         display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end;
+        .adams_hr_company_scope { grid-column:1 / -1; padding:0 0 8px;
+            border-bottom:1px solid var(--adams-line); }
         label { min-width:0; width:100%; }
+        label { display:grid; }
         input { width:100%; max-width:100%; box-sizing:border-box; }
         > button { grid-column:1; justify-self:start; max-width:100%; }
         .adams_hr_timezone { grid-column:2; justify-self:end; margin-inline-start:0; }
