@@ -299,11 +299,15 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
         with patch.object(type(products), '_compute_quantities_dict', custom_quantities):
             self.assertEqual(scoped._inventory_nonzero_locations(products, locations, 'current',
                              {'hide_zero': True}), locations)
-        reader = new_test_user(self.env, login='existence_no_stock', groups='base.group_user',
-                               company_id=self.env.company.id)
+        # A dashboard member without the source Inventory role must be denied
+        # by the actual RPC before the existence prefilter can return rows.
+        reader = new_test_user(self.env, login='existence_no_stock',
+            groups='base.group_user,adams_executive_dashboard.group_dashboard_user',
+            company_id=self.env.company.id)
+        self.assertFalse(reader.has_group('stock.group_stock_user'))
         with self.assertRaises(AccessError):
-            scoped.with_user(reader)._inventory_nonzero_locations(products.with_user(reader), locations,
-                                                                  'current', {'hide_zero': True})
+            self.dashboard.with_user(reader).get_inventory(self.options,
+                filters={'location_id': locations[0].id, 'hide_zero': True})
 
     def test_historical_prefilter_retains_done_move_when_quant_prefilter_empty(self):
         location = self.env['stock.location'].create({'name': 'Historical empty now', 'usage': 'internal',
