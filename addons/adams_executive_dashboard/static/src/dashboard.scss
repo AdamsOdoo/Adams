@@ -938,7 +938,7 @@
 .o_adams_dashboard #adams-finance {
     .adams_card_top { align-items:center; min-height:20px; }
     .adams_metric_info { display:inline-flex; align-items:center; justify-content:center;
-        flex:none; margin-inline-start:auto; padding:0; width:20px; height:20px;
+        flex:none; margin-inline-start:auto; padding:1px 6px; width:27px; height:17px;
         border:0; background:none; color:var(--adams-sub); }
     .adams_metric_info .adams_icon { width:15px; height:15px; }
     .adams_metric_info:hover { color:var(--adams-purple); }
@@ -991,7 +991,12 @@
 // Explicitly neutralize Odoo heading/button inheritance at the approved Finance surfaces.
 .o_adams_dashboard #adams-finance {
     .adams_group_heading h3, .adams_panel_head h3 { line-height:1.5; }
-    .adams_metric_foot > .adams_source_button { padding:2px 0; }
+    .adams_metric_foot > .adams_source_button { padding:2px 0; font-size:12px; line-height:18px; display:inline-flex; align-items:center; }
+    .adams_profit_grid { align-items:stretch; }
+    .adams_profit_panel .adams_panel_head .btn-link { display:inline-flex; align-items:center; gap:5px; padding:2px 0; min-height:0; font-size:12px; font-weight:600; line-height:18px; }
+    .adams_panel_head .adams_metric_info { padding:0; width:18px; height:18px; }
+    .adams_panel_head .adams_metric_info .adams_icon { width:18px; height:18px; }
+    .adams_action_arrow { width:14px; height:14px; }
 }
 
 // Approved context-card markup; warning wording reflects the native report,
@@ -999,12 +1004,52 @@
 .o_adams_dashboard #adams-finance {
     .adams_context_body { padding:17px 20px; }
     .adams_context_row { margin:0; padding:13px 0; }
+    .adams_context_row:first-child { padding-top:0; }
+    .adams_context_row:last-child { border:0; padding-bottom:0; }
     .adams_context_row > span { display:inline; margin:0; }
     .adams_context_row > strong { margin:3px 0; font-size:22px; font-weight:650; letter-spacing:-.3px; }
     .adams_context_row > .adams_no_target { font-size:17px; }
     .adams_context_row p { margin:0; line-height:1.5; }
     .adams_reporting_status { margin:7px 0; }
-    .adams_reporting_pill { display:inline-flex; align-items:center; padding:3px 7px; border-radius:5px; background:var(--adams-soft); color:var(--adams-sub); font-size:11px; font-weight:550; white-space:nowrap; }
+    .adams_reporting_pill { display:inline-flex; align-items:center; padding:3px 7px; border-radius:5px; background:var(--adams-soft); color:var(--adams-sub); font-size:12px; font-weight:550; line-height:18px; white-space:nowrap; }
     .adams_reporting_warning { background:var(--adams-attention); color:var(--adams-ink); }
-    .adams_review_scope { margin-top:10px; padding:2px 0; min-height:0; font-size:12px; font-weight:600; }
+    .adams_review_scope { display:inline-flex; align-items:center; gap:5px; line-height:18px; margin-top:10px; padding:2px 0; min-height:0; font-size:12px; font-weight:600; }
 }
+
+// Approved Finance balance cards: native amounts/actions, direct aging context.
+.o_adams_dashboard #adams-finance {
+    .adams_balance_card { display:block; padding:0; min-height:0; }
+    .adams_balance_card .adams_panel_head h3 { font-size:15px; font-weight:650; }
+    .adams_balance_body { padding:17px 20px; }
+    .adams_balance_card .adams_amount { margin:6px 0; }
+    .adams_balance_card .adams_value { font-size:29px; line-height:1.5; letter-spacing:-.5px; }
+    .adams_cash_card .adams_value { font-size:31px; }
+    .adams_cash_card .adams_panel_head h3 { color:#f1faf6; }
+    .adams_cash_card .adams_panel_head p { color:#c1d9d0; }
+    .adams_cash_links { padding:0; }
+    .adams_balance_card .adams_cash_split { padding:11px 0; margin:0; border-top:1px solid #45685f; font-size:12px; }
+    .adams_cash_split strong { font-size:14px; }
+    .adams_balance_card .adams_hint { margin:11px 0 0; font-size:12px; line-height:1.5; }
+    .adams_balance_card .adams_overdue_total { margin:0; padding:12px 0; border-top:0; border-bottom:1px solid var(--adams-line); font-size:13px; }
+    .adams_balance_card .adams_overdue_total .btn-link { color:#b23843; font-size:13px; font-weight:600; }
+    .adams_aging_strip { display:flex; height:8px; border-radius:4px; overflow:hidden; margin:14px 0 10px; }
+    .adams_aging_strip span { background:var(--adams-green); }
+    .adams_aging_strip span:nth-child(2) { background:#c99752; }
+    .adams_aging_strip span:nth-child(3) { background:#bc6e61; }
+    .adams_aging_strip span:nth-child(4) { background:var(--adams-purple); }
+    .adams_aging_strip span:nth-child(5) { background:#b23843; }
+    .adams_aging_strip span:nth-child(6) { background:#975975; }
+    .adams_aging_labels { display:flex; justify-content:space-between; gap:10px; font-size:11px; color:var(--adams-sub); }
+    .adams_balance_actions { display:flex; justify-content:space-between; gap:8px; margin-top:16px; }
+    .adams_balance_actions .btn-link, .adams_cash_links .btn-link { padding:2px 0; min-height:0; font-size:12px; font-weight:600; line-height:18px; }
+    .adams_balance_card .adams_aging_list { margin:0; padding:11px 20px; border-top:1px solid var(--adams-line); }
+    .adams_balance_card .adams_aging_list summary { font-size:12px; font-weight:550; }
+    .adams_balance_card .adams_aging_list[open] summary { margin-bottom:10px; }
+    @if $o-webclient-color-scheme == dark {
+        .adams_balance_card .adams_overdue_total .btn-link { color:#ffa4ae; }
+        .adams_aging_strip span:nth-child(5) { background:#ffa4ae; }
+    }
+    @media(max-width:650px) { .adams_balance_body { padding:15px; } }
+}
+
+.o_adams_dashboard:dir(rtl) #adams-finance .adams_action_arrow { transform:scaleX(-1); }

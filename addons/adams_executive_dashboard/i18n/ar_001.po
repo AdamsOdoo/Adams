@@ -4747,3 +4747,53 @@ msgstr "الأداء الشهري"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "is a partial month"
 msgstr "شهر جزئي"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Bank & cash"
+msgstr "البنوك والنقدية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Cash & working capital"
+msgstr "النقدية ورأس المال العامل"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balance sheet"
+msgstr "الميزانية العمومية"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balances in active accounts"
+msgstr "الأرصدة في الحسابات النشطة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Balances at the selected cutoff"
+msgstr "الأرصدة في تاريخ القطع المحدد"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Outstanding"
+msgstr "الرصيد المستحق"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Archived accounts are excluded from the account directory."
+msgstr "تُستبعد الحسابات المؤرشفة من دليل الحسابات."
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Review reporting scope"
+msgstr "مراجعة نطاق التقرير"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Posted entries"
+msgstr "القيود المرحلة"
+
+#. module: adams_executive_dashboard
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "As of"
+msgstr "كما في"

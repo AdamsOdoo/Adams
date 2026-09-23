@@ -34,7 +34,7 @@ export class ExecutiveDashboard extends Component {
         ];
         this.sections.sort((a, b) => ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(a.key) - ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(b.key));
         this.labels = {
-            revenue: _t('Revenue'), profit: _t('Net profit'), cash: _t('Bank and cash'), cash_flow: _t('Net cash movement'),
+            revenue: _t('Revenue'), profit: _t('Net profit'), cash: _t('Bank & cash'), cash_flow: _t('Net cash movement'),
             receivables: _t('Receivables'), payables: _t('Payables'), receivables_overdue: _t('Overdue receivables'), payables_overdue: _t('Overdue payables'),
             gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
@@ -351,13 +351,18 @@ export class ExecutiveDashboard extends Component {
         if (section.key === 'finance') {
             return [
                 { key: 'profitability', name: _t('Profitability'), description: _t('Performance during the selected financial period.'), items: select(['revenue', 'gross_profit', 'profit', 'operating_expenses']) },
-                { key: 'working-capital', name: _t('Cash and working capital'), description: _t('Balances at the selected cutoff.'), items: select(['cash', 'receivables', 'payables']) },
+                { key: 'working-capital', name: _t('Cash & working capital'), description: _t('Balances at the selected cutoff.'), items: select(['cash', 'receivables', 'payables']) },
                 { key: 'liquidity', name: _t('Money movement'), description: _t('Recorded cash movement and a separately labelled forecast.'), items: [this.cashMovement(result), ...select(['standard_forecast'])] },
-                { key: 'financial-position', name: _t('Financial position'), description: _t('Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
+                { key: 'financial-position', name: _t('Balance sheet'), description: _t('Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
             ];
         }
         if (section.key === 'sales') { return [{ key: 'commercial', name: _t('Commercial performance'), description: _t('Invoiced sales, order intake and quotations are different measures.'), items: select(['invoiced_sales', 'confirmed_sales', 'quotations']) }]; }
         return [{ key: section.key, name: '', description: '', items: result.items }];
+    }
+
+    agingWidth(bucket, item) {
+        const magnitude = (item.aging_buckets || []).reduce((sum, row) => sum + Math.abs(row.value || 0), 0);
+        return (magnitude ? Math.abs(bucket.value) / magnitude * 100 : 0) + '%';
     }
 
     metricIcon(key) {
@@ -509,6 +514,13 @@ export class ExecutiveDashboard extends Component {
             return formatter.format(date(scope.as_of));
         }
         return formatter.formatRange(date(scope.date_from), date(scope.date_to));
+    }
+
+    financePeriodLabel(item) {
+        const label = this.metricPeriodLabel(item);
+        const language = (user.context?.lang || document.documentElement.lang || 'en');
+        const balance = item.date_field === 'as_of' || ['cash','receivables','payables','assets','liabilities','equity'].includes(item.key);
+        return language.startsWith('en') && !balance ? label.replace(/\bSept\b/g, 'Sep') : label;
     }
 
     supplierWindow(key) {
