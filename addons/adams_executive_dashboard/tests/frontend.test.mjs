@@ -38,7 +38,7 @@ function fixture() {
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
 
 test('populated Owl views keep global constructors out of template expressions', () => {
-    const template = readFileSync(new URL('../static/src/dashboard.xml', import.meta.url), 'utf8');
+    const template = ['dashboard.xml', 'sales.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
     assert.doesNotMatch(template, /(?:String\(|Object\.keys\(|Math\.)/);
     const { controller } = fixture();
     assert.deepEqual(Array.from(controller.searchKindKeys), ['all', 'invoices', 'bills', 'orders', 'quotations']);
@@ -150,6 +150,33 @@ test('switching recent lists suppresses slower prior results', async () => {
     await orders;
     assert.equal(controller.state.recent.kind, 'quotations');
     assert.equal(controller.state.recent.rows[0].id, 22);
+});
+
+test('recent documents use approved six-row pages and honor server filter-shrink recovery', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const request = controller.loadRecent('orders', 24);
+    assert.equal(pending[0].args[3], 6);
+    pending[0].resolve({status:'ready', rows:[{id:1}], offset:0, page_size:6, total_count:1, has_more:false});
+    await request;
+    assert.equal(controller.state.recent.offset, 0);
+    assert.equal(controller.currentPage(controller.state.recent), 1);
+    assert.deepEqual(Array.from(controller.pageNumbers(controller.state.recent)), [1]);
+});
+
+test('shared Sales ranking actions keep measure, dimension and unassigned scope', async () => {
+    const { controller } = fixture();
+    const calls=[];
+    controller.state.ranking={key:'invoiced_margin'};
+    controller.openReport=(...args)=>calls.push(args);
+    controller.inspect=(...args)=>calls.push(args);
+    controller.openProductRanking=(...args)=>calls.push(['product',...args]);
+    controller.openSalesRanking('invoice', false);
+    controller.openSalesRanking('order', 17);
+    controller.openSalesRanking('customer');
+    controller.openSalesRanking('product', 4);
+    assert.deepEqual(calls, [['invoiced_margin','salesperson',false],['confirmed_sales','salesperson',17],['invoiced_sales','customer'],['product',4]]);
+    assert.equal(controller.rankingInitials('  Omar Adel '), 'OA');
 });
 
 test('navigation keeps selections and scroll but never caches business values', () => {

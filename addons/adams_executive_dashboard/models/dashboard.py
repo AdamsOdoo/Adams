@@ -444,6 +444,12 @@ class ExecutiveDashboard(models.AbstractModel):
                         # __count distinguishes an empty native report from a real zero.
                         rows = report._read_group(domain, aggregates=[aggregate, '__count'])
                         value, count = rows[0]
+                        if key == 'quotations':
+                            # Count documents, not sale.report lines; use the
+                            # same report domain and source permissions as value.
+                            report.check_field_access_rights('read', ['order_reference'])
+                            item['document_count'] = report._read_group(
+                                domain, aggregates=['order_reference:count_distinct'])[0][0]
                         item.update(status='ready' if count else 'empty', value=value if count else None,
                                     source=report._description, measure=aggregate,
                                     date_field=SOURCES[key][1], domain=domain,

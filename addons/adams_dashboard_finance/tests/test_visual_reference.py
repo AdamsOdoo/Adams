@@ -12,6 +12,7 @@ import io
 import importlib.util
 import json
 import logging
+import math
 from pathlib import Path
 import tempfile
 import time
@@ -60,6 +61,11 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         original_trends = model.get_financial_trends
         original_directory = model.get_cash_directory
         original_inventory = model.get_inventory
+        original_breakdown, original_recent = model.get_breakdown, model.get_recent_sales
+        original_quantity, original_fulfillment = model.get_product_quantity_ranking, model.get_fulfillment
+        sales_capture = viewport == (1440, 900)
+        if sales_capture:
+            self.env.user.group_ids |= self.env.ref('sales_team.group_sale_salesman_all_leads')
         user_id = self.env.uid
         messages = code_translations.get_web_translations('adams_executive_dashboard', language)['messages']
         catalog = {message['id']: message['string'] for message in messages if message['string']}
@@ -111,6 +117,12 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 for item, value in zip(result['supplier_windows'], [36300,12500,64700,159400]):
                     item.update(status='ready', value=value, drilldown=True, has_warnings=False)
                 result['currency'], result['digits'] = 'EGP', 2
+            if records.env.uid == user_id and key == 'sales' and sales_capture:
+                for item in result['items']:
+                    item.update(status='ready', value={'invoiced_sales':1284000, 'invoiced_margin':464800,
+                        'confirmed_sales':1687500, 'orders':62, 'quotations':482100}[item['key']],
+                        drilldown=True, unit='count' if item['key']=='orders' else 'currency')
+                    if item['key']=='quotations': item['document_count']=18
             return result
 
         @api.model
@@ -138,6 +150,55 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
 
         # Approved sample records exist only inside this native test transaction.
         products = ast.literal_eval(re.search(r"const PRODUCTS=(\[.*?\]);", raw.decode(), re.S).group(1))
+        def scaled(rows, total):
+            denominator = sum(value for _, value in rows)
+            output = [[name, math.floor(value / denominator * total + .5)] for name, value in rows]
+            output[-1][1] += total - sum(value for _, value in output)
+            return output
+        people = scaled(ast.literal_eval(re.search(r"const PEOPLE_SEED=(\[.*?\]);", raw.decode()).group(1)),1284000)
+        customers = scaled(ast.literal_eval(re.search(r"const CUSTOMERS_SEED=(\[.*?\]);", raw.decode()).group(1)),1284000)
+        order_people = scaled(sorted([[name,math.floor(value*(1.8 if i==1 else 1.15)+.5)] for i,(name,value) in enumerate(people)],key=lambda row:-row[1]),1687500)
+
+        @api.model
+        def sales_breakdown(records, key, dimension, options, offset=0):
+            if records.env.uid != user_id or not sales_capture or key not in ('invoiced_sales','invoiced_margin','confirmed_sales'):
+                return original_breakdown(records,key,dimension,options,offset)
+            records._scope(options)
+            source = (order_people if key=='confirmed_sales' else people) if dimension=='salesperson' else customers if dimension=='customer' else scaled([[p[1],285400-i*13310] for i,p in enumerate(products)],1284000)
+            rows = [{'id':i+1,'label':name,'value':math.floor(value*.362+.5) if key=='invoiced_margin' else value} for i,(name,value) in enumerate(source)]
+            return {'status':'ready','rows':rows[offset:offset+25],'offset':offset,'has_more':False,'currency':'EGP','digits':2}
+
+        @api.model
+        def sales_quantity(records, options, unit_id=False):
+            if records.env.uid != user_id or not sales_capture: return original_quantity(records,options,unit_id)
+            records._scope(options)
+            unit_id=unit_id or 1
+            chosen=[p for p in products if unit_id!=2 or p[2]=='Gift Sets']
+            return {'status':'ready','rows':[{'id':products.index(p)+1,'label':p[1],'value':690-i*28 if unit_id==1 else 103-i*15} for i,p in enumerate(chosen)],
+                    'units':[{'id':1,'name':'PCS'},{'id':2,'name':'BOX'}],'unit_id':unit_id,'unit':'quantity','currency':'PCS' if unit_id==1 else 'BOX','digits':2}
+
+        @api.model
+        def sales_recent(records, kind, options, offset=0, page_size=25):
+            if records.env.uid != user_id or not sales_capture: return original_recent(records,kind,options,offset,page_size)
+            records._scope(options)
+            total=18 if kind=='quotations' else 27
+            offset=min(offset,((total-1)//page_size)*page_size)
+            rows=[]
+            for i in range(offset,min(offset+page_size,total)):
+                rows.append({'id':i+1,'name':('INV/2026/' if kind=='invoices' else 'Q' if kind=='quotations' else 'S')+'00'+str(182-i),
+                    'partner_id':[i%10+1,customers[i%10][0]],'user_id':[i%6+1,people[i%6][0]],
+                    'date_label':f'2026-09-{22-i//2:02}','amount_untaxed':18750+(i*2381)%55200,
+                    'currency':'EGP','digits':2,'validity_date':False,
+                    'state':'posted' if kind=='invoices' else 'sent' if kind=='quotations' else 'sale',
+                    'delivery_status':('pending' if i%4==0 else 'partial' if i%5==0 else 'full') if kind=='orders' else False,
+                    'state_label':localized_label('Posted' if kind=='invoices' else 'Quotation sent' if kind=='quotations' else 'To deliver' if i%4==0 else 'Partially delivered' if i%5==0 else 'Delivered')})
+            return {'status':'ready','rows':rows,'offset':offset,'page_size':page_size,'total_count':total,'has_more':offset+page_size<total,'timezone':'Africa/Cairo'}
+
+        @api.model
+        def sales_fulfillment(records, options, offset=0):
+            if records.env.uid != user_id or not sales_capture: return original_fulfillment(records,options,offset)
+            records._scope(options)
+            return {'status':'ready','rows':[{'id':i+1,'name':p[1],'unit':'PCS','unit_id':1,'ordered':750-i*80,'delivered':600-i*50,'remaining':150-i*30} for i,p in enumerate(products[:4])], 'offset':0,'has_more':False}
         warehouse_names = ['Main warehouse', 'Retail store', 'Online fulfilment']
         category_names = ['Hair Care', 'Body Care', 'Grooming', 'Skin Care', 'Gift Sets']
         stock_rows = []
@@ -352,6 +413,33 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             self.assertFalse(empty.get('exceptionDetails'),str(empty))
             capture(browser, 'odoo-stock-empty', '.adams_stock_empty')
 
+            if sales_capture:
+                def sales_action(action, ready):
+                    result = browser._websocket_request('Runtime.evaluate', params={
+                        'expression': "(async()=>{" + action + ";for(let i=0;i<200;i++){if(" + ready + "){await document.fonts.ready;return;}await new Promise(r=>setTimeout(r,50));}throw Error('Sales state did not render');})()",
+                        'awaitPromise':True, 'returnByValue':True})
+                    self.assertFalse(result.get('exceptionDetails'),str(result))
+                sales_action("document.querySelector('.adams_side_link[data-section=sales]').click()",
+                             "document.querySelectorAll('#adams-sales .adams_rank_row').length===20 && document.querySelectorAll('.adams_recent_panel tbody tr').length===6 && document.querySelectorAll('.adams_fulfillment_panel tbody tr').length===4")
+                capture(browser,'odoo-sales-metrics','#adams-group-commercial')
+                capture(browser,'odoo-sales-rankings','.adams_sales_reference > .adams_group_heading','.adams_sales_equal')
+                capture(browser,'odoo-sales-products','.adams_products_heading','.adams_sales_equal:nth-of-type(3)')
+                # Panels have stable own selectors; do not rely on prototype-only IDs.
+                capture(browser,'odoo-sales-documents','.adams_sales_reference > header:nth-of-type(3)','.adams_recent_panel')
+                capture(browser,'odoo-sales-delivery','.adams_sales_reference > header:nth-of-type(4)','.adams_fulfillment_panel')
+                sales_action("document.querySelector('.adams_recent_panel [aria-label=\"Next page\"]').click()", "document.querySelector('.adams_recent_panel [aria-current=page]')?.textContent==='2'")
+                capture(browser,'odoo-sales-documents-page2','.adams_recent_panel')
+                sales_action("document.querySelectorAll('.adams_recent_tabs button')[1].click()", "document.querySelector('.adams_recent_panel tbody')?.textContent.includes('Q00182')")
+                capture(browser,'odoo-sales-quotations','.adams_recent_panel')
+                sales_action("document.querySelectorAll('.adams_recent_tabs button')[2].click()", "document.querySelector('.adams_recent_panel tbody')?.textContent.includes('INV/2026/00182')")
+                capture(browser,'odoo-sales-invoices','.adams_recent_panel')
+                sales_action("document.querySelectorAll('.adams_sales_rank_toolbar button')[1].click()", "document.querySelector('.adams_rank_panel .adams_rank_value')?.textContent.includes('124,262')")
+                capture(browser,'odoo-sales-margin','.adams_rank_panel')
+                sales_action("document.querySelectorAll('.adams_product_measure button')[1].click()", "document.querySelector('.adams_product_ranking .adams_rank_value')?.textContent.includes('690')")
+                capture(browser,'odoo-sales-quantity','.adams_products_heading','.adams_sales_equal:nth-of-type(3)')
+                sales_action("const unit=document.querySelector('.adams_products_heading select');unit.value='2';unit.dispatchEvent(new Event('change',{bubbles:true}))", "document.querySelector('.adams_product_ranking .adams_rank_value')?.textContent.includes('103')")
+                capture(browser,'odoo-sales-box','.adams_products_heading','.adams_sales_equal:nth-of-type(3)')
+
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
             browser._websocket_request('Page.navigate', params={
@@ -460,6 +548,47 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     'expression': "document.querySelector('nav button[data-tab=finance]').click(); document.querySelector('[data-action=menu]').click(); document.querySelector('.main > .heading').style.width=CONTENT_WIDTH+'px';".replace('CONTENT_WIDTH',str(captures['odoo-profitability']['clip']['width']))})
                 capture(browser, 'reference-more-menu', '.menu')
 
+            if sales_capture:
+                def reference_sales(action=''):
+                    localization = ''
+                    if language == 'ar_001':
+                        localization = r"""
+                            const catalog=CATALOG, translated=key=>catalog[key]||key;
+                            const formatter=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+                            document.querySelectorAll('#sales-heading-3 + article td:first-child small').forEach(node=>{
+                                const value=new Date(node.textContent+' 12:00:00 UTC');
+                                if(!isNaN(value))node.textContent=formatter.format(value);
+                            });
+                            const scope=document.querySelector('#sales-heading-3 + article .toolbar > span');
+                            if(scope)scope.textContent=translated('Untaxed values')+' · Africa/Cairo';
+                            const quantity=document.querySelector('#content > .grid-2:nth-of-type(7) article:first-child .card-head p');
+                            if(state.productMeasure==='qty' && quantity)quantity.textContent=translated('Net invoiced quantity ·')+' '+state.productUnit+' '+translated('only');
+                            const caption=document.querySelector('#sales-heading-3 + article .pager-caption');
+                            if(caption){const total=state.docType==='quotations'?18:27;const parts=[(state.docPage-1)*6+1,Math.min(state.docPage*6,total),total,state.docPage,Math.ceil(total/6)];let index=0;caption.textContent=translated('%s–%s of %s · Page %s of %s').replace(/%s/g,()=>parts[index++]);}
+                        """.replace('CATALOG',json.dumps(catalog))
+                    result = browser._websocket_request('Runtime.evaluate', params={
+                        'expression': "(()=>{"+action+";document.querySelector('#content').style.width="+str(captures['odoo-profitability']['clip']['width'])+"+'px';document.querySelectorAll('#content > .section-heading').forEach((node,index)=>node.id='sales-heading-'+index);"+localization+"})()",
+                        'returnByValue':True})
+                    self.assertFalse(result.get('exceptionDetails'),str(result))
+                reference_sales("document.querySelector('nav button[data-tab=sales]').click()")
+                capture(browser,'reference-sales-metrics','#sales-heading-0','#content > .kpis')
+                capture(browser,'reference-sales-rankings','#sales-heading-1','#content > .grid-2')
+                capture(browser,'reference-sales-products','#sales-heading-2','#content > .grid-2:nth-of-type(7)')
+                capture(browser,'reference-sales-documents','#sales-heading-3','#sales-heading-3 + article')
+                capture(browser,'reference-sales-delivery','#sales-heading-4','#sales-heading-4 + article')
+                reference_sales("document.querySelector('[data-page=\"docs:2\"]').click()")
+                capture(browser,'reference-sales-documents-page2','#sales-heading-3 + article')
+                reference_sales("document.querySelector('[data-doc-type=quotations]').click()")
+                capture(browser,'reference-sales-quotations','#sales-heading-3 + article')
+                reference_sales("document.querySelector('[data-doc-type=invoices]').click()")
+                capture(browser,'reference-sales-invoices','#sales-heading-3 + article')
+                reference_sales("document.querySelector('[data-invoice-measure=margin]').click()")
+                capture(browser,'reference-sales-margin','#content > .grid-2 > article:first-child')
+                reference_sales("document.querySelector('[data-product-measure=qty]').click()")
+                capture(browser,'reference-sales-quantity','#sales-heading-2','#content > .grid-2:nth-of-type(7)')
+                reference_sales("const unit=document.querySelector('#productUnit');unit.value='BOX';unit.dispatchEvent(new Event('change',{bubbles:true}))")
+                capture(browser,'reference-sales-box','#sales-heading-2','#content > .grid-2:nth-of-type(7)')
+
             return result
 
         code = r"""(async () => {
@@ -475,10 +604,12 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             throw new Error('Populated Finance fixture failed to render');
         })().catch(e=>console.error(e));"""
         with patch.object(model, 'get_bootstrap', bootstrap), patch.object(model, 'get_section', section), \
-                patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(model, 'get_inventory', inventory), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
+                patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(model, 'get_inventory', inventory), \
+                patch.object(model,'get_breakdown',sales_breakdown), patch.object(model,'get_recent_sales',sales_recent), \
+                patch.object(model,'get_product_quantity_ranking',sales_quantity), patch.object(model,'get_fulfillment',sales_fulfillment), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
             self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=60)
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
-                    'fixture': 'synthetic Finance values; no source reconciliation claim',
+                    'fixture': 'synthetic Finance/Inventory and selected Sales presentation values; no source reconciliation claim',
                     'viewport': list(viewport), 'theme': theme, 'language': language,
                     'adjustments': ['UI07: remove comparison note and Revenue movement row',
                                     'UI08: signed bank/cash classification from standard journals; synthetic values retain the approved split',
@@ -499,6 +630,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         if viewport[0] > 900: regions.append('workspace-navigation')
         if viewport[0] <= 900: regions.append('stock-expanded')
         if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded','more-menu'])
+        if sales_capture: regions.extend('sales-'+name for name in ['metrics','rankings','products','documents','delivery','documents-page2','quotations','invoices','margin','quantity','box'])
         for region in regions:
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'
@@ -508,8 +640,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     box=[0,0,image['clip']['width'],image['clip']['height']],
                     theme=theme, language=language, content_width=manifest['content_width'],
                     company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
-                    controls={'department':'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else ''},
-                    data={'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series},
+                    controls={'department':'sales' if region.startswith('sales-') else 'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else '', 'sales_state':region if region.startswith('sales-') else None},
+                    data=({'fixture':'approved-sales-synthetic-v1','people':people,'customers':customers,'products':products,'documents':27,'quotations':18} if region.startswith('sales-') else {'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series}),
                     state='empty' if region=='stock-empty' else 'expanded' if (region.endswith(('drawer','expanded')) or region=='chart-table') else 'loaded', region=region))
         reference_manifest = output / 'reference.json'
         actual_manifest = output / 'odoo.json'

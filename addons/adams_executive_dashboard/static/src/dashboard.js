@@ -40,8 +40,8 @@ export class ExecutiveDashboard extends Component {
             gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
             assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
             standard_forecast: _t('short-term cash forecast'),
-            invoiced_sales: _t('Net invoiced sales'), invoiced_margin: _t('invoiced commercial margin'), confirmed_sales: _t('Confirmed sales'),
-            orders: _t('Distinct sales orders'), quotations: _t('Draft and sent quotations'), purchases: _t('Confirmed purchases'),
+            invoiced_sales: _t('Invoiced sales'), invoiced_margin: _t('invoiced commercial margin'), confirmed_sales: _t('Confirmed orders'),
+            orders: _t('Distinct sales orders'), quotations: _t('Quotations'), purchases: _t('Confirmed purchases'),
             inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (signed)'),
         };
         this.groupHeadings = { revenue: _t('Profitability'), cash: _t('Liquidity'), receivables: _t('Working capital'), invoiced_sales: _t('Commercial performance') };
@@ -231,9 +231,9 @@ export class ExecutiveDashboard extends Component {
         this.recentRequest = request;
         this.state.recent = { kind, offset, status: 'loading', rows: [] };
         try {
-            const data = await this.orm.call('adams.executive.dashboard', 'get_recent_sales', [kind, { ...this.state.applied }, offset]);
+            const data = await this.orm.call('adams.executive.dashboard', 'get_recent_sales', [kind, { ...this.state.applied }, offset, 6]);
             if (this.alive && generation === this.generation && request === this.recentRequest) {
-                this.state.recent = { ...data, kind, offset };
+                this.state.recent = { ...data, kind, offset: data.offset ?? offset };
             }
         } catch {
             if (this.alive && generation === this.generation && request === this.recentRequest) {
@@ -357,7 +357,7 @@ export class ExecutiveDashboard extends Component {
                 { key: 'financial-position', name: _t('Balance sheet'), description: _t('Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
             ];
         }
-        if (section.key === 'sales') { return [{ key: 'commercial', name: _t('Commercial performance'), description: _t('Invoiced sales, order intake and quotations are different measures.'), items: select(['invoiced_sales', 'confirmed_sales', 'quotations']) }]; }
+        if (section.key === 'sales') { return [{ key: 'commercial', name: _t('Sales performance'), description: '', items: select(['invoiced_sales', 'confirmed_sales', 'quotations']) }]; }
         return [{ key: section.key, name: '', description: '', items: result.items }];
     }
 
@@ -386,7 +386,38 @@ export class ExecutiveDashboard extends Component {
         return this.state.sections.finance?.items.find(item => item.key === key);
     }
 
-    get referenceSurface() { return ['finance','inventory'].includes(this.state.activeSection); }
+    get referenceSurface() { return ['finance','inventory','sales'].includes(this.state.activeSection); }
+    rankingInitials(label) { return (label || '').trim().split(/\s+/).slice(0, 2).map(word => word[0]).join(''); }
+    get salesQuantityUnit() { return this.state.products?.units?.find(unit => unit.id === this.state.products.unit_id)?.name || ''; }
+    openSalesRanking(type, id = undefined) {
+        if (type === 'product') return this.openProductRanking(id);
+        const key = type === 'order' ? 'confirmed_sales' : type === 'invoice' ? (this.state.ranking?.key || 'invoiced_sales') : 'invoiced_sales';
+        const dimension = type === 'customer' ? 'customer' : 'salesperson';
+        return id === undefined ? this.inspect(key, dimension) : this.openReport(key, dimension, id);
+    }
+    retrySalesRanking(type) {
+        if (type === 'product') return this.loadProducts();
+        if (type === 'customer') return this.loadCustomers();
+        if (type === 'order') return this.loadOrderRanking();
+        return this.loadRanking(this.state.ranking?.key || 'invoiced_sales');
+    }
+    recentPageCaption(data) {
+        const total = data?.total_count || 0;
+        return _t('%s–%s of %s · Page %s of %s', total ? data.offset + 1 : 0,
+            Math.min((data?.offset || 0) + (data?.rows?.length || 0), total), total,
+            this.currentPage(data), Math.max(1, Math.ceil(total / (data?.page_size || 6))));
+    }
+    compactPages(data) {
+        const current = this.currentPage(data), total = Math.max(1, Math.ceil((data?.total_count || 0) / (data?.page_size || 6)));
+        const numbers = [...new Set([1,current-1,current,current+1,total])].filter(number => number > 0 && number <= total).sort((a,b) => a-b);
+        return numbers.flatMap((number,index) => index && number - numbers[index-1] > 1 ? [{key:'gap-'+number,number:null},{key:'page-'+number,number}] : [{key:'page-'+number,number}]);
+    }
+    commonRowValue(rows, field) { const values = [...new Set((rows || []).map(row => row[field]))]; return values.length === 1 ? values[0] : ''; }
+    recentDate(row) {
+        const value = row.date_label?.slice(0, 10);
+        const locale = this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale;
+        return /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? new Intl.DateTimeFormat(locale, {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value + 'T12:00:00Z')) : row.date_label;
+    }
     get dashboardCompanies() { return user.allowedCompanies || this.state.companies; }
     async changeDashboardCompany(event) {
         const companyId=Number(event.target.value);

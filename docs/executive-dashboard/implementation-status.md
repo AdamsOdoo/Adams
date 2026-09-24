@@ -1,6 +1,29 @@
 # Executive dashboard — implementation and verification
 
-## 23 September — current visual closure candidate (not ready for approval)
+## 24 September — Sales port batch (not ready for approval)
+
+Recovered local/remote HEAD `9d35f078bc09cfb78e5352ce246214b092d6a45e` without
+discarding unpublished files. PR214 remains draft/open/unmerged. The final
+Finance/Inventory sidebar, narrow and Arabic overlays were inspected; material
+differences left from the previous checkpoint are resolved for component reuse.
+See [the bounded visual-gate record](visual-gate-20260924.md), including unresolved
+build-badge and private archive retrieval qualifications.
+
+Sales markup/styles now follow the approved cards, rankings, document controls and
+direct delivery table. Existing services and report scopes are reused. Six-row
+document pagination honors authoritative totals and the server's filter-shrink
+offset; quotation count is distinct report order references, not report lines.
+The native reference test now captures Sales default/tab/page/margin/unit states.
+**Sales native execution and paired visual review are pending for this batch.**
+Local: 71 controller checks, XML parsing, light/dark SCSS and Arabic format checks pass.
+
+Staging remains `af0d2327184e96dfb3eecd65de3a79c4747d6045`, dashboard versions
+19.0.1.6.0. Remaining: Sales corrections from rendered comparison; Procurement,
+CRM and all HR parity; final staging dashboard-only upgrade and authorized
+journeys; asset/module identity and console checks; private archive retrieval;
+final package and owner guide. No production/main change.
+
+## Historical checkpoint — 23 September visual closure candidate
 
 Development source `5671bb68432c62605a5df3bff94900146c050748`, build38566486, modules19.0.1.7.0 passed **125/125 native tests** (259.54s,107,717queries; final log19:35:01UTC). The reduced representative matrix retains English/Arabic exports, authorization and report-return checks.69 focused frontend tests pass locally.
 

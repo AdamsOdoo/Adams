@@ -130,6 +130,7 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         self.env.flush_all()
         quotation = next(r for r in self.dashboard.get_section('sales', self.options)['items'] if r['key'] == 'quotations')
         self.assertEqual(quotation['value'], 378)
+        self.assertEqual(quotation['document_count'], 27)
         orders = self.dashboard.get_recent_sales('orders', self.options)
         self.assertEqual([r['id'] for r in orders['rows']], confirmed.ids)
         self.assertEqual(orders['rows'][0]['amount_untaxed'], 500)

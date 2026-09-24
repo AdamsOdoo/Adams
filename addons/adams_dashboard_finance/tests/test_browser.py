@@ -879,7 +879,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                     tabs[TAB_INDEX].click();
                                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                                     await wait(() => tabs[TAB_INDEX].classList.contains('active') &&
-                                        section.querySelector('.adams_recent_panel .adams_analysis') &&
+                                        section.querySelector('.adams_recent_panel .adams_sales_table_footer') &&
                                         !section.querySelector('.adams_recent_panel [role="status"]'),
                                         'Selected recent document list must finish loading');
                                     if (section.querySelector('.adams_recent_panel [role="alert"]'))
@@ -891,9 +891,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             capture_section(section, '.adams_fulfillment_panel', """
                                 const panel = section.querySelector('.adams_fulfillment_panel');
                                 if (!panel) throw new Error('Delivery quantities panel must exist');
-                                panel.querySelector('button').click();
-                                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                                await wait(() => panel.querySelector('.adams_page_controls') &&
+                                // Delivery is populated directly, without an extra exploration click.
+                                await wait(() => panel.querySelector('tbody') &&
                                     !panel.querySelector('[role="status"]'),
                                     'Delivery quantities must finish loading');
                                 if (panel.querySelector('[role="alert"]'))
