@@ -22,6 +22,8 @@ from unittest.mock import patch
 
 from PIL import Image
 
+from .hr_visual_fixture import hr_fixture
+
 from odoo import api, Command
 from odoo.tests import tagged
 from odoo.tests.common import ChromeBrowser
@@ -62,15 +64,35 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         original_directory = model.get_cash_directory
         original_inventory = model.get_inventory
         original_breakdown, original_recent = model.get_breakdown, model.get_recent_sales
+        original_hr, original_profile = model.get_hr_workspace, model.get_employee_profile
         original_workspace = model.get_workspace_details
         original_quantity, original_fulfillment = model.get_product_quantity_ranking, model.get_fulfillment
         sales_capture = viewport == (1440, 900)
+        hr_capture = sales_capture or viewport == (768,1080)
         if sales_capture:
             self.env.user.group_ids |= (self.env.ref('sales_team.group_sale_salesman_all_leads') | self.env.ref('purchase.group_purchase_user'))
         user_id = self.env.uid
         messages = code_translations.get_web_translations('adams_executive_dashboard', language)['messages']
         catalog = {message['id']: message['string'] for message in messages if message['string']}
         localized_label = lambda label: catalog.get(label, label)
+        hr_response, hr_profile = hr_fixture(catalog)
+        if hr_capture:
+            self.env.user.group_ids |= (self.env.ref('hr.group_hr_manager') | self.env.ref('hr_attendance.group_hr_attendance_manager') | self.env.ref('hr_holidays.group_hr_holidays_manager'))
+
+        @api.model
+        def people_workspace(records, options, tab='overview', filters=None, offset=0, list_page_size=25):
+            if records.env.uid != user_id or not hr_capture:
+                return original_hr(records,options,tab,filters,offset,list_page_size)
+            records._scope(options)
+            filters=filters or {}
+            return hr_response(tab,filters,offset,100 if tab=='shifts' and filters.get('view')=='week' else list_page_size,records.env.company.id)
+
+        @api.model
+        def people_profile(records, options, employee_id):
+            if records.env.uid != user_id or not hr_capture:
+                return original_profile(records,options,employee_id)
+            records._scope(options)
+            return hr_profile(employee_id,records.env.company.id)
         values = {'revenue': 1284000, 'gross_profit': 464800, 'profit': 182400,
                   'operating_expenses': 282400, 'gross_margin': 36.2, 'net_margin': 14.2,
                   'cash': 640000, 'receivables': 286400, 'payables': 198600,
@@ -124,9 +146,10 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         'confirmed_sales':1687500, 'orders':62, 'quotations':482100}[item['key']],
                         drilldown=True, unit='count' if item['key']=='orders' else 'currency')
                     if item['key']=='quotations': item['document_count']=18
-            if records.env.uid == user_id and key in ('crm','procurement') and sales_capture:
+            if records.env.uid == user_id and key == 'operations' and sales_capture:
                 for item in result['items']:
-                    item.update(status='ready',value=728600 if key=='procurement' else 492000,drilldown=True,unit='currency')
+                    if item['key'] in ('purchases','crm'):
+                        item.update(status='ready',value=728600 if item['key']=='purchases' else 492000,drilldown=True,unit='currency',date_field='period')
             return result
 
         @api.model
@@ -469,6 +492,28 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     capture(browser,'odoo-'+department+'-records','#adams-'+department+' .adams_workspace_panels')
                     if department=='procurement': capture(browser,'odoo-procurement-alert','.adams_procurement_alert')
 
+            if hr_capture:
+                def hr_action(action, condition):
+                    expression="(async()=>{"+action+";for(let i=0;i<150;i++){if("+condition+"){await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return true;}await new Promise(r=>setTimeout(r,50));}throw new Error('HR fixture state did not settle');})()"
+                    outcome=browser._websocket_request('Runtime.evaluate',params={'expression':expression,'awaitPromise':True,'returnByValue':True})
+                    self.assertFalse(outcome.get('exceptionDetails'),str(outcome))
+                hr_action("document.querySelector('.adams_side_link[data-section=hr]').click()", "document.querySelectorAll('.adams_hr_kpi').length===4")
+                hr_action("for(const [name,value] of [['date_from','2026-09-21'],['date_to','2026-09-27']]){const field=document.querySelector('.adams_hr_period input[name='+name+']');field.value=value;field.dispatchEvent(new Event('change',{bubbles:true}));}document.querySelector('.adams_hr_period').requestSubmit()", "document.querySelectorAll('.adams_hr_kpi').length===4 && !document.querySelector('#adams-hr [role=status]')")
+                capture(browser,'odoo-hr-tabs','.adams_hr_tabs')
+                capture(browser,'odoo-hr-overview-metrics','.adams_hr_tabs + .adams_group_heading','.adams_hr_kpis')
+                capture(browser,'odoo-hr-overview-snapshot','.adams_hr_snapshot_grid')
+                capture(browser,'odoo-hr-overview-previews','.adams_hr_upcoming_heading','.adams_hr_upcoming_heading + .adams_hr_grid')
+                for index,tab in [(1,'attendance'),(2,'time-off'),(3,'shifts'),(4,'employees')]:
+                    hr_action("document.querySelectorAll('.adams_hr_tabs button')["+str(index)+"].click()", "!document.querySelector('#adams-hr .adams_message[role=status]') && !!document.querySelector('.adams_hr_filters')")
+                    if tab=='shifts':
+                        hr_action("const status=document.querySelectorAll('.adams_hr_filters select')[1];status.value='all';status.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.adams_hr_filters').requestSubmit()", "document.querySelectorAll('.adams_hr_day').length===7")
+                        capture(browser,'odoo-hr-shifts-week','.adams_hr_tabs + .adams_group_heading','.adams_hr_tabs + .adams_group_heading + .adams_panel')
+                        hr_action("document.querySelectorAll('#adams-hr .adams_group_heading .adams_rank_tabs > button')[1].click()", "document.querySelectorAll('.adams_hr_table tbody tr').length===6")
+                    capture(browser,'odoo-hr-'+tab,'.adams_hr_tabs + .adams_group_heading','.adams_hr_tabs + .adams_group_heading + .adams_panel')
+                hr_action("document.querySelector('.adams_hr_person').click()", "document.querySelector('.adams_employee_dialog[open] .adams_hr_profile_head')")
+                capture(browser,'odoo-hr-profile','.adams_employee_dialog[open]')
+                hr_action("document.querySelector('.adams_hr_profile_close').click()", "!document.querySelector('.adams_employee_dialog[open]')")
+
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
             browser._websocket_request('Page.navigate', params={
@@ -599,7 +644,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         'expression': "(()=>{"+action+";document.querySelector('#content').style.width="+str(captures['odoo-profitability']['clip']['width'])+"+'px';document.querySelectorAll('#content > .section-heading').forEach((node,index)=>node.id='sales-heading-'+index);"+localization+"})()",
                         'returnByValue':True})
                     self.assertFalse(result.get('exceptionDetails'),str(result))
-                reference_sales("document.querySelector('nav button[data-tab=sales]').click()")
+                reference_sales("Object.assign(ar,"+json.dumps(catalog)+");document.querySelector('nav button[data-tab=sales]').click()")
                 capture(browser,'reference-sales-metrics','#sales-heading-0','#content > .kpis')
                 capture(browser,'reference-sales-rankings','#sales-heading-1','#content > .grid-2')
                 capture(browser,'reference-sales-products','#sales-heading-2','#content > .grid-2:nth-of-type(7)')
@@ -639,6 +684,32 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     capture(browser,'reference-'+department+'-metrics','#content > .section-heading','#content > .kpis')
                     capture(browser,'reference-'+department+'-records','#content > .grid-2' if department=='procurement' else '#content > article')
                     if department=='procurement': capture(browser,'reference-procurement-alert','#content > .alert')
+            if hr_capture:
+                def reference_hr(action):
+                    localization = r"""
+                        if(state.lang==='ar'){
+                            const fmt=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'});
+                            const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let node;
+                            while((node=walk.nextNode()))if(!['SCRIPT','STYLE'].includes(node.parentElement?.tagName))node.textContent=node.textContent.replace(/(\d{1,2}) Sept? 2026/g,(_,day)=>fmt.format(new Date('2026-09-'+day.padStart(2,'0')+'T12:00:00Z')));
+                            document.querySelectorAll('.hr-day header').forEach((header,i)=>{const day=new Date('2026-09-'+(21+i)+'T12:00:00Z');header.querySelector('b').textContent=new Intl.DateTimeFormat('ar-001',{weekday:'short',timeZone:'UTC'}).format(day);header.querySelector('span').textContent=new Intl.DateTimeFormat('ar-001',{day:'numeric',month:'short',timeZone:'UTC'}).format(day);});
+                        }
+                    """
+                    expression="(()=>{"+action+";document.querySelector('#content').style.width="+str(captures['odoo-profitability']['clip']['width'])+"+'px';"+localization+"})()"
+                    outcome=browser._websocket_request('Runtime.evaluate',params={'expression':expression,'returnByValue':True})
+                    self.assertFalse(outcome.get('exceptionDetails'),str(outcome))
+                reference_hr("Object.assign(ar,"+json.dumps(catalog)+");for(const e of HR_EMPLOYEES)if(e.company==='adams')e.company=state.companyKey;for(const r of HR_SHIFTS)if(r.company==='adams')r.company=state.companyKey;state.hrFrom='2026-09-21';state.hrTo='2026-09-27';document.querySelector('nav button[data-tab=hr]').click()")
+                capture(browser,'reference-hr-tabs','.hr-tabs')
+                capture(browser,'reference-hr-overview-metrics','.hr-tabs + .section-heading','#content > .kpis')
+                capture(browser,'reference-hr-overview-snapshot','#content > .grid-2')
+                capture(browser,'reference-hr-overview-previews','#content > .grid-2 + .section-heading','#content > .grid-2:last-child')
+                for tab in ('attendance','leave','shifts','employees'):
+                    reference_hr("document.querySelector('[data-hr-tab="+tab+"]').click()")
+                    if tab=='shifts':
+                        capture(browser,'reference-hr-shifts-week','.hr-tabs + .section-heading','#content > article')
+                        reference_hr("document.querySelector('[data-hr-layout=list]').click()")
+                    capture(browser,'reference-hr-'+('time-off' if tab=='leave' else tab),'.hr-tabs + .section-heading','#content > article')
+                reference_hr("document.querySelector('[data-employee]').click();document.querySelector('.drawer-header .eyebrow').textContent=companyName()")
+                capture(browser,'reference-hr-profile','.drawer')
             return result
 
         code = r"""(async () => {
@@ -656,7 +727,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         with patch.object(model, 'get_bootstrap', bootstrap), patch.object(model, 'get_section', section), \
                 patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(model, 'get_inventory', inventory), \
                 patch.object(model,'get_breakdown',sales_breakdown), patch.object(model,'get_recent_sales',sales_recent), \
-                patch.object(model,'get_workspace_details',workspace), patch.object(model,'get_product_quantity_ranking',sales_quantity), patch.object(model,'get_fulfillment',sales_fulfillment), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
+                patch.object(model,'get_hr_workspace',people_workspace), patch.object(model,'get_employee_profile',people_profile), patch.object(model,'get_workspace_details',workspace), patch.object(model,'get_product_quantity_ranking',sales_quantity), patch.object(model,'get_fulfillment',sales_fulfillment), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
             self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=60)
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
                     'fixture': 'synthetic Finance/Inventory and selected Sales presentation values; no source reconciliation claim',
@@ -682,6 +753,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded','more-menu'])
         if sales_capture: regions.extend('sales-'+name for name in ['metrics','rankings','products','documents','delivery','documents-page2','quotations','invoices','margin','quantity','box'])
         if sales_capture: regions.extend(['procurement-metrics','procurement-records','procurement-alert','crm-metrics','crm-records'])
+        if hr_capture: regions.extend('hr-'+name for name in ['tabs','overview-metrics','overview-snapshot','overview-previews','attendance','time-off','shifts-week','shifts','employees','profile'])
         for region in regions:
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'
@@ -691,8 +763,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     box=[0,0,image['clip']['width'],image['clip']['height']],
                     theme=theme, language=language, content_width=manifest['content_width'],
                     company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
-                    controls={'department':region.split('-')[0] if region.startswith(('sales-','procurement-','crm-')) else 'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else '', 'sales_state':region if region.startswith('sales-') else None},
-                    data=({'fixture':'approved-procurement-crm-synthetic-v1','scope':'selected period; procurement worklists current','rows':4} if region.startswith(('procurement-','crm-')) else {'fixture':'approved-sales-synthetic-v1','people':people,'customers':customers,'products':products,'documents':27,'quotations':18} if region.startswith('sales-') else {'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series}),
+                    controls={'department':region.split('-')[0] if region.startswith(('sales-','procurement-','crm-','hr-')) else 'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else '', 'sales_state':region if region.startswith('sales-') else None},
+                    data=({'fixture':'approved-hr-synthetic-v1','period':['2026-09-21','2026-09-27'],'today':'2026-09-22'} if region.startswith('hr-') else {'fixture':'approved-procurement-crm-synthetic-v1','scope':'selected period; procurement worklists current','rows':4} if region.startswith(('procurement-','crm-')) else {'fixture':'approved-sales-synthetic-v1','people':people,'customers':customers,'products':products,'documents':27,'quotations':18} if region.startswith('sales-') else {'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series}),
                     state='empty' if region=='stock-empty' else 'expanded' if (region.endswith(('drawer','expanded')) or region=='chart-table') else 'loaded', region=region))
         reference_manifest = output / 'reference.json'
         actual_manifest = output / 'odoo.json'

@@ -892,8 +892,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const panel = section.querySelector('.adams_fulfillment_panel');
                                 if (!panel) throw new Error('Delivery quantities panel must exist');
                                 // Delivery is populated directly, without an extra exploration click.
-                                await wait(() => panel.querySelector('tbody') &&
-                                    !panel.querySelector('[role="status"]'),
+                                await wait(() => !panel.querySelector('[role="status"]'),
                                     'Delivery quantities must finish loading');
                                 if (panel.querySelector('[role="alert"]'))
                                     throw new Error('Delivery quantities failed during evidence capture');

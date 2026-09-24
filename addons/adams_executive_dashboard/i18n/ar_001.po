@@ -5507,3 +5507,258 @@ msgstr "تحليل مسار المبيعات"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 msgid "Posted customer invoices less credit notes, excluding tax, by invoice date in the selected company."
 msgstr "فواتير العملاء المرحلة مطروحًا منها الإشعارات الدائنة، دون ضريبة، حسب تاريخ الفاتورة في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Action"
+msgstr "الإجراء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Approved and awaiting approval"
+msgstr "المعتمدة وبانتظار الموافقة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Approved time off"
+msgstr "إجازة معتمدة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Approved upcoming time off"
+msgstr "الإجازات القادمة المعتمدة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Assigned and open coverage"
+msgstr "التغطية المعيّنة والشاغرة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Attendance today"
+msgstr "الحضور اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Checked in"
+msgstr "تم تسجيل الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Checked out"
+msgstr "تم تسجيل الانصراف"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Current or next shift"
+msgstr "الوردية الحالية أو التالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Employee / role"
+msgstr "الموظف / الدور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Ends"
+msgstr "تنتهي"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "More requests are available in Time Off."
+msgstr "تتوفر طلبات أخرى في تطبيق الإجازات."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "No check-in is not an absence decision. Check schedules and approved time off."
+msgstr "عدم تسجيل الحضور لا يعني الغياب. راجع جداول العمل والإجازات المعتمدة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "No open check-in"
+msgstr "لا يوجد حضور مفتوح"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "No requests in this period"
+msgstr "لا توجد طلبات خلال هذه الفترة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "No upcoming shift"
+msgstr "لا توجد وردية قادمة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "None"
+msgstr "لا يوجد"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open attendance records"
+msgstr "سجلات الحضور المفتوحة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Overlaps today"
+msgstr "تشمل اليوم"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Published shifts"
+msgstr "الورديات المنشورة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Request duration"
+msgstr "مدة الطلب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Review request"
+msgstr "مراجعة الطلب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Snapshot"
+msgstr "لقطة حالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View request"
+msgstr "عرض الطلب"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View shift"
+msgstr "عرض الوردية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View shifts"
+msgstr "عرض الورديات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "to"
+msgstr "إلى"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open Attendances"
+msgstr "فتح الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open Employees"
+msgstr "فتح الموظفين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open Planning"
+msgstr "فتح التخطيط"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Open Time Off"
+msgstr "فتح الإجازات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Unassigned shifts"
+msgstr "الورديات غير المعيّنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Published unassigned"
+msgstr "منشورة وغير معيّنة"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "Continues from"
+msgstr "تستمر من"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "First seven days of the selected period. Use List for all matching shifts."
+msgstr "أول سبعة أيام من الفترة المحددة. استخدم القائمة لعرض جميع الورديات المطابقة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "Overnight"
+msgstr "وردية ليلية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "Times shown in"
+msgstr "الأوقات معروضة بتوقيت"

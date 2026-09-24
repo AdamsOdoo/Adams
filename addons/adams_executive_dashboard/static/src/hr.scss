@@ -1,0 +1,77 @@
+// Approved HR geometry in the existing Owl workspace; no global Odoo overrides.
+.o_adams_dashboard #adams-hr {
+    .adams_hr_tabs { margin:0 0 22px; }
+    .adams_hr_tabs button { font-size:14px; line-height:21px; }
+    .adams_hr_tabs button:hover { background:var(--adams-soft); }
+    .adams_hr_kpis { gap:13px; margin-bottom:18px; }
+    .adams_hr_kpi { min-height:0; padding:16px 17px 12px; }
+    .adams_hr_kpi .adams_margin_note { margin:11px 0 0; }
+    .adams_hr_kpi_footer { margin-top:13px; }
+    .adams_hr_grid { margin-top:0; align-items:stretch; }
+    .adams_hr_snapshot_grid > .adams_panel { min-height:0; }
+    .adams_hr_mini_metrics { margin-top:15px; gap:10px; }
+    .adams_hr_mini_value { font-size:17px; line-height:25.5px; padding:0; margin-top:5px; }
+    .adams_hr_text_button { display:inline-flex; align-items:center; gap:5px; }
+    .adams_hr_department_list .adams_hr_summary_row { padding:12px 0; }
+    .adams_hr_summary_row small { font-size:12px; line-height:18px; }
+    .adams_hr_filters { justify-content:space-between; padding:15px 20px; gap:12px; flex-wrap:wrap; }
+    .adams_hr_filters label { flex:0 1 auto; min-width:0; margin:0; font-weight:400; }
+    .adams_hr_filters label:first-child { flex:1; min-width:190px; }
+    .adams_hr_filters label:nth-child(2), .adams_hr_filters label:nth-child(3) { flex:0 1 auto; }
+    .adams_hr_filters input:not([type=checkbox]), .adams_hr_filters select { height:36px; min-height:0; font-size:13px; line-height:normal; padding:7px 9px; border:1px solid var(--adams-line); border-radius:6px; background:var(--adams-paper); color:var(--adams-ink); }
+    .adams_hr_filters select { appearance:auto; width:auto; }
+    .adams_hr_filters .adams_check { flex-direction:row; align-items:center; min-height:36px; }
+    .adams_hr_filter_actions { display:flex; gap:8px; align-items:center; }
+    .adams_hr_table { max-height:none; }
+    .adams_hr_table table { min-width:820px; }
+    .adams_hr_table td:first-child { min-width:245px; }
+    .adams_hr_table td:first-child, .adams_hr_table th:first-child { position:sticky; inset-inline-start:0; z-index:1; background:var(--adams-paper); }
+    .adams_hr_table th:first-child { background:var(--adams-soft); }
+    .adams_hr_person { font-size:13px; line-height:19.5px; display:flex; align-items:center; gap:10px; padding:2px 0; color:var(--adams-ink); }
+    .adams_hr_person strong { font-size:13px; font-weight:600; color:var(--adams-purple); }
+    .adams_hr_person small { display:block; color:var(--adams-sub); font-size:12px; margin-top:3px; line-height:1.4; }
+    .adams_hr_avatar { width:29px; height:29px; font-size:10px; font-weight:650; }
+    .adams_row_link { padding:0; border:0; background:none; font-size:13px; line-height:19.5px; text-align:start; color:var(--adams-purple); font-weight:600; }
+    .adams_row_link:hover { text-decoration:underline; }
+    .adams_hr_scope_note { font-size:12px; line-height:18px; padding:13px 16px; margin:0; color:var(--adams-sub); border-top:1px solid var(--adams-line); }
+    .adams_hr_day header { gap:0; color:var(--adams-sub); }
+    .adams_hr_day header strong { font-size:14px; color:var(--adams-ink); }
+    .adams_shift_card { display:block; border-radius:5px; margin-bottom:9px; }
+    .adams_shift_card strong, .adams_shift_card small { display:block; margin-top:5px; }
+    .adams_shift_card strong { font-size:13px; line-height:1.4; }
+    .adams_shift_card small { color:var(--adams-sub); }
+    .adams_shift_card:hover { background:var(--adams-purple-soft); }
+    .adams_shift_card.unassigned { border-inline-start-color:var(--adams-sales-amber); background:var(--adams-attention); }
+    .adams_state_badge.red { background:var(--adams-attention); color:var(--adams-sales-red); }
+    @media(max-width:1100px) { .adams_hr_kpi { padding:14px; } }
+    @media(max-width:900px) { .adams_hr_kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+    @media(max-width:650px) {
+        .adams_hr_kpi { padding:13px 12px 10px; }
+        .adams_hr_filters { padding:13px 15px; }
+        .adams_hr_filters label:first-child { min-width:100%; flex-basis:100%; }
+        .adams_hr_filters label { flex:1; min-width:120px; }
+        .adams_hr_filter_actions { width:100%; justify-content:flex-end; }
+        .adams_hr_tabs button { padding:10px 12px; }
+        .adams_hr_table td:first-child { min-width:190px; max-width:210px; }
+        .adams_hr_grid { grid-template-columns:1fr; }
+        .adams_hr_mini_metrics { gap:5px; }
+        .adams_hr_mini_value { font-size:15px; }
+    }
+}
+.o_adams_dashboard .adams_employee_dialog {
+    #adams-employee-title { font-size:17px; line-height:25.5px; letter-spacing:-.25px; }
+    .adams_source_body { font-size:14px; line-height:21px; }
+    .adams_hr_profile_head { align-items:center; }
+    .adams_hr_profile_head .adams_hr_avatar { width:64px; height:64px; font-size:22px; font-weight:650; }
+    .adams_hr_profile_head h3, .adams_source_body > h3 { font-size:16px; line-height:24px; margin:20px 0 10px; }
+    .adams_hr_profile_head p { font-size:14px; line-height:21px; margin:0; }
+    .adams_hr_profile_status { margin-top:8px; padding:3px 7px; border-radius:5px; font-weight:550; line-height:16.5px; }
+    .adams_hr_profile_fields { margin:0; }
+    .adams_hr_profile_fields > div { padding:12px 0; }
+    .adams_hr_profile_fields dt { font-size:12px; line-height:18px; margin-bottom:3px; }
+    .adams_hr_profile_fields dd { font-size:14px; line-height:21px; margin:0; }
+    .adams_hr_profile_actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .adams_hr_profile_actions .btn { display:inline-flex; align-items:center; gap:8px; }
+    .adams_hr_profile_footer { padding:16px 24px; display:flex; justify-content:space-between; gap:8px; border-top:1px solid var(--adams-line); }
+    @media(max-width:650px) { .adams_hr_profile_head { align-items:flex-start; } }
+}

@@ -1113,11 +1113,35 @@ export class ExecutiveDashboard extends Component {
     clearHRFilters() { this.state.hrFilters = {view:'week'}; return this.applyHRFilters(); }
     openEmployeeRecord() { const id=this.state.employeeProfile?.employee?.id; if (id) return this.openHRSource(id,false,'employees',{status:'all'}); }
     loadHROverviewMetric(metric) { this.state.hrFilters = {...metric.filters}; return this.loadHR(metric.tab, 0, metric.filters); }
-    hrMetricLabel(key) { return {employees:_t('Active employees'), checked_in:_t('Checked in now'), time_off:_t('Approved time off today'), unassigned_shifts:_t('Unassigned published shifts')}[key] || key; }
+    hrMetricLabel(key) { return {employees:_t('Active employees'), checked_in:_t('Checked in now'), time_off:_t('On approved time off'), unassigned_shifts:_t('Unassigned shifts')}[key] || key; }
     employeeInitials(name) { return (name || '').split(/\s+/).slice(0,2).map(part=>part[0]).join(''); }
+    get hrSnapshotLabel() {
+        const hr=this.state.hrData;
+        if (!hr?.generated_at) return this.hrDate(hr?.today);
+        const value=new Date(hr.generated_at.replace(' ','T')+'Z');
+        const locale=this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale;
+        const date=new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric',timeZone:hr.timezone || 'UTC'}).format(value).replace(/\bSept\b/g,'Sep');
+        return date+' · '+new Intl.DateTimeFormat(locale,{hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone:hr.timezone || 'UTC'}).format(value);
+    }
+    get hrUnassignedLabel() { return _t('Unassigned'); }
+    hrDate(value, short = false) {
+        if (!value) return '—';
+        const date = value.slice(0,10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return value;
+        return new Intl.DateTimeFormat(this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale,
+            {day:'numeric',month:'short',...(short ? {} : {year:'numeric'}),timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+    }
+    hrTime(value) { return value ? value.slice(11,16) : '—'; }
+    hrSourceLabel(tab) { return {employees:_t('Open Employees'),attendance:_t('Open Attendances'),time_off:_t('Open Time Off'),shifts:_t('Open Planning')}[tab]; }
+    hrBadgeClass(row) {
+        const state=row.state || row.status;
+        return {green:row.active === true || ['validate','published','closed'].includes(state), amber:['confirm','validate1','open'].includes(state),red:['refuse','cancel'].includes(state)};
+    }
+    get hrStatusSelection() { const filters=this.state.hrFilters; return filters.assignment === 'unassigned' ? (filters.status === 'published' ? 'published_unassigned' : 'unassigned') : filters.status || ''; }
+    changeHRStatus(event) { this.state.hrFilters.status=event.target.value; delete this.state.hrFilters.assignment; }
     get hrStatusOptions() {
-        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Open')],['closed',_t('Closed')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['all',_t('All')]]};
-        return (options[this.state.hrTab] || []).map(([value,label])=>({value,label}));
+        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Open')],['closed',_t('Closed')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['unassigned',_t('Unassigned')],['published_unassigned',_t('Published unassigned')]]};
+        return (options[this.state.hrTab] || []).filter(([value])=>value !== 'all').map(([value,label])=>({value,label}));
     }
     get hrWeekDays() {
         const start = this.state.hrData?.date_from || this.state.applied?.date_from;
@@ -1276,14 +1300,14 @@ export class ExecutiveDashboard extends Component {
         this.invalidateHRSource();
         this.closeEmployeeProfile();
         const changedTab = tab !== this.state.hrTab;
-        if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week'};
+        if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week', ...(tab === 'shifts' ? {status:'published'} : {})};
         const appliedFilters = this.normalizedHRFilters(filters || (changedTab ? this.state.hrFilters : this.state.hrData?.filters) || this.state.hrFilters);
         if (tab === 'overview') for (const key of Object.keys(appliedFilters)) delete appliedFilters[key];
         if (tab === 'shifts' && appliedFilters.view === 'week') offset = 0;
         this.state.hrTab = tab;
         this.state.hrData = {status:'loading', rows:[], filters: appliedFilters, offset};
         try {
-            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset]);
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset,6]);
             if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total, next_offset: (data.offset || 0) + (data.rows?.length || 0)}; if (data.departments) this.hrDepartments = data.departments; }
         } catch { if (this.alive && generation === this.generation && this.hrRequest === marker) this.state.hrData = {status:'error',rows:[],filters:appliedFilters,offset}; }
     }
@@ -1331,7 +1355,7 @@ export class ExecutiveDashboard extends Component {
             }
         }
     }
-    normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
+    normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if (['unassigned','published_unassigned'].includes(result.status)) { result.assignment='unassigned'; result.status=result.status==='published_unassigned' ? 'published' : 'all'; } if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
     applyHRFilters() { return this.loadHR(this.state.hrTab,0,{...this.state.hrFilters}); }
     async openEmployeeProfile(id) {
         this.invalidateHRSource();

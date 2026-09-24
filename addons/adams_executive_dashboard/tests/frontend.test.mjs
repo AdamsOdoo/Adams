@@ -38,7 +38,7 @@ function fixture() {
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
 
 test('populated Owl views keep global constructors out of template expressions', () => {
-    const template = ['dashboard.xml', 'sales.xml', 'workspaces.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
+    const template = ['dashboard.xml', 'sales.xml', 'workspaces.xml', 'hr.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
     assert.doesNotMatch(template, /(?:String\(|Object\.keys\(|Math\.)/);
     const { controller } = fixture();
     assert.deepEqual(Array.from(controller.searchKindKeys), ['all', 'invoices', 'bills', 'orders', 'quotations']);
@@ -1214,4 +1214,26 @@ test('procurement worklist navigation rejects a superseded company and recovers 
     pending[2].resolve({name:'Authorized approval worklist'});
     await retry;
     assert.equal(actions[0].name,'Authorized approval worklist');
+});
+
+test('HR compact pages retain native dates and approved shift status selections', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const task=controller.loadHR('employees',24);
+    assert.equal(pending[0].args[4],6);
+    pending[0].resolve({status:'ready',rows:[{id:1}],offset:0,total:1,page_size:6});
+    await task;
+    assert.equal(controller.state.hrData.offset,0);
+    controller.state.hrFilters={status:'published',assignment:'unassigned'};
+    assert.equal(controller.hrStatusSelection,'published_unassigned');
+    controller.changeHRStatus({target:{value:'unassigned'}});
+    let filters=controller.normalizedHRFilters(controller.state.hrFilters);
+    assert.equal(filters.status,'all');
+    assert.equal(filters.assignment,'unassigned');
+    controller.changeHRStatus({target:{value:'draft'}});
+    filters=controller.normalizedHRFilters(controller.state.hrFilters);
+    assert.equal(filters.status,'draft');
+    assert.equal(filters.assignment,undefined);
+    assert.equal(controller.hrDate('2026-09-22 09:05'),'22 Sept 2026');
+    assert.equal(controller.hrTime('2026-09-22 09:05'),'09:05');
 });

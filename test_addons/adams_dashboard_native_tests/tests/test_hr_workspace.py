@@ -51,9 +51,17 @@ class TestDashboardHRWorkspace(TransactionCase):
         self.assertEqual(first['total'], 27)
         self.assertEqual(len(first['rows']), 25)
         self.assertEqual(len(last['rows']), 2)
+        compact = self.dashboard.get_hr_workspace(self.options, 'employees', filters, 24, 6)
+        self.assertEqual(compact['page_size'], 6)
+        self.assertEqual(compact['total'], 27)
+        self.assertEqual(len(compact['rows']), 3)
+        self.assertFalse(compact['has_more'])
         employees[1:].active = False
         shrunk = self.dashboard.get_hr_workspace(self.options, 'employees', filters, 25)
         self.assertEqual(shrunk['offset'], 0)
+        compact = self.dashboard.get_hr_workspace(self.options, 'employees', filters, 24, 6)
+        self.assertEqual(compact['offset'], 0)
+        self.assertEqual(compact['total'], 1)
         self.assertEqual([row['id'] for row in shrunk['rows']], employees[:1].ids)
         archived = self.dashboard.get_hr_workspace(self.options, 'employees', {**filters, 'status': 'archived'})
         self.assertEqual(archived['total'], 26)
@@ -134,6 +142,9 @@ class TestDashboardHRWorkspace(TransactionCase):
         current = self.dashboard.get_hr_workspace(self.options, 'attendance',
                    {'employee_id': self.employee.id, 'scope': 'current', 'status': 'open'})
         self.assertEqual([row['id'] for row in current['rows']], opened.ids)
+        profile = self.dashboard.get_employee_profile(historical, employee.id)
+        self.assertEqual([row['id'] for row in profile['snapshots']['attendance']['rows']], opened.ids)
+        self.assertIsNone(profile['snapshots']['attendance']['rows'][0]['worked_hours'])
         self.assertIsNone(current['rows'][0]['worked_hours'])
         action = self.dashboard.open_hr_source(self.options, 'attendance',
                     {'employee_id': self.employee.id, 'scope': 'current', 'status': 'open'}, opened.id)

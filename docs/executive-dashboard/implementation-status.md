@@ -1,6 +1,40 @@
 # Executive dashboard — implementation and verification
 
-## 24 September — Procurement/CRM and Sales correction batch (not approval-ready)
+## 24 September — HR port and second rendered correction batch (qualification pending)
+
+Previous published candidate `848f8052408f14d8cdc1f5d5150ddf94b9ef9608` ran
+in development build38579240. Native result: 126 tests, zero failed assertions,
+one error. The error was an evidence-capture wait requiring delivery rows from
+an honestly empty source. The wait now accepts settled empty results and still
+rejects errors. This is not a clean native qualification until rerun.
+
+English and Arabic Sales/Procurement/CRM overlays exposed remaining table row
+baseline inheritance and supplier-payment formatting/line-height differences.
+The source CSS now explicitly restores baseline alignment and approved payment
+formatting. Procurement/CRM metric fixtures incorrectly targeted a UI department
+instead of their existing `operations` service; that test-only routing is fixed.
+Reference Arabic captions now use the complete Odoo translation catalog while
+preserving immutable markup/styles. No baseline image was replaced.
+
+HR remains the same component/controller and source services, now moved to its
+own registered Owl template for direct presentation maintenance. Approved columns,
+manager field, six-row lists, compact pagination, shift status controls, calendar
+formatting, four-row upcoming worklists and work-profile snapshots are connected.
+All new profile/preview reads use normal source access and company rules, explicit
+work-only fields and honest unavailable/restricted states. Calendar batches remain
+bounded and retain Load more when required. Existing 25-row RPC callers remain
+compatible. New comparison cases cover all five tabs, week/list and profile at
+1440 English/light, 1440 Arabic/dark and768 English/dark. They are unreviewed until
+the native build runs. Local:74 controller checks; Python/XML/light-dark SCSS and
+Arabic PO validation passed. No HR business application was installed.
+
+Remaining release requirements: rendered correction review including HR;
+quotation badge semantic conflict; final staging dashboard-only upgrade and
+real authorized journeys; exact assets/module identity; durable private evidence
+retrieval; final installable package and owner test guide. Staging still1.6.0;
+production/main untouched; PR214 must remain draft/open/unmerged.
+
+## Historical — Procurement/CRM and Sales correction batch (not approval-ready)
 
 The preceding Sales source `fab32ab99ac993f9a15d9bc69e0cd79aea2f4471`
 ran in development build `38578759`: 126 native tests, two failures, zero errors.

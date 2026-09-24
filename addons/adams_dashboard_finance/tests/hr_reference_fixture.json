@@ -1,0 +1,1163 @@
+{
+  "source_sha256": "36ec95831f3f1e82e0709594d5c177938e3b3805ccd763b1e59c13933b2d7f4a",
+  "employees": [
+    {
+      "id": 1,
+      "company": "adams",
+      "name": "Omar Hassan",
+      "department": "Sales",
+      "job": "Sales executive",
+      "manager": "Mariam Fathy",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "omar.hassan@adams.example"
+    },
+    {
+      "id": 2,
+      "company": "adams",
+      "name": "Nour Ali",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Rana Samir",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "nour.ali@adams.example"
+    },
+    {
+      "id": 3,
+      "company": "adams",
+      "name": "Youssef Adel",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Ahmed Nabil",
+      "location": "Main warehouse",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "youssef.adel@adams.example"
+    },
+    {
+      "id": 4,
+      "company": "adams",
+      "name": "Mariam Fathy",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Omar Hassan",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "mariam.fathy@adams.example"
+    },
+    {
+      "id": 5,
+      "company": "adams",
+      "name": "Karim Mostafa",
+      "department": "Sales",
+      "job": "Sales executive",
+      "manager": "Mariam Fathy",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "karim.mostafa@adams.example"
+    },
+    {
+      "id": 6,
+      "company": "adams",
+      "name": "Rana Samir",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Rana Samir",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "rana.samir@adams.example"
+    },
+    {
+      "id": 7,
+      "company": "adams",
+      "name": "Ahmed Nabil",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Ahmed Nabil",
+      "location": "Main warehouse",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "ahmed.nabil@adams.example"
+    },
+    {
+      "id": 8,
+      "company": "adams",
+      "name": "Salma Tarek",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Omar Hassan",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "salma.tarek@adams.example"
+    },
+    {
+      "id": 9,
+      "company": "adams",
+      "name": "Hana Ashraf",
+      "department": "Sales",
+      "job": "Sales executive",
+      "manager": "Mariam Fathy",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "hana.ashraf@adams.example"
+    },
+    {
+      "id": 10,
+      "company": "adams",
+      "name": "Ali Sherif",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Rana Samir",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "ali.sherif@adams.example"
+    },
+    {
+      "id": 11,
+      "company": "adams",
+      "name": "Dina Amr",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Ahmed Nabil",
+      "location": "Main warehouse",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "dina.amr@adams.example"
+    },
+    {
+      "id": 12,
+      "company": "adams",
+      "name": "Mostafa Khaled",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Omar Hassan",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "mostafa.khaled@adams.example"
+    },
+    {
+      "id": 13,
+      "company": "adams",
+      "name": "Farah Yasser",
+      "department": "Sales",
+      "job": "Sales executive",
+      "manager": "Mariam Fathy",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "farah.yasser@adams.example"
+    },
+    {
+      "id": 14,
+      "company": "adams",
+      "name": "Mohamed Hany",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Rana Samir",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "mohamed.hany@adams.example"
+    },
+    {
+      "id": 15,
+      "company": "adams",
+      "name": "Nada Adel",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Ahmed Nabil",
+      "location": "Main warehouse",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "nada.adel@adams.example"
+    },
+    {
+      "id": 16,
+      "company": "adams",
+      "name": "Tarek Ibrahim",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Omar Hassan",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "tarek.ibrahim@adams.example"
+    },
+    {
+      "id": 17,
+      "company": "adams",
+      "name": "Laila Mahmoud",
+      "department": "Sales",
+      "job": "Sales executive",
+      "manager": "Mariam Fathy",
+      "location": "Head office",
+      "active": true,
+      "joined": "2024-03-01",
+      "email": "laila.mahmoud@adams.example"
+    },
+    {
+      "id": 18,
+      "company": "adams",
+      "name": "Hossam Saad",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Rana Samir",
+      "location": "Retail store",
+      "active": false,
+      "joined": "2024-03-01",
+      "email": "hossam.saad@adams.example"
+    },
+    {
+      "id": 101,
+      "company": "harbor",
+      "name": "Amira Saleh",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Amira Saleh",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "amira.saleh@harbor.example"
+    },
+    {
+      "id": 102,
+      "company": "harbor",
+      "name": "Samir Ibrahim",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Amira Saleh",
+      "location": "Head office",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "samir.ibrahim@harbor.example"
+    },
+    {
+      "id": 103,
+      "company": "harbor",
+      "name": "Nadia Mostafa",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Amira Saleh",
+      "location": "Head office",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "nadia.mostafa@harbor.example"
+    },
+    {
+      "id": 104,
+      "company": "harbor",
+      "name": "Hazem Nabil",
+      "department": "Retail",
+      "job": "Retail advisor",
+      "manager": "Amira Saleh",
+      "location": "Retail store",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "hazem.nabil@harbor.example"
+    },
+    {
+      "id": 105,
+      "company": "harbor",
+      "name": "Mona Tarek",
+      "department": "Administration",
+      "job": "Operations specialist",
+      "manager": "Amira Saleh",
+      "location": "Head office",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "mona.tarek@harbor.example"
+    },
+    {
+      "id": 106,
+      "company": "harbor",
+      "name": "Khaled Emad",
+      "department": "Warehouse",
+      "job": "Warehouse coordinator",
+      "manager": "Amira Saleh",
+      "location": "Head office",
+      "active": true,
+      "joined": "2025-02-01",
+      "email": "khaled.emad@harbor.example"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "A-1-21",
+      "employee": 1,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-1-22",
+      "employee": 1,
+      "date": "2026-09-22",
+      "checkIn": "08:30",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-2-21",
+      "employee": 2,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-2-22",
+      "employee": 2,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-3-21",
+      "employee": 3,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-3-22",
+      "employee": 3,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-4-21",
+      "employee": 4,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-4-22",
+      "employee": 4,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-5-21",
+      "employee": 5,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-6-21",
+      "employee": 6,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-6-22",
+      "employee": 6,
+      "date": "2026-09-22",
+      "checkIn": "08:30",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-7-21",
+      "employee": 7,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-7-22",
+      "employee": 7,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-8-21",
+      "employee": 8,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-8-22",
+      "employee": 8,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-9-21",
+      "employee": 9,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-10-21",
+      "employee": 10,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-10-22",
+      "employee": 10,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-11-21",
+      "employee": 11,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-11-22",
+      "employee": 11,
+      "date": "2026-09-22",
+      "checkIn": "08:30",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-12-21",
+      "employee": 12,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-12-22",
+      "employee": 12,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-13-21",
+      "employee": 13,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-13-22",
+      "employee": 13,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-14-21",
+      "employee": 14,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-14-22",
+      "employee": 14,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-15-21",
+      "employee": 15,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-15-22",
+      "employee": 15,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-16-21",
+      "employee": 16,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-16-22",
+      "employee": 16,
+      "date": "2026-09-22",
+      "checkIn": "08:30",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-17-21",
+      "employee": 17,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-17-22",
+      "employee": 17,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-101-21",
+      "employee": 101,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-101-22",
+      "employee": 101,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-102-21",
+      "employee": 102,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-102-22",
+      "employee": 102,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-103-21",
+      "employee": 103,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-103-22",
+      "employee": 103,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-104-21",
+      "employee": 104,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-104-22",
+      "employee": 104,
+      "date": "2026-09-22",
+      "checkIn": "08:30",
+      "checkOut": null,
+      "hours": null
+    },
+    {
+      "id": "A-105-21",
+      "employee": 105,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-105-22",
+      "employee": 105,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": "14:15",
+      "hours": 5.17
+    },
+    {
+      "id": "A-106-21",
+      "employee": 106,
+      "date": "2026-09-21",
+      "checkIn": "09:00",
+      "checkOut": "17:00",
+      "hours": 7.5
+    },
+    {
+      "id": "A-106-22",
+      "employee": 106,
+      "date": "2026-09-22",
+      "checkIn": "09:05",
+      "checkOut": null,
+      "hours": null
+    }
+  ],
+  "time_off": [
+    {
+      "id": "TO-104",
+      "employee": 5,
+      "type": "Annual leave",
+      "from": "2026-09-21",
+      "to": "2026-09-23",
+      "duration": 3,
+      "unit": "days",
+      "status": "Approved"
+    },
+    {
+      "id": "TO-105",
+      "employee": 9,
+      "type": "Annual leave",
+      "from": "2026-09-22",
+      "to": "2026-09-22",
+      "duration": 0.5,
+      "unit": "days",
+      "status": "Approved"
+    },
+    {
+      "id": "TO-106",
+      "employee": 2,
+      "type": "Annual leave",
+      "from": "2026-09-24",
+      "to": "2026-09-25",
+      "duration": 2,
+      "unit": "days",
+      "status": "To approve"
+    },
+    {
+      "id": "TO-107",
+      "employee": 12,
+      "type": "Personal time",
+      "from": "2026-09-23",
+      "to": "2026-09-23",
+      "duration": 2,
+      "unit": "hours",
+      "status": "To approve"
+    },
+    {
+      "id": "TO-108",
+      "employee": 4,
+      "type": "Annual leave",
+      "from": "2026-09-27",
+      "to": "2026-09-28",
+      "duration": 2,
+      "unit": "days",
+      "status": "Approved"
+    },
+    {
+      "id": "TO-109",
+      "employee": 11,
+      "type": "Annual leave",
+      "from": "2026-09-18",
+      "to": "2026-09-18",
+      "duration": 1,
+      "unit": "days",
+      "status": "Refused"
+    },
+    {
+      "id": "TO-110",
+      "employee": 7,
+      "type": "Annual leave",
+      "from": "2026-10-01",
+      "to": "2026-10-04",
+      "duration": 2,
+      "unit": "days",
+      "status": "To approve"
+    },
+    {
+      "id": "TO-201",
+      "employee": 102,
+      "type": "Annual leave",
+      "from": "2026-09-22",
+      "to": "2026-09-23",
+      "duration": 2,
+      "unit": "days",
+      "status": "Approved"
+    }
+  ],
+  "shifts": [
+    {
+      "id": "SH-adams-1",
+      "company": "adams",
+      "employee": null,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-21T14:00",
+      "end": "2026-09-21T22:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-adams-2",
+      "company": "adams",
+      "employee": 2,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-22T09:00",
+      "end": "2026-09-22T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-3",
+      "company": "adams",
+      "employee": 3,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Main warehouse",
+      "start": "2026-09-23T09:00",
+      "end": "2026-09-23T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-4",
+      "company": "adams",
+      "employee": 4,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-5",
+      "company": "adams",
+      "employee": 5,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-25T14:00",
+      "end": "2026-09-25T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-6",
+      "company": "adams",
+      "employee": 6,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-26T09:00",
+      "end": "2026-09-26T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-7",
+      "company": "adams",
+      "employee": null,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Main warehouse",
+      "start": "2026-09-27T09:00",
+      "end": "2026-09-27T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-8",
+      "company": "adams",
+      "employee": 8,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-21T09:00",
+      "end": "2026-09-21T17:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-adams-9",
+      "company": "adams",
+      "employee": 9,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-22T22:00",
+      "end": "2026-09-23T06:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-10",
+      "company": "adams",
+      "employee": 10,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-23T09:00",
+      "end": "2026-09-23T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-11",
+      "company": "adams",
+      "employee": 11,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Main warehouse",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-12",
+      "company": "adams",
+      "employee": 12,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-25T09:00",
+      "end": "2026-09-25T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-13",
+      "company": "adams",
+      "employee": null,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-26T14:00",
+      "end": "2026-09-26T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-14",
+      "company": "adams",
+      "employee": 14,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-27T09:00",
+      "end": "2026-09-27T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-15",
+      "company": "adams",
+      "employee": 15,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Main warehouse",
+      "start": "2026-09-21T09:00",
+      "end": "2026-09-21T17:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-adams-16",
+      "company": "adams",
+      "employee": 16,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-22T09:00",
+      "end": "2026-09-22T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-17",
+      "company": "adams",
+      "employee": 17,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-23T14:00",
+      "end": "2026-09-23T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-adams-18",
+      "company": "adams",
+      "employee": 1,
+      "department": "Sales",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-1",
+      "company": "harbor",
+      "employee": null,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-21T14:00",
+      "end": "2026-09-21T22:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-harbor-2",
+      "company": "harbor",
+      "employee": 102,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-22T09:00",
+      "end": "2026-09-22T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-3",
+      "company": "harbor",
+      "employee": 103,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-23T09:00",
+      "end": "2026-09-23T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-4",
+      "company": "harbor",
+      "employee": 104,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-5",
+      "company": "harbor",
+      "employee": 105,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-25T14:00",
+      "end": "2026-09-25T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-6",
+      "company": "harbor",
+      "employee": 106,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-26T09:00",
+      "end": "2026-09-26T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-7",
+      "company": "harbor",
+      "employee": null,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-27T09:00",
+      "end": "2026-09-27T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-8",
+      "company": "harbor",
+      "employee": 102,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-21T09:00",
+      "end": "2026-09-21T17:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-harbor-9",
+      "company": "harbor",
+      "employee": 103,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-22T22:00",
+      "end": "2026-09-23T06:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-10",
+      "company": "harbor",
+      "employee": 104,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-23T09:00",
+      "end": "2026-09-23T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-11",
+      "company": "harbor",
+      "employee": 105,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-12",
+      "company": "harbor",
+      "employee": 106,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-25T09:00",
+      "end": "2026-09-25T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-13",
+      "company": "harbor",
+      "employee": null,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-26T14:00",
+      "end": "2026-09-26T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-14",
+      "company": "harbor",
+      "employee": 102,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-27T09:00",
+      "end": "2026-09-27T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-15",
+      "company": "harbor",
+      "employee": 103,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-21T09:00",
+      "end": "2026-09-21T17:00",
+      "hours": 7.5,
+      "status": "Draft"
+    },
+    {
+      "id": "SH-harbor-16",
+      "company": "harbor",
+      "employee": 104,
+      "department": "Retail",
+      "role": "Retail coverage",
+      "location": "Retail store",
+      "start": "2026-09-22T09:00",
+      "end": "2026-09-22T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-17",
+      "company": "harbor",
+      "employee": 105,
+      "department": "Administration",
+      "role": "Team coverage",
+      "location": "Head office",
+      "start": "2026-09-23T14:00",
+      "end": "2026-09-23T22:00",
+      "hours": 7.5,
+      "status": "Published"
+    },
+    {
+      "id": "SH-harbor-18",
+      "company": "harbor",
+      "employee": 106,
+      "department": "Warehouse",
+      "role": "Stock operations",
+      "location": "Head office",
+      "start": "2026-09-24T09:00",
+      "end": "2026-09-24T17:00",
+      "hours": 7.5,
+      "status": "Published"
+    }
+  ]
+}

@@ -2,7 +2,8 @@
 // Odoo chrome and appearance remain authoritative.
 .o_adams_dashboard #adams-sales,
 .o_adams_dashboard #adams-procurement,
-.o_adams_dashboard #adams-crm {
+.o_adams_dashboard #adams-crm,
+.o_adams_dashboard #adams-hr {
     --adams-sales-amber:#85510d; --adams-sales-red:#b23843;
     @if $o-webclient-color-scheme == dark { --adams-sales-amber:#f6c672; --adams-sales-red:#ffa4ae; }
     .adams_metric_group { margin-bottom:0; }
@@ -44,9 +45,9 @@
     .adams_procurement_payments .adams_panel_body { padding:17px 20px; }
     .adams_procurement_payments h3 { font-size:15px; font-weight:650; line-height:22.5px; margin:0; }
     .adams_payment_scope { font-size:12px; color:var(--adams-sub); margin:6px 0 14px; }
-    .adams_payment_row { padding:11px 0; }
+    .adams_payment_row { padding:12px 0; }
     .adams_payment_row:last-child { border-bottom:0; }
-    .adams_payment_row .btn-link { font-size:13px; padding:0; line-height:19.5px; }
+    .adams_payment_row .btn-link { font-size:14px; padding:0; line-height:21px; }
     .adams_panel_head { display:flex; align-items:start; justify-content:space-between; padding:18px 20px 0; }
     .adams_panel_head h3 { line-height:22.5px; }
     .adams_panel_head p { margin:3px 0 0; font-size:12px; line-height:18px; }
@@ -67,8 +68,8 @@
     .adams_table_wrap th { color:var(--adams-sub); font-size:11px; font-weight:600; background:var(--adams-soft); }
     .adams_table_wrap th, .adams_table_wrap td { padding:12px 15px; line-height:19.5px; vertical-align:middle; border-bottom:1px solid var(--adams-line); }
     .adams_table_wrap th { padding:10px 15px; line-height:16.5px; white-space:nowrap; }
-    .adams_recent_panel td .btn-link { display:inline; padding:0; font-size:13px; line-height:19.5px; }
-    .adams_workspace_records .adams_row_link { padding:0; font-size:13px; line-height:19.5px; white-space:normal; text-align:start; }
+    .adams_recent_panel td .btn-link { display:inline; vertical-align:baseline; padding:0; font-size:13px; line-height:19.5px; }
+    .adams_workspace_records .adams_row_link { display:inline; vertical-align:baseline; padding:0; font-size:13px; line-height:19.5px; white-space:normal; text-align:start; }
     .adams_table_wrap tbody tr:last-child td { border-bottom:0; }
     .adams_table_wrap td small { display:block; color:var(--adams-sub); font-size:11px; line-height:16.5px; margin-top:2px; }
     .adams_state_badge { display:inline-flex; align-items:center; padding:3px 7px; border-radius:5px; background:var(--adams-soft); color:var(--adams-sub); font-size:11px; line-height:16.5px; font-weight:550; white-space:nowrap; }
