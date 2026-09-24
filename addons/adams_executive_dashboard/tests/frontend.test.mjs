@@ -26,6 +26,7 @@ function fixture() {
         useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
         useState: value => value, useService: key => { if (!services[key]) throw new Error(`Service ${key} is not available`); return services[key]; },
         useBus(bus, event, callback) { companyEvents[event] = callback; }, user: nativeUser, userBus: {}, _t: value => value,
+        getComputedStyle: element => ({direction: element.direction || 'ltr'}),
         requestAnimationFrame() {}, registry: { category: () => ({ add() {} }) }, Intl, document: { documentElement: { lang: 'en' } },
     });
     const controller = new Controller();
@@ -37,7 +38,7 @@ function fixture() {
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
 
 test('populated Owl views keep global constructors out of template expressions', () => {
-    const template = readFileSync(new URL('../static/src/dashboard.xml', import.meta.url), 'utf8');
+    const template = ['dashboard.xml', 'sales.xml', 'workspaces.xml', 'hr.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
     assert.doesNotMatch(template, /(?:String\(|Object\.keys\(|Math\.)/);
     const { controller } = fixture();
     assert.deepEqual(Array.from(controller.searchKindKeys), ['all', 'invoices', 'bills', 'orders', 'quotations']);
@@ -151,6 +152,33 @@ test('switching recent lists suppresses slower prior results', async () => {
     assert.equal(controller.state.recent.rows[0].id, 22);
 });
 
+test('recent documents use approved six-row pages and honor server filter-shrink recovery', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = { ...controller.state.draft };
+    const request = controller.loadRecent('orders', 24);
+    assert.equal(pending[0].args[3], 6);
+    pending[0].resolve({status:'ready', rows:[{id:1}], offset:0, page_size:6, total_count:1, has_more:false});
+    await request;
+    assert.equal(controller.state.recent.offset, 0);
+    assert.equal(controller.currentPage(controller.state.recent), 1);
+    assert.deepEqual(Array.from(controller.pageNumbers(controller.state.recent)), [1]);
+});
+
+test('shared Sales ranking actions keep measure, dimension and unassigned scope', async () => {
+    const { controller } = fixture();
+    const calls=[];
+    controller.state.ranking={key:'invoiced_margin'};
+    controller.openReport=(...args)=>calls.push(args);
+    controller.inspect=(...args)=>calls.push(args);
+    controller.openProductRanking=(...args)=>calls.push(['product',...args]);
+    controller.openSalesRanking('invoice', false);
+    controller.openSalesRanking('order', 17);
+    controller.openSalesRanking('customer');
+    controller.openSalesRanking('product', 4);
+    assert.deepEqual(calls, [['invoiced_margin','salesperson',false],['confirmed_sales','salesperson',17],['invoiced_sales','customer'],['product',4]]);
+    assert.equal(controller.rankingInitials('  Omar Adel '), 'OA');
+});
+
 test('navigation keeps selections and scroll but never caches business values', () => {
     const { controller } = fixture();
     controller.state.applied = { ...controller.state.draft };
@@ -254,6 +282,9 @@ test('large headline abbreviation retains exact detail formatting and native sig
     assert.equal(controller.headline({value: -2330000}, {digits: 2}), '-2.33M');
     assert.equal(controller.formatted({value: -2330000}, {digits: 2}), '-2,330,000.00');
     assert.equal(controller.headline({value: 0}, {digits: 2}), '0.00');
+    assert.equal(controller.headline({value: -2330000}, {digits: 2}, true), '-2,330,000');
+    assert.equal(controller.headline({value: 129.45}, {digits: 2}, true), '129.45');
+    assert.equal(controller.headline({value: 0}, {digits: 2}, true), '0');
     assert.equal(controller.headline({value: null, status: 'restricted'}, {digits: 2}), 'Access restricted');
 });
 
@@ -837,7 +868,8 @@ test('global replenishment opens a real scoped action and rejects a late stock r
     controller.state.inventory={status:'loading',rows:[]};
     pending[0].resolve({type:'ir.actions.act_window'}); await action;
     assert.equal(opened,0);
-    const current=controller.openStockSource('history');
+    const current=controller.openStockSource('forecast');
+    assert.equal(pending[1].args[1],'forecast');
     pending[1].resolve({type:'ir.actions.act_window'}); await current;
     assert.equal(opened,1);
 });
@@ -1081,4 +1113,127 @@ test('native user Arabic language governs week and metric dates even when host H
     assert.equal(days[0].label,new Intl.DateTimeFormat('ar-001',{weekday:'short',timeZone:'UTC'}).format(new Date('2026-09-21T12:00:00Z')));
     assert.match(days[0].label, /[\u0600-\u06ff]/);
     assert.match(controller.metricPeriodLabel({key:'cash'}), /[\u0600-\u06ff]/);
+});
+
+
+test('stock dashboard pages use the returned size and retain position and totals', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const request=controller.pageStock(8);
+    assert.equal(pending[0].args[4],8);
+    pending[0].resolve({status:'ready',offset:8,page_size:8,total_count:27,has_more:true,rows:[]});
+    await request;
+    assert.equal(controller.currentPage(controller.state.inventory),2);
+    assert.deepEqual([...controller.pageNumbers(controller.state.inventory)],[1,2,3,4]);
+    assert.deepEqual([...controller.stockPageNumbers()].map(row=>row.number),[1,2,3,4]);
+    controller.state.inventory.offset=0;
+    assert.deepEqual([...controller.stockPageNumbers()].map(row=>row.number),[1,2,null,4]);
+});
+
+
+test('stock date displays today while preserving current versus historical requests', () => {
+    const {controller}=fixture();
+    controller.defaultOptions={date_to:'2026-09-23'};
+    controller.state.stockFilters.at_date='';
+    assert.equal(controller.stockDateValue,'2026-09-23');
+    controller.changeStockDate({target:{value:'2026-09-20'}});
+    assert.equal(controller.state.stockFilters.at_date,'2026-09-20');
+    assert.equal(controller.stockDateValue,'2026-09-20');
+    controller.changeStockDate({target:{value:'2026-09-23'}});
+    assert.equal(controller.state.stockFilters.at_date,'');
+});
+
+
+test('dashboard company selector delegates only authorized choices to the native company API', async () => {
+    const {controller,nativeUser}=fixture();
+    nativeUser.allowedCompanies=[{id:1,name:'First'},{id:2,name:'Second'}];
+    nativeUser.activeCompany={id:1};
+    const calls=[];
+    nativeUser.activateCompanies=async(ids,options)=>calls.push({ids:[...ids],...options});
+    await controller.changeDashboardCompany({target:{value:'999'}});
+    await controller.changeDashboardCompany({target:{value:'1'}});
+    assert.equal(calls.length,0);
+    await controller.changeDashboardCompany({target:{value:'2'}});
+    assert.deepEqual(calls,[{ids:[2],includeChildCompanies:false,reload:false}]);
+    assert.equal(controller.state.companySwitchPending,false);
+    nativeUser.activateCompanies=async()=>{throw new Error('switch failed');};
+    await controller.changeDashboardCompany({target:{value:'2'}});
+    assert.equal(controller.state.companySwitchPending,false);
+});
+
+
+test('keyboard tabs follow rendered Odoo direction without a DOM dir attribute', () => {
+    const { controller } = fixture();
+    const selected = [];
+    const buttons = [0, 1, 2].map(index => ({focus() {}, click() { selected.push(index); }}));
+    const group = {direction: 'rtl', querySelectorAll: () => buttons};
+    const press = key => controller.switchTabs({key, target: buttons[1], currentTarget: group, preventDefault() {}});
+    press('ArrowRight');
+    press('ArrowLeft');
+    press('Home');
+    press('End');
+    assert.deepEqual(selected, [0, 2, 0, 2]);
+    group.direction = 'ltr';
+    press('ArrowRight');
+    assert.equal(selected.at(-1), 2);
+});
+
+test('compact workspaces retain server-clamped pages and reject stale responses', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.enabledSections = ['crm','procurement'];
+    const old = controller.loadWorkspaceDetails('crm', 24);
+    const current = controller.loadWorkspaceDetails('crm', 0);
+    assert.equal(pending[0].args[3], 4);
+    pending[1].resolve({status:'ready',rows:[{id:1}],offset:0,total:1,page_size:4,has_more:false});
+    await current;
+    pending[0].resolve({status:'ready',rows:[{id:99}],offset:24,total:27,page_size:4});
+    await old;
+    assert.equal(controller.state.workspaceDetails.crm.offset, 0);
+    assert.equal(controller.state.workspaceDetails.crm.rows[0].id, 1);
+});
+
+test('procurement worklist navigation rejects a superseded company and recovers after failure', async () => {
+    const { controller, pending, notifications } = fixture();
+    controller.state.applied = {...controller.state.draft};
+    const actions=[];
+    controller.action.doAction = action => actions.push(action);
+    const old=controller.openProcurementWorklist('late');
+    assert.equal(pending[0].method,'open_procurement');
+    assert.equal(pending[0].args[1],'late');
+    controller.generation++;
+    pending[0].resolve({name:'Old company worklist'});
+    await old;
+    assert.equal(actions.length,0);
+    const failed=controller.openProcurementWorklist('approvals');
+    pending[1].reject(new Error('Temporary error'));
+    await failed;
+    assert.equal(controller.state.opening,false);
+    assert.equal(notifications.length,1);
+    const retry=controller.openProcurementWorklist('approvals');
+    pending[2].resolve({name:'Authorized approval worklist'});
+    await retry;
+    assert.equal(actions[0].name,'Authorized approval worklist');
+});
+
+test('HR compact pages retain native dates and approved shift status selections', async () => {
+    const {controller,pending}=fixture();
+    controller.state.applied={...controller.state.draft};
+    const task=controller.loadHR('employees',24);
+    assert.equal(pending[0].args[4],6);
+    pending[0].resolve({status:'ready',rows:[{id:1}],offset:0,total:1,page_size:6});
+    await task;
+    assert.equal(controller.state.hrData.offset,0);
+    controller.state.hrFilters={status:'published',assignment:'unassigned'};
+    assert.equal(controller.hrStatusSelection,'published_unassigned');
+    controller.changeHRStatus({target:{value:'unassigned'}});
+    let filters=controller.normalizedHRFilters(controller.state.hrFilters);
+    assert.equal(filters.status,'all');
+    assert.equal(filters.assignment,'unassigned');
+    controller.changeHRStatus({target:{value:'draft'}});
+    filters=controller.normalizedHRFilters(controller.state.hrFilters);
+    assert.equal(filters.status,'draft');
+    assert.equal(filters.assignment,undefined);
+    assert.equal(controller.hrDate('2026-09-22 09:05'),'22 Sept 2026');
+    assert.equal(controller.hrTime('2026-09-22 09:05'),'09:05');
 });

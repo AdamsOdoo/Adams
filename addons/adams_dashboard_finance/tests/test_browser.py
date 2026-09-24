@@ -10,7 +10,6 @@ from pathlib import Path
 import tempfile
 import time
 from uuid import uuid4
-from itertools import product
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -25,6 +24,53 @@ from odoo.addons.account.tests.common import AccountTestInvoicingHttpCommon
 
 @tagged('post_install', '-at_install')
 class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
+    def test_browser_company_selector_preserves_period_and_authorized_scope(self):
+        companies = self.env.company | self.env['res.company'].create({'name': 'Dashboard second authorized company'})
+        user = new_test_user(self.env, login='dashboard_company_navigation',
+            groups='base.group_user,base.group_multi_company,account.group_account_readonly,adams_executive_dashboard.group_dashboard_user',
+            company_id=companies[0].id, company_ids=[Command.set(companies.ids)], lang='en_US', tz='UTC')
+        model = type(self.env['adams.executive.dashboard'])
+        original = model.get_section
+        requests = []
+
+        @api.model
+        def track_scope(records, section, options):
+            if records.env.uid == user.id and section == 'finance':
+                requests.append((records.env.company.id, dict(options)))
+            return original(records, section, options)
+
+        self.browser_size = '1440x900'
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        code = r"""(async () => {
+            const wait = async (fn, message) => {
+                for (let i=0;i<250;i++) { if(fn())return; await new Promise(r=>setTimeout(r,100)); }
+                throw new Error(message);
+            };
+            await wait(()=>document.querySelector('.adams_company_select'), 'Company selector must render');
+            const root=document.querySelector('.o_adams_dashboard'), origin=performance.timeOrigin;
+            const period=()=>root.querySelector('.adams_applied_period')?.textContent.trim();
+            const initialPeriod=period();
+            const allowed=[...root.querySelector('.adams_company_select').options].map(o=>Number(o.value));
+            if(JSON.stringify(allowed.sort())!==JSON.stringify(COMPANIES.map(c=>c.id).sort()))throw new Error('Selector must contain exactly authorized companies');
+            for(const company of [COMPANIES[1],COMPANIES[0]]) {
+                const select=root.querySelector('.adams_company_select');
+                select.value=String(company.id);select.dispatchEvent(new Event('change',{bubbles:true}));
+                await wait(()=>root.querySelector('.adams_company_brand strong')?.textContent.trim()===company.name &&
+                    root.querySelector('.adams_company_select')?.value===String(company.id) &&
+                    !root.querySelector('.adams_company_select').disabled, 'Authorized company identity must refresh');
+                if(period()!==initialPeriod)throw new Error('Company switch lost applied period');
+                if(root.querySelector('.adams_side_link[aria-current="page"]')?.dataset.section!=='finance')throw new Error('Company switch lost department');
+            }
+            if(performance.timeOrigin!==origin || document.querySelector('.o_adams_dashboard')!==root)throw new Error('Company selector reloaded the dashboard');
+            console.log('test successful');
+        })().catch(error=>console.error(error));""".replace('COMPANIES', json.dumps([{'id': c.id, 'name': c.name} for c in companies]))
+        with patch.object(model, 'get_section', track_scope):
+            self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=75)
+        self.assertTrue(any(company_id == companies[1].id for company_id, _options in requests))
+        for company_id, options in requests:
+            self.assertEqual(options['company_id'], company_id)
+        self.assertEqual(len({(options['date_from'], options['date_to'], options['as_of']) for _company_id, options in requests}), 1)
+
     def test_browser_hr_retry_preserves_scope_after_one_rpc_failure(self):
         if 'hr.employee' not in self.env:
             self.skipTest('HR is optional; this browser recovery fixture requires installed HR')
@@ -42,7 +88,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         attempts = []
 
         @api.model
-        def fail_once(recordset, options, tab='overview', filters=None, offset=0):
+        def fail_once(recordset, options, tab='overview', filters=None, offset=0, list_page_size=25):
             if (recordset.env.uid == user.id and tab == 'employees'
                     and (filters or {}).get('search')):
                 attempts.append({'options': dict(options), 'filters': dict(filters), 'offset': offset})
@@ -50,7 +96,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # UserError is an expected RPC failure, not an unexpected
                     # server ERROR or a customer/staging fault injection.
                     raise UserError('Controlled disposable HR recovery failure')
-            return original(recordset, options, tab, filters, offset)
+            return original(recordset, options, tab, filters, offset, list_page_size)
 
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
         self.browser_size = '1440x900'
@@ -289,10 +335,19 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         existing_screenshots = set(screenshot_source.glob('*.png'))
         capture_prefixes = []
         captured_pdfs = []
-        viewports = [(320, 900), (390, 900), (768, 900), (1024, 900), (1366, 768), (1440, 900), (1920, 1080)]
-        for lang, heading, direction in [('en_US', 'Accounting revenue', 'ltr'), ('ar_001', 'الإيرادات المحاسبية', 'rtl')]:
+        # Representative coverage requested by the owner, not the full cross-product.
+        # Preserve all seven widths, both languages/appearances, and both 1440px
+        # export/report-return branches. Independent reference comparisons are separate.
+        cases = {
+            'en_US': [('light', (320, 900)), ('dark', (768, 900)),
+                      ('light', (1366, 768)), ('light', (1440, 900)), ('light', (1920, 1080))],
+            'ar_001': [('dark', (390, 900)), ('light', (1024, 900)), ('dark', (1440, 900))],
+        }
+        viewports = sorted({viewport for selected in cases.values() for _theme, viewport in selected})
+        matrix_cases = sum(len(selected) for selected in cases.values())
+        for lang, heading, direction in [('en_US', 'Revenue', 'ltr'), ('ar_001', 'الإيرادات', 'rtl')]:
             self.env.user.lang = lang
-            for theme, (width, height) in product(('light', 'dark'), viewports):
+            for theme, (width, height) in cases[lang]:
                 self.env.user.color_scheme = theme
                 self.browser_size = f'{width}x{height}'
                 prefixes = ['dashboard', 'polish_sales', 'polish_inventory', 'polish_procurement',
@@ -326,9 +381,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     };
                     const heading = HEADING;
                     const expected = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(100);
+                    const headlineExpected = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: 2}).format(100);
                     const card = await wait(() => [...document.querySelectorAll('.adams_card')]
                         .find(node => node.querySelector('h3')?.textContent.trim() === heading &&
-                            node.querySelector('.adams_value')?.textContent.trim() === expected),
+                            node.querySelector('.adams_value')?.textContent.trim() === headlineExpected),
                         'Native revenue fixture must render 100.00 in the selected language');
                     const root = document.querySelector('.o_adams_dashboard');
                     if (getComputedStyle(root).colorScheme !== THEME) throw new Error('Dashboard must follow native Odoo theme');
@@ -339,22 +395,18 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     sample.remove();
                     if (root.querySelectorAll('.adams_header > .adams_header_actions button').length !== 3) throw new Error('Reference view/export/print controls are missing');
                     if (getComputedStyle(root).direction !== DIRECTION) throw new Error('Incorrect text direction');
-                    if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow');
+                    const actionArrow = root.querySelector('.adams_action_arrow');
+                    if (DIRECTION === 'rtl' && !getComputedStyle(actionArrow).transform.startsWith('matrix(-1')) throw new Error('Native RTL action arrows must point left even when Odoo has no DOM dir attribute');
+                    if (root.scrollWidth > root.clientWidth + 2) throw new Error('Dashboard has horizontal page overflow at ' + WIDTH + ': ' + JSON.stringify([...root.querySelectorAll('*')].filter(node => {const r=node.getBoundingClientRect(),b=root.getBoundingClientRect();return r.width && (r.right>b.right+2 || r.left<b.left-2) && getComputedStyle(node).position!=='fixed';}).slice(0,8).map(node=>({tag:node.tagName,classes:node.className,width:node.getBoundingClientRect().width}))));
                     const scopeDates = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')];
-                    if (scopeDates.length !== 3) throw new Error('Applied filter summary must show three individual dates');
-                    if (scopeDates.some(date => date.getClientRects().length !== 1)) throw new Error('Applied filter summary split an individual date');
+                    if (scopeDates.length !== 2 || scopeDates.some(date => !date.textContent.trim())) throw new Error('Applied filter summary must retain the approved period range and balance cutoff');
+                    if (scopeDates.some(date => getComputedStyle(date.parentElement).display !== 'none' && date.getClientRects().length !== 1)) throw new Error('Visible applied period or cutoff must not wrap internally');
                     if (WIDTH <= 900) {
-                        const toggle = root.querySelector('.adams_mobile_menu');
-                        toggle.click();
-                        const menu = await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must open');
-                        await wait(() => menu.contains(document.activeElement), 'Mobile navigation must receive focus');
-                        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
-                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Escape must dismiss mobile navigation');
-                        if (document.activeElement !== toggle) throw new Error('Mobile navigation must return focus');
-                        toggle.click();
-                        await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Mobile navigation must reopen');
-                        root.querySelector('.adams_workspace_close').click();
-                        await wait(() => !root.querySelector('.adams_sidebar.is-open'), 'Close control must dismiss mobile navigation');
+                        const tabs = root.querySelector('.adams_reference_mobile_tabs');
+                        const active = tabs?.querySelector('button.active');
+                        if (!active || !tabs.getBoundingClientRect().height) throw new Error('Approved mobile department tabs must be visible');
+                        active.focus();
+                        if (document.activeElement !== active) throw new Error('Mobile department tabs must be keyboard focusable');
                     }
                     const profitability = root.querySelector('#adams-group-profitability > .adams_grid');
                     if (profitability.children.length !== 4) throw new Error('Reference requires four primary profitability cards');
@@ -404,16 +456,32 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     filter.focus();
                     if (document.activeElement !== filter) throw new Error('Filter button is not focusable');
                     const navigate = async key => {
-                        if (WIDTH <= 900) {
-                            root.querySelector('.adams_mobile_menu').click();
-                            await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Navigation must open');
+                        const mobileTabs = root.querySelector('.adams_reference_mobile_tabs');
+                        if (WIDTH <= 900 && mobileTabs) {
+                            const tab = [...mobileTabs.querySelectorAll('button')].find(button => button.dataset.section === key);
+                            if (!tab) throw new Error('Missing approved mobile department tab: ' + key);
+                            tab.click();
+                        } else {
+                            if (WIDTH <= 900) {
+                                root.querySelector('.adams_mobile_menu').click();
+                                await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Navigation must open');
+                            }
+                            root.querySelector('.adams_side_link[data-section="' + key + '"]').click();
                         }
-                        root.querySelector('.adams_side_link[data-section="' + key + '"]').click();
                         await wait(() => root.querySelector('#adams-' + key), 'Department must render: ' + key);
                         await wait(() => root.querySelector('.adams_side_link.active')?.dataset.section === key, 'Department must remain active');
                         if (root.querySelectorAll('.adams_section').length !== 1) throw new Error('Only the selected department must own the page');
                     };
                     const more = async action => {
+                        if (action === 'restore' && root.classList.contains('adams_reference_surface')) {
+                            root.querySelector('.adams_header [data-action="views"]').click();
+                            const dialog = await wait(() => root.querySelector('.adams_views_dialog[open]'), 'Saved views must open for restore');
+                            const restore = dialog.querySelector('[data-action="restore"]');
+                            if (restore.disabled) throw new Error('Saved view restoration must be available');
+                            restore.click();
+                            await wait(() => !dialog.open, 'Restore must close saved views');
+                            return;
+                        }
                         if (!root.querySelector('#adams-more-menu')) root.querySelector('[aria-controls="adams-more-menu"]').click();
                         const menu = await wait(() => root.querySelector('#adams-more-menu'), 'More menu must open');
                         const button = menu.querySelector('[data-action="' + action + '"]');
@@ -431,7 +499,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     }
                     await navigate('sales');
                     const productRank = await wait(() => root.querySelector('.adams_product_ranking .adams_rank_row'), 'Native product ranking must render');
-                    if (!productRank.innerText.includes(expected)) throw new Error('Product ranking must retain signed native invoice value');
+                    if (productRank.querySelector('.adams_rank_value')?.textContent.trim() !== headlineExpected) throw new Error('Product ranking must retain signed native invoice value');
                     root.dispatchEvent(new Event('wheel')); root.scrollTop = root.scrollHeight;
                     await new Promise(resolve => requestAnimationFrame(resolve));
                     if (root.querySelector('.adams_side_link.active')?.dataset.section !== 'sales') throw new Error('Scrolling must not change the selected department');
@@ -506,7 +574,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         await wait(() => !profile.open, 'Employee profile must close');
                     }
                     await navigate('finance');
-                    if (WIDTH <= 900) { root.querySelector('.adams_mobile_menu').click(); await wait(() => root.querySelector('.adams_sidebar.is-open'), 'Search navigation must open'); }
+                    if (WIDTH > 900) {
                     root.querySelector('.adams_sidebar button:not([data-section]).adams_side_link').click();
                     if (root.querySelector('.adams_sidebar.is-open')) root.querySelector('.adams_workspace_close').click();
                     const searchInput = await wait(() => root.querySelector('#adams-search'), 'Search input must open');
@@ -519,12 +587,14 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (searchDialog.scrollWidth > searchDialog.clientWidth + 2) throw new Error('Search drawer overflow');
                     searchDialog.querySelector('header button').click();
                     await wait(() => !searchDialog.open, 'Search drawer must close');
+                    }
                     if (WIDTH === 1440) {
                         await more('print');
                         const printPreview = await wait(() => root.querySelector('.adams_print_summary[open] tbody tr'), 'Native print preview must render');
                         const printDialog = printPreview.closest('dialog');
                         if (!printDialog.innerText.includes(expected)) throw new Error('Print preview lost formatted native revenue');
-                        if (!printDialog.innerText.includes(heading)) throw new Error('Print preview lost translated native revenue label');
+                        const printRevenueLabel = DIRECTION === 'rtl' ? 'الإيرادات المحاسبية' : 'Accounting revenue';
+                        if (!printDialog.innerText.includes(printRevenueLabel)) throw new Error('Print preview lost translated native revenue label');
                         if (printDialog.scrollWidth > printDialog.clientWidth + 2) throw new Error('Print preview overflow');
                         printDialog.querySelectorAll('header button')[1].click();
                         await wait(() => !printDialog.open, 'Print preview must close');
@@ -575,19 +645,22 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             !root.querySelector('#adams-sales [role="status"]'), 'Reset must preserve the stored view for explicit restoration');
                         await navigate('finance');
                         const restoredCard = [...root.querySelectorAll('.adams_card')].find(node => node.querySelector('h3')?.textContent.trim() === heading);
-                        const open = restoredCard.querySelector('button[aria-label="Open report"]');
+                        const open = restoredCard.querySelector('button.adams_value');
+                        if (!open || open.disabled) throw new Error('Revenue value must open its native report');
+                        await assertHitTarget(open, 'Revenue value');
+                        const datesBeforeReport = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(node => node.textContent.trim());
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
                         const back = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
                             'Native financial report must expose dashboard breadcrumb');
                         back.click();
-                        const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === expected
+                        const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === headlineExpected
                             && document.querySelector('.o_adams_dashboard'), 'Financial report return must reload the known native value');
                         const restoredDates = [...restored.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(input => input.textContent.trim());
-                        if (JSON.stringify(restoredDates) !== JSON.stringify(EXPECTED_DATES))
+                        if (JSON.stringify(restoredDates) !== JSON.stringify(datesBeforeReport))
                             throw new Error('Financial report return changed applied dates');
-                        const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button'),
+                        const paymentOpen = await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card')[2]?.querySelector('button.adams_value'),
                             'Payment window drilldown must load after financial report return');
                         paymentOpen.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
@@ -636,7 +709,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id)).replace('EXPECTED_DATES', json.dumps([today.replace(day=1).isoformat(), today.isoformat(), today.isoformat()]))
+                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):
@@ -718,7 +791,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         print_context = observed['result']['value']
                         self.assertEqual(print_context['viewport'], [width, height])
                         self.assertEqual(print_context['company'], self.env.company.name)
-                        self.assertIn(heading, print_context['rendered_text'])
+                        self.assertIn('الإيرادات المحاسبية' if lang == 'ar_001' else 'Accounting revenue',
+                                      print_context['rendered_text'])
                         parameters = {'landscape': False, 'displayHeaderFooter': False,
                             'printBackground': True, 'preferCSSPageSize': True,
                             'paperWidth': 210 / 25.4, 'paperHeight': 297 / 25.4,
@@ -783,10 +857,10 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 await new Promise(resolve => requestAnimationFrame(resolve));
                                 filters.requestSubmit();
                                 await wait(() => !filters.querySelector('button[type="submit"]').disabled &&
-                                    section.querySelectorAll('.adams_stock_table tbody tr').length === 25 &&
-                                    section.querySelectorAll('.adams_page_number').length === 2 &&
+                                    section.querySelectorAll('.adams_stock_table tbody tr').length === 8 &&
+                                    section.querySelectorAll('.adams_page_number').length === 3 &&
                                     [...section.querySelectorAll('.adams_stock_table tbody tr')].every(row => row.innerText.includes('DASH-VIS-')),
-                                    'Filtered native stock must render 25 rows and two numbered pages');
+                                    'Filtered native stock must render eight rows and a compact four-page navigator');
                             """.replace('STOCK_CATEGORY', json.dumps(str(stock_category.id)))
                             target = '.adams_stock_filters'
                         capture_section(section, target, setup)
@@ -805,7 +879,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                     tabs[TAB_INDEX].click();
                                     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                                     await wait(() => tabs[TAB_INDEX].classList.contains('active') &&
-                                        section.querySelector('.adams_recent_panel .adams_analysis') &&
+                                        section.querySelector('.adams_recent_panel .adams_sales_table_footer') &&
                                         !section.querySelector('.adams_recent_panel [role="status"]'),
                                         'Selected recent document list must finish loading');
                                     if (section.querySelector('.adams_recent_panel [role="alert"]'))
@@ -817,10 +891,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             capture_section(section, '.adams_fulfillment_panel', """
                                 const panel = section.querySelector('.adams_fulfillment_panel');
                                 if (!panel) throw new Error('Delivery quantities panel must exist');
-                                panel.querySelector('button').click();
-                                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                                await wait(() => panel.querySelector('.adams_page_controls') &&
-                                    !panel.querySelector('[role="status"]'),
+                                // Delivery is populated directly, without an extra exploration click.
+                                await wait(() => !panel.querySelector('[role="status"]'),
                                     'Delivery quantities must finish loading');
                                 if (panel.querySelector('[role="alert"]'))
                                     throw new Error('Delivery quantities failed during evidence capture');
@@ -836,22 +908,24 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const sourceCell = firstRow.cells[firstRow.cells.length - 1];
                                 const categoryHeader = viewport.querySelector('thead th.adams_stock_category');
                                 const categoryCell = firstRow.querySelector('td.adams_stock_category');
-                                const inlineCategory = productCell.querySelector('.adams_stock_mobile_category');
-                                const sourceMenu = sourceCell.querySelector('details.adams_stock_actions');
-                                if (!categoryHeader || !categoryCell || !inlineCategory ||
-                                    !categoryCell.textContent.includes('Dashboard visual stock') ||
-                                    !sourceMenu?.querySelector('summary') ||
-                                    !sourceMenu.querySelector('button'))
-                                    throw new Error('Native Category and Source data columns must retain product/category and source records');
-                                if (innerWidth === 1440 && getComputedStyle(root).colorScheme === 'light') {
-                                    if (getComputedStyle(categoryHeader).display === 'none' ||
-                                        getComputedStyle(categoryCell).display === 'none' ||
-                                        getComputedStyle(inlineCategory).display !== 'none')
-                                        throw new Error('Desktop stock must render Category as its own column');
+                                const direct = sourceCell.querySelector('button.adams_stock_direct');
+                                const expand = sourceCell.querySelector('button.adams_stock_detail_toggle');
+                                if (!categoryHeader || !categoryCell || !direct || !expand ||
+                                    !categoryCell.textContent.includes('Dashboard visual stock'))
+                                    throw new Error('Category, direct stock action and detail control must remain available');
+                                if (innerWidth > 900 && getComputedStyle(categoryCell).display === 'none')
+                                    throw new Error('Desktop stock must render Category as its own column');
+                                if (innerWidth <= 900) {
+                                    if (getComputedStyle(categoryCell).display !== 'none' || getComputedStyle(expand).display === 'none')
+                                        throw new Error('Narrow stock must expose expandable product details');
+                                    expand.click();
+                                    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+                                    const detail=section.querySelector('.adams_stock_detail');
+                                    if (!detail?.textContent.includes('Dashboard visual stock') || expand.getAttribute('aria-expanded') !== 'true')
+                                        throw new Error('Expanded stock details must retain the real category');
+                                    expand.click();
+                                    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
                                 }
-                                if (innerWidth <= 1100 && (getComputedStyle(categoryCell).display !== 'none' ||
-                                    getComputedStyle(inlineCategory).display === 'none'))
-                                    throw new Error('Narrow stock must retain Category within Product details');
                                 const rtl = getComputedStyle(viewport).direction === 'rtl';
                                 const origin = viewport.scrollLeft;
                                 const visibleBounds = () => {
@@ -891,12 +965,12 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 const pageTwo = [...section.querySelectorAll('.adams_page_number')].find(button => button.textContent.trim() === '2');
                                 if (!pageTwo) throw new Error('Second stock page is missing');
                                 pageTwo.click();
-                                await wait(() => section.querySelectorAll('.adams_stock_table tbody tr').length === 2 &&
+                                await wait(() => section.querySelectorAll('.adams_stock_table tbody tr').length === 8 &&
                                     section.querySelector('.adams_page_number[aria-current="page"]')?.textContent.trim() === '2' &&
                                     !section.querySelector('.adams_stock_filters button[type="submit"]').disabled,
-                                    'Second stock page must settle with the remaining two fixture rows');
-                                if (!section.querySelector('.adams_stock_table tbody').innerText.includes('DASH-VIS-26'))
-                                    throw new Error('Second stock page lost its final fixture product');
+                                    'Second stock page must settle with eight fixture rows');
+                                if (!section.querySelector('.adams_stock_table tbody').innerText.includes('DASH-VIS-08'))
+                                    throw new Error('Second stock page lost its first fixture product');
                             """)
                             browser.take_screenshot(prefix=f'polish_inventory_page2_{lang}_{theme}_{width}_').result(timeout=20)
                     for index, tab in enumerate(('overview', 'attendance', 'time_off', 'shifts', 'employees')):
@@ -933,7 +1007,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 break
             # take_screenshot's file-writing callback may finish just after its Future.
             time.sleep(0.05)
-        self.assertEqual(len(capture_prefixes), len(viewports) * 4 * (16 + (2 if stock_category else 0) + (1 if employee else 0)))
+        self.assertEqual(len(capture_prefixes), matrix_cases * (16 + (2 if stock_category else 0) + (1 if employee else 0)))
         self.assertTrue(all(len(paths) == 1 for paths in matched.values()),
                         'Each matrix view must have exactly one newly saved screenshot')
         retained_root = Path(config['data_dir']) / 'adams_dashboard_ui_evidence' / self.env.cr.dbname
@@ -942,7 +1016,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         retained_root.chmod(0o700)
         pending = Path(tempfile.mkdtemp(prefix='.pending-', dir=retained_root))
         manifest = {'test': self._testMethodName, 'database': self.env.cr.dbname,
-                    'matrix_cases': len(viewports) * 4, 'viewports': viewports, 'screenshots': len(capture_prefixes),
+                    'matrix_cases': matrix_cases, 'cases': cases, 'viewports': viewports, 'screenshots': len(capture_prefixes),
                     'populated_stock': bool(stock_category), 'files': []}
         for prefix, paths in matched.items():
             source = paths[0]
@@ -972,7 +1046,11 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                          destination, len(capture_prefixes))
 
         # PDFs have their own manifest and do not change PNG matrix coverage.
-        self.assertEqual(len(captured_pdfs), 4, 'Retain English/Arabic × light/dark actual PDFs')
+        expected_pdfs = {f'dashboard_summary_{lang}_{theme}_{width}.pdf'
+                         for lang, selected in cases.items() for theme, (width, _height) in selected
+                         if width == 1440}
+        self.assertEqual({item['name'] for item in captured_pdfs}, expected_pdfs,
+                         'Retain every representative native PDF, including both languages')
         pdf_root = Path(config['data_dir']) / 'adams_dashboard_pdf_evidence' / self.env.cr.dbname
         pdf_root.mkdir(parents=True, exist_ok=True, mode=0o700)
         pdf_root.parent.chmod(0o700)

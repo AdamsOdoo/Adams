@@ -18,6 +18,8 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
             source.check_access('read')
             columns = ['name', 'partner_id', 'date_order', 'date_planned',
                        'amount_untaxed', 'currency_id', 'state']
+            if 'receipt_status' in source._fields:
+                columns.append('receipt_status')
             source.check_field_access_rights('read', ['company_id', *columns])
             domain = [('company_id', '=', self.env.company.id), ('state', '=', 'purchase'),
                       *self._date_bounds(source, 'date_order', dates)]
@@ -32,6 +34,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
         rows = records.read(columns)
         dates = [name for name in columns if source._fields[name].type == 'datetime']
         states = dict(source._fields['state']._description_selection(self.env)) if 'state' in columns else {}
+        receipts = dict(source._fields['receipt_status']._description_selection(self.env)) if 'receipt_status' in columns else {}
         currencies = {currency.id: (currency.name, currency.decimal_places) for currency in records.currency_id} if 'currency_id' in columns else {}
         for row in rows:
             for name in dates:
@@ -39,19 +42,21 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
                     self, fields.Datetime.to_datetime(row[name])).strftime('%Y-%m-%d %H:%M') if row[name] else '')
             if states:
                 row['state_label'] = states.get(row['state'], row['state'])
+            if receipts:
+                row['receipt_label'] = receipts.get(row.get('receipt_status'))
             if 'currency_id' in row:
                 currency, digits = currencies[row['currency_id'][0]]
                 row.update(currency=currency, digits=digits)
         return rows
 
-    def _workspace_records(self, section, dates, offset):
+    def _workspace_records(self, section, dates, offset, page_size=25):
         source, domain, columns, order, action_id = self._workspace_record_scope(section, dates)
         total = source.search_count(domain)
-        offset = min(offset, ((total - 1) // 25) * 25) if total else 0
-        records = source.search(domain, order=order, offset=offset, limit=25)
+        offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
+        records = source.search(domain, order=order, offset=offset, limit=page_size)
         return {'status': 'ready' if records else 'empty',
                 'rows': self._workspace_record_rows(source, records, columns),
-                'total': total, 'offset': offset, 'page_size': 25, 'has_more': offset + len(records) < total,
+                'total': total, 'offset': offset, 'page_size': page_size, 'has_more': offset + len(records) < total,
                 'provenance': {'model': source._name, 'domain': domain, 'source_kind': 'operational_records'}}
 
     def _workspace_amount(self, key, dates, measure=None):
@@ -83,10 +88,12 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
             return {'status': 'error', 'rows': []}
 
     @api.model
-    def get_workspace_details(self, options, section, offset=0):
+    def get_workspace_details(self, options, section, offset=0, page_size=25):
         scoped, dates = self._scope(options)
         if section not in ('procurement', 'crm') or type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid workspace or page.'))
+        if type(page_size) is not int or page_size not in (4, 25):
+            raise ValidationError(_('Invalid page size.'))
         base = {'status': 'ready', 'company_id': scoped.env.company.id,
                 'currency': scoped.env.company.currency_id.name,
                 'digits': scoped.env.company.currency_id.decimal_places,
@@ -96,14 +103,14 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
         if model not in scoped.env:
             return {**base, 'status': 'not_installed', 'rows': []}
         if section == 'crm':
-            rows = scoped._workspace_panel(lambda: scoped._workspace_records(section, dates, offset))
+            rows = scoped._workspace_panel(lambda: scoped._workspace_records(section, dates, offset, page_size))
             amount = scoped._workspace_panel(lambda: scoped._workspace_amount('crm', dates, 'expected_revenue:sum'))
             return {**base, **rows, 'unweighted': amount}
         return {**base,
                 'summary': scoped._workspace_panel(lambda: scoped._workspace_amount('purchases', dates)),
                 'approvals': scoped._workspace_panel(lambda: scoped._workspace_attention('approvals')),
                 'late': scoped._workspace_panel(lambda: scoped._workspace_attention('late')),
-                'recent': scoped._workspace_panel(lambda: scoped._workspace_records(section, dates, offset))}
+                'recent': scoped._workspace_panel(lambda: scoped._workspace_records(section, dates, offset, page_size))}
 
     @api.model
     def open_workspace_record(self, options, section, record_id=None):

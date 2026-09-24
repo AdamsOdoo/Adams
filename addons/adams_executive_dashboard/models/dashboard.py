@@ -161,11 +161,16 @@ class ExecutiveDashboard(models.AbstractModel):
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', columns)
         domain = [*domain, ('product_id', '!=', False)]
+        # Count the displayed product/unit groups, not report lines or orders.
+        # _read_group retains the report's normal record rules and company scope.
+        total = len(report._read_group(domain, groupby=['product_id', 'product_uom_id']))
+        offset = min(offset, ((total - 1) // 25) * 25) if total else 0
         rows = report._read_group(domain,
             groupby=['product_id', 'product_uom_id'],
             aggregates=['product_uom_qty:sum', 'qty_delivered:sum', 'qty_to_deliver:sum'],
-            order='product_id ASC, product_uom_id ASC', offset=offset, limit=26)
-        return {'status': 'ready' if rows else 'empty', 'has_more': len(rows) > 25,
+            order='product_id ASC, product_uom_id ASC', offset=offset, limit=25)
+        return {'status': 'ready' if rows else 'empty', 'has_more': offset + len(rows) < total,
+                'total_count': total, 'offset': offset, 'page_size': 25,
                 'rows': [{'id': product.id, 'name': product.display_name, 'unit': unit.display_name, 'unit_id': unit.id,
                           'ordered': ordered, 'delivered': delivered, 'remaining': remaining}
                          for product, unit, ordered, delivered, remaining in rows[:25]],
@@ -196,10 +201,12 @@ class ExecutiveDashboard(models.AbstractModel):
         return action
 
     @api.model
-    def get_recent_sales(self, kind, options, offset=0):
+    def get_recent_sales(self, kind, options, offset=0, page_size=25):
         scoped, dates = self._scope(options)
         if kind not in ('orders', 'quotations', 'invoices') or type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid list or page.'))
+        if type(page_size) is not int or page_size not in (6, 25):
+            raise ValidationError(_('Invalid page size.'))
         if kind != 'invoices' and 'sale.order' not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
         documents, domain = scoped._recent_scope(kind, dates)
@@ -210,12 +217,14 @@ class ExecutiveDashboard(models.AbstractModel):
         if not invoice_list and 'delivery_status' in documents._fields:
             columns.append('delivery_status')
         documents.check_field_access_rights('read', columns)
-        records = documents.search(domain, order=f'{date_field} desc, id desc', limit=26, offset=offset)
-        rows = records[:25].read(columns)
+        total = documents.search_count(domain)
+        offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
+        records = documents.search(domain, order=f'{date_field} desc, id desc', limit=page_size, offset=offset)
+        rows = records.read(columns)
         states = dict(documents._fields['state']._description_selection(scoped.env))
         delivery_labels = dict(documents._fields['delivery_status']._description_selection(scoped.env)) if 'delivery_status' in columns else {}
         type_labels = dict(documents._fields['move_type']._description_selection(scoped.env)) if invoice_list else {}
-        for row, record in zip(rows, records[:25]):
+        for row, record in zip(rows, records):
             row['delivery_label'] = delivery_labels.get(row.get('delivery_status'))
             row.update(state_label=states[row['state']], currency=record.currency_id.name,
                        digits=record.currency_id.decimal_places, res_model=documents._name)
@@ -225,8 +234,9 @@ class ExecutiveDashboard(models.AbstractModel):
                            date_label=fields.Date.to_string(record.invoice_date))
             else:
                 row['date_label'] = fields.Datetime.context_timestamp(record, record.date_order).strftime('%Y-%m-%d %H:%M')
-        return {'status': 'ready' if rows else 'empty', 'rows': rows, 'has_more': len(records) > 25,
-                'offset': offset, 'date_basis': date_field, 'timezone': scoped.env.user.tz or 'UTC',
+        return {'status': 'ready' if rows else 'empty', 'rows': rows, 'has_more': offset + len(rows) < total,
+                'offset': offset, 'page_size': page_size, 'total_count': total,
+                'date_basis': date_field, 'timezone': scoped.env.user.tz or 'UTC',
                 'scope_label': (_('Posted invoices and credit notes · Untaxed document values') if invoice_list
                                 else _('Untaxed order values'))}
 
@@ -439,6 +449,12 @@ class ExecutiveDashboard(models.AbstractModel):
                         # __count distinguishes an empty native report from a real zero.
                         rows = report._read_group(domain, aggregates=[aggregate, '__count'])
                         value, count = rows[0]
+                        if key == 'quotations':
+                            # Count documents, not sale.report lines; use the
+                            # same report domain and source permissions as value.
+                            report.check_field_access_rights('read', ['order_reference'])
+                            item['document_count'] = report._read_group(
+                                domain, aggregates=['order_reference:count_distinct'])[0][0]
                         item.update(status='ready' if count else 'empty', value=value if count else None,
                                     source=report._description, measure=aggregate,
                                     date_field=SOURCES[key][1], domain=domain,

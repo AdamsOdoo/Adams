@@ -1,6 +1,6 @@
 {
     'name': 'Adams Executive Dashboard',
-    'version': '19.0.1.6.0',
+    'version': '19.0.1.7.0',
     'summary': 'Report-first executive workspace',
     'author': 'Adams',
     'license': 'LGPL-3',
@@ -9,7 +9,12 @@
     'assets': {'web.assets_backend': [
         'adams_executive_dashboard/static/src/dashboard.js',
         'adams_executive_dashboard/static/src/dashboard.xml',
+        'adams_executive_dashboard/static/src/sales.xml',
+        'adams_executive_dashboard/static/src/workspaces.xml',
+        'adams_executive_dashboard/static/src/hr.xml',
         'adams_executive_dashboard/static/src/dashboard.scss',
+        'adams_executive_dashboard/static/src/sales.scss',
+        'adams_executive_dashboard/static/src/hr.scss',
     ]},
     'application': True,
     'installable': True,

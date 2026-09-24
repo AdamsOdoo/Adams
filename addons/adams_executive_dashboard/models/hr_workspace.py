@@ -16,7 +16,7 @@ HR_ACTIONS = {'employees': 'hr.open_view_employee_list',
               'time_off': 'hr_holidays.hr_leave_action_action_approve_department',
               'shifts': 'planning.planning_action_schedule_by_resource'}
 HR_FIELDS = {
-    'employees': ['name', 'active', 'department_id', 'job_id', 'work_location_id'],
+    'employees': ['name', 'active', 'department_id', 'job_id', 'work_location_id', 'parent_id'],
     'attendance': ['employee_id', 'department_id', 'check_in', 'check_out', 'worked_hours'],
     'time_off': ['employee_id', 'department_id', 'holiday_status_id', 'date_from', 'date_to',
                  'state', 'number_of_days', 'number_of_hours', 'request_unit_hours'],
@@ -187,7 +187,42 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 row['assigned'] = bool(row['resource_id'])
             if states:
                 row['state_label'] = states.get(row['state'], row['state'])
+        if tab != 'employees' and records and 'employee_id' in records._fields:
+            # Work-only subtitles and locations follow employee source permissions.
+            try:
+                with self.env.cr.savepoint():
+                    employees = records.employee_id
+                    employees.check_access('read')
+                    work_fields = ['job_id', 'work_location_id']
+                    employees.check_field_access_rights('read', work_fields)
+                    work = {employee['id']: employee for employee in employees.read(work_fields)}
+                    for row in rows:
+                        employee_id = row.get('employee_id')
+                        if employee_id and employee_id[0] in work:
+                            row.update({name: work[employee_id[0]][name] for name in work_fields})
+            except AccessError:
+                pass  # Authorized attendance/leave rows remain usable without HR subtitles.
         return rows
+
+    def _hr_preview(self, tab, dates):
+        if not self._hr_has_source(tab, {}):
+            return {'status': 'not_installed', 'rows': []}
+        try:
+            with self.env.cr.savepoint():
+                raw = {'status': 'published'} if tab == 'shifts' else {'status': 'all'}
+                filters, scoped_dates = self._hr_filters(tab, raw, dates)
+                source, domain, columns, order = self._hr_source_scope(tab, filters, scoped_dates)
+                if tab == 'time_off':
+                    domain = [*domain, ('state', 'in', ['confirm', 'validate1', 'validate'])]
+                records = source.search(domain, order=order, limit=4)
+                return {'status': 'ready' if records else 'empty', 'rows': self._hr_rows(tab, records, columns),
+                        'total': source.search_count(domain), 'filters': raw,
+                        'provenance': {'model':source._name, 'domain':domain}}
+        except AccessError:
+            return {'status': 'restricted', 'rows': []}
+        except Exception as error:
+            _logger.warning('Dashboard HR preview %s failed: %s', tab, type(error).__name__)
+            return {'status': 'error', 'rows': []}
 
     def _hr_overview(self, dates):
         definitions = [
@@ -242,19 +277,23 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 attendance_summary[key] = item
             else:
                 metrics.append(item)
+        previews['requests'] = self._hr_preview('time_off', dates)
+        previews['published'] = self._hr_preview('shifts', dates)
         return {'status': 'ready', 'metrics': metrics, 'departments': departments, 'previews': previews,
                 'attendance_summary': attendance_summary,
                 'today': fields.Date.context_today(self).isoformat()}
 
     @api.model
-    def get_hr_workspace(self, options, tab='overview', filters=None, offset=0):
+    def get_hr_workspace(self, options, tab='overview', filters=None, offset=0, list_page_size=25):
         scoped, dates = self._scope(options)
         filters, dates = scoped._hr_filters(tab, filters, dates)
         if type(offset) is not int or not 0 <= offset <= 100000:
             raise ValidationError(_('Invalid page.'))
+        if type(list_page_size) is not int or list_page_size not in (6, 25):
+            raise ValidationError(_('Invalid page size.'))
         # Calendar batches are explicit and bounded; the UI can append further
         # batches without presenting a paginated fragment as a complete week.
-        page_size = 100 if tab == 'shifts' and filters.get('view') == 'week' else 25
+        page_size = 100 if tab == 'shifts' and filters.get('view') == 'week' else list_page_size
         base = {'tab': tab, 'company_id': scoped.env.company.id, 'timezone': scoped.env.user.tz or 'UTC',
                 'date_from': dates[0].isoformat(), 'date_to': dates[1].isoformat(),
                 'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
@@ -275,6 +314,38 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 'offset': offset, 'has_more': offset + len(rows) < total,
                 'date_basis': 'current' if tab == 'employees' else filters.get('scope', 'period'),
                 'provenance': {'model': source._name, 'domain': domain, 'source_kind': 'operational_records'}}
+
+    def _hr_profile_snapshot(self, tab, employee_id, dates):
+        if not self._hr_has_source(tab, {}):
+            return {'status':'not_installed','rows':[]}
+        try:
+            with self.env.cr.savepoint():
+                raw = {'employee_id':employee_id, 'status':{'attendance':'open','time_off':'validate','shifts':'published'}[tab]}
+                filters, scoped_dates = self._hr_filters(tab, raw, dates)
+                source, _domain, columns, _order = self._hr_source_scope(tab, filters, scoped_dates)
+                # These work-profile fields are current snapshots, independent of list period.
+                company_field = 'employee_id.company_id' if tab=='attendance' else 'company_id'
+                domain=[(company_field,'=',self.env.company.id),('employee_id','=',employee_id)]
+                if tab=='attendance':
+                    domain.append(('check_out','=',False))
+                    order,limit='check_in desc, id desc',1
+                elif tab=='shifts':
+                    domain += [('state','=','published'),('end_datetime','>',fields.Datetime.now())]
+                    order,limit='start_datetime, id',1
+                else:
+                    today=fields.Date.context_today(self)
+                    lower=self._date_bounds(source,'date_from',(today,today))[0][2]
+                    domain += [('state','=','validate'),('date_to','>=',lower)]
+                    order,limit='date_from, id',4
+                source.check_field_access_rights('read', list({term[0].split('.')[0] for term in domain}))
+                records=source.search(domain,order=order,limit=limit)
+                return {'status':'ready' if records else 'empty','rows':self._hr_rows(tab,records,columns),
+                        'total':source.search_count(domain),'timezone':self.env.user.tz or 'UTC'}
+        except AccessError:
+            return {'status':'restricted','rows':[]}
+        except Exception as error:
+            _logger.warning('Dashboard HR profile snapshot %s failed: %s',tab,type(error).__name__)
+            return {'status':'error','rows':[]}
 
     @api.model
     def get_employee_profile(self, options, employee_id):
@@ -314,7 +385,8 @@ class ExecutiveDashboardHR(models.AbstractModel):
                     _logger.warning('Dashboard HR source %s failed: %s', tab, type(error).__name__)
                     item['status'] = 'error'
             summaries.append(item)
-        return {'status': 'ready', 'company_id': scoped.env.company.id, 'employee': profile,
+        return {'status': 'ready', 'company_id': scoped.env.company.id, 'today':fields.Date.context_today(scoped).isoformat(), 'employee': profile,
+                'snapshots': {tab:scoped._hr_profile_snapshot(tab,employee_id,dates) for tab in ('attendance','time_off','shifts')},
                 'summaries': summaries, 'date_from': dates[0].isoformat(), 'date_to': dates[1].isoformat()}
 
     @api.model
