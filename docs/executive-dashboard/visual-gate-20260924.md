@@ -1,6 +1,15 @@
 # Finance / Inventory component propagation gate
 
-Status: **reviewed for presentation reuse; not a release or staging qualification**.
+Status: **reviewed for presentation reuse; not production acceptance**.
+
+24 September continuation: the earlier archive-download blocker below is resolved.
+Paired archives were retrieved, checksum/integrity checked and reviewed. Candidate
+`e962e671` completed native build 38589101 with zero failures/errors in 126 cases
+(283.47s; 109852 queries); optional Manufacturing cases were skipped.
+The corrected English HR previews/profile/attendance and Sales count were reviewed
+on 94b54982; the final Arabic HR link translations were reviewed on e962e671.
+See the current implementation status for staging and acceptance boundaries.
+Historical pending statements below describe their original checkpoint.
 
 Reviewed source: `9d35f078bc09cfb78e5352ce246214b092d6a45e`, development build
 `38567302`; application code is unchanged from `238445032bf053bab18255c794097f87d42ecfd2`.

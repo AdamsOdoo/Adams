@@ -1,5 +1,38 @@
 # Executive dashboard — implementation and verification
 
+## 24 September — final source and staging verification
+
+Application source: `e962e671c87bad93075153057843e1ddd4abb2a2`.
+Native development build 38589101: 126 cases, zero failed/zero errors,
+283.47 seconds, 109852 queries. Optional Manufacturing cases were skipped;
+field-access deprecation warnings remain. 74 focused controller checks pass.
+
+Corrected HR preview typography, profile control sizes/alignment, attendance
+filter labels and employee checkbox spacing; restored the Sales order-count
+note style and translated the two HR source links after their SVG arrow port.
+English/light 1440 corrections were reviewed on 94b54982; final Arabic/dark 1440
+HR links were reviewed on e962e671. Finance/Inventory presentation reuse gate
+and prior 768px comparisons remain applicable to unchanged components.
+
+Staging commit `b4d788110fdb02d4278dfab8409ef54f1c40fe6c` contains exactly the
+two dashboard addon trees from e962e671. Backup 2026-09-24 04:23:57 UTC preserves
+previous staging af0d2327 and its data/configuration. Both modules are verified installed at `19.0.1.7.0`; runtime Git HEAD and addon
+trees match. Live P&L revenue/gross profit/net profit/expenses and a sampled
+Stock product balance match their native sources. Sales margin/Top 10/quantity
+and page 2 work; Procurement opens the matching purchase order; employee
+profiles and all three missing HR-app tabs settle correctly. CRM remains
+disabled by the existing company setting. See [final handoff](handoff-20260924.md).
+
+Explicit acceptance boundaries: source-backed quotation badge colors differ
+from the prototype's delivery-derived colors; Time Off retains additional
+real approval/cancelled statuses; record/department names remain source data,
+not translated fixture labels. Localized date text differs in ordering in some
+Arabic comparison captions. These are documented differences, not a claim of
+pixel-identical acceptance. Owner visual/financial review and independent final
+review remain open. No production release or main merge; PR214 stays draft.
+
+Earlier entries below are historical and are superseded where stated above.
+
 ## 24 September — reviewed HR corrections, native rerun pending
 
 Candidate `0a46bb89` / development build38579807 completed 126 native checks

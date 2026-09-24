@@ -1,7 +1,8 @@
 # Approved dashboard candidate: owner check
 
-Status: development qualification in progress. Do not use historical UAT checkboxes
-as acceptance of this candidate. Exact build/deployment status is in
+Status: candidate deployed to staging and representative live checks completed.
+See [the final handoff](handoff-20260924.md) for exact evidence and remaining
+acceptance boundaries. Do not use historical UAT checkboxes as acceptance of this candidate. Exact build/deployment status is in
 [implementation-status.md](implementation-status.md). PR214 stays draft and no
 production release is authorized.
 
@@ -59,8 +60,9 @@ production release is authorized.
 
 ## Acceptance still required
 
-A clean native run, final rendered comparison review, dashboard-only staging
-upgrade, source/module/asset identity and live staging journeys are mandatory.
+The current native run, corrected comparison review, dashboard-only staging
+upgrade, source/module/asset identity and representative live journeys are recorded
+in the handoff. Full owner acceptance and independent review remain open.
 Optional HR applications are not installed on Adams For Men staging; native
 populated-app tests and live unavailable-state checks are separate evidence.
 Owner visual/financial approval and production release approval remain separate.
