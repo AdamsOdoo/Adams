@@ -50,7 +50,7 @@
     .adams_shift_card.unassigned { border-inline-start-color:var(--adams-sales-amber); background:var(--adams-attention); }
     .adams_state_badge.red { background:var(--adams-attention); color:var(--adams-sales-red); }
     @media(max-width:1100px) { .adams_hr_kpi { padding:14px; } }
-    @media(max-width:900px) { .adams_hr_kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+    @media(max-width:900px) { .adams_hr_kpi .adams_value { font-size:24px; } .adams_hr_kpi .adams_card_top h3 { font-size:12px; } .adams_hr_kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
     @media(max-width:650px) {
         .adams_hr_kpi { padding:13px 12px 10px; }
         .adams_hr_filters { padding:13px 15px; }

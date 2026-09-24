@@ -386,7 +386,7 @@ export class ExecutiveDashboard extends Component {
         return this.state.sections.finance?.items.find(item => item.key === key);
     }
 
-    get referenceSurface() { return ['finance','inventory','sales','procurement','crm'].includes(this.state.activeSection); }
+    get referenceSurface() { return ['finance','inventory','sales','procurement','crm','hr'].includes(this.state.activeSection); }
     rankingInitials(label) { return (label || '').trim().split(/\s+/).slice(0, 2).map(word => word[0]).join(''); }
     get salesQuantityUnit() { return this.state.products?.units?.find(unit => unit.id === this.state.products.unit_id)?.name || ''; }
     openSalesRanking(type, id = undefined) {
