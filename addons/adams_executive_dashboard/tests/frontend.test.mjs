@@ -11,6 +11,15 @@ function fixture() {
     const storage = new Map();
     const companyEvents = {};
     const nativeUser = {};
+    const urlState = {};
+    const urlPushes = [];
+    const routeTo = (values, replace) => {
+        const next = replace ? Object.fromEntries(Object.entries(urlState).filter(([key]) => ['debug', 'lang'].includes(key))) : { ...urlState };
+        Object.assign(next, values);
+        for (const key of Object.keys(urlState)) delete urlState[key];
+        for (const [key, value] of Object.entries(next)) if (value !== undefined) urlState[key] = value;
+    };
+    const externalListeners = [];
     const services = {
         orm: { call(model, method, args) {
             return new Promise((resolve, reject) => pending.push({ method, args, resolve, reject }));
@@ -23,7 +32,11 @@ function fixture() {
     const Controller = runInNewContext(source + '\nExecutiveDashboard;', {
         window: { localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) } },
         Component: class {}, onWillStart() {}, onWillUnmount(fn) { destroy = fn; },
-        useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {},
+        useRef: () => ({ el: { scrollTop: 140 } }), useEffect() {}, useSetupAction() {}, useExternalListener(target, event, callback) { externalListeners.push({ event, callback }); },
+        router: { current: urlState,
+            // Mirrors Odoo 19 computeNextState: replace keeps only locked keys, otherwise values merge.
+            pushState(values, options = {}) { urlPushes.push({ mode: 'push', values, options }); routeTo(values, options.replace); },
+            replaceState(values, options = {}) { urlPushes.push({ mode: 'replace', values, options }); routeTo(values, options.replace); } },
         useState: value => value, useService: key => { if (!services[key]) throw new Error(`Service ${key} is not available`); return services[key]; },
         useBus(bus, event, callback) { companyEvents[event] = callback; }, user: nativeUser, userBus: {}, _t: value => value,
         getComputedStyle: element => ({direction: element.direction || 'ltr'}),
@@ -32,7 +45,7 @@ function fixture() {
     const controller = new Controller();
     controller.setup();
     controller.state.draft = { company_id: 1, date_from: '2026-08-01', date_to: '2026-08-31', as_of: '2026-08-31' };
-    return { controller, pending, notifications, storage, companyEvents, nativeUser, destroy: () => destroy() };
+    return { controller, pending, notifications, storage, companyEvents, nativeUser, urlState, urlPushes, externalListeners, destroy: () => destroy() };
 }
 
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
@@ -283,7 +296,9 @@ test('large headline abbreviation retains exact detail formatting and native sig
     assert.equal(controller.formatted({value: -2330000}, {digits: 2}), '-2,330,000.00');
     assert.equal(controller.headline({value: 0}, {digits: 2}), '0.00');
     assert.equal(controller.headline({value: -2330000}, {digits: 2}, true), '-2,330,000');
-    assert.equal(controller.headline({value: 129.45}, {digits: 2}, true), '129.45');
+    // Cards show whole units like the approved design; exact values stay in formatted().
+    assert.equal(controller.headline({value: 129.45}, {digits: 2}, true), '129');
+    assert.equal(controller.formatted({value: 129.45}, {digits: 2}), '129.45');
     assert.equal(controller.headline({value: 0}, {digits: 2}, true), '0');
     assert.equal(controller.headline({value: null, status: 'restricted'}, {digits: 2}), 'Access restricted');
 });
@@ -1236,4 +1251,295 @@ test('HR compact pages retain native dates and approved shift status selections'
     assert.equal(filters.assignment,undefined);
     assert.equal(controller.hrDate('2026-09-22 09:05'),'22 Sept 2026');
     assert.equal(controller.hrTime('2026-09-22 09:05'),'09:05');
+});
+
+test('card headlines use one whole-unit format while tables keep exact values', () => {
+    const { controller } = fixture();
+    // Synthetic amounts: cards previously mixed "12,345.67" with "234,567.6" side by side.
+    assert.deepEqual([12345.67, 234567.6, 45678.4, 309876.2].map(value => controller.headline({value}, {digits: 2}, true)),
+        ['12,346', '234,568', '45,678', '309,876']);
+    assert.equal(controller.formatted({value: 234567.6}, {digits: 2}), '234,567.60');
+    assert.equal(controller.quantity(2.5), '2.5');
+});
+
+test('ranking and employee initials use letters, not internal references or punctuation', () => {
+    const { controller } = fixture();
+    assert.equal(controller.rankingInitials('[FURN_8220] Four Person Desk'), 'FP');
+    assert.equal(controller.rankingInitials('Two-Seat Sofa (Linen)'), 'TS');
+    assert.equal(controller.rankingInitials('(Unassigned)'), 'U');
+    assert.equal(controller.rankingInitials('  Omar Adel '), 'OA');
+    assert.equal(controller.rankingInitials('محمد علي'), 'مع');
+    assert.equal(controller.employeeInitials('nour ali'), 'NA');
+    assert.equal(controller.rankingInitials('3M Company'), 'MC');
+    assert.equal(controller.rankingInitials('2024 Retail Plan'), 'RP');
+    assert.equal(controller.rankingInitials(''), '');
+});
+
+test('utility menu closes on an outside press, keeps inside presses, and returns focus on Escape', () => {
+    const { controller, externalListeners } = fixture();
+    const listener = externalListeners.find(entry => entry.event === 'pointerdown');
+    assert.ok(listener, 'an outside-press listener is registered');
+    let focused = false;
+    controller.moreToggle = { el: { focus() { focused = true; } } };
+    controller.toggleMore();
+    listener.callback({ target: { closest: selector => selector === '.adams_more_wrapper' ? {} : null } });
+    assert.equal(controller.state.moreOpen, true);
+    listener.callback({ target: { closest: () => null } });
+    assert.equal(controller.state.moreOpen, false);
+    controller.toggleMore();
+    let prevented = false;
+    controller.workspaceKeydown({ key: 'Escape', target: { tagName: 'DIV' }, preventDefault() { prevented = true; } });
+    assert.equal(controller.state.moreOpen, false);
+    assert.ok(prevented && focused, 'Escape closes the menu and returns focus to its toggle');
+});
+
+test('menu arrow keys move between enabled items and wrap', () => {
+    const { controller } = fixture();
+    const focusLog = [];
+    const items = ['export', 'print', 'views'].map(name => ({ name, focus() { focusLog.push(name); } }));
+    const press = (key, target) => controller.menuKeydown({ key, target, currentTarget: { querySelectorAll: () => items }, preventDefault() {} });
+    press('ArrowDown', items[2]);
+    press('ArrowUp', items[0]);
+    press('Home', items[1]);
+    press('End', items[0]);
+    press('Tab', items[0]);
+    assert.deepEqual(focusLog, ['export', 'views', 'export', 'views']);
+});
+
+test('department and applied dates are kept in the URL without new history entries', async () => {
+    const { controller, pending, urlPushes, urlState } = fixture();
+    Object.assign(urlState, { action: 'executive-dashboard', actionStack: [{ action: 'executive-dashboard' }] });
+    controller.alive = true;
+    controller.defaultOptions = { company_id: 1, date_from: '2026-09-01', date_to: '2026-09-24', as_of: '2026-09-24' };
+    controller.state.companies = [{ id: 1, enabled_sections: ['finance', 'sales', 'hr'] }];
+    controller.state.draft = { ...controller.defaultOptions };
+    void controller.refresh();
+    let last = urlPushes.at(-1);
+    assert.equal(last.mode, 'replace', 'no new history entry per selection');
+    assert.equal(last.options.replace, undefined, 'a full-state replace would drop the action path');
+    assert.equal(urlState.section, undefined);
+    assert.equal(urlState.date_from, undefined, 'default scope keeps the URL clean');
+    controller.navigateSection('sales');
+    assert.equal(urlState.section, 'sales');
+    assert.equal(urlState.action, 'executive-dashboard', 'the dashboard stays addressable after a selection');
+    controller.state.draft = { ...controller.defaultOptions, date_from: '2026-08-01', date_to: '2026-08-31' };
+    void controller.refresh();
+    assert.deepEqual([urlState.date_from, urlState.date_to, urlState.as_of], ['2026-08-01', '2026-08-31', '2026-09-24']);
+    assert.equal(urlState.action, 'executive-dashboard');
+    assert.equal(controller.state.periodPreset, 'previous');
+    controller.navigateSection('finance');
+    assert.equal('section' in urlState, false, 'the default department is removed from the URL');
+    for (const request of pending) request.resolve({ items: [], digits: 2 });
+});
+
+test('URL selections are validated before use', () => {
+    const { controller, urlState } = fixture();
+    const data = { options: { company_id: 1, date_from: '2026-09-01', date_to: '2026-09-24', as_of: '2026-09-24' } };
+    Object.assign(urlState, { section: 'sales', hr_tab: 'shifts', date_from: '2026-01-01', date_to: '2026-03-31', as_of: '2026-03-31' });
+    let selection = controller.urlSelection(data);
+    assert.deepEqual({ ...selection.scope }, { date_from: '2026-01-01', date_to: '2026-03-31', as_of: '2026-03-31' });
+    assert.equal(selection.section, 'sales');
+    assert.equal(selection.hrTab, 'shifts');
+    Object.assign(urlState, { date_from: '2026-05-01', date_to: '2026-04-01', hr_tab: 'payroll' });
+    selection = controller.urlSelection(data);
+    assert.deepEqual({ ...selection.scope }, {}, 'a reversed range is ignored, not applied');
+    assert.equal(selection.hrTab, null);
+    Object.assign(urlState, { date_from: '2026-02-30', date_to: '2026-03-31' });
+    assert.deepEqual({ ...controller.urlSelection(data).scope }, {}, 'an impossible date is ignored');
+});
+
+test('period selector always describes the applied dates', () => {
+    const { controller } = fixture();
+    controller.defaultOptions = { date_to: '2026-09-24' };
+    assert.equal(controller.presetFor({ date_from: '2026-09-01', date_to: '2026-09-24' }), 'month');
+    assert.equal(controller.presetFor({ date_from: '2026-01-01', date_to: '2026-09-24' }), 'ytd');
+    assert.equal(controller.presetFor({ date_from: '2026-08-01', date_to: '2026-08-31' }), 'previous');
+    assert.equal(controller.presetFor({ date_from: '2026-08-02', date_to: '2026-08-31' }), 'custom');
+});
+
+test('profitability chart names configuration states instead of offering a useless retry', () => {
+    const { controller } = fixture();
+    const finance = statuses => ({ status: 'ready', items: ['revenue', 'gross_profit', 'profit'].map((key, index) => ({ key, status: statuses[index] })) });
+    controller.state.sections = { finance: finance(['ready', 'not_configured', 'ready']) };
+    assert.equal(controller.chartBlockedReason, 'Not configured');
+    controller.state.sections = { finance: finance(['ready', 'ready', 'restricted']) };
+    assert.equal(controller.chartBlockedReason, 'Access restricted');
+    controller.state.sections = { finance: { status: 'ready', items: [{ key: 'revenue', status: 'not_configured' }] } };
+    assert.equal(controller.chartBlockedReason, 'Not configured');
+    controller.state.sections = { finance: finance(['ready', 'ready', 'error']) };
+    assert.equal(controller.chartBlockedReason, '', 'a transient error keeps Retry');
+    controller.state.sections = { finance: finance(['empty', 'empty', 'empty']) };
+    assert.equal(controller.chartBlockedReason, '', 'a period without entries can still load earlier months');
+    controller.state.sections = { finance: { status: 'ready', items: [{ key: 'revenue', status: 'ready' }, { key: 'profit', status: 'ready' }] } };
+    assert.equal(controller.chartBlockedReason, 'App not installed', 'a series only the finance addon provides');
+    controller.state.sections = { finance: { status: 'loading', items: [] } };
+    assert.equal(controller.chartBlockedReason, '', 'no label while Finance is still loading');
+});
+
+test('refresh and company changes reload the visible workspace lists instead of leaving them blank', async () => {
+    const cases = [
+        ['sales', 1, 'get_fulfillment', null],
+        ['sales', 2, 'get_fulfillment', null],
+        ['inventory', 2, 'get_inventory', 'current'],
+        ['procurement', 1, 'get_procurement', 'approvals'],
+        ['procurement', 2, 'get_procurement', 'late'],
+    ];
+    for (const [section, company, method, mode] of cases) {
+        const {controller, pending} = fixture();
+        controller.state.applied = {...controller.state.draft};
+        controller.state.activeSection = section;
+        controller.state.procurement = {status: 'ready', mode: 'approvals', offset: 25, rows: []};
+        controller.state.inventory = {status: 'ready', mode: 'current', offset: 8, rows: [],
+            filters: {warehouse_id: 9, category_id: false, hide_zero: true, search: '', at_date: '', sort: 'name'}};
+        controller.state.draft.company_id = company;
+        await settleRequests(pending, controller.refresh(), request => request.method === 'get_section'
+            ? {items: []} : {status: 'ready', rows: [], mode: request.args[2]});
+        const calls = pending.filter(request => request.method === method);
+        assert.equal(calls.length, 1, `${section} for company ${company} reloads ${method} once`);
+        assert.equal(calls[0].args[1], 0);
+        if (mode) assert.equal(calls[0].args[2], mode);
+        // A company change must not reuse the old company's warehouse.
+        if (section === 'inventory') assert.equal(calls[0].args[3].warehouse_id, false);
+        assert.notEqual(controller.state[section === 'sales' ? 'fulfillment' : section], null);
+    }
+});
+
+test('a company switch keeps the HR tab and starts it from that tab\'s default filters', async () => {
+    for (const [tab, status] of [['time_off', undefined], ['shifts', 'published'], ['employees', undefined]]) {
+        const {controller, pending, urlState} = fixture();
+        controller.state.applied = {...controller.state.draft};
+        controller.state.activeSection = 'hr';
+        controller.state.hrTab = tab;
+        controller.state.hrFilters = {search: 'Previous company', department_id: 7, employee_id: '', status: 'refuse', assignment: '', view: 'week'};
+        controller.state.draft.company_id = 2;
+        await settleRequests(pending, controller.refresh(), request => request.method === 'get_section'
+            ? {items: []} : {status: 'ready', rows: [], departments: []});
+        const calls = pending.filter(request => request.method === 'get_hr_workspace');
+        assert.equal(calls.length, 1, `${tab} reloads once`);
+        assert.equal(calls[0].args[0].company_id, 2);
+        assert.equal(calls[0].args[1], tab);
+        assert.equal(controller.state.hrTab, tab);
+        assert.equal(urlState.hr_tab, tab);
+        assert.equal(calls[0].args[2].search, undefined);
+        assert.equal(calls[0].args[2].department_id, undefined);
+        assert.equal(calls[0].args[2].status, status);
+    }
+});
+
+test('missing HR sources name their standard app while other states keep shared labels', () => {
+    const { controller } = fixture();
+    assert.equal(controller.hrStatusLabel('not_installed', 'shifts'), 'Planning is not installed');
+    assert.equal(controller.hrStatusLabel('not_installed', 'attendance'), 'Attendances is not installed');
+    assert.equal(controller.hrStatusLabel('not_installed', controller.hrMetricSource('time_off')), 'Time Off is not installed');
+    assert.equal(controller.hrStatusLabel('not_installed', controller.hrMetricSource('employees')), 'Employees is not installed');
+    assert.equal(controller.hrStatusLabel('not_installed', 'unknown'), controller.statusLabels.not_installed);
+    assert.equal(controller.hrStatusLabel('restricted', 'shifts'), controller.statusLabels.restricted);
+});
+
+test('whole units apply to amounts only; ratios keep the approved or native precision', () => {
+    const { controller } = fixture();
+    assert.equal(controller.headline({ value: 1284000.49 }, { digits: 2 }, true), '1,284,000');
+    assert.equal(controller.headline({ value: 36.183, unit: 'percentage' }, { digits: 2 }, true), '36.2');
+    assert.equal(controller.headline({ value: 37.525, unit: 'percentage', digits: 2 }, { digits: 2 }, true), '37.53');
+    assert.equal(controller.headline({ value: 90, unit: 'percentage', digits: 2 }, { digits: 2 }, true), '90');
+});
+
+test('returning from a native record reloads the restored department lists that were not saved', async () => {
+    for (const section of ['crm', 'procurement']) {
+        const {controller, pending} = fixture();
+        controller.alive = true;
+        controller.state.companies = [{id: 1, enabled_sections: ['finance', 'sales', 'procurement', 'crm']}];
+        controller.state.applied = {...controller.state.draft};
+        controller.state.activeSection = section;
+        const saved = controller.navigationState();
+        // A controller created by the breadcrumb starts on the default department with no records.
+        controller.state.activeSection = 'finance';
+        controller.state.workspaceDetails = {};
+        await settleRequests(pending, controller.restoreNavigation(saved), request => request.method === 'get_section'
+            ? {items: []} : {status: 'ready', rows: [], offset: 0});
+        assert.equal(controller.state.activeSection, section);
+        const details = pending.filter(request => request.method === 'get_workspace_details');
+        assert.equal(details.length, 1, `${section} records reload once`);
+        assert.equal(details[0].args[1], section);
+        assert.equal(controller.state.workspaceDetails[section].status, 'ready');
+    }
+});
+
+test('a department chosen during the first load wins over the URL selection', () => {
+    const {controller} = fixture();
+    controller.alive = true;
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'inventory', 'hr']}];
+    controller.state.applied = {...controller.state.draft};
+    controller.urlSection = 'hr';
+    controller.urlHRTab = 'time_off';
+    controller.navigateSection('inventory');
+    controller.applyUrlSection();
+    assert.equal(controller.state.activeSection, 'inventory');
+    const second = fixture().controller;
+    second.alive = true;
+    second.state.companies = [{id: 1, enabled_sections: ['finance', 'inventory', 'hr']}];
+    second.state.applied = {...second.state.draft};
+    second.urlSection = 'hr';
+    second.applyUrlSection();
+    assert.equal(second.state.activeSection, 'hr', 'without a user choice the URL department opens');
+});
+
+test('the URL is left alone when the dashboard runs inside a dialog', () => {
+    const {controller, urlPushes} = fixture();
+    controller.alive = true;
+    controller.state.applied = {...controller.state.draft};
+    controller.env = {inDialog: true};  // set by Odoo 19 dialogs (web/static/src/core/dialog/dialog.js)
+    controller.syncUrl();
+    assert.equal(urlPushes.length, 0);
+    controller.env = {};
+    controller.syncUrl();
+    assert.equal(urlPushes.length, 1);
+});
+
+test('finance Retry requests the chart and cash accounts only when their metrics are ready', async () => {
+    for (const [status, expected] of [['not_installed', 0], ['ready', 1]]) {
+        const {controller, pending} = fixture();
+        controller.state.applied = {...controller.state.draft};
+        const items = ['revenue', 'gross_profit', 'profit', 'cash'].map(key => ({key, status}));
+        await settleRequests(pending, controller.retrySection('finance'), request => request.method === 'get_section'
+            ? {items} : {status: 'ready', rows: [], series: {}});
+        assert.equal(pending.filter(request => request.method === 'get_financial_trends').length, expected, `chart when ${status}`);
+        assert.equal(pending.filter(request => request.method === 'get_cash_directory').length, expected, `accounts when ${status}`);
+    }
+});
+
+test('a company switch that hides the current department also corrects the URL', async () => {
+    const {controller, pending, urlState} = fixture();
+    controller.alive = true;
+    controller.defaultOptions = {...controller.state.draft};
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'hr']}, {id: 2, enabled_sections: ['finance', 'sales']}];
+    controller.state.applied = {...controller.state.draft};
+    controller.state.activeSection = 'hr';
+    urlState.section = 'hr';
+    controller.state.draft.company_id = 2;
+    await settleRequests(pending, controller.refresh());
+    assert.equal(controller.state.activeSection, 'finance');
+    assert.equal('section' in urlState, false);
+});
+
+test('restoring a saved view while Inventory is loaded applies the saved stock filters', async () => {
+    const {controller, pending} = fixture();
+    controller.alive = true;
+    controller.state.companies = [{id: 1, enabled_sections: ['finance', 'inventory']}];
+    controller.state.applied = {...controller.state.draft};
+    controller.state.activeSection = 'inventory';
+    const saved = {...controller.navigationState(), inventory: {offset: 8, mode: 'current',
+        filters: {warehouse_id: 3, category_id: '', search: 'Saved', hide_zero: true, hide_negative: false, at_date: '', sort: 'name'}}};
+    // The table currently shows other applied filters.
+    controller.state.inventory = {status: 'ready', rows: [], offset: 0, mode: 'current', warehouses: [{id: 3}], categories: [],
+        filters: {warehouse_id: 9, category_id: false, search: 'Earlier', hide_zero: true, hide_negative: false, at_date: '', sort: 'name'}};
+    await settleRequests(pending, controller.restoreNavigation(saved), request => request.method === 'get_section'
+        ? {items: []} : {status: 'ready', rows: [], offset: request.args[1], mode: request.args[2], filters: request.args[3]});
+    const loads = pending.filter(request => request.method === 'get_inventory');
+    const last = loads.at(-1);
+    assert.equal(last.args[1], 8);
+    assert.equal(last.args[3].warehouse_id, 3);
+    assert.equal(last.args[3].search, 'Saved');
+    assert.equal(controller.state.stockFilters.search, 'Saved');
+    assert.equal(controller.state.inventory.filters.search, 'Saved', 'the table and the form agree');
 });

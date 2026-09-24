@@ -351,3 +351,36 @@ class TestExecutiveDashboard(AccountTestInvoicingCommon):
             self.dashboard.with_user(self.reader).get_product_quantity_ranking(self.options)
         with self.assertRaises(ValidationError):
             self.dashboard.get_product_quantity_ranking(self.options, True)
+
+    def test_readable_field_check_keeps_deprecated_semantics(self):
+        """check_readable replaces Odoo 19's deprecated check_field_access_rights one to one."""
+        from unittest.mock import patch
+        from odoo.addons.adams_executive_dashboard.models.access import check_readable
+        user = new_test_user(self.env, login='field_reader', groups='base.group_user')
+        partners = self.env['res.partner'].with_user(user)
+        self.assertEqual(check_readable(partners, ['name', 'not_a_field']), ['name', 'not_a_field'])
+        field = partners._fields['email']
+        with patch.object(field, 'groups', 'base.group_system'):
+            with self.assertRaises(AccessError):
+                check_readable(partners, ['name', 'email'])
+            # Superuser checks bypass field groups exactly like the deprecated method.
+            self.assertEqual(check_readable(partners.sudo(), ['email']), ['email'])
+        # The helper consults the same per-field hook that read() enforces.
+        with patch.object(type(partners), '_check_field_access', side_effect=AccessError('denied')):
+            with self.assertRaises(AccessError):
+                check_readable(partners.sudo(), ['name'])
+
+    def test_dashboard_action_has_a_portable_url_path(self):
+        action = self.env.ref('adams_executive_dashboard.action_dashboard')
+        self.assertEqual(action.path, 'executive-dashboard')
+        self.assertEqual(self.env['ir.actions.actions'].search_count([('path', '=', 'executive-dashboard')]), 1)
+
+    def test_app_menu_has_a_packaged_icon(self):
+        from odoo.modules.module import get_module_icon
+        from odoo.tools import file_path
+        menu = self.env.ref('adams_executive_dashboard.menu_dashboard')
+        self.assertEqual(menu.web_icon, 'adams_executive_dashboard,static/description/icon.png')
+        self.assertTrue(menu.web_icon_data)
+        # The PWA manifest and Apps list use the module icon; it must not fall back or 404.
+        self.assertEqual(get_module_icon('adams_executive_dashboard'), '/adams_executive_dashboard/static/description/icon.png')
+        self.assertTrue(file_path('adams_executive_dashboard/static/description/icon.svg'))

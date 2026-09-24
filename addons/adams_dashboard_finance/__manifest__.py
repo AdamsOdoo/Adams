@@ -1,6 +1,6 @@
 {
     'name': 'Adams Dashboard — Native Financial Reports',
-    'version': '19.0.1.7.0',
+    'version': '19.0.1.8.0',
     'summary': 'Company-specific mappings to evaluated Odoo accounting reports',
     'author': 'Adams',
     'license': 'LGPL-3',

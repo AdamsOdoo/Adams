@@ -1,5 +1,14 @@
 # Executive dashboard — implementation and verification
 
+## 25 September — completion pass 19.0.1.8.0 (development candidate)
+
+Grouped fixes RC1–RC14 from a full control sweep of the real dashboard, paired comparison with the
+approved HTML at 1440/1024/768/390 px (English and Arabic, light, and a dark approximation) and targeted
+browser checks, followed by one independent review whose findings were fixed. Results, the owner journey,
+the staging promotion step and the surfaces that still need Enterprise verification are in
+[completion-20260925/README.md](completion-20260925/README.md). Staging still runs 19.0.1.7.0 below until
+the owner promotes this candidate. PR #214 stays draft.
+
 ## 24 September — final source and staging verification
 
 Application source: `e962e671c87bad93075153057843e1ddd4abb2a2`.

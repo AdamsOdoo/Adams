@@ -11,6 +11,7 @@ import pytz
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import html2plaintext
+from .access import check_readable
 
 
 # Every source and measure is server-owned. No client-supplied model or domain.
@@ -113,7 +114,7 @@ class ExecutiveDashboard(models.AbstractModel):
         model, date_field, states, aggregate, action_id = SOURCES[key]
         report = self.env[model]
         report.check_access('read')
-        report.check_field_access_rights('read', [date_field, 'company_id', aggregate.split(':')[0],
+        check_readable(report, [date_field, 'company_id', aggregate.split(':')[0],
                                                 *[term[0] for term in states]])
         bounds = self._date_bounds(report, date_field, dates)
         domain = [('company_id', '=', self.env.company.id), *states, *bounds]
@@ -136,7 +137,7 @@ class ExecutiveDashboard(models.AbstractModel):
         if kind == 'invoices':
             invoices = self.env['account.move']
             invoices.check_access('read')
-            invoices.check_field_access_rights('read', ['company_id', 'state', 'move_type', 'invoice_date'])
+            check_readable(invoices, ['company_id', 'state', 'move_type', 'invoice_date'])
             return invoices, [('company_id', '=', self.env.company.id), ('state', '=', 'posted'),
                               ('move_type', 'in', ['out_invoice', 'out_refund']),
                               *self._date_bounds(invoices, 'invoice_date', dates)]
@@ -144,7 +145,7 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('This list is not configured.'))
         orders = self.env['sale.order']
         orders.check_access('read')
-        orders.check_field_access_rights('read', ['company_id', 'state', 'date_order'])
+        check_readable(orders, ['company_id', 'state', 'date_order'])
         states = ['sale'] if kind == 'orders' else ['draft', 'sent']
         domain = [('company_id', '=', self.env.company.id), ('state', 'in', states),
                   *self._date_bounds(orders, 'date_order', dates)]
@@ -159,7 +160,7 @@ class ExecutiveDashboard(models.AbstractModel):
             return {'status': 'not_installed', 'rows': []}
         report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
-        report.check_field_access_rights('read', columns)
+        check_readable(report, columns)
         domain = [*domain, ('product_id', '!=', False)]
         # Count the displayed product/unit groups, not report lines or orders.
         # _read_group retains the report's normal record rules and company scope.
@@ -184,7 +185,7 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(_('This report is not configured.'))
         report, domain, aggregate, action_id = scoped._native_scope('confirmed_sales', dates)
         measures = ['product_uom_qty', 'qty_delivered', 'qty_to_deliver']
-        report.check_field_access_rights('read', ['product_id', 'product_uom_id', *measures])
+        check_readable(report, ['product_id', 'product_uom_id', *measures])
         domain = [*domain, ('product_id', '!=', False)]
         if product_id is not None or unit_id is not None:
             # A displayed row is a product AND unit group. Never silently open
@@ -216,7 +217,7 @@ class ExecutiveDashboard(models.AbstractModel):
         columns += ['invoice_user_id', 'move_type'] if invoice_list else ['user_id', 'validity_date']
         if not invoice_list and 'delivery_status' in documents._fields:
             columns.append('delivery_status')
-        documents.check_field_access_rights('read', columns)
+        check_readable(documents, columns)
         total = documents.search_count(domain)
         offset = min(offset, ((total - 1) // page_size) * page_size) if total else 0
         records = documents.search(domain, order=f'{date_field} desc, id desc', limit=page_size, offset=offset)
@@ -280,7 +281,7 @@ class ExecutiveDashboard(models.AbstractModel):
                       ('move_type', 'in', types), *self._date_bounds(records, date_field, dates)]
         else:
             raise ValidationError(_('Invalid document type.'))
-        records.check_field_access_rights('read', ['name', 'partner_id', date_field, 'company_id', 'state'])
+        check_readable(records, ['name', 'partner_id', date_field, 'company_id', 'state'])
         return records, [*domain, '|', ('name', 'ilike', query), ('partner_id.name', 'ilike', query)], date_field
 
     @api.model
@@ -452,7 +453,7 @@ class ExecutiveDashboard(models.AbstractModel):
                         if key == 'quotations':
                             # Count documents, not sale.report lines; use the
                             # same report domain and source permissions as value.
-                            report.check_field_access_rights('read', ['order_reference'])
+                            check_readable(report, ['order_reference'])
                             item['document_count'] = report._read_group(
                                 domain, aggregates=['order_reference:count_distinct'])[0][0]
                         item.update(status='ready' if count else 'empty', value=value if count else None,
@@ -479,7 +480,7 @@ class ExecutiveDashboard(models.AbstractModel):
             field = DIMENSIONS.get(key, {}).get(dimension)
             if not field or (group_id is not False and (type(group_id) is not int or group_id < 1)):
                 raise ValidationError(_('Invalid report dimension.'))
-            report.check_field_access_rights('read', [field])
+            check_readable(report, [field])
             domain = [*domain, (field, '=', group_id)]
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)
         # Discard native default filters that would silently change the chosen scope.
@@ -505,7 +506,7 @@ class ExecutiveDashboard(models.AbstractModel):
         if SOURCES[key][0] not in scoped.env:
             return {'status': 'not_installed', 'rows': []}
         report, domain, aggregate, action_id = scoped._native_scope(key, dates)
-        report.check_field_access_rights('read', [field])
+        check_readable(report, [field])
         rows = report._read_group(domain, groupby=[field], aggregates=[aggregate],
                                   order=f'{aggregate} DESC, {field} ASC', offset=offset, limit=26)
         # Label resolution uses normal record/field access, including archived history.
@@ -520,7 +521,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _product_quantity_scope(self, dates, unit_id):
         report, domain, aggregate, action_id = self._native_scope('invoiced_sales', dates)
-        report.check_field_access_rights('read', ['quantity', 'product_id', 'product_uom_id'])
+        check_readable(report, ['quantity', 'product_id', 'product_uom_id'])
         units = [unit for unit, in report._read_group(domain, ['product_uom_id'], []) if unit]
         units.sort(key=lambda unit: unit.id)
         if unit_id is not None and unit_id is not False and (type(unit_id) is not int or unit_id not in [unit.id for unit in units]):
@@ -582,7 +583,7 @@ class ExecutiveDashboard(models.AbstractModel):
         if not field or SOURCES[key][0] not in scoped.env:
             raise ValidationError(_('This report is not configured.'))
         report, domain, aggregate, action_id = scoped._native_scope(key, dates)
-        report.check_field_access_rights('read', [field])
+        check_readable(report, [field])
         rows = report._read_group(domain, groupby=[field], aggregates=[aggregate],
                                   order=f'{aggregate} DESC, {field} ASC', limit=5001)
         if len(rows) > 5000:
@@ -616,8 +617,8 @@ class ExecutiveDashboard(models.AbstractModel):
         journals = scoped.env['account.journal'].with_context(active_test=False)
         accounts.check_access('read')
         journals.check_access('read')
-        accounts.check_field_access_rights('read', ['name', 'code', 'active', 'currency_id', 'account_type', 'company_ids'])
-        journals.check_field_access_rights('read', ['name', 'default_account_id', 'type', 'company_id'])
+        check_readable(accounts, ['name', 'code', 'active', 'currency_id', 'account_type', 'company_ids'])
+        check_readable(journals, ['name', 'default_account_id', 'type', 'company_id'])
         domain = [('company_ids', 'in', [scoped.env.company.id]), ('account_type', '=', 'asset_cash'), ('active', '=', True)]
         if search:
             domain += ['|', ('name', 'ilike', search), ('code', 'ilike', search)]
@@ -646,7 +647,7 @@ class ExecutiveDashboard(models.AbstractModel):
         products = scoped.env['product.product']
         columns = ['display_name', 'qty_available', 'free_qty', 'virtual_available', 'uom_id']
         products.check_access('read')
-        products.check_field_access_rights('read', columns)
+        check_readable(products, columns)
         domain = [('is_storable', '=', True), ('company_id', 'in', [False, scoped.env.company.id])]
         records = products.search(domain, order='id', offset=offset, limit=26)
         return {'status': 'ready' if records else 'empty', 'rows': records[:25].read(columns),

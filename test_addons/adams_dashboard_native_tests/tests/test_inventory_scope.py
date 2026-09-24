@@ -405,6 +405,6 @@ class TestDashboardInventoryScope(AccountTestInvoicingCommon):
             field = source._fields[field_name]
             with patch.object(field, 'groups', 'base.group_system'):
                 with self.assertRaises(AccessError):
-                    source.check_field_access_rights('read', [field_name])
+                    source._check_field_access(field, 'read')
                 with self.assertRaises(AccessError):
                     dashboard.get_inventory(self.options, mode=mode, filters=filters)

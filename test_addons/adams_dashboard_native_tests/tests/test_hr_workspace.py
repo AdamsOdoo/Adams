@@ -42,6 +42,18 @@ class TestDashboardHRWorkspace(TransactionCase):
         with self.assertRaises(AccessError):
             service.open_hr_source(self.options, 'employees', record_id=self.employee.id)
 
+    def test_employee_list_links_open_existing_employees(self):
+        # hr.open_view_employee_list is form-first (hr_employee_views.xml): without a record it opens "New".
+        for action in (self.dashboard.open_hr_source(self.options, 'employees'),
+                       self.dashboard.open_workforce(self.options)):
+            with self.subTest(action=action['xml_id']):
+                self.assertEqual(action['xml_id'], 'hr.open_view_employee_list_my')
+                self.assertNotEqual(action['views'][0][1], 'form')
+                self.assertFalse(action.get('res_id'))
+                self.assertIn(self.employee, self.env['hr.employee'].search(action['domain']))
+        record = self.dashboard.open_hr_source(self.options, 'employees', record_id=self.employee.id)
+        self.assertEqual((record['res_id'], record['views']), (self.employee.id, [(False, 'form')]))
+
     def test_employee_current_archived_pages_and_private_profile_fields(self):
         employees = self.env['hr.employee'].create([
             {'name': f'Bounded staff {n:02}', 'company_id': self.env.company.id} for n in range(27)])
@@ -117,6 +129,14 @@ class TestDashboardHRWorkspace(TransactionCase):
                 action = self.dashboard.open_hr_source(self.options, 'employees', filters)
                 self.assertEqual(set(self.env['hr.employee'].search(action['domain']).ids),
                                  set(expected.ids))
+        # Department choices arrive with each tab, so a tab opened directly can still filter by department.
+        for tab in ('attendance', 'time_off', 'employees'):
+            with self.subTest(tab=tab):
+                choices = self.dashboard.get_hr_workspace(self.options, tab).get('departments', [])
+                self.assertIn(department.id, [choice['id'] for choice in choices])
+        # Without HR officer rights the choices are withheld, whatever the tab's own record rules allow.
+        own_reader = self.dashboard.with_user(self.reader).get_hr_workspace(self.options, 'attendance')
+        self.assertEqual(own_reader.get('departments', []), [])
         for filters in ({'department_unassigned': value} for value in (0, 1, 'true', None)):
             with self.subTest(filters=filters), self.assertRaises(ValidationError):
                 self.dashboard.get_hr_workspace(self.options, 'employees', filters)
@@ -360,14 +380,14 @@ class TestDashboardHRWorkspace(TransactionCase):
 
     def test_profile_omits_individually_denied_work_field(self):
         employee_type = type(self.env['hr.employee'])
-        original = employee_type.check_field_access_rights
+        original = employee_type._check_field_access
 
-        def restricted(model, operation, field_names):
-            if 'work_email' in field_names:
+        def restricted(model, field, operation):
+            if field.name == 'work_email':
                 raise AccessError('Field denied by fixture')
-            return original(model, operation, field_names)
+            return original(model, field, operation)
 
-        with patch.object(employee_type, 'check_field_access_rights', restricted):
+        with patch.object(employee_type, '_check_field_access', restricted):
             profile = self.dashboard.get_employee_profile(self.options, self.employee.id)['employee']
         self.assertNotIn('work_email', profile)
         self.assertEqual(profile['name'], self.employee.name)
@@ -409,14 +429,14 @@ class TestDashboardHRWorkspace(TransactionCase):
             restricted = self.dashboard.with_user(self.reader).get_hr_workspace(self.options)
             self.assertEqual(restricted['attendance_summary']['no_check_in_today']['status'], 'restricted')
             employee_type = type(self.env['hr.employee'])
-            original = employee_type.check_field_access_rights
+            original = employee_type._check_field_access
 
-            def denied(model, operation, names):
-                if 'last_check_in' in names:
+            def denied(model, field, operation):
+                if field.name == 'last_check_in':
                     raise AccessError('Controlled field denial')
-                return original(model, operation, names)
+                return original(model, field, operation)
 
-            with patch.object(employee_type, 'check_field_access_rights', denied):
+            with patch.object(employee_type, '_check_field_access', denied):
                 denied_result = self.dashboard.get_hr_workspace(self.options)
                 self.assertEqual(denied_result['attendance_summary']['no_check_in_today']['status'], 'restricted')
                 with self.assertRaises(AccessError):

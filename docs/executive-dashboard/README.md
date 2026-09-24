@@ -1,8 +1,8 @@
 # Executive dashboard — ED-001
 
-Status: **Approved scope implemented and deployed to Adams For Men staging for UAT.**
-Final addon source `adbe2997`: 58 native tests pass. Independent review and owner
-UAT signoff are outstanding; production and main remain excluded.
+Status: **19.0.1.7.0 on Adams For Men staging for UAT; 19.0.1.8.0 completion candidate qualified
+locally on this branch** — see [completion-20260925](completion-20260925/README.md). Owner UAT signoff is
+outstanding; production and main remain excluded.
 
 Access and licensed native report integration are available. Current results,
 source/build identities and remaining limits are in [implementation status](implementation-status.md).

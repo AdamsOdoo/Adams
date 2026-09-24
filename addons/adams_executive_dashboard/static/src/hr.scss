@@ -14,6 +14,16 @@
     .adams_hr_mini_value { font-size:17px; line-height:25.5px; padding:0; margin-top:5px; }
     .adams_hr_text_button { display:inline-flex; align-items:center; gap:5px; }
     .adams_hr_department_list .adams_hr_summary_row { padding:12px 0; }
+    // The list scrolls when a company has more departments than the approved four; shadows appear only
+    // while rows are hidden above or below, so a cut-off row never looks like the end of the list.
+    .adams_hr_department_list {
+        background:
+            linear-gradient(var(--adams-paper) 30%, transparent) center top / 100% 28px no-repeat local,
+            linear-gradient(transparent, var(--adams-paper) 70%) center bottom / 100% 28px no-repeat local,
+            radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, .14), transparent) center top / 100% 10px no-repeat scroll,
+            radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, .14), transparent) center bottom / 100% 10px no-repeat scroll;
+        background-color:var(--adams-paper);
+    }
     .adams_hr_summary_row small { font-size:12px; line-height:18px; }
     .adams_hr_filters { justify-content:space-between; padding:15px 20px; gap:12px; flex-wrap:wrap; }
     .adams_hr_filters label { flex:0 1 auto; min-width:0; margin:0; font-weight:400; }
@@ -21,6 +31,9 @@
     .adams_hr_filters label:nth-child(2), .adams_hr_filters label:nth-child(3) { flex:0 1 auto; }
     .adams_hr_filters input:not([type=checkbox]), .adams_hr_filters select { height:36px; min-height:0; font-size:13px; line-height:normal; padding:7px 9px; border:1px solid var(--adams-line); border-radius:6px; background:var(--adams-paper); color:var(--adams-ink); }
     .adams_hr_filters select { appearance:auto; width:auto; }
+    // Odoo's full hierarchical department names would size this selector to the longest one and squeeze
+    // the search field; it keeps the approved compact width instead (full names stay in the list).
+    .adams_hr_filters label:nth-child(2) select { max-width:220px; text-overflow:ellipsis; }
     .adams_hr_filters .adams_check { flex-direction:row; align-items:center; min-height:36px; }
     .adams_hr_filter_actions { display:flex; gap:8px; align-items:center; }
     .adams_hr_table { max-height:none; }
@@ -30,8 +43,11 @@
     .adams_hr_table th:first-child { background:var(--adams-soft); }
     .adams_hr_person { font-size:13px; line-height:19.5px; display:flex; align-items:center; gap:10px; padding:2px 0; color:var(--adams-ink); }
     .adams_hr_person strong { font-size:13px; font-weight:600; color:var(--adams-purple); }
-    .adams_hr_person small { display:block; color:var(--adams-sub); font-size:12px; margin-top:3px; line-height:1.4; }
-    .adams_panel .adams_hr_person { display:flex; gap:10px; border:0; background:none; border-radius:0; font-size:13px; line-height:19.5px; font-weight:400; vertical-align:baseline; font-variant-numeric:tabular-nums; }
+    .adams_hr_person small { display:block; color:var(--adams-sub); font-size:12px; margin-top:3px; line-height:1.4; overflow-wrap:break-word; }
+    // Names and work profiles wrap inside their column as in the approved HTML. The shared panel link rule
+    // (sales.scss, `.adams_panel .btn-link`) keeps links on one line; here that pushed long department
+    // paths over the next column. Same specificity, later file: this rule wins.
+    .adams_panel .adams_hr_person { display:flex; gap:10px; border:0; background:none; border-radius:0; font-size:13px; line-height:19.5px; font-weight:400; vertical-align:baseline; font-variant-numeric:tabular-nums; white-space:normal; text-align:start; }
     .adams_panel .adams_hr_person small { font-size:12px; line-height:1.4; margin-top:3px; font-weight:400; }
     .adams_hr_summary_row .adams_hr_person { font-size:14px; line-height:21px; }
     .adams_hr_summary_row .adams_hr_person strong { font-size:14px; }
@@ -61,6 +77,9 @@
         .adams_hr_filters { padding:13px 15px; }
         .adams_hr_filters label:first-child { min-width:100%; flex-basis:100%; }
         .adams_hr_filters label { flex:1; min-width:120px; }
+        // Department and Status share one row on phones, as in the approved HTML.
+        .adams_hr_filters label:nth-child(2), .adams_hr_filters label:nth-child(3) { flex:1 1 0; min-width:120px; }
+        .adams_hr_filters label:nth-child(2) select, .adams_hr_filters label:nth-child(3) select { width:100%; max-width:100%; }
         .adams_hr_filter_actions { width:100%; justify-content:flex-end; }
         .adams_hr_tabs button { padding:10px 12px; }
         .adams_hr_table td:first-child { min-width:190px; max-width:210px; }
