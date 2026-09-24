@@ -5774,3 +5774,15 @@ msgstr "صف واحد لكل تسجيل حضور. تسجيلات الحضور ا
 #: code:addons/adams_executive_dashboard/static/src/hr.xml:0
 msgid "View details"
 msgstr "عرض التفاصيل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "View employees"
+msgstr "عرض الموظفين"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "View attendance"
+msgstr "عرض الحضور"
