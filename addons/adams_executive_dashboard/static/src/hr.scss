@@ -33,6 +33,11 @@
     .adams_hr_person small { display:block; color:var(--adams-sub); font-size:12px; margin-top:3px; line-height:1.4; }
     .adams_panel .adams_hr_person { display:flex; gap:10px; border:0; background:none; border-radius:0; font-size:13px; line-height:19.5px; font-weight:400; vertical-align:baseline; font-variant-numeric:tabular-nums; }
     .adams_panel .adams_hr_person small { font-size:12px; line-height:1.4; margin-top:3px; font-weight:400; }
+    .adams_hr_summary_row .adams_hr_person { font-size:14px; line-height:21px; }
+    .adams_hr_summary_row .adams_hr_person strong { font-size:14px; }
+    .adams_hr_summary_row .adams_hr_person small { margin-top:4px; }
+    .adams_hr_filters input:not([type=checkbox]) { line-height:19.5px; }
+    .adams_hr_filters input[type=checkbox] { margin:3px 3px 3px 4px; }
     .adams_hr_filters .btn:not(.btn-primary) { border:1px solid var(--adams-line); background:var(--adams-paper); color:var(--adams-ink); }
     .adams_hr_department_list .adams_hr_summary_row .btn { font-size:14px; line-height:21px; }
     .adams_hr_kpi .adams_value { display:flex; align-items:baseline; }
@@ -78,7 +83,12 @@
     .adams_hr_profile_fields dd { font-size:14px; line-height:21px; margin:0; }
     .adams_hr_profile_actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
     .adams_hr_profile_actions .btn { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; }
+    .adams_hr_profile_actions .btn .adams_icon { width:18px; height:18px; }
+    .adams_hr_profile_actions .btn, .adams_hr_profile_footer .btn:not(.btn-primary) { background:var(--adams-paper); color:var(--adams-ink); }
     .adams_hr_profile_footer { padding:16px 24px; display:flex; justify-content:space-between; gap:8px; border-top:1px solid var(--adams-line); }
+    .adams_hr_profile_footer .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; }
+    .adams_hr_profile_footer .adams_icon { width:18px; height:18px; }
+    .adams_hr_profile_close { width:34px; min-width:34px; }
     @media(max-width:650px) { .adams_hr_profile_head { align-items:flex-start; } }
 }
 

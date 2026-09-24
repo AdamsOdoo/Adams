@@ -1140,7 +1140,7 @@ export class ExecutiveDashboard extends Component {
     get hrStatusSelection() { const filters=this.state.hrFilters; return filters.assignment === 'unassigned' ? (filters.status === 'published' ? 'published_unassigned' : 'unassigned') : filters.status || ''; }
     changeHRStatus(event) { this.state.hrFilters.status=event.target.value; delete this.state.hrFilters.assignment; }
     get hrStatusOptions() {
-        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Open')],['closed',_t('Closed')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['unassigned',_t('Unassigned')],['published_unassigned',_t('Published unassigned')]]};
+        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Checked in')],['closed',_t('Checked out')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['unassigned',_t('Unassigned')],['published_unassigned',_t('Published unassigned')]]};
         return (options[this.state.hrTab] || []).filter(([value])=>value !== 'all').map(([value,label])=>({value,label}));
     }
     get hrWeekDays() {
