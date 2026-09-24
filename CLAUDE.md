@@ -1,4 +1,6 @@
-> **Current ChatGPT Work development entrypoint:** Read [the verified harness handoff](docs/harness-onboarding.md). Use the exact external private toolkit pinned in `.odoo-harness/connection.json` and run `python3 scripts/work-harness.py check` after loading it. Follow the latest user-authorized requirement and the selected branch's applicable instructions; preserve existing work and do not resume an old feature automatically. The historical governance below is preserved for provenance. Its research-only phase and Claude-only role assignment do not override newly authorized Work development. Production and release remain separate approvals.
+@AGENTS.md
+
+> The current development entrypoint and the rules for this public repository are at the top of AGENTS.md (imported above). The governance contract below is historical (Shopify research phase) and does not override them.
 
 # CLAUDE.md — Project Governance Contract
 

@@ -1,0 +1,2766 @@
+#!/usr/bin/env python3
+"""oh - local Odoo 19 toolbelt of the odoo-harness.
+
+Run it from anywhere inside the project repository:
+
+  oh env [--update]               prepare PostgreSQL, the pinned Odoo source and the Python venv
+  oh test [MODULE ...]            install modules in a disposable database and run their tests
+  oh shell [-c CODE] [--db DB]    run Python in `odoo-bin shell` on a kept database (rolled back)
+  oh serve [--db DB] / oh stop    run this project's Odoo server on a kept database
+  oh shot PATH [PATH ...]         checked screenshots of Odoo pages in every configured language
+  oh src PATTERN [--module M]     search the standard Odoo (and Enterprise) source
+  oh i18n MODULE [...]            export i18n/<lang>.po from a kept database
+  oh evidence                     check the result records, their retained files and the source they match
+  oh doctor                       check the installation, runtime and deployment boundaries
+  oh protect                      print the GitHub ruleset that protects the deploy branches
+  oh clean                        drop this project's databases (--all-projects: every project's)
+
+Exit codes: 0 passed, 1 failed, 2 setup error, 3 blocked (modules missing locally),
+4 not verified (a required test, upgrade check, valid screen, current record or protection is missing).
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import contextlib
+import glob
+import gzip
+import hashlib
+import json
+import os
+import re
+import shlex
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows: run the Odoo runtime inside WSL instead
+    fcntl = None
+
+ODOO_REPO = "https://github.com/odoo/odoo.git"
+PASSED, FAILED, SETUP, BLOCKED, UNVERIFIED = 0, 1, 2, 3, 4
+LABELS = {PASSED: "PASSED", FAILED: "FAILED", SETUP: "SETUP ERROR", BLOCKED: "BLOCKED", UNVERIFIED: "NOT VERIFIED"}
+DEFAULTS = {
+    "odoo_ref": "19.0",
+    "odoo_commit": None,
+    "enterprise_path": None,
+    "enterprise_repo": None,
+    "enterprise_ref": None,
+    "enterprise_commit": None,
+    "languages": ["en_US", "ar_001"],
+    "addons_paths": [],
+    "base_branch": None,
+    "production_branch": None,
+    "staging_branches": [],
+    "protected_branches": [],
+    "with_demo": True,
+    "python": "python3.12",
+}
+TEMPLATE_FORMAT = 3  # bump when template databases are built differently
+VENV_FORMAT = 1  # bump when venvs are built differently
+FINGERPRINT_FORMAT = 2  # bump when module content ids are computed differently
+KEEP_TEMPLATES, KEEP_TREES, KEEP_KEPT_DBS, KEEP_RECORDS, KEEP_REFS = 4, 3, 3, 60, 6
+REUSE_SECONDS = 24 * 3600
+UPGRADE_TAG = "oh_upgrade"
+EVIDENCE = ".odoo-harness/evidence"
+BLOCK_START = "<!-- odoo-harness:start"
+BLOCK_END = "<!-- odoo-harness:end -->"
+LEGACY_HOOKS = [  # installed by odoo-harness 1.0.0, whose lock.json did not record its hooks
+    {"event": "PreToolUse", "matcher": "Bash|mcp__.*github.*",
+     "hook": {"type": "command", "command": 'python3 "$CLAUDE_PROJECT_DIR/.odoo-harness/guard.py"'}},
+    {"event": "SessionStart", "matcher": "startup|resume",
+     "hook": {"type": "command", "async": True,
+              "command": 'python3 "$CLAUDE_PROJECT_DIR/.odoo-harness/oh" env --background --if-remote'}},
+]
+RTL_LANGS = ("ar", "he", "fa", "ur")
+SKIP_DIRS = {".git", ".odoo-harness", ".agents", ".claude", "node_modules", "__pycache__", ".venv", "venv"}
+ENV_WARNINGS = re.compile(r"wkhtmltopdf|rtlcss|GeoIP|inotify|psutil|num2words|ldap", re.I)
+HEADER = re.compile(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3} \d+ ([A-Z]+) (\S+) (\S+): ?(.*)$")
+RESULT = re.compile(r"(\d+) failed, (\d+) error\(s\) of (\d+) tests")
+ADDON = re.compile(r"odoo\.addons\.(\w+)\.")
+NAME = re.compile(r"^[A-Za-z0-9_]+$")
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
+
+
+class OhError(Exception):
+    def __init__(self, message, code=SETUP):
+        super().__init__(message)
+        self.code = code
+
+
+def run(cmd, *, check=True, env=None, cwd=None, timeout=None, input=None):
+    """Run a command, returning its combined output; raise OhError with the tail on failure."""
+    env = dict(env or os.environ, GIT_TERMINAL_PROMPT="0")  # never hang on a credential prompt
+    result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env, input=input, text=True,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+    if check and result.returncode:
+        tail = "\n".join(result.stdout.splitlines()[-15:])
+        raise OhError(f"command failed ({result.returncode}): {shlex.join(map(str, cmd))}\n{tail}")
+    return result
+
+
+def git(path, *args, check=True):
+    result = run(["git", "-C", path, *args], check=check)
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def sha_bytes(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def slug(text):
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", text).strip("-") or "x"
+
+
+def now_iso(ts=None):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def port_free(port):
+    with socket.socket() as s:
+        return s.connect_ex(("127.0.0.1", port)) != 0
+
+
+def pid_alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def junk(path):
+    return "__pycache__/" in path or path.endswith((".pyc", ".pyo"))
+
+
+def norm_url(url):
+    return re.sub(r"(\.git)?/*$", "", (url or "").strip())
+
+
+def read_json(path, default=None):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
+def write_json(path, data):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(data, indent=1, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    tmp.replace(path)
+
+
+# --------------------------------------------------------------------------- project
+
+def project_root():
+    if os.environ.get("OH_PROJECT"):
+        return Path(os.environ["OH_PROJECT"]).resolve()
+    here = Path(__file__).resolve().parent
+    if here.name == ".odoo-harness":  # the installed copy belongs to its project, whatever the cwd
+        return here.parent
+    start = Path(os.getcwd()).resolve()
+    result = subprocess.run(["git", "-C", str(start), "rev-parse", "--show-toplevel"], text=True, capture_output=True)
+    return Path(result.stdout.strip()) if result.returncode == 0 else start
+
+
+def project_key(root):
+    """Directory name of this project's state in the shared cache."""
+    return f"{slug(Path(root).name).lower()[:24]}-{sha(str(root))[:8]}"
+
+
+def db_prefix(root):
+    """Every database this project creates starts with this prefix; other projects' ones are left alone."""
+    return f"oh_{sha(str(root))[:8]}_"
+
+
+def load_config(root):
+    config = dict(DEFAULTS)
+    path = root / ".odoo-harness" / "project.json"
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError as exc:
+            raise OhError(f"{path} is not valid JSON ({exc})") from None
+        if not isinstance(data, dict):
+            raise OhError(f"{path} must contain a JSON object")
+        config.update({k: v for k, v in data.items() if not k.startswith("_")})
+    for key, var in (("enterprise_path", "OH_ENTERPRISE_PATH"), ("enterprise_repo", "OH_ENTERPRISE_REPO"),
+                     ("odoo_ref", "OH_ODOO_REF")):
+        if os.environ.get(var):
+            config[key] = os.environ[var]
+    return config
+
+
+def config_problems(config):
+    problems = []
+    for key in ("odoo_ref", "production_branch", "base_branch", "enterprise_path", "enterprise_repo",
+                "enterprise_ref", "python"):
+        if config.get(key) is not None and not isinstance(config.get(key), str):
+            problems.append(f"{key} must be a string")
+    for key in ("staging_branches", "protected_branches", "languages", "addons_paths"):
+        value = config.get(key)
+        if value is not None and not (isinstance(value, list) and all(isinstance(v, str) for v in value)):
+            problems.append(f"{key} must be a list of strings")
+    for key in ("odoo_commit", "enterprise_commit"):
+        if config.get(key) and not SHA40.match(str(config[key])):
+            problems.append(f"{key} must be a full 40-character commit SHA")
+    if not config.get("production_branch"):
+        problems.append("production_branch is not set, so the guard only protects main/master/production/prod/staging")
+    if config.get("enterprise_path") and config.get("enterprise_repo"):
+        problems.append("set enterprise_path or enterprise_repo, not both")
+    return problems
+
+
+def protected_names(config):
+    names = {config.get("production_branch")} | set(config.get("staging_branches") or [])
+    names |= set(config.get("protected_branches") or [])
+    return sorted(n for n in names if n)
+
+
+_manifests = {}
+
+
+def read_manifest(module_dir):
+    module_dir = Path(module_dir)
+    if module_dir not in _manifests:
+        _manifests[module_dir] = ast.literal_eval((module_dir / "__manifest__.py").read_text(encoding="utf-8"))
+    return _manifests[module_dir]
+
+
+def scan_modules(roots):
+    """Map module name -> directory for each addons root; the first root wins, like Odoo's addons path."""
+    index = {}
+    for root in roots:
+        try:
+            entries = sorted(os.scandir(root), key=lambda e: e.name)
+        except OSError:
+            continue
+        for entry in entries:
+            if (entry.is_dir() and not entry.name.startswith(".")
+                    and os.path.isfile(os.path.join(entry.path, "__manifest__.py"))):
+                index.setdefault(entry.name, Path(entry.path))
+    return index
+
+
+def discover_project(root, config):
+    """Return (addons roots, {module: dir}) for the project: configured paths or auto-detected ones."""
+    if config.get("addons_paths"):
+        roots = [(root / p).resolve() for p in config["addons_paths"]]
+    else:
+        roots = []
+
+        def walk(directory, depth):
+            try:
+                entries = sorted(os.scandir(directory), key=lambda e: e.name)
+            except OSError:
+                return
+            has_module = False
+            for entry in entries:
+                if not entry.is_dir() or entry.name in SKIP_DIRS or entry.name.startswith("."):
+                    continue
+                if os.path.isfile(os.path.join(entry.path, "__manifest__.py")):
+                    has_module = True
+                elif depth < 3:
+                    walk(entry.path, depth + 1)
+            if has_module:
+                roots.append(Path(directory))
+
+        walk(root, 0)
+    return roots, scan_modules(roots)
+
+
+def closure(names, index):
+    """Dependencies of `names` (inclusive) resolved in `index`; returns (found, missing)."""
+    found, missing, stack = set(), set(), list(names)
+    while stack:
+        name = stack.pop()
+        if name in found or name in missing:
+            continue
+        if name not in index:
+            missing.add(name)
+            continue
+        found.add(name)
+        stack.extend(read_manifest(index[name]).get("depends", []))
+    return found, missing
+
+
+def dependents(targets, project):
+    """Project modules that depend, directly or not, on any of `targets` (excluding the targets)."""
+    targets = set(targets)
+    return {name for name in project if name not in targets and closure([name], project)[0] & targets}
+
+
+def resolve_base(root, config):
+    for branch in (config.get("base_branch"), config.get("production_branch")):
+        if not branch:
+            continue
+        for ref in (f"origin/{branch}", branch):
+            probe = subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q", ref + "^{commit}"],
+                                   capture_output=True)
+            if probe.returncode == 0:
+                return ref
+    return None
+
+
+def changed_files(root, base):
+    """Files changed since `base` (committed or not) and untracked files; a changed submodule shows as its path."""
+    files = set()
+    if base:
+        files.update(git(root, "diff", "--name-only", "--ignore-submodules=none", f"{base}...HEAD", check=False).splitlines())
+    files.update(git(root, "diff", "--name-only", "--ignore-submodules=none", "HEAD", check=False).splitlines())
+    files.update(git(root, "ls-files", "--others", "--exclude-standard", check=False).splitlines())
+    return {f for f in files if f and not junk(f)}
+
+
+def modules_for_files(root, files, index):
+    """Modules that contain a changed file, or that live in a changed submodule."""
+    touched = set()
+    for name, path in index.items():
+        try:
+            rel = Path(path).relative_to(root).as_posix()
+        except ValueError:
+            continue
+        if any(f.startswith(rel + "/") or rel.startswith(f.rstrip("/") + "/") for f in files):
+            touched.add(name)
+    return touched
+
+
+def version_key(version):
+    """Comparable form of a manifest version such as '19.0.1.2.0' (non-numeric parts compare as 0)."""
+    return tuple(int(part) if part.isdigit() else 0 for part in str(version or "").split("."))
+
+
+def version_notes(root, ref, modules, index, files):
+    """Modules changed since `ref` whose manifest version did not increase (Odoo.sh won't update them)."""
+    notes = []
+    for name in sorted(modules):
+        try:
+            rel = index[name].relative_to(root).as_posix()
+        except ValueError:
+            continue
+        old = subprocess.run(["git", "-C", str(root), "show", f"{ref}:{rel}/__manifest__.py"],
+                             capture_output=True, text=True)
+        if old.returncode:
+            continue  # new module: Odoo.sh installs it, no update needed
+        try:
+            old_version = ast.literal_eval(old.stdout).get("version")
+        except (ValueError, SyntaxError):
+            continue
+        new_version = read_manifest(index[name]).get("version")
+        relevant = [f for f in files if (f.startswith(rel + "/") and "/tests/" not in f[len(rel):]
+                                         and not f.endswith((".md", ".rst", ".txt")))
+                    or rel.startswith(f.rstrip("/") + "/")]
+        if relevant and version_key(new_version) <= version_key(old_version):
+            notes.append(f"{name}: changed since {ref} but its manifest version {new_version!r} is not higher than "
+                         f"{old_version!r}; Odoo.sh updates it on staging/production only when the version increases.")
+    return notes
+
+
+def file_digest(path):
+    """sha256 of a file's content; for a symlink that points nowhere, of its target text."""
+    path = Path(path)
+    if path.is_symlink() and not path.exists():
+        return sha("symlink:" + os.readlink(path))
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def git_paths(repo, *args):
+    """Paths printed (NUL-separated) by a git command in `repo`; raises OhError when git fails."""
+    out = subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
+    if out.returncode:
+        raise OhError(f"`git {' '.join(args[:3])}` failed in {repo}: "
+                      f"{out.stderr.decode(errors='replace').strip()[:200]}")
+    return [p for p in out.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
+
+
+def repo_top(directory, cache):
+    """Top of the git repository holding `directory` (a submodule is a repository of its own), or None."""
+    directory = Path(directory)
+    if directory not in cache:
+        out = subprocess.run(["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
+                             capture_output=True, text=True)
+        top = out.stdout.strip()
+        cache[directory] = Path(top).resolve() if out.returncode == 0 and top else None
+    return cache[directory]
+
+
+def fingerprint(root, modules, use_git=True):
+    """Content ids of `modules` ({name: directory}) and what they can be trusted for.
+
+    A module's files are listed by the git repository that holds them: the project, a submodule (nested
+    ones too) or a checkout outside the project. Tracked and untracked files count, ignored ones don't,
+    like the source Odoo.sh deploys; a module outside git is hashed file by file. An id is None when the
+    module's files can't all be listed and read; `problems` then says why, and results are not reused.
+    `use_git=False` hashes every file (an exported tree, such as a prior version for --upgrade-from).
+    """
+    root = Path(root).resolve()
+    tops, groups = {}, {}
+    for name, directory in sorted(modules.items()):
+        directory = Path(directory).resolve()
+        if not use_git:
+            top = None
+        elif (directory / ".git").exists():
+            top = directory
+        else:
+            top = repo_top(directory.parent, tops)
+        groups.setdefault(top, []).append((name, directory))
+    ids, problems, ignored, repos = {}, [], {}, {}
+    for top, members in groups.items():
+        files = {name: [] for name, _ in members}
+        skipped = {name: [] for name, _ in members}
+        rels = {name: (directory.relative_to(top).as_posix() if top else None) for name, directory in members}
+        try:
+            if top:
+                specs = sorted(set(rels.values()))
+                listed = git_paths(top, "--literal-pathspecs", "ls-files", "-z", "-c", "-o", "--exclude-standard",
+                                   "--", *specs)
+                hidden = git_paths(top, "--literal-pathspecs", "ls-files", "-z", "-o", "-i", "--exclude-standard",
+                                   "--", *specs)
+                for bucket, paths in ((files, listed), (skipped, hidden)):
+                    for path in paths:
+                        owner = next((n for n, rel in rels.items() if rel == "." or path.startswith(rel + "/")), None)
+                        if owner and not junk(path):
+                            prefix = rels[owner]
+                            bucket[owner].append(path if prefix == "." else path[len(prefix) + 1:])
+                if top != root:
+                    label = top.relative_to(root).as_posix() if top.is_relative_to(root) else str(top)
+                    status = git(top, "status", "--porcelain", "--ignore-submodules=none", check=False)
+                    repos[label] = {"head": git(top, "rev-parse", "HEAD", check=False) or None,
+                                    "dirty": any(l and not junk(l) for l in status.splitlines())}
+            else:
+                for name, directory in members:
+                    for folder, dirnames, filenames in os.walk(directory):
+                        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+                        for filename in filenames:
+                            rel = os.path.relpath(os.path.join(folder, filename), directory).replace(os.sep, "/")
+                            if not junk(rel):
+                                files[name].append(rel)
+                repos["(not in git)"] = {"head": None, "dirty": None}
+        except OhError as exc:
+            for name, _ in members:
+                ids[name] = None
+            problems.append(f"{', '.join(n for n, _ in members)}: {exc}")
+            continue
+        for name, directory in members:
+            if skipped[name]:
+                ignored[name] = sorted(skipped[name])[:5]
+            if not files[name]:
+                ids[name] = None
+                problems.append(f"{name}: no files found in {directory} (ignored by .gitignore?)")
+                continue
+            lines = []
+            try:
+                for rel in sorted(files[name]):
+                    path = directory / rel
+                    if path.is_dir() and not path.is_symlink():
+                        raise OhError(f"{rel} is a git submodule inside the module (not supported)")
+                    if path.exists() or path.is_symlink():  # a deleted file simply isn't there any more
+                        lines.append(f"{rel} {file_digest(path)}")
+                if not any(line.startswith("__manifest__.py ") for line in lines):
+                    raise OhError("its __manifest__.py is missing")
+            except (OSError, OhError) as exc:
+                ids[name] = None
+                problems.append(f"{name}: cannot read its files ({exc})")
+                continue
+            ids[name] = sha("\n".join(lines))[:16]
+    return {"modules": ids, "repos": repos, "problems": problems, "ignored": ignored}
+
+
+def module_ids(root, modules, use_git=True):
+    """{module: content id or None}: see fingerprint()."""
+    return fingerprint(root, modules, use_git)["modules"]
+
+
+def committed_modules(root, modules):
+    """{module: True when its files match the project's HEAD (submodule commits included), False when
+    they differ, None when the module is outside this repository}."""
+    root = Path(root).resolve()
+    if not git(root, "rev-parse", "--git-dir", check=False):
+        return dict.fromkeys(modules)  # not a git repository: nothing is committed
+    gitlinks = [line.split("\t", 1)[1] for line in git(root, "ls-files", "-s", check=False).splitlines()
+                if line.startswith("160000 ")]
+    bounds = {}
+    for name, directory in modules.items():
+        try:
+            rel = Path(directory).resolve().relative_to(root).as_posix()
+        except ValueError:
+            bounds[name] = None
+            continue
+        bounds[name] = next((g for g in gitlinks if rel == g or rel.startswith(g + "/")), rel)
+    specs = sorted({b for b in bounds.values() if b})
+    changed = []
+    if specs:
+        entries = git_paths(root, "--literal-pathspecs", "status", "--porcelain", "-z", "--ignore-submodules=none",
+                            "--", *specs)
+        skip = False
+        for entry in entries:
+            if skip:  # the original path of a rename
+                skip = False
+                continue
+            if len(entry) > 3 and not junk(entry[3:]):
+                changed.append(entry[3:].rstrip("/"))
+            skip = entry[:1] in ("R", "C")
+    return {name: (None if bound is None else not any(c == bound or c.startswith(bound + "/")
+                                                      or bound.startswith(c + "/") for c in changed))
+            for name, bound in bounds.items()}
+
+
+def source_identity(root, modules):
+    found = fingerprint(root, modules)
+    status = git(root, "status", "--porcelain", check=False)
+    return {
+        "format": FINGERPRINT_FORMAT,
+        "head": git(root, "rev-parse", "HEAD", check=False) or None,
+        "branch": git(root, "rev-parse", "--abbrev-ref", "HEAD", check=False) or None,
+        "dirty": any(line and not junk(line) for line in status.splitlines()),
+        **found,
+    }
+
+
+def candidate(root, project):
+    """What a review or record refers to: branch, commit and a digest of everything uncommitted
+    (tracked changes, untracked files, and the module contents, submodules included)."""
+    root = Path(root)
+    head = git(root, "rev-parse", "HEAD", check=False) or None
+    digest = hashlib.sha256((head or "-").encode())
+    diff = subprocess.run(["git", "-C", str(root), "diff", "HEAD", "--binary", "--no-ext-diff", "--no-textconv",
+                           "--ignore-submodules=none", "--submodule=short"], capture_output=True)
+    digest.update(diff.stdout if diff.returncode == 0 else b"?")
+    try:
+        untracked = [p for p in git_paths(root, "ls-files", "-z", "-o", "--exclude-standard") if not junk(p)]
+    except OhError:
+        untracked = []
+    for path in sorted(untracked):
+        full = root / path
+        digest.update(f"\n{path} {file_digest(full) if full.is_file() else '-'}".encode("utf-8", "surrogateescape"))
+    ids = module_ids(root, project)
+    digest.update(json.dumps(ids, sort_keys=True).encode())
+    return {"branch": git(root, "rev-parse", "--abbrev-ref", "HEAD", check=False) or None, "commit": head,
+            "uncommitted": bool(diff.stdout.strip() or untracked), "digest": digest.hexdigest()[:16],
+            "complete": all(ids.values())}
+
+
+def head_info(root):
+    branch = git(root, "rev-parse", "--abbrev-ref", "HEAD", check=False) or "?"
+    commit = git(root, "rev-parse", "--short", "HEAD", check=False) or "?"
+    dirty = any(not junk(line) for line in git(root, "status", "--porcelain", check=False).splitlines())
+    return f"{branch}@{commit}" + (" +uncommitted" if dirty else "")
+
+
+def harness_identity(root):
+    info = {"oh_sha256": sha_bytes(Path(__file__).read_bytes())[:16], "version": None, "commit": None}
+    lock = read_json(Path(root) / ".odoo-harness" / "lock.json")
+    if isinstance(lock, dict) and isinstance(lock.get("harness"), dict):
+        info["version"] = lock["harness"].get("version")
+        info["commit"] = (lock["harness"].get("commit") or "")[:12] or None
+    return info
+
+
+# --------------------------------------------------------------------------- installation checks
+
+def extract_block(text):
+    """Return (block, count): the managed block of AGENTS.md, or None when it is missing or damaged."""
+    starts, ends = text.count(BLOCK_START), text.count(BLOCK_END)
+    if not starts and not ends:
+        return None, 0
+    if starts != 1 or ends != 1 or text.index(BLOCK_END) < text.index(BLOCK_START):
+        return None, max(starts, ends, 2)
+    start = text.index(BLOCK_START)
+    return text[start:text.index(BLOCK_END) + len(BLOCK_END)], 1
+
+
+def hook_present(settings, entry):
+    for group in (settings.get("hooks") or {}).get(entry["event"]) or []:
+        if group.get("matcher") == entry.get("matcher") and entry["hook"] in (group.get("hooks") or []):
+            return True
+    return False
+
+
+def legacy_files(root):
+    """Files of the v0.2 harness overlay; they describe a different workflow and must not be mixed in."""
+    root = Path(root)
+    found = []
+    skills = root / ".agents" / "skills"
+    if skills.is_dir():
+        found += [f".agents/skills/{p.name}" for p in sorted(skills.iterdir()) if p.name.startswith("odoo19-")]
+    if (root / "HARNESS_SETUP.md").is_file():
+        found.append("HARNESS_SETUP.md")
+    data = read_json(root / ".odoo-harness" / "project.json")
+    if isinstance(data, dict) and ("schema_version" in data or "project_id" in data):
+        found.append(".odoo-harness/project.json (v0.2 format)")
+    return found
+
+
+def verify_install(root):
+    """Check an installed project against its lock.json. Returns (problems, notes)."""
+    root = Path(root)
+    problems, notes = [], []
+    lock = read_json(root / ".odoo-harness" / "lock.json")
+    if not isinstance(lock, dict):
+        return ["not installed: .odoo-harness/lock.json is missing or unreadable (run install.py)"], notes
+    harness = lock.get("harness") or {}
+    notes.append(f"odoo-harness {harness.get('version')} @ {str(harness.get('commit'))[:12]}"
+                 + (" (installed from uncommitted harness files)" if harness.get("dirty") else ""))
+    for rel, digest in sorted((lock.get("files") or {}).items()):
+        target = root / rel
+        if not target.is_file():
+            problems.append(f"missing {rel}")
+        elif sha_bytes(target.read_bytes()) != digest:
+            problems.append(f"changed {rel}")
+        elif rel in (".odoo-harness/oh", ".odoo-harness/guard.py") and not os.access(target, os.X_OK):
+            problems.append(f"{rel} is not executable")
+        if rel.startswith(".claude/skills/"):  # both clients must read the same skill, whatever the lock says
+            twin = root / ".agents" / "skills" / rel[len(".claude/skills/"):]
+            if target.is_file() and twin.is_file() and target.read_bytes() != twin.read_bytes():
+                problems.append(f"{rel} differs from its copy in .agents/skills (the two clients would disagree)")
+    agents = root / "AGENTS.md"
+    block, count = extract_block(agents.read_text(encoding="utf-8") if agents.is_file() else "")
+    if count == 0:
+        problems.append("AGENTS.md has no odoo-harness block")
+    elif block is None:
+        problems.append("AGENTS.md has a damaged or duplicated odoo-harness block")
+    elif lock.get("block") and sha(block) != lock["block"]:
+        problems.append("the odoo-harness block in AGENTS.md differs from the installed one")
+    claude = root / "CLAUDE.md"
+    if claude.is_symlink():
+        if claude.resolve() != agents.resolve():
+            problems.append("CLAUDE.md is a symlink that does not point to AGENTS.md")
+    elif not claude.is_file() or "@AGENTS.md" not in [l.strip() for l in claude.read_text(encoding="utf-8").splitlines()]:
+        problems.append("CLAUDE.md does not import @AGENTS.md (Claude Code would not read AGENTS.md)")
+    for name in ("settings.json", "settings.local.json"):
+        path = root / ".claude" / name
+        if not path.is_file():
+            if name == "settings.json":
+                problems.append(".claude/settings.json is missing, so the guard hook is not configured")
+            continue
+        data = read_json(path)
+        if not isinstance(data, dict):
+            problems.append(f".claude/{name} is not valid JSON")
+            continue
+        if data.get("disableAllHooks"):
+            problems.append(f".claude/{name} sets disableAllHooks, so the guard does not run")
+        if name == "settings.json":
+            for entry in lock.get("hooks") or LEGACY_HOOKS:
+                if not hook_present(data, entry):
+                    problems.append(f"hook missing or changed in .claude/settings.json: {entry['event']} "
+                                    f"[{entry.get('matcher')}] {entry['hook'].get('command')}")
+    user_settings = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude") / "settings.json"
+    data = read_json(user_settings)
+    if isinstance(data, dict) and data.get("disableAllHooks"):
+        problems.append(f"{user_settings} sets disableAllHooks, so the guard does not run for this user")
+    try:
+        problems += [f"project.json: {p}" for p in config_problems(load_config(root))]
+    except OhError as exc:
+        problems.append(str(exc))
+    problems += [f"legacy v0.2 harness file present: {p}" for p in legacy_files(root)]
+    if not lock.get("hooks"):
+        notes.append("installed by odoo-harness 1.0.0: re-run install.py so the lock records the hooks and the block")
+    return problems, notes
+
+
+# --------------------------------------------------------------------------- log parsing and verdicts
+
+def parse_log(text):
+    """Summarise an Odoo log: per-module tests (started, skipped, failed, errored), other errors, warnings."""
+    records = []
+    for line in text.splitlines():
+        match = HEADER.match(line)
+        if match:
+            records.append([match.group(1), match.group(3), match.group(4).rstrip(), []])  # Odoo ends lines with a space
+        elif records:
+            records[-1][3].append(line)
+    summary = {"result": None, "tests": {}, "failures": [], "errors": [], "warnings": {}, "migrations": []}
+
+    def bucket(module):
+        return summary["tests"].setdefault(module, {"started": [], "skipped": [], "failed": [], "errors": []})
+
+    for level, logger, message, body in records:
+        found = RESULT.search(message)
+        if logger.startswith("odoo.tests") and found:
+            summary["result"] = tuple(int(x) for x in found.groups())
+            continue
+        if logger == "odoo.modules.migration" and "Running upgrade" in message:
+            match = re.match(r"module (\w+): Running upgrade (.*)", message)
+            summary["migrations"].append((match.group(1), match.group(2)) if match else ("?", message))
+            continue
+        test_logger = ".tests" in logger or logger == "unittest.suite"
+        where = ADDON.match(logger + ".") if logger.startswith("odoo.addons.") else ADDON.search(message)
+        module = where.group(1) if (where and test_logger) else None
+        if level == "INFO" and module:
+            if message.startswith("Starting ") and message.endswith(" ..."):
+                bucket(module)["started"].append(message[len("Starting "):-len(" ...")])
+                continue
+            if message.startswith("skipped "):
+                bucket(module)["skipped"].append(message[len("skipped "):].split(" : ", 1)[0])
+                continue
+        if level in ("ERROR", "CRITICAL"):
+            if message.startswith(("FAIL:", "ERROR:")):
+                kind, _, rest = message.partition(": ")
+                if module:
+                    bucket(module)["failed" if kind == "FAIL" else "errors"].append(rest.strip())
+                summary["failures"].append((message, body))
+            else:
+                summary["errors"].append((logger, message, body))
+        elif level == "WARNING":
+            key = f"{logger}: {message[:220]}"
+            summary["warnings"][key] = summary["warnings"].get(key, 0) + 1
+    return summary
+
+
+def executed_tests(summary):
+    """{module: [Class.method, ...]} for the tests that ran (started and not skipped)."""
+    result = {}
+    for module, info in summary["tests"].items():
+        skipped = list(info["skipped"])
+        tests = []
+        for test in info["started"]:
+            if test in skipped:
+                skipped.remove(test)
+            else:
+                tests.append(test)
+        result[module] = tests
+    return result
+
+
+def test_counts(summary):
+    executed = executed_tests(summary)
+    per = {module: {"executed": len(executed[module]), "skipped": len(info["skipped"]),
+                    "failed": len(info["failed"]), "errors": len(info["errors"])}
+           for module, info in summary["tests"].items()}
+    total = {key: sum(c[key] for c in per.values()) for key in ("executed", "skipped", "failed", "errors")}
+    return per, total
+
+
+def parse_require(spec, modules):
+    """`module:Class.method`, `module:Class`, `module`, `Class.method` or `Class` -> (module, test)."""
+    if ":" in spec:
+        module, _, test = spec.partition(":")
+        return module or None, test or None
+    if spec in modules:
+        return spec, None
+    return None, spec
+
+
+def require_matches(require, module, test):
+    want_module, want_test = require
+    return ((want_module is None or want_module == module)
+            and (want_test is None or test == want_test or test.startswith(want_test + ".")))
+
+
+def verdict(summary, returncode, required=(), requires=(), upgrade_classes=None, need_checks=()):
+    """Return (status, reasons). PASSED only when every required module, test and upgrade check ran."""
+    result = summary["result"]
+    if summary["failures"] or summary["errors"] or (result and (result[0] or result[1])) or returncode:
+        return FAILED, []
+    if not result:
+        return UNVERIFIED, ["Odoo reported no test result (the run stopped before the tests finished?)"]
+    _, total = test_counts(summary)
+    if not total["executed"]:
+        return UNVERIFIED, ["all selected tests were skipped" if total["skipped"] else
+                            "no test ran: check that tests/__init__.py imports the test files and that --tags matches them"]
+    executed = executed_tests(summary)
+    reasons = []
+    for module in sorted(required):
+        if not executed.get(module):
+            skipped = len(summary["tests"].get(module, {}).get("skipped", []))
+            reasons.append(f"{module}: " + (f"all {skipped} of its selected tests were skipped" if skipped
+                                            else "none of its tests ran (it has no tests, or --tags excluded them)"))
+    for spec, parsed in requires:
+        if not any(require_matches(parsed, m, t) for m, tests in executed.items() for t in tests):
+            reasons.append(f"required test did not run: {spec}")
+    for module in sorted(need_checks):
+        classes = (upgrade_classes or {}).get(module, set())
+        if not any(t.split(".")[0] in classes for t in executed.get(module, [])):
+            reasons.append(f"{module}: the upgrade changed data (migration script or prepare_upgrade), but no test "
+                           f"tagged '{UPGRADE_TAG}' checked the result")
+    return (UNVERIFIED if reasons else PASSED), reasons
+
+
+def excerpt(body, markers, limit=14):
+    lines = [l.rstrip() for l in body if l.strip()]
+    keep = []
+    for i, line in enumerate(lines):
+        if any(m and m in line for m in markers):
+            keep.extend(lines[i:i + 2])
+    selected = list(dict.fromkeys(keep[-6:] + lines[-5:]))
+    return selected[-limit:]
+
+
+def report(summary, status, reasons, markers, max_items=8):
+    out = []
+    per, total = test_counts(summary)
+    if summary["result"] or total["executed"] or total["skipped"]:
+        modules = ", ".join(f"{m} {c['executed']}" + (f" (+{c['skipped']} skipped)" if c["skipped"] else "")
+                            for m, c in sorted(per.items()))
+        out.append(f"tests: {total['executed']} executed, {total['skipped']} skipped, {total['failed']} failed, "
+                   f"{total['errors']} errors" + (f" | {modules}" if modules else ""))
+    for reason in reasons:
+        out.append(f"not verified: {reason}")
+    if summary["migrations"]:
+        out.append("migrations run: " + "; ".join(f"module {m}: {text}" for m, text in summary["migrations"][:10]))
+    for message, body in summary["failures"][:max_items]:
+        out.append(message.splitlines()[0][:200])
+        out.extend("  | " + l[:220] for l in excerpt(body, markers))
+    if len(summary["failures"]) > max_items:
+        out.append(f"... {len(summary['failures']) - max_items} more failing tests (see log)")
+    for logger, message, body in summary["errors"][:max_items]:
+        out.append(f"error {logger}: {message.splitlines()[0][:200]}")
+        out.extend("  | " + l[:220] for l in excerpt(body, markers, limit=8))
+    if len(summary["errors"]) > max_items:
+        out.append(f"... {len(summary['errors']) - max_items} more errors (see log)")
+    warnings = summary["warnings"]
+    project = {k: v for k, v in warnings.items() if not ENV_WARNINGS.search(k)}
+    if project:
+        out.append(f"warnings ({len(project)} unique; Odoo.sh marks builds with warnings as 'almost successful'):")
+        for key, count in list(project.items())[:max_items]:
+            out.append(f"  - {key}" + (f" (x{count})" if count > 1 else ""))
+    env_count = len(warnings) - len(project)
+    if env_count:
+        out.append(f"({env_count} local-environment warnings hidden, e.g. wkhtmltopdf/rtlcss; see log)")
+    return out
+
+
+# --------------------------------------------------------------------------- upgrade checks
+
+def find_prepares(project, modules):
+    """[(module, file, code)] for each `prepare_upgrade(env)` defined in a module's tests/*.py."""
+    found = []
+    for name in sorted(modules):
+        for path in sorted((project[name] / "tests").glob("*.py")):
+            source = path.read_text(encoding="utf-8")
+            try:
+                tree = ast.parse(source)
+            except SyntaxError:
+                continue
+            functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "prepare_upgrade"]
+            if functions:
+                imports = [ast.get_source_segment(source, n) for n in tree.body
+                           if isinstance(n, (ast.Import, ast.ImportFrom)) and not getattr(n, "level", 0)]
+                found.append((name, path, "\n".join(imports + [ast.get_source_segment(source, functions[0])])))
+    return found
+
+
+def prepare_script(prepares):
+    """Code for `odoo-bin shell` on the prior version: run each prepare_upgrade(env), then commit."""
+    sources = json.dumps([[module, str(path), code] for module, path, code in prepares])
+    return "\n".join([
+        f"__oh_sources = {sources}",
+        "for __oh_module, __oh_file, __oh_code in __oh_sources:",
+        "    __oh_namespace = {'__name__': 'oh_prepare_upgrade'}",
+        "    exec(compile(__oh_code, __oh_file, 'exec'), __oh_namespace)",
+        "    __oh_namespace['prepare_upgrade'](env)",
+        "    env.flush_all()",
+        "env.cr.commit()",
+        "print('OH_PREPARE_DONE')",
+    ]) + "\n"
+
+
+def upgrade_classes(module_dir):
+    """Names of the test classes decorated with @tagged(..., 'oh_upgrade', ...) in a module."""
+    classes = set()
+    for path in (Path(module_dir) / "tests").glob("*.py"):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for deco in node.decorator_list:
+                func = getattr(deco, "func", None)
+                if (getattr(func, "id", None) or getattr(func, "attr", None)) == "tagged" and any(
+                        isinstance(a, ast.Constant) and a.value == UPGRADE_TAG for a in deco.args):
+                    classes.add(node.name)
+    return classes
+
+
+# --------------------------------------------------------------------------- environment
+
+def worktree_changes(path):
+    """Digest of the uncommitted changes of a git checkout (tracked and untracked files), or None when clean."""
+    diff = subprocess.run(["git", "-C", str(path), "diff", "HEAD", "--binary", "--no-ext-diff", "--no-textconv"],
+                          capture_output=True)
+    if diff.returncode:
+        raise OhError(f"cannot read the changes of {path}: {diff.stderr.decode(errors='replace').strip()[:200]}")
+    untracked = [p for p in git_paths(path, "ls-files", "-z", "-o", "--exclude-standard") if not junk(p)]
+    if not diff.stdout.strip() and not untracked:
+        return None
+    digest = hashlib.sha256(diff.stdout)
+    for rel in sorted(untracked):
+        full = Path(path, rel)
+        digest.update(f"\n{rel} {file_digest(full) if full.is_file() else '-'}".encode("utf-8", "surrogateescape"))
+    return digest.hexdigest()[:12]
+
+
+def stat_digest(path):
+    """Digest of the names, sizes and modification times under `path`: notices edits in a copy outside git."""
+    digest = hashlib.sha256()
+    for folder, dirnames, filenames in os.walk(path):
+        dirnames[:] = sorted(d for d in dirnames if d != "__pycache__")
+        for name in sorted(filenames):
+            full = os.path.join(folder, name)
+            if not junk(full):
+                with contextlib.suppress(OSError):
+                    info = os.stat(full)
+                    digest.update(f"{os.path.relpath(full, path)} {info.st_size} {info.st_mtime_ns}\n".encode())
+    return digest.hexdigest()[:12]
+
+
+def installed_digest(venv):
+    """Digest of the distributions installed in a venv right now (their dist-info names carry the versions)."""
+    names = []
+    for site in Path(venv).glob("lib/python*/site-packages"):
+        names += [p.name for p in site.iterdir() if p.name.endswith((".dist-info", ".egg-info", ".egg-link", ".pth"))]
+    return sha("\n".join(sorted(names)))[:12]
+
+
+class Env:
+    def __init__(self, root, config, quiet=False):
+        self.root, self.config, self.quiet = root, config, quiet
+        self.cache = Path(os.environ.get("OH_CACHE") or Path.home() / ".cache" / "odoo-harness")
+        self.db = {
+            "host": os.environ.get("OH_DB_HOST", "127.0.0.1"),
+            "port": os.environ.get("OH_DB_PORT", "5432"),
+            "user": os.environ.get("OH_DB_USER", "odoo"),
+            "password": os.environ.get("OH_DB_PASSWORD", "odoo"),
+        }
+        for key in ("user", "password"):
+            if not NAME.match(self.db[key]):
+                raise OhError(f"OH_DB_{key.upper()} may only contain letters, digits and underscores")
+        self.key, self.prefix = project_key(root), db_prefix(root)
+        self.home = self.cache / "projects" / self.key
+        self.data = self.cache / "data"
+        self.logs = self.home / "logs"
+        self.state_path = self.home / "state.json"
+        self.conf = self.home / "odoo.conf"
+        self.odoo_url = os.environ.get("OH_ODOO_REPO") or ODOO_REPO
+        self.src = self.enterprise = self.odoo_commit = self.enterprise_commit = self.enterprise_state = None
+        self.python = self.python_version = self.venv_key = self.packages = self.rtlcss_dir = None
+        self.pg_version, self.packages_changed, self.base_python, self.last_run = None, False, None, None
+        self.identity_problems = []  # reasons results can't be matched exactly to their inputs
+
+    def say(self, message):
+        if not self.quiet:
+            print(message, file=sys.stderr, flush=True)
+
+    @contextlib.contextmanager
+    def lock(self, name, shared=False, wait=True):
+        """File lock shared by every project on this machine; yields False when `wait` is off and it is busy."""
+        directory = self.cache / "locks"
+        directory.mkdir(parents=True, exist_ok=True)
+        with open(directory / f"{name}.lock", "a") as handle:
+            acquired = True
+            if fcntl:
+                flags = (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | (0 if wait else fcntl.LOCK_NB)
+                try:
+                    fcntl.flock(handle, flags)
+                except BlockingIOError:
+                    acquired = False
+            yield acquired
+
+    # project state ---------------------------------------------------------
+    def state(self):
+        data = read_json(self.state_path, {})
+        return data if isinstance(data, dict) else {}
+
+    def update_state(self, change):
+        with self.lock(f"state-{self.key}"):
+            state = self.state()
+            change(state)
+            state["root"] = str(self.root)
+            write_json(self.state_path, state)
+            return state
+
+    # postgres ----------------------------------------------------------------
+    def psql(self, sql, database="postgres", check=True):
+        if not shutil.which("psql"):
+            raise OhError("psql not found: install the PostgreSQL client (apt-get install postgresql-client)")
+        env = dict(os.environ, PGPASSWORD=self.db["password"])
+        return run(["psql", "-h", self.db["host"], "-p", self.db["port"], "-U", self.db["user"], "-d", database,
+                    "-v", "ON_ERROR_STOP=1", "-tAc", sql], env=env, check=check)
+
+    def ensure_postgres(self):
+        if self.psql("SELECT 1", check=False).returncode == 0:
+            return
+        local = self.db["host"] in ("127.0.0.1", "localhost")
+        if not (local and hasattr(os, "geteuid") and os.geteuid() == 0 and shutil.which("pg_lsclusters")):
+            raise OhError(f"Cannot connect to PostgreSQL as {self.db['user']}@{self.db['host']}:{self.db['port']}. "
+                          "Start it, or set OH_DB_HOST / OH_DB_PORT / OH_DB_USER / OH_DB_PASSWORD.")
+        clusters = [l.split() for l in run(["pg_lsclusters", "--no-header"], check=False).stdout.splitlines() if l.strip()]
+        if not clusters:
+            versions = sorted(glob.glob("/usr/lib/postgresql/*/bin/initdb"))
+            if not versions:
+                raise OhError("PostgreSQL server not installed: apt-get install -y postgresql")
+            run(["pg_createcluster", Path(versions[-1]).parts[4], "main", "--port", self.db["port"], "--start"])
+        else:
+            run(["pg_ctlcluster", clusters[0][0], clusters[0][1], "start"], check=False)
+        for _ in range(30):
+            if run(["pg_isready", "-h", self.db["host"], "-p", self.db["port"]], check=False).returncode == 0:
+                break
+            time.sleep(1)
+        user, password = self.db["user"], self.db["password"]
+        sql = (f"DO $$BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='{user}') THEN "
+               f"CREATE ROLE \"{user}\" LOGIN SUPERUSER PASSWORD '{password}'; END IF; END$$;")
+        run(["su", "postgres", "-c", f"psql -p {self.db['port']} -qc {shlex.quote(sql)}"], check=False)
+        if self.psql("SELECT 1", check=False).returncode:
+            raise OhError("PostgreSQL started but the odoo role cannot log in; check pg_hba.conf for 127.0.0.1")
+
+    def db_exists(self, name):
+        return self.psql(f"SELECT 1 FROM pg_database WHERE datname = '{name}'").stdout.strip() == "1"
+
+    def list_dbs(self, prefix):
+        like = prefix.replace("_", "\\_") + "%"
+        out = self.psql(f"SELECT datname FROM pg_database WHERE datname LIKE '{like}'").stdout
+        return sorted(l.strip() for l in out.splitlines() if l.strip())
+
+    def drop_db(self, name, any_project=False):
+        if not re.match(r"^oh_[a-z0-9_]+$", name):
+            raise OhError(f"refusing to drop non-oh database {name!r}")
+        if not (any_project or name.startswith(self.prefix) or name.startswith("oh_tpl_")):
+            raise OhError(f"refusing to drop {name}: it belongs to another project (oh clean --all-projects)")
+        self.psql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)', check=False)
+        shutil.rmtree(self.data / "filestore" / name, ignore_errors=True)
+
+    def clone_db(self, template, name):
+        self.psql(f'CREATE DATABASE "{name}" TEMPLATE "{template}"')
+        source = self.data / "filestore" / template
+        if source.exists():
+            shutil.copytree(source, self.data / "filestore" / name)
+
+    def check_db(self, name):
+        """Refuse databases of other projects and shared templates."""
+        if name.startswith("oh_tpl_"):
+            raise OhError(f"{name} is a shared template database; use a kept database (oh test <module> --keep)")
+        if name.startswith("oh_") and not name.startswith(self.prefix):
+            raise OhError(f"database {name} belongs to another project; this project's databases start with {self.prefix}")
+
+    def resolve_db(self, requested):
+        db = requested or self.state().get("last_db")
+        if not db:
+            raise OhError("no kept database: run `oh test <module> --keep` first, or pass --db")
+        self.check_db(db)
+        if not self.db_exists(db):
+            raise OhError(f"database {db} does not exist: run `oh test <module> --keep` first")
+        return db
+
+    # sources -----------------------------------------------------------------
+    def sparse_patterns(self, enterprise=False):
+        codes = set()
+        for lang in self.config["languages"]:
+            if not lang.startswith("en"):
+                codes.update({lang, lang.split("_")[0]})
+        dirs = ["/*"] if enterprise else ["/addons/*", "/odoo/addons/*"]
+        patterns = ["/*"] + [f"!{d}/i18n/*" for d in dirs]
+        for code in sorted(codes):
+            patterns += [f"{d}/i18n/{code}.po" for d in dirs]
+        return patterns
+
+    def resolve_ref(self, url, ref):
+        try:
+            out = run(["git", "ls-remote", url, ref], timeout=300).stdout
+        except OhError as exc:
+            raise OhError(f"could not read {url}: {exc}") from None
+        refs = {}
+        for line in out.splitlines():
+            commit, _, name = line.partition("\t")
+            refs[name.strip()] = commit.strip()
+        for name in (f"refs/heads/{ref}", f"refs/tags/{ref}^{{}}", f"refs/tags/{ref}", ref):
+            if SHA40.match(refs.get(name, "")):
+                return refs[name]
+        raise OhError(f"{ref!r} is not a branch or tag of {url}")
+
+    def commit_for(self, kind, url, ref, pin, sources, update):
+        """The exact commit to use: the pin, else the commit resolved earlier for this project."""
+        pin = pin or (ref if SHA40.match(ref or "") else None)
+        if pin:
+            if not SHA40.match(pin):
+                raise OhError(f"{kind}_commit must be a full 40-character commit SHA, not {pin!r}")
+            sources[kind] = {"url": url, "ref": ref, "commit": pin, "pinned": True}
+            return pin
+        known = sources.get(kind) or {}
+        if (not update and not known.get("pinned") and SHA40.match(known.get("commit") or "")
+                and norm_url(known.get("url")) == norm_url(url) and known.get("ref") == ref):
+            return known["commit"]
+        self.say(f"resolving {kind} {ref} ...")
+        commit = self.resolve_ref(url, ref)
+        sources[kind] = {"url": url, "ref": ref, "commit": commit, "pinned": False, "resolved": now_iso()}
+        return commit
+
+    def ensure_tree(self, kind, url, commit):
+        """A trimmed checkout of exactly `commit`, shared by every project that uses that commit."""
+        dest = self.cache / "src" / f"{kind}-{commit[:12]}"
+        with self.lock(f"src-{dest.name}"):
+            if dest.exists():
+                origin = git(dest, "config", "--get", "remote.origin.url", check=False)
+                head = git(dest, "rev-parse", "HEAD", check=False)
+                if norm_url(origin) != norm_url(url) or head != commit:
+                    raise OhError(f"cached source {dest} is {origin or '?'} @ {head[:12] or '?'}, expected {url} @ "
+                                  f"{commit[:12]}; delete that directory and run `oh env` again")
+                # Same commit is not enough: a file edited in the cache would change every result.
+                changes = [l for l in git(dest, "status", "--porcelain", "--untracked-files=all", check=False).splitlines()
+                           if l and not junk(l)]
+                if changes:
+                    raise OhError(f"the cached {kind} source {dest} has local changes ({len(changes)} paths, e.g. "
+                                  f"{changes[0][3:]}), so it is not {kind} {commit[:12]} any more. Restore it with "
+                                  f"`git -C {dest} checkout -- . && git -C {dest} clean -fdq` (or delete it), then re-run.")
+            else:
+                self.fetch_tree(kind, url, commit, dest)
+            os.utime(dest)
+        return dest
+
+    def fetch_tree(self, kind, url, commit, dest):
+        partial = dest.with_name(dest.name + ".partial")
+        shutil.rmtree(partial, ignore_errors=True)
+        partial.mkdir(parents=True)
+        self.say(f"fetching {kind} {commit[:12]} from {url} (trimmed checkout) ...")
+        run(["git", "-C", partial, "init", "-q"])
+        run(["git", "-C", partial, "remote", "add", "origin", url])
+        run(["git", "-C", partial, "config", "core.sparseCheckout", "true"])
+        run(["git", "-C", partial, "config", "core.sparseCheckoutCone", "false"])
+        info = partial / ".git" / "info"
+        info.mkdir(parents=True, exist_ok=True)
+        (info / "sparse-checkout").write_text("\n".join(self.sparse_patterns(kind == "enterprise")) + "\n")
+        try:
+            run(["git", "-C", partial, "fetch", "-q", "--depth", "1", "--filter=blob:none", "origin", commit],
+                timeout=1800)
+        except OhError as exc:
+            hint = (" The Enterprise source is private: attach the repository to this session or set "
+                    "OH_ENTERPRISE_PATH to an existing checkout.") if kind == "enterprise" else ""
+            shutil.rmtree(partial, ignore_errors=True)
+            raise OhError(f"could not fetch {url} @ {commit[:12]}.{hint}\n{exc}") from None
+        run(["git", "-C", partial, "checkout", "-q", "--detach", "FETCH_HEAD"], timeout=1800)
+        if git(partial, "rev-parse", "HEAD") != commit:
+            raise OhError(f"{url} returned a different commit than {commit}")
+        git(partial, "status", "--porcelain", check=False)  # refreshes the index so later checks are fast
+        partial.rename(dest)
+
+    def prune_trees(self):
+        """Delete old source trees that no existing project uses any more."""
+        referenced = set()
+        for path in (self.cache / "projects").glob("*/state.json"):
+            state = read_json(path, {})
+            if not isinstance(state, dict) or (state.get("root") and not Path(state["root"]).exists()):
+                continue
+            for info in (state.get("sources") or {}).values():
+                if isinstance(info, dict) and info.get("commit"):
+                    referenced.add(str(info["commit"])[:12])
+        for kind in ("odoo", "enterprise"):
+            trees = sorted((p for p in (self.cache / "src").glob(f"{kind}-*")
+                            if p.is_dir() and not p.name.endswith(".partial")),
+                           key=lambda p: p.stat().st_mtime, reverse=True)
+            for stale in trees[KEEP_TREES:]:
+                if stale.name.split("-", 1)[1] not in referenced:
+                    with self.lock(f"src-{stale.name}", wait=False) as acquired:
+                        if acquired:
+                            shutil.rmtree(stale, ignore_errors=True)
+
+    def ensure_enterprise(self, sources, update):
+        """Return (path, commit, cache key) of the Enterprise source, or Nones when not configured."""
+        path = self.config.get("enterprise_path")
+        pin = self.config.get("enterprise_commit")
+        if path:
+            path = Path(path).expanduser().resolve()
+            if not path.is_dir():
+                raise OhError(f"enterprise_path {path} does not exist")
+            if not (path / "web_enterprise" / "__manifest__.py").is_file():
+                raise OhError(f"enterprise_path {path} is not the Odoo Enterprise source (no web_enterprise module)")
+            commit = git(path, "rev-parse", "HEAD", check=False) if (path / ".git").exists() else ""
+            if pin and commit != pin:
+                raise OhError(f"enterprise_path is at {commit[:12] or 'an unversioned copy'}, "
+                              f"but enterprise_commit pins {pin[:12]}")
+            if not commit:
+                self.identity_problems.append("enterprise_path is not a git checkout, so its exact content is unknown")
+                return path, None, "unversioned-" + stat_digest(path)
+            changes = worktree_changes(path)
+            return path, commit, commit + (f"+local-{changes}" if changes else "")
+        repo = self.config.get("enterprise_repo")
+        if repo:
+            odoo_ref = self.config.get("odoo_ref") or ""
+            ref = self.config.get("enterprise_ref") or (odoo_ref if not SHA40.match(odoo_ref) else "") or "19.0"
+            commit = self.commit_for("enterprise", repo, ref, pin, sources, update)
+            dest = self.ensure_tree("enterprise", repo, commit)
+            if not (dest / "web_enterprise" / "__manifest__.py").is_file():
+                raise OhError(f"{repo} @ {commit[:12]} is not the Odoo Enterprise source (no web_enterprise module)")
+            return dest, commit, commit
+        sources.pop("enterprise", None)
+        return None, None, None
+
+    def ensure_sources(self, update=False):
+        """Resolve and fetch the Odoo (and Enterprise) source only: enough for `oh src`."""
+        sources = dict(self.state().get("sources") or {})
+        ref = self.config.get("odoo_ref") or "19.0"
+        self.odoo_commit = self.commit_for("odoo", self.odoo_url, ref, self.config.get("odoo_commit"), sources, update)
+        self.src = self.ensure_tree("odoo", self.odoo_url, self.odoo_commit)
+        release = self.src / "odoo" / "release.py"
+        match = re.search(r"version_info\s*=\s*\(\s*(\d+)", release.read_text()) if release.is_file() else None
+        if not match or int(match.group(1)) != 19:
+            raise OhError(f"{self.odoo_url} @ {self.odoo_commit[:12]} is not Odoo 19 (see odoo/release.py); "
+                          "check odoo_ref / odoo_commit in .odoo-harness/project.json")
+        self.enterprise, self.enterprise_commit, self.enterprise_state = self.ensure_enterprise(sources, update)
+        self.update_state(lambda state: state.__setitem__("sources", sources))
+        self.prune_trees()
+
+    def requirements(self):
+        lines = []
+        for line in (self.src / "requirements.txt").read_text().splitlines():
+            stripped = line.strip()
+            if re.match(r"(?i)python-ldap\b", stripped):
+                continue  # needs system headers; only auth_ldap uses it
+            lines.append(re.sub(r"(?i)^psycopg2(?=\s*==)", "psycopg2-binary", stripped))
+        extras = [("project", self.root / "requirements.txt")]
+        gitmodules = self.root / ".gitmodules"
+        if gitmodules.is_file():  # Odoo.sh reads the requirements.txt of submodules too
+            for match in re.finditer(r"^\s*path\s*=\s*(.+?)\s*$", gitmodules.read_text(), re.M):
+                extras.append((f"submodule {match.group(1)}", self.root / match.group(1) / "requirements.txt"))
+        if self.enterprise:
+            extras.append(("enterprise", Path(self.enterprise) / "requirements.txt"))
+        for label, extra in extras:
+            if extra.is_file():
+                lines += [f"# {label} requirements.txt"] + extra.read_text().splitlines()
+        return "\n".join(lines) + "\n"
+
+    def ensure_venv(self):
+        """A venv keyed by its inputs, so projects with different requirements never share one."""
+        exe = shutil.which(self.config.get("python") or "") or shutil.which("python3") or sys.executable
+        exe = os.path.realpath(exe)
+        version = run([exe, "-c", "import sys; print('%d.%d.%d' % sys.version_info[:3])"]).stdout.strip()
+        if tuple(map(int, version.split(".")[:2])) < (3, 10):
+            raise OhError(f"Odoo 19 needs Python >= 3.10, found {version} at {exe}")
+        requirements = self.requirements()
+        self.venv_key = sha(json.dumps([VENV_FORMAT, exe, version, requirements]))[:12]
+        venv = self.cache / "venvs" / f"py{version}-{self.venv_key}"
+        python, marker = venv / "bin" / "python", venv / ".oh-ready.json"
+        with self.lock(f"venv-{self.venv_key}"):
+            if not (marker.is_file() and python.exists()):
+                shutil.rmtree(venv, ignore_errors=True)
+                run([exe, "-m", "venv", venv])
+                req_file = venv / "requirements.oh.txt"
+                req_file.write_text(requirements)
+                self.say(f"installing Odoo Python requirements (python {version}) ...")
+                run([python, "-m", "pip", "install", "-q", "--disable-pip-version-check", "-r", req_file], timeout=2400)
+                write_json(marker, {"key": self.venv_key, "python": version, "installed": installed_digest(venv),
+                                    "created": now_iso()})
+            info = read_json(marker, {}) or {}
+            if not info.get("installed"):  # made by an older harness: take what is there now as the baseline
+                info["installed"] = installed_digest(venv)
+                write_json(marker, info)
+        # What is installed now, not what was installed at creation: a package added by hand changes it.
+        self.python, self.python_version, self.packages = python, version, installed_digest(venv)
+        self.base_python = exe
+        self.packages_changed = self.packages != info.get("installed")
+        return python
+
+    def ensure_rtlcss(self):
+        if not any(l.split("_")[0] in RTL_LANGS for l in self.config["languages"]) or shutil.which("rtlcss"):
+            return None
+        bin_dir = self.cache / "node" / "node_modules" / ".bin"
+        if (bin_dir / "rtlcss").exists():
+            return bin_dir
+        if not shutil.which("npm"):
+            self.say("note: rtlcss missing and npm unavailable; right-to-left screens will not be mirrored locally")
+            return None
+        run(["npm", "install", "--prefix", self.cache / "node", "rtlcss", "--no-audit", "--no-fund", "--silent"],
+            check=False, timeout=600)
+        return bin_dir if (bin_dir / "rtlcss").exists() else None
+
+    @staticmethod
+    def browser_bin():
+        if os.environ.get("ODOO_BROWSER_BIN"):
+            return os.environ["ODOO_BROWSER_BIN"]
+        for name in ("google-chrome", "chromium", "chromium-browser", "google-chrome-stable"):
+            if shutil.which(name):
+                return shutil.which(name)
+        roots = [os.environ.get("PLAYWRIGHT_BROWSERS_PATH", ""), "/opt/pw-browsers", str(Path.home() / ".cache/ms-playwright")]
+        for root in roots:
+            found = sorted(glob.glob(os.path.join(root, "chromium-*", "chrome-linux*", "chrome")), reverse=True) if root else []
+            if found:
+                return found[0]
+        return None
+
+    def ensure(self, update=False):
+        with self.lock("postgres"):
+            self.ensure_postgres()
+        self.pg_version = self.psql("SHOW server_version_num", check=False).stdout.strip() or None
+        self.ensure_sources(update)
+        self.ensure_venv()
+        with self.lock("node"):
+            self.rtlcss_dir = self.ensure_rtlcss()
+        self.write_conf()
+
+    def write_conf(self):
+        self.data.mkdir(parents=True, exist_ok=True)
+        self.logs.mkdir(parents=True, exist_ok=True)
+        conf = "\n".join([
+            "[options]",
+            f"db_host = {self.db['host']}", f"db_port = {self.db['port']}",
+            f"db_user = {self.db['user']}", f"db_password = {self.db['password']}",
+            f"data_dir = {self.data}", "max_cron_threads = 0", "http_interface = 127.0.0.1", "list_db = False", "",
+        ])
+        self.conf.write_text(conf)
+        self.conf.chmod(0o600)
+
+    def standard_roots(self):
+        roots = [self.enterprise] if self.enterprise else []
+        return roots + [self.src / "addons", self.src / "odoo" / "addons"]
+
+    def addons_path(self, project_roots):
+        paths = [str(p) for p in project_roots] + [str(p) for p in self.standard_roots()]
+        return ",".join(dict.fromkeys(paths))
+
+    def runtime_env(self):
+        env = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONDONTWRITEBYTECODE="1")  # keep the repo clean
+        if self.rtlcss_dir:
+            env["PATH"] = f"{self.rtlcss_dir}{os.pathsep}{env.get('PATH', '')}"
+        browser = self.browser_bin()
+        if browser:
+            env["ODOO_BROWSER_BIN"] = browser
+        return env
+
+    def odoo(self, *args):
+        return [self.python, self.src / "odoo-bin", *args]
+
+    def odoo_server(self, db, addons, *extra, port=None):
+        return self.odoo("-c", self.conf, "-d", db, f"--addons-path={addons}",
+                         f"--http-port={port or free_port()}", *extra)
+
+    def run_logged(self, argv, log_path, timeout):
+        with open(log_path, "w") as handle:
+            process = subprocess.run([str(a) for a in argv], stdout=handle, stderr=subprocess.STDOUT,
+                                     env=self.runtime_env(), timeout=timeout)
+        return process.returncode
+
+    def log_file(self, label):
+        self.logs.mkdir(parents=True, exist_ok=True)
+        for stale in sorted(self.logs.glob("*.log"))[:-40]:
+            stale.unlink(missing_ok=True)
+        return self.logs / f"{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}-{label}.log"
+
+    # template databases ------------------------------------------------------
+    def load_languages(self):
+        # en_US first: loading only ar_001 on a new database deactivates English and makes the admin Arabic.
+        return ["en_US"] + [l for l in self.config["languages"] if l != "en_US"]
+
+    def template(self, std_modules, project_roots, demo, shadowed):
+        """Name and addons path of the template holding `std_modules`, keyed by everything that shapes it.
+
+        Templates contain standard modules only, so projects share them safely. A project that ships its
+        own copy of a standard module (`shadowed`) gets a template of its own.
+        """
+        key = [TEMPLATE_FORMAT, self.odoo_commit, self.enterprise_state, self.venv_key, self.packages,
+               sorted(std_modules), bool(demo), self.load_languages(), str(self.root) if shadowed else None]
+        roots = (list(project_roots) if shadowed else []) + self.standard_roots()
+        return "oh_tpl_" + sha(json.dumps(key))[:12], ",".join(dict.fromkeys(str(p) for p in roots))
+
+    def build_template(self, name, std_modules, addons, demo):
+        """Build the template unless it exists; the caller holds its exclusive lock. True when built."""
+        if self.db_exists(name):
+            return False
+        log = self.log_file("template")
+        self.say(f"building template database ({len(std_modules)} standard modules, demo={demo}); "
+                 "this happens once per dependency set ...")
+        extra = ["-i", ",".join(sorted(std_modules) or ["base"]), "--stop-after-init"]
+        if demo:
+            extra.append("--with-demo")
+        extra += ["--load-language", ",".join(self.load_languages())]
+        started = time.time()
+        rc = self.run_logged(self.odoo_server(name, addons, *extra), log, timeout=5400)
+        summary = parse_log(log.read_text(errors="replace"))
+        if rc or summary["errors"]:
+            self.drop_db(name)
+            first = summary["errors"][0][1] if summary["errors"] else f"exit code {rc}"
+            raise OhError(f"template build failed ({first[:300]}); log: {log}")
+        self.touch_template(name, seconds=round(time.time() - started))
+        return True
+
+    def touch_template(self, name, seconds=None):
+        path = self.cache / "templates.json"
+        with self.lock("templates"):
+            registry = read_json(path, {}) or {}
+            entry = registry.setdefault(name, {"built": now_iso()})
+            entry["used"] = time.time()
+            entry["projects"] = sorted(set(entry.get("projects", [])) | {self.key})
+            if seconds is not None:
+                entry["seconds"] = seconds
+            write_json(path, registry)
+
+    def evict_templates(self, keep):
+        """Drop the least recently used templates beyond KEEP_TEMPLATES, skipping any that is in use."""
+        path = self.cache / "templates.json"
+        with self.lock("templates"):
+            registry = read_json(path, {}) or {}
+        others = sorted((n for n in registry if n != keep), key=lambda n: registry[n].get("used", 0), reverse=True)
+        for name in others[KEEP_TEMPLATES - 1:]:
+            with self.lock(f"tpl-{name}", wait=False) as acquired:
+                if not acquired:
+                    continue
+                self.drop_db(name)
+                with self.lock("templates"):
+                    registry = read_json(path, {}) or {}
+                    registry.pop(name, None)
+                    write_json(path, registry)
+
+    def clone_template(self, std_modules, project_roots, demo, shadowed, db):
+        name, addons = self.template(std_modules, project_roots, demo, shadowed)
+        for _ in range(3):
+            with self.lock(f"tpl-{name}"):
+                built = self.build_template(name, std_modules, addons, demo)
+            with self.lock(f"tpl-{name}", shared=True):  # eviction needs the exclusive lock, so it waits
+                if not self.db_exists(name):
+                    continue
+                self.clone_db(name, db)
+            self.touch_template(name)
+            if built:
+                self.evict_templates(keep=name)
+            return name
+        raise OhError(f"template {name} kept disappearing; is `oh clean --all-projects` running?")
+
+    def export_ref(self, ref):
+        commit = git(self.root, "rev-parse", "--verify", ref + "^{commit}", check=False)
+        if not commit:
+            raise OhError(f"{ref!r} is not a commit of this repository (git fetch it first?)")
+        refs = self.cache / "refs"
+        dest = refs / commit
+        with self.lock(f"ref-{commit[:12]}"):
+            if not dest.exists():
+                partial = dest.with_name(commit + ".partial")
+                shutil.rmtree(partial, ignore_errors=True)
+                partial.mkdir(parents=True)
+                archive = subprocess.run(["git", "-C", str(self.root), "archive", commit], capture_output=True, check=True)
+                subprocess.run(["tar", "-x", "-C", str(partial)], input=archive.stdout, check=True)
+                partial.rename(dest)
+            os.utime(dest)
+        exports = sorted((p for p in refs.iterdir() if p.is_dir() and SHA40.match(p.name)),
+                         key=lambda p: p.stat().st_mtime, reverse=True)
+        for stale in exports[KEEP_REFS:]:
+            with self.lock(f"ref-{stale.name[:12]}", wait=False) as acquired:
+                if acquired:
+                    shutil.rmtree(stale, ignore_errors=True)
+        return dest, commit
+
+    def cleanup_runs(self):
+        """Drop this project's leftover run databases (never another project's, never kept ones)."""
+        kept = set(self.state().get("kept", []))
+        for name in self.list_dbs(self.prefix + "run_"):
+            match = re.match(re.escape(self.prefix) + r"run_(\d+)_", name)
+            owner = int(match.group(1)) if match else None
+            if name not in kept and not (owner and owner != os.getpid() and pid_alive(owner)):
+                self.drop_db(name)
+
+    def runtime_key(self):
+        """What a kept database and a running server depend on besides the project source."""
+        return {"odoo": self.odoo_commit, "enterprise": self.enterprise_state, "venv": self.venv_key,
+                "packages": self.packages}
+
+    def keep_db(self, db, modules, targets):
+        """Remember a kept database with the source it was built from; keep the last KEEP_KEPT_DBS."""
+        dropped = []
+
+        def change(state):
+            serving = (state.get("serve") or {}).get("db")
+            kept = [d for d in state.get("kept", []) if d != db and self.db_exists(d)] + [db]
+            for old in kept[:-KEEP_KEPT_DBS]:
+                if old != serving:
+                    self.drop_db(old)
+                    dropped.append(old)
+            state["kept"] = [d for d in kept if d not in dropped]
+            state["last_db"] = db
+            dbs = {d: info for d, info in (state.get("dbs") or {}).items() if d in state["kept"]}
+            dbs[db] = {"created": now_iso(), "modules": modules, "targets": targets, "format": FINGERPRINT_FORMAT,
+                       "environment": self.runtime_key()}
+            state["dbs"] = dbs
+
+        self.update_state(change)
+        return dropped
+
+
+# --------------------------------------------------------------------------- this project's server
+
+def server_alive(entry):
+    pid = (entry or {}).get("pid")
+    if not pid or not pid_alive(pid):
+        return False
+    cmdline = Path(f"/proc/{pid}/cmdline")
+    if cmdline.exists():  # the pid may have been reused by another process
+        try:
+            return (entry.get("db") or "\0") in cmdline.read_bytes().decode(errors="replace")
+        except OSError:
+            return False
+    return True
+
+
+def serve_state(env):
+    entry = env.state().get("serve")
+    return entry if server_alive(entry) else None
+
+
+def stop_server(env):
+    entry = serve_state(env)
+    if entry:
+        with contextlib.suppress(OSError):
+            os.killpg(entry["pid"], signal.SIGTERM)
+        for _ in range(20):
+            if not pid_alive(entry["pid"]):
+                break
+            time.sleep(0.5)
+    env.update_state(lambda state: state.pop("serve", None))
+    return bool(entry)
+
+
+def wait_http(url, seconds):
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == 200:
+                    return True
+        except OSError:
+            time.sleep(1)
+    return False
+
+
+def start_server(env, db, port=None):
+    """Serve `db` with this project's server. A server started for another database, source or environment
+    is restarted, so what it shows is what the project holds now; other projects' servers are left alone."""
+    roots, project = discover_project(env.root, env.config)
+    addons = env.addons_path(roots)
+    identity = sha(json.dumps([db, addons, env.runtime_key(), module_ids(env.root, project)], sort_keys=True))[:16]
+    running = serve_state(env)
+    if running and running.get("db") == db and running.get("identity") == identity:
+        return running
+    if running:
+        stop_server(env)
+    if not (port and port_free(port)):
+        port = 8069 if port_free(8069) else free_port()
+    log = env.log_file("serve")
+    argv = env.odoo_server(db, addons, f"--db-filter=^{db}$", port=port)
+    with open(log, "w") as handle:
+        process = subprocess.Popen([str(a) for a in argv], stdout=handle, stderr=subprocess.STDOUT,
+                                   env=env.runtime_env(), start_new_session=True)
+    entry = {"pid": process.pid, "db": db, "port": port, "log": str(log), "started": now_iso(), "identity": identity}
+    env.update_state(lambda state: state.__setitem__("serve", entry))
+    if not wait_http(f"http://127.0.0.1:{port}/web/login", 180):
+        raise OhError(f"server did not answer on port {port}; log: {log}")
+    return entry
+
+
+# --------------------------------------------------------------------------- result records
+
+def evidence_name(kind, labels):
+    label = "+".join(sorted(labels)) or "none"
+    if len(label) > 60:
+        label = "+".join(sorted(labels)[:3]) + f"+{len(labels) - 3}-more-{sha(label)[:6]}"
+    return f"{kind}-" + re.sub(r"[^A-Za-z0-9._+-]+", "-", label).strip("-")
+
+
+def command_line(argv):
+    words, hide = [], False
+    for word in argv:
+        words.append("***" if hide else word)
+        hide = word == "--password"
+    return "oh " + shlex.join(words)
+
+
+def browser_digest(path):
+    if not path:
+        return None
+    try:
+        info = os.stat(path)
+    except OSError:
+        return None
+    return sha(f"{os.path.realpath(path)} {info.st_size} {info.st_mtime_ns}")[:12]
+
+
+def environment_record(env):
+    """Everything outside the project source that shapes a result."""
+    return {
+        "odoo": {"ref": env.config.get("odoo_ref"), "commit": env.odoo_commit, "repository": env.odoo_url},
+        "enterprise": ({"commit": env.enterprise_commit, "key": env.enterprise_state,
+                        "source": env.config.get("enterprise_repo") or "local path"} if env.enterprise else None),
+        "python": env.python_version, "venv": env.venv_key, "packages": env.packages,
+        "packages_changed_by_hand": env.packages_changed, "postgres": env.pg_version,
+        "browser": browser_digest(env.browser_bin()), "wkhtmltopdf": bool(shutil.which("wkhtmltopdf")),
+        "rtlcss": bool(env.rtlcss_dir or shutil.which("rtlcss")), "languages": env.load_languages(),
+    }
+
+
+def keep_file(source, folder, name, role, compress=False):
+    """Copy (gzip when `compress`) `source` to `folder/name`; return its entry for a record's `files`."""
+    data = Path(source).read_bytes()
+    entry = {"name": name, "role": role}
+    if compress:
+        entry["content_sha256"] = sha_bytes(data)
+        data = gzip.compress(data, mtime=0)
+    target = Path(folder) / name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return dict(entry, sha256=sha_bytes(data), bytes=len(data))
+
+
+def file_problems(record, folder, root):
+    """Missing or changed files of a record: `name` entries live in its folder, `path` ones in the project."""
+    problems = []
+    for entry in record.get("files") or []:
+        where = Path(folder) / entry["name"] if entry.get("name") else Path(root) / str(entry.get("path"))
+        label = entry.get("name") or entry.get("path")
+        if not where.is_file():
+            problems.append(f"missing file {label}")
+        elif sha_bytes(where.read_bytes()) != entry.get("sha256"):
+            problems.append(f"changed file {label} (its sha256 differs from the record)")
+    return problems
+
+
+def save_record(env, name, record, to_project, retained=(), reuse_folder=None):
+    """Keep a record and its files in this project's cache, and copy both into the project unless told not to.
+
+    A record `<name>.json` has its files in the folder `<name>/` next to it (the Odoo log, screenshots),
+    each listed in `files` with its sha256; `oh evidence` checks them. `retained` is a list of
+    (source path, name in the folder, role, gzip?). Files kept elsewhere in the project are listed by `path`.
+    """
+    runs = env.home / "runs"
+    stem = f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() % 10**9:09d}-{os.getpid()}-{name}"  # sorts by time
+    folder = runs / stem
+    files = [f for f in record.get("files") or [] if not f.get("name")]
+    if reuse_folder:
+        shutil.copytree(reuse_folder, folder)
+        files += [f for f in record.get("files") or [] if f.get("name")]
+    for source, file_name, role, compress in retained:
+        files.append(keep_file(source, folder, file_name, role, compress))
+    record = json.loads(json.dumps(dict(record, files=files), default=str))
+    write_json(runs / f"{stem}.json", record)
+    env.last_run = runs / f"{stem}.json"
+    for stale in sorted(runs.glob("*.json"))[:-KEEP_RECORDS]:
+        stale.unlink(missing_ok=True)
+        shutil.rmtree(stale.with_suffix(""), ignore_errors=True)
+    if not to_project:
+        return None
+    target = env.root / EVIDENCE / f"{name}.json"
+    shutil.rmtree(target.with_suffix(""), ignore_errors=True)
+    if folder.is_dir():
+        shutil.copytree(folder, target.with_suffix(""))
+    write_json(target, record)
+    return target.relative_to(env.root)
+
+
+def find_reusable(env, identity):
+    """(record, folder) of the newest run with this identity, when it passed less than REUSE_SECONDS ago
+    and the log it retained is still intact; otherwise None. Only this machine's own runs count."""
+    if not identity:
+        return None
+    for path in sorted((env.home / "runs").glob("*.json"), reverse=True):
+        record = read_json(path)
+        if not isinstance(record, dict) or record.get("identity") != identity:
+            continue
+        folder = path.with_suffix("")
+        usable = (record.get("status") == "passed" and time.time() - record.get("finished_ts", 0) < REUSE_SECONDS
+                  and any(f.get("role") == "log" for f in record.get("files") or [])
+                  and not file_problems(record, folder, env.root))
+        return (record, folder) if usable else None
+    return None
+
+
+# --------------------------------------------------------------------------- commands
+
+def cmd_env(args):
+    root = project_root()
+    config = load_config(root)
+    if args.if_remote and os.environ.get("CLAUDE_CODE_REMOTE") != "true" and os.environ.get("OH_PREWARM") != "1":
+        return PASSED
+    if args.background:
+        env = Env(root, config, quiet=True)
+        env.logs.mkdir(parents=True, exist_ok=True)
+        with open(env.logs / "prewarm.log", "w") as log:
+            subprocess.Popen([sys.executable, __file__, "env", "--prebuild"], stdout=log, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, start_new_session=True, cwd=str(root))
+        return PASSED
+    env = Env(root, config)
+    env.ensure(update=args.update)
+    roots, project = discover_project(root, config)
+    std_index = scan_modules(env.standard_roots())
+    sources = env.state().get("sources") or {}
+
+    def how(kind):
+        info = sources.get(kind) or {}
+        return "pinned" if info.get("pinned") else f"resolved {str(info.get('resolved', '?'))[:10]}; `oh env --update` moves it"
+
+    if not env.enterprise:
+        enterprise = "not configured: modules that need Enterprise are verified on Odoo.sh builds"
+    elif config.get("enterprise_repo"):
+        enterprise = f"{env.enterprise_commit[:12]} ({how('enterprise')})"
+    else:
+        enterprise = f"{(env.enterprise_commit or 'unversioned')[:12]} at {env.enterprise}"
+    lines = ["oh env: ready",
+             f"  project     {root.name}: databases {env.prefix}*, state {env.home}",
+             f"  postgres    {env.db['user']}@{env.db['host']}:{env.db['port']}",
+             f"  odoo        {config['odoo_ref']} @ {env.odoo_commit[:12]} ({how('odoo')})",
+             f"  enterprise  {enterprise}",
+             f"  python    {env.python_version}, venv {env.venv_key} (packages {env.packages})",
+             f"  browser     {env.browser_bin() or 'none (tours and screenshots unavailable)'}",
+             f"  rtlcss      {'ok' if (env.rtlcss_dir or shutil.which('rtlcss')) else 'missing'}",
+             f"  pdf         {'wkhtmltopdf ok' if shutil.which('wkhtmltopdf') else 'wkhtmltopdf missing: PDF output only on Odoo.sh'}",
+             f"  modules     {len(project)} in {len(roots)} addons root(s)"
+             + (f": {', '.join(str(r.relative_to(root)) or '.' for r in roots)}" if roots else "")]
+    need, missing = closure(project, {**std_index, **project})
+    if missing:
+        lines.append(f"  missing     {', '.join(sorted(missing))} (not in local source; Enterprise or submodule?)")
+    print("\n".join(lines))
+    if args.prebuild and project and not missing:
+        std, demo = need - set(project), bool(config["with_demo"])
+        name, addons = env.template(std, roots, demo, bool(set(project) & set(std_index)))
+        with env.lock(f"tpl-{name}"):
+            env.build_template(name, std, addons, demo)
+        env.touch_template(name)
+        print(f"  template    {name} ready")
+    return PASSED
+
+
+def cmd_test(args):
+    started = time.time()
+    root = project_root()
+    config = load_config(root)
+    roots, project = discover_project(root, config)
+    if not project:
+        raise OhError("no Odoo modules found in this repository (looked for __manifest__.py up to 3 levels deep)")
+    unknown = [m for m in args.modules if m not in project]
+    if unknown:
+        raise OhError(f"not modules of this project: {', '.join(unknown)} (known: {', '.join(sorted(project))})")
+    base = resolve_base(root, config)
+    files = changed_files(root, base)
+    changed = modules_for_files(root, files, project)
+    tag_modules = {m for spec in (args.tags or "").split(",") if spec and not spec.startswith("-")
+                   for m in re.findall(r"/(\w+)", spec) if m in project}
+    if args.modules:
+        targets = required = set(args.modules)
+    elif args.all:
+        targets, required = set(project), set(tag_modules or changed)
+    elif tag_modules:
+        targets = required = set(tag_modules)
+    else:
+        targets = required = set(changed or project)
+    if args.with_dependents:
+        targets = targets | dependents(targets, project)
+    targets, required = sorted(targets), set(required)
+    requires = [(spec, parse_require(spec, project)) for spec in args.require or []]
+    demo = bool(config["with_demo"]) and not args.no_demo
+    kind = "upgrade" if args.upgrade_from else "test"
+    name = evidence_name(kind, targets)
+    to_project = not args.no_record and not args.tags
+
+    env = Env(root, config)
+    env.ensure()
+    setup_done = time.time()
+    env.cleanup_runs()
+    std_index = scan_modules(env.standard_roots())
+    index = {**std_index, **project}
+    needed, missing = closure(project if args.all else targets, index)
+    selection = {"modules": targets, "required": sorted(required), "tags": args.tags, "require": args.require or [],
+                 "require_parsed": [list(parsed) for _, parsed in requires], "all": args.all,
+                 "with_dependents": args.with_dependents, "demo": demo, "fresh": args.fresh, "upgrade_from": None}
+    record = {"kind": kind, "command": command_line(args.argv), "harness": harness_identity(root),
+              "environment": environment_record(env), "selection": selection, "identity": None}
+    if missing:
+        print(f"oh test: BLOCKED - modules not available locally: {', '.join(sorted(missing))}")
+        print("  These are usually Odoo Enterprise (or submodule) modules. Either set enterprise_path/enterprise_repo")
+        print("  in .odoo-harness/project.json, or push the branch and verify on an Odoo.sh development build.")
+        record.update(status="blocked", exit_code=BLOCKED, reasons=[f"missing locally: {', '.join(sorted(missing))}"],
+                      project=source_identity(root, {m: project[m] for m in sorted(needed & set(project))}),
+                      finished=now_iso(), finished_ts=time.time())
+        save_record(env, name, record, to_project)
+        return BLOCKED
+    project_needed = sorted(needed & set(project))
+    all_needed, all_missing = closure(project, index)
+    std = (all_needed if not all_missing else needed) - set(project)
+    shadowed = bool(set(project) & set(std_index))
+    tags = args.tags or ",".join(f"/{t}" for t in targets)
+    upgrade = None
+    if args.upgrade_from:
+        old_root, old_commit = env.export_ref(args.upgrade_from)
+        old_roots, old_project = discover_project(old_root, config)
+        present = [t for t in targets if t in old_project]
+        upgrade = {"ref": args.upgrade_from, "commit": old_commit, "present": present}
+        selection["upgrade_from"] = {"ref": args.upgrade_from, "commit": old_commit}
+        if present and not args.tags:
+            tags += "," + ",".join(f"{UPGRADE_TAG}/{m}" for m in present)
+    selection["tags"] = tags
+    source = source_identity(root, {m: project[m] for m in project_needed})
+    record["project"] = source
+    notes = []
+    doubts = source["problems"] + env.identity_problems + [
+        f"{m} has files ignored by git ({', '.join(f)}): Odoo loads them locally, Odoo.sh never sees them"
+        for m, f in sorted(source["ignored"].items())]
+    if doubts:
+        notes += [f"this result can't be matched exactly to its source, so it won't be reused: {d}" for d in doubts]
+    else:
+        record["identity"] = sha(json.dumps([selection, source["modules"], source["repos"], record["environment"],
+                                             record["harness"]["oh_sha256"]], sort_keys=True, default=str))[:16]
+    if env.packages_changed:
+        notes.append("the venv's packages changed after it was created (installed by hand?); add what the "
+                     "modules need to requirements.txt, or Odoo.sh won't have it")
+    extra_reasons = []
+    if upgrade:
+        old_ids = module_ids(old_root, {m: old_project[m] for m in upgrade["present"]}, use_git=False)
+        for module in upgrade["present"]:
+            old_version = read_manifest(old_project[module]).get("version")
+            new_version = read_manifest(project[module]).get("version")
+            if old_ids.get(module) != source["modules"].get(module) and version_key(new_version) <= version_key(old_version):
+                extra_reasons.append(f"{module} changed since {args.upgrade_from} but its version {new_version!r} is not "
+                                     f"higher than {old_version!r}, so Odoo.sh will not update it on staging or production")
+    if not (args.rerun or args.keep):
+        found = find_reusable(env, record["identity"])
+        if found:
+            previous, folder = found
+            reused = dict(previous, reused_from=previous.get("finished"), command=record["command"])
+            saved = save_record(env, name, reused, to_project, reuse_folder=folder)
+            minutes = round((time.time() - previous.get("finished_ts", time.time())) / 60)
+            tests = previous.get("tests") or {}
+            print(f"oh test: PASSED (reused) modules: {', '.join(targets)}")
+            print(f"  the same source, environment and selection passed {minutes} min ago and its log is intact; "
+                  "--rerun runs it again")
+            print(f"  tests: {tests.get('executed', 0)} executed, {tests.get('skipped', 0)} skipped, "
+                  f"{tests.get('failed', 0)} failed, {tests.get('errors', 0)} errors")
+            if saved:
+                print(f"evidence: {saved} (log: {saved.with_suffix('')}/odoo.log.gz)")
+            return PASSED
+
+    db = f"{env.prefix}run_{os.getpid()}_{int(time.time())}"
+    log = env.log_file("test")
+    mode, prepares, retained = "template", [], []
+    demo_flag = ["--with-demo"] if demo else []
+    template = None
+    if args.fresh:
+        mode = "fresh"
+        extra = ["-i", ",".join(project_needed), *demo_flag, "--load-language", ",".join(env.load_languages())]
+    else:
+        template = env.clone_template(std, roots, demo, shadowed, db)
+        extra = ["-i", ",".join(project_needed), *demo_flag]
+    template_done = time.time()
+    if upgrade:
+        mode += f"+upgrade-from {args.upgrade_from}"
+        present = upgrade["present"]
+        if not present:
+            notes.append(f"none of {', '.join(targets)} exists at {args.upgrade_from}: this is a first installation")
+        else:
+            old_needed, old_missing = closure(present, {**std_index, **old_project})
+            if old_missing:
+                env.drop_db(db)
+                in_submodule = sorted(m for m in old_missing if m in project)
+                raise OhError(f"prior version needs modules missing locally: {', '.join(sorted(old_missing))}"
+                              + (" (modules in git submodules are not part of `git archive`, so --upgrade-from can't "
+                                 "install their prior version)" if in_submodule else ""), BLOCKED)
+            if args.fresh:
+                env.psql(f'CREATE DATABASE "{db}"')
+            prior = sorted(old_needed & set(old_project))
+            prior_log = env.log_file("prior")
+            rc = env.run_logged(env.odoo_server(db, env.addons_path(old_roots), "-i", ",".join(prior),
+                                                "--stop-after-init", *demo_flag), prior_log, timeout=args.timeout)
+            retained.append((prior_log, "prior.log.gz", "prior version log", True))
+            prior_summary = parse_log(prior_log.read_text(errors="replace"))
+            if rc or prior_summary["errors"]:
+                env.drop_db(db)
+                raise OhError(f"the prior version ({args.upgrade_from}) failed to install; log: {prior_log}")
+            prepares = find_prepares(project, present)
+            if prepares:
+                shell = subprocess.run([str(a) for a in env.odoo("shell", "-c", env.conf, "-d", db,
+                                                                 f"--addons-path={env.addons_path(old_roots)}",
+                                                                 "--no-http", "--log-level=warn")],
+                                       input=prepare_script(prepares), text=True, capture_output=True,
+                                       env=env.runtime_env(), timeout=args.timeout)
+                prepare_log = env.log_file("prepare")
+                prepare_log.write_text(shell.stdout + shell.stderr)
+                retained.append((prepare_log, "prepare.log.gz", "prepare_upgrade output", True))
+                if shell.returncode or "OH_PREPARE_DONE" not in shell.stdout:
+                    env.drop_db(db)
+                    tail = (shell.stderr or shell.stdout).splitlines()[-12:]
+                    print(f"oh test: FAILED - prepare_upgrade() failed on the prior version ({args.upgrade_from})")
+                    print("\n".join("  | " + line[:220] for line in tail))
+                    record.update(status="failed", exit_code=FAILED, finished=now_iso(), finished_ts=time.time(),
+                                  reasons=["prepare_upgrade() failed on the prior version"], failures=tail[-3:])
+                    save_record(env, name, record, to_project, retained)
+                    return FAILED
+                notes.append("prepared data on the prior version: "
+                             + ", ".join(f"{m} ({p.name})" for m, p, _ in prepares))
+            new_only = [m for m in project_needed if m not in old_project]
+            extra = ["-u", ",".join(present), *(["-i", ",".join(new_only)] if new_only else []), *demo_flag]
+    elif base:
+        notes += version_notes(root, base, targets, project, files)
+    argv = env.odoo_server(db, env.addons_path(roots), *extra, "--test-enable", f"--test-tags={tags}",
+                           "--log-level=test", "--stop-after-init")
+    odoo_started = time.time()
+    try:
+        rc = env.run_logged(argv, log, timeout=args.timeout)
+    except subprocess.TimeoutExpired:
+        rc = -1
+        notes.append(f"timed out after {args.timeout}s")
+    summary = parse_log(log.read_text(errors="replace"))
+    need_checks, classes = set(), {}
+    if upgrade and upgrade["present"]:
+        classes = {m: upgrade_classes(project[m]) for m in upgrade["present"]}
+        need_checks = {m for m, _ in summary["migrations"] if m in upgrade["present"]} | {m for m, _, _ in prepares}
+    status, reasons = verdict(summary, rc, required, requires, classes, need_checks)
+    reasons += extra_reasons
+    if status == PASSED and extra_reasons:
+        status = UNVERIFIED
+    if rc and not summary["failures"] and not summary["errors"]:
+        notes.append(f"odoo exited with code {rc}; see the log")
+    finished = time.time()
+    if args.keep:
+        dropped = env.keep_db(db, source["modules"], targets)
+        if dropped:
+            notes.append(f"dropped older kept databases: {', '.join(dropped)}")
+    else:
+        env.drop_db(db)
+    per, total = test_counts(summary)
+    record.update(
+        status=LABELS[status].lower(), exit_code=status, reasons=reasons, notes=notes,
+        tests=dict(total, by_module=per), migrations=[f"module {m}: {t}" for m, t in summary["migrations"]],
+        failures=[message.splitlines()[0][:200] for message, _ in summary["failures"][:10]]
+        + [f"{logger}: {message.splitlines()[0][:200]}" for logger, message, _ in summary["errors"][:5]],
+        upgrade_checks=({m: sorted(c) for m, c in classes.items()} if upgrade else None),
+        need_checks=sorted(need_checks), extra_reasons=extra_reasons, odoo_exit_code=rc,
+        database=(db if args.keep else "dropped"), template=template, finished=now_iso(finished), finished_ts=finished,
+        seconds={"total": round(finished - started), "setup": round(setup_done - started),
+                 "database": round(template_done - setup_done), "prior_version": round(odoo_started - template_done),
+                 "odoo": round(finished - odoo_started)},
+    )
+    saved = save_record(env, name, record, to_project, [(log, "odoo.log.gz", "log", True)] + retained)
+    markers = [str(p) for p in roots] + ["/tests/"]
+    print(f"oh test: {LABELS[status]} ({round(finished - started)}s) modules: {', '.join(targets)}"
+          + (f" (+{len(project_needed) - len(targets)} project deps)" if len(project_needed) > len(targets) else ""))
+    print(f"  mode: {mode}{' +demo' if demo else ''} | tags: {tags} | project: {head_info(root)}")
+    print(f"  odoo {config['odoo_ref']}@{env.odoo_commit[:8]} | enterprise: "
+          + (str(env.enterprise_commit or 'local')[:8] if env.enterprise else "none") + f" | log: {log}")
+    print(f"  db: {db} kept (oh serve / oh shell / oh shot use it)" if args.keep else "  db: dropped (--keep to inspect)")
+    for line in report(summary, status, reasons, markers):
+        print(line)
+    for note in notes:
+        print(f"note: {note}")
+    if saved:
+        print(f"evidence: {saved} (with its log in {saved.with_suffix('')}/)")
+    return status
+
+
+def cmd_shell(args):
+    root = project_root()
+    config = load_config(root)
+    env = Env(root, config, quiet=True)
+    env.ensure()
+    db = env.resolve_db(args.db)
+    roots, _ = discover_project(root, config)
+    code = args.code if args.code is not None else sys.stdin.read()
+    argv = env.odoo("shell", "-c", env.conf, "-d", db, f"--addons-path={env.addons_path(roots)}", "--no-http",
+                    "--log-level=warn")
+    result = subprocess.run([str(a) for a in argv], input=code, text=True, capture_output=True,
+                            env=env.runtime_env(), timeout=args.timeout)
+    lines = result.stdout.splitlines()
+    print("\n".join(lines[:args.max_lines]))
+    if len(lines) > args.max_lines:
+        print(f"... {len(lines) - args.max_lines} more lines")
+    if result.returncode or "Traceback" in result.stderr:
+        print("\n".join(result.stderr.splitlines()[-20:]), file=sys.stderr)
+        return FAILED
+    return PASSED
+
+
+def cmd_serve(args):
+    root = project_root()
+    env = Env(root, load_config(root), quiet=True)
+    env.ensure()
+    db = env.resolve_db(args.db)
+    entry = start_server(env, db, args.port)
+    print(f"serving {db} at http://127.0.0.1:{entry['port']} (login admin / admin); stop with `oh stop`")
+    return PASSED
+
+
+def cmd_stop(args):
+    root = project_root()
+    env = Env(root, load_config(root), quiet=True)
+    print("stopped this project's server" if stop_server(env) else "no server running for this project")
+    return PASSED
+
+
+SHOT_SCRIPT = r"""
+import json, re, sys, xmlrpc.client
+from pathlib import Path
+from urllib.parse import urlparse
+from playwright.sync_api import sync_playwright
+
+cfg = json.loads(sys.stdin.read())
+base, db, login, password = cfg["url"], cfg["db"], cfg["login"], cfg["password"]
+uid = xmlrpc.client.ServerProxy(base + "/xmlrpc/2/common").authenticate(db, login, password, {})
+if not uid:
+    print(json.dumps({"fatal": "login failed for %s on %s" % (login, db)}))
+    sys.exit(0)
+models = xmlrpc.client.ServerProxy(base + "/xmlrpc/2/object")
+VIEW = ".o_action_manager .o_action, .o_action_manager .o_view_controller"
+BUSY = "() => ![...document.querySelectorAll('.o_loading_indicator, .o_blockUI:not(.o_blockUI_invisible)')].some(e => e.offsetParent !== null)"
+STATE = '''() => ({
+  rtl: document.body.classList.contains("o_rtl"),
+  view: !!document.querySelector("%s"),
+  busy: [...document.querySelectorAll(".o_loading_indicator, .o_blockUI:not(.o_blockUI_invisible)")].some(e => e.offsetParent !== null),
+  dialog: [...document.querySelectorAll(".o_error_dialog")].map(e => e.innerText.trim()).join(" | "),
+  danger: [...document.querySelectorAll(".o_notification")].filter(n => n.querySelector(".o_notification_bar.bg-danger")).map(n => n.innerText.trim()).join(" | "),
+  title: document.title,
+})''' % VIEW
+SESSION = '''async () => {
+  const response = await fetch("/web/session/get_session_info", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({jsonrpc: "2.0", method: "call", params: {}})});
+  const data = await response.json();
+  return data.result || {error: (data.error && data.error.message) || "no session"};
+}'''
+# Odoo shows another screen when a requested action doesn't exist, so each action is resolved first.
+ACTION = '''async (ref) => {
+  const response = await fetch("/web/action/load", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({jsonrpc: "2.0", method: "call", params: {action_id: ref}})});
+  const data = await response.json();
+  if (data.result) return {id: data.result.id, path: data.result.path || null};
+  const error = data.error || {};
+  return {error: (error.data && error.data.message) || error.message || "unknown action"};
+}'''
+
+
+def segments(url):
+    return [p for p in urlparse(url).path.split("/") if p]
+
+
+def expected_segments(page, wanted):
+    # /odoo/<part>/...: `action-<id or xmlid>` is shown as action-<id> or as the action's path; model names,
+    # action paths, record ids and "new" are shown as requested (web/static/src/core/browser/router.js).
+    accepted, reasons = [], []
+    for part in wanted[1:]:
+        if part.startswith("action-"):
+            found = page.evaluate(ACTION, part[len("action-"):])
+            if found.get("error"):
+                reasons.append("requested action not found: " + str(found["error"])[:160])
+                accepted.append({part})
+            else:
+                accepted.append({"action-%s" % found["id"], found.get("path")} - {None})
+        else:
+            accepted.append({part})
+    return accepted, reasons
+
+
+results = []
+with sync_playwright() as p:
+    browser = p.chromium.launch(executable_path=cfg["browser"] or None, args=["--no-sandbox"])
+    for lang in cfg["langs"]:
+        models.execute_kw(db, uid, password, "res.users", "write", [[uid], {"lang": lang}])
+        context = browser.new_context(viewport=cfg["viewport"], is_mobile=cfg["mobile"])
+        page = context.new_page()
+        page.goto(base + "/web/login", wait_until="domcontentloaded")
+        page.fill("input[name=login]", login)
+        page.fill("input[name=password]", password)
+        page.click("button[type=submit]")
+        try:
+            page.wait_for_url(re.compile(r"/odoo"), timeout=60000)
+            logged_in = True
+        except Exception:
+            logged_in = False
+        for path, name in zip(cfg["paths"], cfg["names"]):
+            reasons, session, state, accepted = [], {}, {}, None
+            wanted = segments(path)
+            try:
+                if not logged_in:
+                    raise RuntimeError("login did not reach the web client")
+                if len(wanted) > 1 and wanted[0] == "odoo":
+                    accepted, problems = expected_segments(page, wanted)
+                    reasons += problems
+                # Odoo keeps a bus connection open, so "networkidle" never happens: wait for the rendered view.
+                page.goto(base + path, wait_until="domcontentloaded")
+                try:
+                    page.wait_for_function("() => window.odoo && window.odoo.isReady", timeout=60000)
+                    page.wait_for_selector(VIEW, timeout=30000)
+                except Exception:
+                    reasons.append("no view rendered within the time limit")
+                try:
+                    page.wait_for_function(BUSY, timeout=20000)
+                except Exception:
+                    pass  # reported below as "still loading"
+                page.evaluate("async () => { await document.fonts.ready; return true; }")
+                page.wait_for_timeout(600)
+                state = page.evaluate(STATE)
+                session = page.evaluate(SESSION)
+            except Exception as exc:
+                reasons.append(str(exc).splitlines()[0][:200])
+            shown = segments(page.url)
+            if "/web/login" in page.url:
+                reasons.append("redirected to the login page")
+            elif accepted is not None:
+                if shown[:1] != ["odoo"] or len(shown) - 1 != len(accepted) or any(
+                        part not in ok for part, ok in zip(shown[1:], accepted)):
+                    reasons.append("the page shows %s, not the requested %s" % (urlparse(page.url).path, path))
+            if state.get("dialog"):
+                reasons.append("error dialog: " + state["dialog"][:200])
+            if state.get("danger"):
+                reasons.append("error notification: " + state["danger"][:200])
+            if state and not state.get("view"):
+                reasons.append("no Odoo view on the page")
+            if state.get("busy"):
+                reasons.append("still loading")
+            for selector in cfg["expect"]:
+                try:
+                    if not page.query_selector(selector):
+                        reasons.append("expected element not found: " + selector)
+                except Exception as exc:
+                    reasons.append("invalid --expect selector %s: %s" % (selector, str(exc).splitlines()[0][:80]))
+            if session:
+                if session.get("db") != db:
+                    reasons.append("page belongs to database %s, not %s" % (session.get("db"), db))
+                if session.get("username") != login:
+                    reasons.append("logged in as %s, not %s" % (session.get("username"), login))
+                lang_now = (session.get("user_context") or {}).get("lang")
+                if lang_now != lang:
+                    reasons.append("page language is %s, not %s" % (lang_now, lang))
+            else:
+                reasons.append("the session could not be read")
+            if state:
+                rtl_expected = lang.split("_")[0] in cfg["rtl_langs"]
+                if bool(state.get("rtl")) != rtl_expected:
+                    reasons.append("layout is %s, expected %s" % ("right-to-left" if state.get("rtl") else "left-to-right",
+                                                                   "right-to-left" if rtl_expected else "left-to-right"))
+            target = Path(cfg["dir"]) / lang / (name + ".png")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                page.screenshot(path=str(target), full_page=True)
+            except Exception as exc:
+                reasons.append("screenshot failed: " + str(exc).splitlines()[0][:120])
+            results.append({"path": path, "lang": lang, "captured": str(target), "reasons": reasons, "url": page.url,
+                            "title": state.get("title"), "rtl": state.get("rtl"), "uid": session.get("uid"),
+                            "is_admin": session.get("is_admin")})
+        context.close()
+    browser.close()
+print(json.dumps({"results": results}))
+"""
+
+
+def ensure_playwright(env):
+    """Python of a small venv with Playwright, kept apart so the Odoo venv stays as its requirements made it."""
+    venv = env.cache / "venvs" / f"playwright-py{env.python_version}"
+    python = venv / "bin" / "python"
+    with env.lock(f"venv-{venv.name}"):
+        ready = python.exists() and not subprocess.run([str(python), "-c", "import playwright"],
+                                                       capture_output=True).returncode
+        if not ready:
+            env.say("installing playwright into its own venv (browsers are not downloaded) ...")
+            shutil.rmtree(venv, ignore_errors=True)
+            run([env.base_python, "-m", "venv", venv])
+            run([python, "-m", "pip", "install", "-q", "--disable-pip-version-check", "playwright"],
+                env=dict(os.environ, PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD="1"), timeout=900)
+    return python
+
+
+def provenance_problems(env, db, project):
+    """Why screens of `db` would not show this project's current source and environment ([] when they do)."""
+    built = (env.state().get("dbs") or {}).get(db)
+    if not built:
+        return [f"database {db} was not built by `oh test --keep` in this project, so the source it runs is unknown"]
+    if built.get("format") != FINGERPRINT_FORMAT or not built.get("environment"):
+        return [f"database {db} was built by an older odoo-harness version: rebuild it with `oh test <module> --keep`"]
+    problems = []
+    modules = built.get("modules") or {}
+    current = module_ids(env.root, {m: project[m] for m in modules if m in project})
+    stale = sorted(m for m, ident in modules.items() if not ident or current.get(m) != ident)
+    if stale:
+        problems.append(f"database {db} was built before the latest changes to {', '.join(stale)}: "
+                        f"re-run `oh test {' '.join(built.get('targets') or stale)} --keep`")
+    then, now = built["environment"], env.runtime_key()
+    moved = sorted(k for k in now if then.get(k) != now[k])
+    if moved:
+        problems.append(f"database {db} was built with another {' and '.join(moved)} than the current one: "
+                        f"rebuild it with `oh test {' '.join(built.get('targets') or [])} --keep`")
+    return problems
+
+
+def cmd_shot(args):
+    started = time.time()
+    root = project_root()
+    config = load_config(root)
+    env = Env(root, config, quiet=True)
+    env.ensure()
+    db = env.resolve_db(args.db)
+    _, project = discover_project(root, config)
+    reasons = provenance_problems(env, db, project)
+    entry = start_server(env, db, None)
+    python = ensure_playwright(env)
+    capture = env.home / "shots" / f"{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}"
+    langs = args.langs.split(",") if args.langs else list(config["languages"])
+    names = [re.sub(r"[^A-Za-z0-9]+", "-", path).strip("-") or "home" for path in args.paths]
+    payload = {
+        "url": f"http://127.0.0.1:{entry['port']}", "db": db, "login": args.login, "password": args.password,
+        "paths": args.paths, "names": names, "langs": langs, "dir": str(capture), "browser": env.browser_bin(),
+        "mobile": args.mobile, "expect": args.expect or [], "rtl_langs": list(RTL_LANGS),
+        "viewport": {"width": 390, "height": 844} if args.mobile else {"width": 1440, "height": 900},
+    }
+    result = subprocess.run([str(python), "-c", SHOT_SCRIPT], input=json.dumps(payload), capture_output=True,
+                            text=True, timeout=900, env=env.runtime_env())
+    try:
+        data = json.loads(result.stdout.strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        print("\n".join((result.stderr or result.stdout).splitlines()[-15:]), file=sys.stderr)
+        return FAILED
+    if data.get("fatal"):
+        print(f"oh shot: FAILED - {data['fatal']}", file=sys.stderr)
+        return FAILED
+    name = evidence_name("shot", [slug(p) for p in args.paths])
+    out = Path(args.out).resolve() if args.out else None
+    shots, retained, files, removed = data["results"], [], [], []
+    for shot, page in zip(shots, [n for _ in langs for n in names]):
+        shot["reasons"] = reasons + shot["reasons"]
+        shot["accepted"] = not shot["reasons"]
+        captured = Path(shot.pop("captured"))
+        rel = f"{shot['lang']}/{page}.png"
+        if not captured.is_file():
+            shot["file"] = None
+            continue
+        shot["sha256"] = sha_bytes(captured.read_bytes())
+        if shot["accepted"] and out:
+            target = out / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(captured, target)
+            shot["file"] = target.relative_to(root).as_posix() if target.is_relative_to(root) else str(target)
+            files.append({"path": shot["file"], "role": "screenshot", "sha256": shot["sha256"],
+                          "bytes": target.stat().st_size})
+        else:
+            shot["file"] = rel if shot["accepted"] else f"diagnostic/{rel}"
+            retained.append((captured, shot["file"], "screenshot" if shot["accepted"] else "diagnostic screenshot", False))
+            if not shot["accepted"] and out and (out / rel).is_file():
+                (out / rel).unlink()  # an earlier accepted image of this screen would now be misleading
+                removed.append(str(out / rel))
+    bad = [s for s in shots if not s["accepted"]]
+    status = UNVERIFIED if bad or not shots else PASSED
+    modules = (env.state().get("dbs") or {}).get(db, {}).get("modules") or {}
+    record = {"kind": "shot", "command": command_line(args.argv), "harness": harness_identity(root),
+              "environment": environment_record(env), "status": LABELS[status].lower(), "exit_code": status,
+              "project": dict(source_identity(root, {m: project[m] for m in modules if m in project}), database_modules=modules),
+              "database": db, "server": {k: entry.get(k) for k in ("started", "identity")}, "login": args.login,
+              "languages": langs, "shots": shots, "files": files, "finished": now_iso(), "finished_ts": time.time(),
+              "seconds": {"total": round(time.time() - started)}}
+    saved = save_record(env, name, record, not args.no_record, retained)
+    shutil.rmtree(capture, ignore_errors=True)
+    where = saved.with_suffix("") if saved else None
+    print(f"oh shot: {LABELS[status]} - {len(shots) - len(bad)} of {len(shots)} screenshots verified | "
+          f"db {db} | user {args.login} | languages {', '.join(langs)}")
+    for shot in shots:
+        folder = where or env.last_run.with_suffix("")
+        location = shot["file"] if out and shot["accepted"] else f"{folder}/{shot['file']}"
+        print(("  ok    " if shot["accepted"] else "  DIAG  ") + str(location)
+              + ("" if shot["accepted"] else "  <- " + "; ".join(shot["reasons"])))
+    if not saved:
+        print(f"  record and images kept in the cache: {env.last_run} (--no-record)")
+    for path in removed:
+        print(f"  removed {path}: the new capture of that screen did not pass the checks")
+    if bad:
+        print("  DIAG images show what went wrong; they are not evidence of a working screen.")
+    if len(shots) > len(bad):
+        print("  Open the ok images and look at them: the checks prove the right screen, database, user and "
+              "language, not that the layout or content is right.")
+    if saved:
+        print(f"evidence: {saved}")
+    return status
+
+
+def cmd_src(args):
+    root = project_root()
+    config = load_config(root)
+    env = Env(root, config, quiet=True)
+    env.ensure_sources()  # source only: no database or venv needed to search
+    std_index = scan_modules(env.standard_roots())
+    labels = [(str(env.src) + "/", "odoo:")] + ([(str(env.enterprise) + "/", "enterprise:")] if env.enterprise else [])
+    if args.where:
+        path = std_index.get(args.where)
+        if not path:
+            raise OhError(f"module {args.where!r} not found in local standard source")
+        text = str(path)
+        for prefix, label in labels:
+            text = text.replace(prefix, label)
+        print(f"{args.where}: {text} ({path})")
+        return PASSED
+    if not args.pattern:
+        raise OhError("give a PATTERN (regular expression), or --where MODULE")
+    if args.module:
+        paths = [std_index[m] for m in args.module if m in std_index]
+        if not paths:
+            raise OhError(f"modules not found: {', '.join(args.module)}")
+    else:
+        paths = [env.src / "odoo", env.src / "addons"] + ([env.enterprise] if env.enterprise else [])
+    if shutil.which("rg"):
+        cmd = ["rg", "-n", "--no-heading", "--color=never", "-S", "--max-columns=240", "--max-columns-preview",
+               "-g", "!**/i18n/**", "-g", "!**/static/lib/**", "-g", "!*.po"]
+        if args.glob:
+            cmd += ["-g", args.glob]
+        cmd += ["-e", args.pattern, *paths]
+    else:
+        cmd = ["grep", "-rnE", "--exclude-dir=i18n", "--exclude-dir=lib", args.pattern, *paths]
+    lines = run(cmd, check=False).stdout.splitlines()
+    for line in lines[:args.max]:
+        for prefix, label in labels:
+            line = line.replace(prefix, label)
+        print(line[:260])
+    if len(lines) > args.max:
+        print(f"... {len(lines) - args.max} more matches (narrow with --module or --glob)")
+    if not lines:
+        print("no matches")
+    return PASSED
+
+
+def cmd_i18n(args):
+    root = project_root()
+    config = load_config(root)
+    env = Env(root, config, quiet=True)
+    env.ensure()
+    roots, project = discover_project(root, config)
+    unknown = [m for m in args.modules if m not in project]
+    if unknown:
+        raise OhError(f"not modules of this project: {', '.join(unknown)}")
+    db = env.resolve_db(args.db)
+    problems = provenance_problems(env, db, project)
+    if problems:  # the terms would come from other code than the project's current source
+        print(f"oh i18n: NOT VERIFIED - nothing exported: {'; '.join(problems)}")
+        return UNVERIFIED
+    langs = args.lang.split(",") if args.lang else [l for l in config["languages"] if l != "en_US"]
+    if args.pot:
+        langs.append("pot")
+    conf = env.home / "i18n.conf"
+    conf.write_text(env.conf.read_text() + f"addons_path = {env.addons_path(roots)}\n")
+    conf.chmod(0o600)
+    before = {p: p.stat().st_mtime for m in args.modules for p in (project[m] / "i18n").glob("*.po*")}
+    result = run(env.odoo("i18n", "export", "-c", conf, "-d", db, *args.modules, "-l", *langs),
+                 check=False, env=env.runtime_env(), timeout=900)
+    written = [p for m in args.modules for p in sorted((project[m] / "i18n").glob("*.po*"))
+               if before.get(p) != p.stat().st_mtime]
+    if result.returncode or not written:
+        print("\n".join(result.stdout.splitlines()[-15:]), file=sys.stderr)
+        raise OhError("translation export failed", FAILED)
+    for path in written:
+        empty = len(re.findall(r'^msgstr ""\n\n', path.read_text(encoding="utf-8") + "\n", re.M))
+        print(f"{path.relative_to(root)}" + (f"  ({empty} untranslated)" if not path.name.endswith(".pot") else ""))
+    return PASSED
+
+
+def check_record(root, path, record):
+    """(problems, notes) for one record: a problem is a missing or changed file, or a claim its files contradict."""
+    if "files" not in record:
+        return [], ["made by an older odoo-harness (no retained files): run it again"]
+    folder = path.with_suffix("")
+    problems = file_problems(record, folder, root)
+    kind, status = record.get("kind"), record.get("status")
+    logs = [f for f in record["files"] if f.get("role") == "log" and f.get("name")]
+    if kind in ("test", "upgrade") and status == "passed" and not logs:
+        problems.append("a passed test record without its Odoo log")
+    for entry in logs:
+        data = (folder / entry["name"]).read_bytes() if (folder / entry["name"]).is_file() else b""
+        if sha_bytes(data) != entry.get("sha256"):
+            continue  # reported as missing or changed
+        summary = parse_log(gzip.decompress(data).decode("utf-8", "replace"))
+        _, total = test_counts(summary)
+        claimed = record.get("tests") or {}
+        differ = [f"{k} {claimed.get(k)} vs {total[k]}" for k in ("executed", "skipped", "failed", "errors")
+                  if claimed.get(k) != total[k]]
+        if differ:
+            problems.append("its test counts differ from its log (record vs log): " + ", ".join(differ))
+        selection = record.get("selection") or {}
+        again, _ = verdict(summary, record.get("odoo_exit_code") or 0, set(selection.get("required") or []),
+                           [(spec, tuple(parsed)) for spec, parsed in zip(selection.get("require") or [],
+                                                                          selection.get("require_parsed") or [])],
+                           {m: set(c) for m, c in (record.get("upgrade_checks") or {}).items()},
+                           set(record.get("need_checks") or []))
+        if again == PASSED and record.get("extra_reasons"):
+            again = UNVERIFIED
+        if LABELS[again].lower() != status:
+            problems.append(f"it says {status}, but its log gives {LABELS[again].lower()}")
+    if kind == "shot":
+        listed = {f.get("name") or f.get("path") for f in record["files"]}
+        shots = record.get("shots") or []
+        missing = [s.get("file") for s in shots if s.get("accepted") and s.get("file") not in listed]
+        if missing:
+            problems.append(f"accepted screenshots not among its files: {', '.join(map(str, missing))}")
+        if status == "passed" and (not shots or any(not s.get("accepted") for s in shots)):
+            problems.append("it says passed, but not every screenshot passed its checks")
+    return problems, []
+
+
+def cmd_evidence(args):
+    root = project_root()
+    config = load_config(root)
+    _, project = discover_project(root, config)
+    now = candidate(root, project)
+    print(f"candidate: {now['branch']}@{(now['commit'] or '?')[:12]}{' +uncommitted' if now['uncommitted'] else ''} "
+          f"digest {now['digest']}" + ("" if now["complete"] else " (some module files could not be read)"))
+    paths = sorted((root / EVIDENCE).glob("*.json"))
+    if not paths:
+        print(f"no result records in {EVIDENCE}/ yet: oh test and oh shot write them")
+        return UNVERIFIED
+    current = module_ids(root, project)
+    committed = committed_modules(root, project)
+    state = read_json(Env(root, config, quiet=True).state_path, {}) or {}
+    odoo_now = ((state.get("sources") or {}).get("odoo") or {}).get("commit")
+    bad = doubtful = 0
+    for path in paths:
+        record = read_json(path)
+        if not isinstance(record, dict):
+            print(f"{path.name}: PROBLEM - unreadable")
+            bad += 1
+            continue
+        problems, notes = check_record(root, path, record)
+        source = record.get("project") or {}
+        modules = source.get("modules") or {}
+        current_ok = False
+        if source.get("format") != FINGERPRINT_FORMAT:
+            where = "source ids from an older odoo-harness: run it again"
+        elif not modules:
+            where = "no module source recorded"
+        else:
+            changed = sorted(m for m, ident in modules.items() if not ident or current.get(m) != ident)
+            if changed:
+                where = f"STALE: {', '.join(changed)} changed since"
+            else:
+                current_ok = True
+                where = "matches the working tree" + (" and HEAD" if all(committed.get(m) for m in modules)
+                                                      else " (not committed yet)")
+        tests, shots = record.get("tests") or {}, record.get("shots") or []
+        if tests:
+            detail = (f"{tests.get('executed', 0)} executed, {tests.get('skipped', 0)} skipped, "
+                      f"{tests.get('failed', 0)} failed, {tests.get('errors', 0)} errors")
+        elif shots:
+            detail = f"{sum(1 for s in shots if s.get('accepted'))}/{len(shots)} screens verified"
+        else:
+            detail = "-"
+        odoo = ((record.get("environment") or {}).get("odoo") or {}).get("commit") or ""
+        env_note = "" if not odoo_now or odoo == odoo_now else f" | odoo {odoo[:8]} (now {odoo_now[:8]})"
+        kept = len(record.get("files") or [])
+        print(f"{path.name}: {str(record.get('status', '?')).upper()} {str(record.get('finished', ''))[:16]} | "
+              f"{detail} | {where}{env_note}" + (f" | {kept} file(s) " + ("PROBLEM" if problems else "intact") if kept else "")
+              + (" | reused" if record.get("reused_from") else ""))
+        for problem in problems:
+            print(f"    PROBLEM: {problem}")
+        for note in notes:
+            print(f"    note: {note}")
+        for reason in record.get("reasons") or []:
+            print(f"    not verified: {reason}")
+        bad += bool(problems)
+        doubtful += not problems and (record.get("status") != "passed" or not current_ok or bool(notes))
+    good = len(paths) - bad - doubtful
+    print(f"{len(paths)} record(s): {good} passed, intact and current; {doubtful} not verified, stale or older; "
+          f"{bad} with problems")
+    return FAILED if bad else UNVERIFIED if doubtful else PASSED
+
+
+def github_protection(root, branches, api=None):
+    """How GitHub protects each deploy branch from the identity of the token used here.
+
+    Returns (identity, [(branch, verdict, detail)]); verdict "enforced" means a ruleset restricts updates
+    (pushes and merges) and that identity cannot bypass it; "not enforced" and "unknown" say why not.
+    """
+    remote = git(root, "remote", "get-url", "origin", check=False)
+    # github.com URLs, and the Claude Code cloud git proxy (http://…@127.0.0.1:<port>/git/<owner>/<repo>)
+    match = re.search(r"(?:github\.com[:/]|/git/)([^/:]+)/([^/]+?)(?:\.git)?/?$", remote or "")
+    if not match:
+        return None, [(None, "unknown", "not checked: origin is not a GitHub repository" if remote
+                       else "not checked: no origin remote")]
+    owner, repo = match.groups()
+    if api is None:
+        token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        if not token and shutil.which("gh"):
+            token = run(["gh", "auth", "token"], check=False).stdout.strip()
+        if not token:
+            return None, [(None, "unknown", f"not checked: no GH_TOKEN/GITHUB_TOKEN or gh login; check {owner}/{repo} "
+                                            "Settings > Rules on GitHub, or run oh doctor where a token is available")]
+
+        def api(path):
+            request = urllib.request.Request(f"https://api.github.com{path}", headers={
+                "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28"})
+            with urllib.request.urlopen(request, timeout=20) as response:
+                return json.loads(response.read().decode())
+
+    try:
+        identity = api("/user").get("login")
+    except (urllib.error.HTTPError, OSError, ValueError, AttributeError):
+        identity = None  # an app installation token has no user
+    who = identity or "this token's identity"
+    base = f"/repos/{owner}/{repo}"
+    results = []
+    for branch in branches:
+        try:
+            rules = api(f"{base}/rules/branches/{branch}")
+            bypass = {}
+            for ruleset_id in sorted({r.get("ruleset_id") for r in rules if r.get("type") == "update"} - {None}):
+                ruleset = api(f"{base}/rulesets/{ruleset_id}?includes_parents=true")
+                bypass[ruleset.get("name") or str(ruleset_id)] = ruleset.get("current_user_can_bypass")
+            classic = False if bypass else bool(api(f"{base}/branches/{branch}").get("protected"))
+        except urllib.error.HTTPError as exc:
+            why = (" (the token can't read this repository's rules, or the network blocks api.github.com)"
+                   if exc.code in (401, 403, 404) else "")
+            results.append((branch, "unknown", f"not checked: GitHub answered {exc.code}{why}"))
+            continue
+        except (OSError, ValueError, AttributeError) as exc:
+            results.append((branch, "unknown", f"not checked: {exc}"))
+            continue
+        types = sorted({r.get("type") for r in rules} - {None})
+        blocking = [name for name, mode in bypass.items() if mode == "never"]
+        if blocking:
+            results.append((branch, "enforced", f"ruleset {blocking[0]!r} restricts updates and {who} cannot bypass it"))
+        elif bypass and all(mode in ("always", "pull_requests_only", "exempt") for mode in bypass.values()):
+            modes = ", ".join(f"{name!r}: {mode}" for name, mode in bypass.items())
+            results.append((branch, "not enforced", f"{who} can bypass the update restriction ({modes})"))
+        elif bypass:
+            results.append((branch, "unknown", f"GitHub did not say whether {who} can bypass "
+                                               f"{', '.join(map(repr, bypass))} (the token may not read rulesets)"))
+        elif "pull_request" in types:
+            results.append((branch, "not enforced", "pull requests are required, but anyone with write access, agents "
+                                                    "included, can still merge one; add \"Restrict updates\" (oh protect)"))
+        elif classic:
+            results.append((branch, "unknown", "classic branch protection is on; whether it stops agents from pushing "
+                                               "or merging needs admin access to read: use the ruleset from oh protect"))
+        else:
+            results.append((branch, "not enforced", f"nothing restricts updates ({', '.join(types) or 'no rules'}): "
+                                                    "agents and people with write access can push to it"))
+    return identity, results
+
+
+def cmd_doctor(args):
+    root = project_root()
+    problems, notes = verify_install(root)
+    print("installation")
+    for note in notes:
+        print(f"  {note}")
+    print("  " + ("files, AGENTS.md block, CLAUDE.md import, hooks and project.json ok" if not problems else
+                  f"{len(problems)} problem(s):"))
+    for problem in problems:
+        print(f"    - {problem}")
+    try:
+        config = load_config(root)
+    except OhError:
+        return FAILED
+    env = Env(root, config, quiet=True)
+    state = env.state()
+    sources = state.get("sources") or {}
+    odoo = sources.get("odoo") or {}
+    print("runtime")
+    try:
+        pg_ok = env.psql("SELECT 1", check=False).returncode == 0
+    except OhError:
+        pg_ok = False
+    tree = env.cache / "src" / f"odoo-{str(odoo.get('commit', ''))[:12]}"
+    print(f"  postgres    {'reachable' if pg_ok else 'not reachable (oh env starts it when run as root)'}")
+    print("  odoo        " + (f"{odoo.get('ref')} @ {odoo['commit'][:12]} ({'pinned' if odoo.get('pinned') else 'resolved'}), "
+                              + ("source ready" if tree.is_dir() else "source not fetched") if odoo.get("commit")
+                              else "not prepared: run oh env"))
+    print(f"  enterprise  " + ("configured" if config.get("enterprise_path") or config.get("enterprise_repo")
+                               else "not configured (Enterprise-dependent modules are verified on Odoo.sh)"))
+    print(f"  venvs       {len(list((env.cache / 'venvs').glob('*/.oh-ready.json')))} ready in {env.cache / 'venvs'}")
+    print(f"  browser     {env.browser_bin() or 'none: screenshots and tours unavailable'}")
+    print(f"  pdf         {'wkhtmltopdf ok' if shutil.which('wkhtmltopdf') else 'wkhtmltopdf missing: PDF output only on Odoo.sh'}")
+    branches = protected_names(config)
+    hook_ok = not any("hook" in p or "guard" in p or "disableAllHooks" in p for p in problems)
+    print("deployment boundaries (three separate claims)")
+    print("  1 hook       " + ("configured: guard.py checks Bash and GitHub MCP calls in Claude Code (with hooks enabled, "
+                             "in a trusted workspace); a second line of defence, not the boundary" if hook_ok
+                             else "NOT configured: see the installation problems above"))
+    identity, results = github_protection(root, branches) if branches else (None, [(None, "unknown", "no branches")])
+    print(f"  2 github     branch rules" + (f", as seen by {identity}" if identity else ""))
+    for branch, verdict_, detail in results:
+        print(f"    {branch}: {verdict_.upper()} - {detail}" if branch else f"    {detail}")
+    verdicts = {v for _, v, _ in results}
+    if verdicts == {"enforced"}:
+        claim = (f"prevented for {identity or 'this token'} and any identity without bypass rights; an agent acting "
+                 "as another identity (a GitHub app, a deploy key) is covered only if that identity is not on the "
+                 "bypass list: check with that identity's token")
+    elif "not enforced" in verdicts:
+        claim = "NOT prevented: an agent with write access can push to or merge into an unprotected branch"
+    else:
+        claim = "unknown until the GitHub rules are checked with a token that can read them"
+    print(f"  3 agents     {claim}")
+    if "not enforced" in verdicts:
+        print("  fix: oh protect prints the ruleset to import (GitHub > Settings > Rules > Rulesets)")
+    records = sorted((root / EVIDENCE).glob("*.json"))
+    print(f"evidence      {len(records)} record(s) in {EVIDENCE}/ (check them: oh evidence)")
+    if problems or "not enforced" in verdicts:
+        return FAILED
+    return PASSED if verdicts == {"enforced"} else UNVERIFIED
+
+
+PROTECT_HELP = """\
+How to apply it (a repository admin, once per repository):
+  GitHub > the repository > Settings > Rules > Rulesets > New ruleset > Import a ruleset, choose a file
+  with the JSON above, review, Create. Or create a branch ruleset by hand with: target branches {branches};
+  rules "Restrict updates", "Restrict deletions", "Block force pushes"; bypass list "Repository admin".
+What it does: only repository admins (the people who promote releases) can push to or merge into those
+branches; agents and everyone else work on feature branches and open pull requests.
+Keep agent identities out of the bypass list: the Claude and ChatGPT GitHub apps, deploy keys, and any
+token an agent uses. Give agents a token or app installation without admin rights.
+Rulesets on private repositories need GitHub Pro, Team or Enterprise.
+Odoo.sh: its merges from the Odoo.sh interface use the GitHub account that authorized Odoo.sh. After
+enabling the ruleset, promote once from Odoo.sh; if GitHub rejects it, add that user to the bypass list.
+Check the result with `oh doctor` wherever a GitHub token (GH_TOKEN) is available."""
+
+
+def cmd_protect(args):
+    root = project_root()
+    config = load_config(root)
+    if not config.get("production_branch"):
+        raise OhError("set production_branch (and staging_branches) in .odoo-harness/project.json first")
+    branches = protected_names(config)
+    ruleset = {
+        "name": "odoo-harness: Odoo.sh deploy branches",
+        "target": "branch",
+        "enforcement": "active",
+        "conditions": {"ref_name": {"include": [f"refs/heads/{b}" for b in branches], "exclude": []}},
+        "rules": [{"type": "deletion"}, {"type": "non_fast_forward"},
+                  {"type": "update", "parameters": {"update_allows_fetch_and_merge": False}}],
+        "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+    }
+    print(json.dumps(ruleset, indent=2))
+    print("\n" + PROTECT_HELP.format(branches=", ".join(branches)), file=sys.stderr)
+    return PASSED
+
+
+def cmd_clean(args):
+    root = project_root()
+    env = Env(root, load_config(root), quiet=True)
+    env.ensure_postgres()
+    if args.all_projects:
+        stopped = 0
+        for path in (env.cache / "projects").glob("*/state.json"):
+            state = read_json(path, {}) or {}
+            if server_alive(state.get("serve")):
+                with contextlib.suppress(OSError):
+                    os.killpg(state["serve"]["pid"], signal.SIGTERM)
+                stopped += 1
+            for key in ("serve", "kept", "last_db", "dbs"):
+                state.pop(key, None)
+            write_json(path, state)
+        dropped = env.list_dbs("oh_")
+        for name in dropped:
+            env.drop_db(name, any_project=True)
+        write_json(env.cache / "templates.json", {})
+        print(f"all projects: stopped {stopped} server(s), dropped {len(dropped)} database(s) including templates")
+        return PASSED
+    stop_server(env)
+    dropped = env.list_dbs(env.prefix)
+    for name in dropped:
+        env.drop_db(name)
+    env.update_state(lambda state: [state.pop(key, None) for key in ("serve", "kept", "last_db", "dbs")])
+    templates = []
+    if args.templates:
+        path = env.cache / "templates.json"
+        with env.lock("templates"):
+            registry = read_json(path, {}) or {}
+        for name, entry in registry.items():
+            if entry.get("projects") == [env.key]:  # shared templates stay for the other projects
+                with env.lock(f"tpl-{name}", wait=False) as acquired:
+                    if acquired:
+                        env.drop_db(name)
+                        templates.append(name)
+        with env.lock("templates"):
+            registry = read_json(path, {}) or {}
+            for name in templates:
+                registry.pop(name, None)
+            write_json(path, registry)
+    print(f"dropped {len(dropped)} database(s) of this project"
+          + (f" and {len(templates)} template(s) only it used" if args.templates else "")
+          + "; other projects were not touched")
+    return PASSED
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser = argparse.ArgumentParser(prog="oh", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("env", help="prepare PostgreSQL, the pinned Odoo source and the venv")
+    p.add_argument("--update", action="store_true", help="move unpinned sources to the latest commit of their ref")
+    p.add_argument("--prebuild", action="store_true", help="also build the template database for all project modules")
+    p.add_argument("--background", action="store_true", help="run `env --prebuild` detached and return at once")
+    p.add_argument("--if-remote", action="store_true", help="do nothing unless in a Claude Code cloud session")
+    p = sub.add_parser("test", help="install modules in a disposable database and run their tests")
+    p.add_argument("modules", nargs="*", help="project modules (default: modules changed vs the base branch)")
+    p.add_argument("--all", action="store_true", help="install and test every project module, like an Odoo.sh build")
+    p.add_argument("--tags", help="Odoo --test-tags spec (default: /<module> for each target); no evidence record")
+    p.add_argument("--require", action="append", metavar="TEST",
+                   help="a test that must run and pass: module:Class.method, Class.method or Class (repeatable)")
+    p.add_argument("--with-dependents", action="store_true", help="also test project modules that depend on the targets")
+    p.add_argument("--upgrade-from", metavar="REF", help="install the modules from a git ref first, then update to HEAD")
+    p.add_argument("--fresh", action="store_true", help="no template: install everything in one run (slower)")
+    p.add_argument("--no-demo", action="store_true", help="without demo data (Odoo.sh development builds load it)")
+    p.add_argument("--keep", action="store_true", help="keep the database for oh serve / oh shell / oh shot")
+    p.add_argument("--rerun", action="store_true", help="run even if the same source and environment already passed")
+    p.add_argument("--no-record", action="store_true", help="don't write the result to .odoo-harness/evidence")
+    p.add_argument("--timeout", type=int, default=3600)
+    p = sub.add_parser("shell", help="run Python in odoo-bin shell on a kept database (changes are rolled back)")
+    p.add_argument("-c", "--code", help="code to run (default: stdin)")
+    p.add_argument("--db")
+    p.add_argument("--timeout", type=int, default=600)
+    p.add_argument("--max-lines", type=int, default=200)
+    p = sub.add_parser("serve", help="run this project's Odoo server on a kept database")
+    p.add_argument("--db")
+    p.add_argument("--port", type=int)
+    sub.add_parser("stop", help="stop this project's server")
+    p = sub.add_parser("shot", help="checked screenshots of Odoo pages in each configured language")
+    p.add_argument("paths", nargs="+", help="URL paths such as /odoo/action-sale.action_orders")
+    p.add_argument("--db", help="kept database to show (default: the last one kept by oh test --keep)")
+    p.add_argument("--langs", help="comma-separated language codes (default: project languages)")
+    p.add_argument("--out", help="directory for verified screenshots (default: the oh cache)")
+    p.add_argument("--expect", action="append", metavar="CSS", help="element that must be on every page (repeatable)")
+    p.add_argument("--mobile", action="store_true", help="390x844 mobile viewport")
+    p.add_argument("--login", default="admin", help="user to log in as, to check a role's view")
+    p.add_argument("--password", default="admin")
+    p.add_argument("--no-record", action="store_true", help="don't write the result to .odoo-harness/evidence")
+    p = sub.add_parser("src", help="search the standard Odoo / Enterprise source")
+    p.add_argument("pattern", nargs="?")
+    p.add_argument("--module", action="append", help="limit to a standard module (repeatable)")
+    p.add_argument("--glob", help="file glob, e.g. '*.py' or '*.xml'")
+    p.add_argument("--where", metavar="MODULE", help="print where a standard module lives")
+    p.add_argument("--max", type=int, default=40)
+    p = sub.add_parser("i18n", help="export translation files (i18n/<lang>.po) from a kept database")
+    p.add_argument("modules", nargs="+")
+    p.add_argument("--lang", help="comma-separated language codes (default: project languages except en_US)")
+    p.add_argument("--pot", action="store_true", help="also write the .pot template")
+    p.add_argument("--db")
+    sub.add_parser("evidence", help="list result records and whether they still match the source")
+    sub.add_parser("doctor", help="check installation, settings, runtime and GitHub branch protection")
+    sub.add_parser("protect", help="print a GitHub ruleset for the production and staging branches")
+    p = sub.add_parser("clean", help="drop this project's databases")
+    p.add_argument("--templates", action="store_true", help="also drop template databases only this project used")
+    p.add_argument("--all-projects", action="store_true", help="drop every project's databases and templates")
+    args = parser.parse_args(argv)
+    args.argv = argv
+    handler = {"env": cmd_env, "test": cmd_test, "shell": cmd_shell, "serve": cmd_serve, "stop": cmd_stop,
+               "shot": cmd_shot, "src": cmd_src, "i18n": cmd_i18n, "evidence": cmd_evidence, "doctor": cmd_doctor,
+               "protect": cmd_protect, "clean": cmd_clean}[args.command]
+    try:
+        return handler(args)
+    except OhError as exc:
+        print(f"oh {args.command}: {LABELS.get(exc.code, 'ERROR')} - {exc}", file=sys.stderr)
+        return exc.code
+    except subprocess.TimeoutExpired as exc:
+        print(f"oh {args.command}: timed out: {exc}", file=sys.stderr)
+        return SETUP
+    except BrokenPipeError:  # the reader stopped early (`oh evidence | head -1`): not an error of oh
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 128 + signal.SIGPIPE
+
+
+if __name__ == "__main__":
+    sys.exit(main())

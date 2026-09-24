@@ -1,3 +1,5 @@
+> **Superseded on 25 September 2026.** Development now uses odoo-harness 1.2.1 installed in this repository (see the top of AGENTS.md; pin `176f07317e5a6cd8cd9b769d7ebd3d99eca34bd1`). This page and the external-toolkit adapter are kept for provenance only.
+
 # Adams development harness — ready for new development
 
 Verified 19 September 2026. Status: **development-ready for bounded Odoo 19 Community work using the private remote runner**.
