@@ -5762,3 +5762,15 @@ msgstr "وردية ليلية"
 #: code:addons/adams_executive_dashboard/static/src/hr.xml:0
 msgid "Times shown in"
 msgstr "الأوقات معروضة بتوقيت"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "One row per check-in. Open check-ins have no final recorded hours."
+msgstr "صف واحد لكل تسجيل حضور. تسجيلات الحضور المفتوحة ليس لها عدد نهائي لساعات العمل المسجلة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/hr.xml:0
+msgid "View details"
+msgstr "عرض التفاصيل"

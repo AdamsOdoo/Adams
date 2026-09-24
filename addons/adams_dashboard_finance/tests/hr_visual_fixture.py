@@ -28,7 +28,7 @@ def hr_fixture(catalog):
         'state':{'Approved':'validate','To approve':'confirm','Refused':'refuse'}[r['status']],
         'state_label':tr(r['status'])} for i,r in enumerate(data['time_off']) if r['employee'] in employees]
     shifts=[{'id':i+1,**work(r),'resource_id':[r['employee'],'Employee'] if r['employee'] else False,
-        'role_id':[i+1,r['role']],'start_datetime_label':r['start'].replace('T',' '),
+        'work_location_id':[i+1,tr(r['location'])], 'role_id':[i+1,tr(r['role'])],'start_datetime_label':r['start'].replace('T',' '),
         'end_datetime_label':r['end'].replace('T',' '),'allocated_hours':r['hours'],
         'assigned':bool(r['employee']),'state':r['status'].lower(),'state_label':tr(r['status'])}
         for i,r in enumerate(data['shifts']) if r['company']=='adams']

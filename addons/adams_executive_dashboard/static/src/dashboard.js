@@ -1135,7 +1135,7 @@ export class ExecutiveDashboard extends Component {
     hrSourceLabel(tab) { return {employees:_t('Open Employees'),attendance:_t('Open Attendances'),time_off:_t('Open Time Off'),shifts:_t('Open Planning')}[tab]; }
     hrBadgeClass(row) {
         const state=row.state || row.status;
-        return {green:row.active === true || ['validate','published','closed'].includes(state), amber:['confirm','validate1','open'].includes(state),red:['refuse','cancel'].includes(state)};
+        return {green:row.active === true || ['validate','published','open'].includes(state), amber:['confirm','validate1'].includes(state),red:['refuse','cancel'].includes(state)};
     }
     get hrStatusSelection() { const filters=this.state.hrFilters; return filters.assignment === 'unassigned' ? (filters.status === 'published' ? 'published_unassigned' : 'unassigned') : filters.status || ''; }
     changeHRStatus(event) { this.state.hrFilters.status=event.target.value; delete this.state.hrFilters.assignment; }

@@ -110,4 +110,6 @@
 .o_rtl .o_adams_dashboard #adams-procurement .adams_action_arrow,
 .o_adams_dashboard:dir(rtl) #adams-procurement .adams_action_arrow,
 .o_rtl .o_adams_dashboard #adams-crm .adams_action_arrow,
-.o_adams_dashboard:dir(rtl) #adams-crm .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }
+.o_adams_dashboard:dir(rtl) #adams-crm .adams_action_arrow,
+.o_rtl .o_adams_dashboard #adams-hr .adams_action_arrow,
+.o_adams_dashboard:dir(rtl) #adams-hr .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }

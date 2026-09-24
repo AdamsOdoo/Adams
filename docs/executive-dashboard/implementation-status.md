@@ -1,5 +1,21 @@
 # Executive dashboard — implementation and verification
 
+## 24 September — reviewed HR corrections, native rerun pending
+
+Candidate `0a46bb89` / development build38579807 completed 126 native checks
+with one failure and one error: the HR recovery wrapper lacked the new optional
+page-size argument, and a new profile assertion referenced undefined test variables.
+Both are corrected without weakening assertions. 74 local controller checks pass.
+
+Independent English/Arabic HR pairs are retrieved and reviewed. This correction
+batch fixes inherited employee-row typography, preview button borders, shift-card
+small text, Clear buttons, attendance badge states, profile typography, integer
+counts, localized date/detail labels and RTL arrows. Test-only shift locations now
+match the approved synthetic source. HR capture manifests identify their own dates.
+These fixes still require new rendered comparisons; no parity claim or staging
+release is made. Staging remains on 19.0.1.6.0 pending qualification.
+
+
 ## 24 September — HR port and second rendered correction batch (qualification pending)
 
 Previous published candidate `848f8052408f14d8cdc1f5d5150ddf94b9ef9608` ran

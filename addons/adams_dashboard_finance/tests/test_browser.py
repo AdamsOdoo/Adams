@@ -88,7 +88,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
         attempts = []
 
         @api.model
-        def fail_once(recordset, options, tab='overview', filters=None, offset=0):
+        def fail_once(recordset, options, tab='overview', filters=None, offset=0, list_page_size=25):
             if (recordset.env.uid == user.id and tab == 'employees'
                     and (filters or {}).get('search')):
                 attempts.append({'options': dict(options), 'filters': dict(filters), 'offset': offset})
@@ -96,7 +96,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     # UserError is an expected RPC failure, not an unexpected
                     # server ERROR or a customer/staging fault injection.
                     raise UserError('Controlled disposable HR recovery failure')
-            return original(recordset, options, tab, filters, offset)
+            return original(recordset, options, tab, filters, offset, list_page_size)
 
         action = self.env.ref('adams_executive_dashboard.action_dashboard')
         self.browser_size = '1440x900'
