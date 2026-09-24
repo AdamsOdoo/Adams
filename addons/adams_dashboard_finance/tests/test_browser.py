@@ -499,7 +499,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     }
                     await navigate('sales');
                     const productRank = await wait(() => root.querySelector('.adams_product_ranking .adams_rank_row'), 'Native product ranking must render');
-                    if (!productRank.innerText.includes(expected)) throw new Error('Product ranking must retain signed native invoice value');
+                    if (productRank.querySelector('.adams_rank_value')?.textContent.trim() !== headlineExpected) throw new Error('Product ranking must retain signed native invoice value');
                     root.dispatchEvent(new Event('wheel')); root.scrollTop = root.scrollHeight;
                     await new Promise(resolve => requestAnimationFrame(resolve));
                     if (root.querySelector('.adams_side_link.active')?.dataset.section !== 'sales') throw new Error('Scrolling must not change the selected department');

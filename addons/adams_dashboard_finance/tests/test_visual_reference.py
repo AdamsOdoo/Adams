@@ -62,10 +62,11 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         original_directory = model.get_cash_directory
         original_inventory = model.get_inventory
         original_breakdown, original_recent = model.get_breakdown, model.get_recent_sales
+        original_workspace = model.get_workspace_details
         original_quantity, original_fulfillment = model.get_product_quantity_ranking, model.get_fulfillment
         sales_capture = viewport == (1440, 900)
         if sales_capture:
-            self.env.user.group_ids |= self.env.ref('sales_team.group_sale_salesman_all_leads')
+            self.env.user.group_ids |= (self.env.ref('sales_team.group_sale_salesman_all_leads') | self.env.ref('purchase.group_purchase_user'))
         user_id = self.env.uid
         messages = code_translations.get_web_translations('adams_executive_dashboard', language)['messages']
         catalog = {message['id']: message['string'] for message in messages if message['string']}
@@ -123,6 +124,9 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                         'confirmed_sales':1687500, 'orders':62, 'quotations':482100}[item['key']],
                         drilldown=True, unit='count' if item['key']=='orders' else 'currency')
                     if item['key']=='quotations': item['document_count']=18
+            if records.env.uid == user_id and key in ('crm','procurement') and sales_capture:
+                for item in result['items']:
+                    item.update(status='ready',value=728600 if key=='procurement' else 492000,drilldown=True,unit='currency')
             return result
 
         @api.model
@@ -199,6 +203,23 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
             if records.env.uid != user_id or not sales_capture: return original_fulfillment(records,options,offset)
             records._scope(options)
             return {'status':'ready','rows':[{'id':i+1,'name':p[1],'unit':'PCS','unit_id':1,'ordered':750-i*80,'delivered':600-i*50,'remaining':150-i*30} for i,p in enumerate(products[:4])], 'offset':0,'has_more':False}
+        @api.model
+        def workspace(records, options, section, offset=0, page_size=25):
+            if records.env.uid != user_id or not sales_capture:
+                return original_workspace(records,options,section,offset,page_size)
+            records._scope(options)
+            base={'status':'ready','currency':'EGP','digits':2,'offset':0,'page_size':page_size,'total':4,'has_more':False}
+            if section=='crm':
+                names=['Retail starter range','Autumn grooming collection','New store opening','Monthly supply agreement']
+                return {**base,'unweighted':{'status':'ready','value':984000},'rows':[
+                    {'id':i+1,'name':name,'partner_id':[i+1,customers[i][0]],'stage_id':[i+1,localized_label(['Qualified','Proposition','Negotiation','Qualified'][i])],
+                     'expected_revenue':98400+i*36000,'probability':[30,50,70,40][i]} for i,name in enumerate(names)]}
+            return {**base,'summary':{'status':'ready','value':728600},
+                'approvals':{'status':'ready','total':3},'late':{'status':'ready','total':4},
+                'recent':{**base,'rows':[{'id':i+1,'name':f'P00{94-i}','partner_id':[i+1,name],
+                    'amount_untaxed':73600-i*7400,'currency':'EGP','digits':2,'state':'purchase',
+                    'receipt_status':'pending' if i<2 else 'full','receipt_label':localized_label('To receive' if i<2 else 'Received')}
+                    for i,name in enumerate(['Packaging Partners','Care Ingredients Co.','Retail Supplies','Bottle & Cap'])]}}
         warehouse_names = ['Main warehouse', 'Retail store', 'Online fulfilment']
         category_names = ['Hair Care', 'Body Care', 'Grooming', 'Skin Care', 'Gift Sets']
         stock_rows = []
@@ -427,7 +448,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 # Panels have stable own selectors; do not rely on prototype-only IDs.
                 capture(browser,'odoo-sales-documents','.adams_sales_reference > header:nth-of-type(3)','.adams_recent_panel')
                 capture(browser,'odoo-sales-delivery','.adams_sales_reference > header:nth-of-type(4)','.adams_fulfillment_panel')
-                sales_action("document.querySelector('.adams_recent_panel [aria-label=\"Next page\"]').click()", "document.querySelector('.adams_recent_panel [aria-current=page]')?.textContent==='2'")
+                sales_action("document.querySelector('.adams_recent_panel .adams_page_controls > button:last-child').click()", "document.querySelector('.adams_recent_panel [aria-current=page]')?.textContent==='2'")
                 capture(browser,'odoo-sales-documents-page2','.adams_recent_panel')
                 sales_action("document.querySelectorAll('.adams_recent_tabs button')[1].click()", "document.querySelector('.adams_recent_panel tbody')?.textContent.includes('Q00182')")
                 capture(browser,'odoo-sales-quotations','.adams_recent_panel')
@@ -439,6 +460,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 capture(browser,'odoo-sales-quantity','.adams_products_heading','.adams_sales_equal:nth-of-type(3)')
                 sales_action("const unit=document.querySelector('.adams_products_heading select');unit.value='2';unit.dispatchEvent(new Event('change',{bubbles:true}))", "document.querySelector('.adams_product_ranking .adams_rank_value')?.textContent.includes('103')")
                 capture(browser,'odoo-sales-box','.adams_products_heading','.adams_sales_equal:nth-of-type(3)')
+
+            if sales_capture:
+                for department in ('procurement','crm'):
+                    sales_action("document.querySelector('.adams_side_link[data-section="+department+"]').click()",
+                        "document.querySelectorAll('#adams-"+department+" .adams_workspace_records tbody tr').length===4")
+                    capture(browser,'odoo-'+department+'-metrics','#adams-'+department+' .adams_workspace_reference > .adams_group_heading','#adams-'+department+' .adams_workspace_kpis')
+                    capture(browser,'odoo-'+department+'-records','#adams-'+department+' .adams_workspace_panels')
+                    if department=='procurement': capture(browser,'odoo-procurement-alert','.adams_procurement_alert')
 
             # Navigate only this disposable test browser to the immutable reference.
             # No iframe, mock route, production asset, or global dashboard patch.
@@ -589,6 +618,27 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 reference_sales("const unit=document.querySelector('#productUnit');unit.value='BOX';unit.dispatchEvent(new Event('change',{bubbles:true}))")
                 capture(browser,'reference-sales-box','#sales-heading-2','#content > .grid-2:nth-of-type(7)')
 
+            if sales_capture:
+                for department in ('procurement','crm'):
+                    normalization = ''
+                    if department=='procurement':
+                        # UI20: preserve truthful counts while the money/count decision is deferred.
+                        normalization = """
+                            const cards=[...document.querySelectorAll('#content > .kpis > .kpi')];
+                            cards.slice(1).forEach((card,i)=>{
+                                card.querySelector('.kpi-value').innerHTML='<bdi>'+(i===0?3:4)+'</bdi>';
+                                card.querySelector('.kpi-note').textContent=t('Purchase orders')+' · '+t(i===0?'Current worklist':'Overdue now');
+                                card.querySelector('.kpi-footer button').textContent=t('View worklist');
+                                card.querySelector('.kpi-footer > span').textContent=t('Current worklist');
+                            });
+                            document.querySelector('#content > .alert b').textContent='4 '+t('purchase orders need delivery follow-up.');
+                        """
+                    expression="(()=>{document.querySelector('nav button[data-tab="+department+"]').click();document.querySelector('#content').style.width="+str(captures['odoo-profitability']['clip']['width'])+"+'px';"+normalization+"})()"
+                    result=browser._websocket_request('Runtime.evaluate',params={'expression':expression,'returnByValue':True})
+                    self.assertFalse(result.get('exceptionDetails'),str(result))
+                    capture(browser,'reference-'+department+'-metrics','#content > .section-heading','#content > .kpis')
+                    capture(browser,'reference-'+department+'-records','#content > .grid-2' if department=='procurement' else '#content > article')
+                    if department=='procurement': capture(browser,'reference-procurement-alert','#content > .alert')
             return result
 
         code = r"""(async () => {
@@ -606,14 +656,14 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         with patch.object(model, 'get_bootstrap', bootstrap), patch.object(model, 'get_section', section), \
                 patch.object(model, 'get_financial_trends', trends), patch.object(model, 'get_cash_directory', directory), patch.object(model, 'get_inventory', inventory), \
                 patch.object(model,'get_breakdown',sales_breakdown), patch.object(model,'get_recent_sales',sales_recent), \
-                patch.object(model,'get_product_quantity_ranking',sales_quantity), patch.object(model,'get_fulfillment',sales_fulfillment), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
+                patch.object(model,'get_workspace_details',workspace), patch.object(model,'get_product_quantity_ranking',sales_quantity), patch.object(model,'get_fulfillment',sales_fulfillment), patch.object(ChromeBrowser, '_wait_code_ok', after_render):
             self.browser_js(f'/odoo/action-{action.id}', code, login=self.env.user.login, timeout=60)
         manifest = {'status': 'unreviewed-captures-not-parity', 'html_sha256': hashlib.sha256(raw).hexdigest(),
                     'fixture': 'synthetic Finance/Inventory and selected Sales presentation values; no source reconciliation claim',
                     'viewport': list(viewport), 'theme': theme, 'language': language,
                     'adjustments': ['UI07: remove comparison note and Revenue movement row',
                                     'UI08: signed bank/cash classification from standard journals; synthetic values retain the approved split',
-                                    'UI20: Procurement monetary/count decision deferred; not represented in these captures',
+                                    'UI20: Procurement money/count decision deferred; counts, count labels and worklist links replace unsupported money; alert counts purchase orders',
                                     'Company: standard authorized test-company name and logo',
                                     'Exclude prototype review eyebrow and source-destination explanation callout'],
                     'state_normalization': ['authorized test company/logo/menu', 'synthetic Finance values', 'no report warnings'] + (['UI27: completed Arabic catalog and native Arabic period/cutoff content; reference geometry unchanged'] if language == 'ar_001' else []),
@@ -631,6 +681,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
         if viewport[0] <= 900: regions.append('stock-expanded')
         if viewport == (1440,900) and theme == 'light': regions.extend(['chart-table','aging-expanded','more-menu'])
         if sales_capture: regions.extend('sales-'+name for name in ['metrics','rankings','products','documents','delivery','documents-page2','quotations','invoices','margin','quantity','box'])
+        if sales_capture: regions.extend(['procurement-metrics','procurement-records','procurement-alert','crm-metrics','crm-records'])
         for region in regions:
             for side, destination in (('reference', refs), ('odoo', acts)):
                 name = f'{side}-{region}'
@@ -640,8 +691,8 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                     box=[0,0,image['clip']['width'],image['clip']['height']],
                     theme=theme, language=language, content_width=manifest['content_width'],
                     company=manifest['company'], dates={'from':'2026-09-01','to':'2026-09-22','cutoff':'2026-09-22'},
-                    controls={'department':'sales' if region.startswith('sales-') else 'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else '', 'sales_state':region if region.startswith('sales-') else None},
-                    data=({'fixture':'approved-sales-synthetic-v1','people':people,'customers':customers,'products':products,'documents':27,'quotations':18} if region.startswith('sales-') else {'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series}),
+                    controls={'department':region.split('-')[0] if region.startswith(('sales-','procurement-','crm-')) else 'inventory' if region.startswith('stock-') else 'finance','expanded':(region.endswith(('drawer','expanded')) or region=='chart-table'), 'search':'NO-MATCH-VISUAL-FIXTURE' if region=='stock-empty' else '', 'sales_state':region if region.startswith('sales-') else None},
+                    data=({'fixture':'approved-procurement-crm-synthetic-v1','scope':'selected period; procurement worklists current','rows':4} if region.startswith(('procurement-','crm-')) else {'fixture':'approved-sales-synthetic-v1','people':people,'customers':customers,'products':products,'documents':27,'quotations':18} if region.startswith('sales-') else {'fixture':'approved-inventory-synthetic-v1','rows':[] if region=='stock-empty' else stock_rows} if region.startswith('stock-') else {'fixture':'approved-finance-synthetic-v1','values':values,'series':series}),
                     state='empty' if region=='stock-empty' else 'expanded' if (region.endswith(('drawer','expanded')) or region=='chart-table') else 'loaded', region=region))
         reference_manifest = output / 'reference.json'
         actual_manifest = output / 'odoo.json'

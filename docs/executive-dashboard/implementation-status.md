@@ -1,6 +1,36 @@
 # Executive dashboard — implementation and verification
 
-## 24 September — Sales port batch (not ready for approval)
+## 24 September — Procurement/CRM and Sales correction batch (not approval-ready)
+
+The preceding Sales source `fab32ab99ac993f9a15d9bc69e0cd79aea2f4471`
+ran in development build `38578759`: 126 native tests, two failures, zero errors.
+Both failures are explained and corrected in this batch: the Arabic capture used
+an English aria-label; the real-source product assertion expected two fixed
+decimal places despite the approved headline formatter. Native rerun is pending.
+
+All eleven English Sales overlays were inspected. Corrections remove inherited
+ranking bottom margins, the forced document scrollbar, excess document-row
+height and displaced quantity controls. Card note spacing now matches the HTML.
+These corrections still need new rendered comparisons. The prototype gives
+quotation badges delivery-dependent amber/green colors despite every quotation
+being labelled sent; the real dashboard retains source-backed quotation state.
+This specific presentation conflict remains unresolved, not silently waived.
+
+Procurement/CRM now use the existing workspace services with approved Owl card,
+table and supplier-payment structure. Recent records use four-row pages with
+server clamping; Procurement approval/late cards retain current order counts
+under UI20 and open authorized standard worklists. CRM weighted/unweighted
+measures retain their source scope. New native controlled captures cover both
+workspaces; they are diagnostic, not acceptance claims. Delivery pagination now
+counts product/unit groups and recovers after filters shrink; row keys include
+both product and unit. Local controller checks: 73 passed. Python/XML, light/dark
+SCSS and Arabic PO checks pass.
+
+Next: native qualification and overlay corrections for this batch, HR controlled
+parity, final staging verification, durable evidence retrieval and final package.
+Production/main untouched; PR214 draft/open/unmerged; staging unchanged at1.6.0.
+
+## Historical — Sales port batch (not ready for approval)
 
 Recovered local/remote HEAD `9d35f078bc09cfb78e5352ce246214b092d6a45e` without
 discarding unpublished files. PR214 remains draft/open/unmerged. The final

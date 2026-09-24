@@ -38,7 +38,7 @@ function fixture() {
 const data = value => ({ items: [{ key: 'invoiced_sales', value }], digits: 2 });
 
 test('populated Owl views keep global constructors out of template expressions', () => {
-    const template = ['dashboard.xml', 'sales.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
+    const template = ['dashboard.xml', 'sales.xml', 'workspaces.xml'].map(name => readFileSync(new URL('../static/src/' + name, import.meta.url), 'utf8')).join('\n');
     assert.doesNotMatch(template, /(?:String\(|Object\.keys\(|Math\.)/);
     const { controller } = fixture();
     assert.deepEqual(Array.from(controller.searchKindKeys), ['all', 'invoices', 'bills', 'orders', 'quotations']);
@@ -1176,4 +1176,42 @@ test('keyboard tabs follow rendered Odoo direction without a DOM dir attribute',
     group.direction = 'ltr';
     press('ArrowRight');
     assert.equal(selected.at(-1), 2);
+});
+
+test('compact workspaces retain server-clamped pages and reject stale responses', async () => {
+    const { controller, pending } = fixture();
+    controller.state.applied = {...controller.state.draft};
+    controller.state.enabledSections = ['crm','procurement'];
+    const old = controller.loadWorkspaceDetails('crm', 24);
+    const current = controller.loadWorkspaceDetails('crm', 0);
+    assert.equal(pending[0].args[3], 4);
+    pending[1].resolve({status:'ready',rows:[{id:1}],offset:0,total:1,page_size:4,has_more:false});
+    await current;
+    pending[0].resolve({status:'ready',rows:[{id:99}],offset:24,total:27,page_size:4});
+    await old;
+    assert.equal(controller.state.workspaceDetails.crm.offset, 0);
+    assert.equal(controller.state.workspaceDetails.crm.rows[0].id, 1);
+});
+
+test('procurement worklist navigation rejects a superseded company and recovers after failure', async () => {
+    const { controller, pending, notifications } = fixture();
+    controller.state.applied = {...controller.state.draft};
+    const actions=[];
+    controller.action.doAction = action => actions.push(action);
+    const old=controller.openProcurementWorklist('late');
+    assert.equal(pending[0].method,'open_procurement');
+    assert.equal(pending[0].args[1],'late');
+    controller.generation++;
+    pending[0].resolve({name:'Old company worklist'});
+    await old;
+    assert.equal(actions.length,0);
+    const failed=controller.openProcurementWorklist('approvals');
+    pending[1].reject(new Error('Temporary error'));
+    await failed;
+    assert.equal(controller.state.opening,false);
+    assert.equal(notifications.length,1);
+    const retry=controller.openProcurementWorklist('approvals');
+    pending[2].resolve({name:'Authorized approval worklist'});
+    await retry;
+    assert.equal(actions[0].name,'Authorized approval worklist');
 });

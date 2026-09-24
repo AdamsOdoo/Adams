@@ -161,11 +161,16 @@ class ExecutiveDashboard(models.AbstractModel):
         columns = ['product_id', 'product_uom_id', 'product_uom_qty', 'qty_delivered', 'qty_to_deliver']
         report.check_field_access_rights('read', columns)
         domain = [*domain, ('product_id', '!=', False)]
+        # Count the displayed product/unit groups, not report lines or orders.
+        # _read_group retains the report's normal record rules and company scope.
+        total = len(report._read_group(domain, groupby=['product_id', 'product_uom_id']))
+        offset = min(offset, ((total - 1) // 25) * 25) if total else 0
         rows = report._read_group(domain,
             groupby=['product_id', 'product_uom_id'],
             aggregates=['product_uom_qty:sum', 'qty_delivered:sum', 'qty_to_deliver:sum'],
-            order='product_id ASC, product_uom_id ASC', offset=offset, limit=26)
-        return {'status': 'ready' if rows else 'empty', 'has_more': len(rows) > 25,
+            order='product_id ASC, product_uom_id ASC', offset=offset, limit=25)
+        return {'status': 'ready' if rows else 'empty', 'has_more': offset + len(rows) < total,
+                'total_count': total, 'offset': offset, 'page_size': 25,
                 'rows': [{'id': product.id, 'name': product.display_name, 'unit': unit.display_name, 'unit_id': unit.id,
                           'ordered': ordered, 'delivered': delivered, 'remaining': remaining}
                          for product, unit, ordered, delivered, remaining in rows[:25]],

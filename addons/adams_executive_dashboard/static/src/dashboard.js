@@ -42,7 +42,7 @@ export class ExecutiveDashboard extends Component {
             standard_forecast: _t('short-term cash forecast'),
             invoiced_sales: _t('Invoiced sales'), invoiced_margin: _t('invoiced commercial margin'), confirmed_sales: _t('Confirmed orders'),
             orders: _t('Distinct sales orders'), quotations: _t('Quotations'), purchases: _t('Confirmed purchases'),
-            inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), hr: _t('Approved leave hours (signed)'),
+            inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), crm_expected: _t('Expected revenue'), hr: _t('Approved leave hours (signed)'),
         };
         this.groupHeadings = { revenue: _t('Profitability'), cash: _t('Liquidity'), receivables: _t('Working capital'), invoiced_sales: _t('Commercial performance') };
         this.statusLabels = {
@@ -386,7 +386,7 @@ export class ExecutiveDashboard extends Component {
         return this.state.sections.finance?.items.find(item => item.key === key);
     }
 
-    get referenceSurface() { return ['finance','inventory','sales'].includes(this.state.activeSection); }
+    get referenceSurface() { return ['finance','inventory','sales','procurement','crm'].includes(this.state.activeSection); }
     rankingInitials(label) { return (label || '').trim().split(/\s+/).slice(0, 2).map(word => word[0]).join(''); }
     get salesQuantityUnit() { return this.state.products?.units?.find(unit => unit.id === this.state.products.unit_id)?.name || ''; }
     openSalesRanking(type, id = undefined) {
@@ -791,7 +791,15 @@ export class ExecutiveDashboard extends Component {
     }
 
     openSource(item, result) {
-        this.state.source = { item, result };
+        const definitions = {
+            invoiced_sales: _t('Posted customer invoices less credit notes, excluding tax, by invoice date in the selected company.'),
+            confirmed_sales: _t('Confirmed sales orders, excluding tax, by order date in the selected company.'),
+            quotations: _t('Draft and sent quotations, excluding tax, by order date in the selected company.'),
+            purchases: _t('Confirmed purchase orders, excluding tax, by order date in the selected company.'),
+            crm: _t('Expected revenue weighted by probability for open opportunities created in the selected period.'),
+            crm_expected: _t('Expected revenue before probability weighting for the same open opportunities created in the selected period.'),
+        };
+        this.state.source = { item: {...item, definition:item.definition || definitions[item.key]}, result };
     }
 
     closeSource() { this.state.source = null; }
@@ -1053,7 +1061,7 @@ export class ExecutiveDashboard extends Component {
         this.workspaceRequests ||= {}; this.workspaceRequests[section]=marker;
         this.state.workspaceDetails[section]={status:'loading',rows:[],offset};
         try {
-            const data=await this.orm.call('adams.executive.dashboard','get_workspace_details',[{...this.state.applied},section,offset]);
+            const data=await this.orm.call('adams.executive.dashboard','get_workspace_details',[{...this.state.applied},section,offset,4]);
             if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]=data;
         } catch {if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]={status:'error',rows:[],offset};}
     }
@@ -1065,6 +1073,25 @@ export class ExecutiveDashboard extends Component {
             if(this.alive && generation===this.generation)await this.action.doAction(action);
         } catch {if(this.alive && generation===this.generation)this.notification.add(_t('The record is unavailable in the selected scope.'),{type:'warning'});}
         finally {if(this.alive)this.state.opening=false;}
+    }
+
+    workspaceMetric(section, details) {
+        if (section === 'crm') return {...details.unweighted, key:'crm_expected', unit:'currency', source:_t('Pipeline Analysis'), date_field:'create_date', drilldown:details.unweighted?.status === 'ready'};
+        return this.sectionResult({key:'procurement'})?.items?.find(item => item.key === 'purchases');
+    }
+    get purchaseNote() { return _t('Untaxed purchase orders'); }
+    get pipelineNote() { return _t('Open opportunities · weighted by probability'); }
+    get pipelineUnweightedNote() { return _t('Open opportunities · unweighted'); }
+
+    async openProcurementWorklist(kind) {
+        if (this.state.opening || !['approvals','late'].includes(kind)) return;
+        const generation=this.generation;
+        this.state.opening=true;
+        try {
+            const action=await this.orm.call('adams.executive.dashboard','open_procurement',[{...this.state.applied},kind]);
+            if(this.alive && generation===this.generation) await this.action.doAction(action);
+        } catch { if(this.alive && generation===this.generation) this.notification.add(_t('The report could not be opened. Check your access.'),{type:'warning'}); }
+        finally { if(this.alive) this.state.opening=false; }
     }
 
     async refreshCompanyIdentity(generation) {
@@ -1331,6 +1358,7 @@ export class ExecutiveDashboard extends Component {
 
     async openReport(key, dimension = null, groupId = null) {
         if (this.state.opening) { return; }
+        if (key === 'crm_expected') { this.closeSource(); return this.openWorkspaceRecord('crm'); }
         const generation = this.generation;
         this.closeSource();
         this.state.opening = true;

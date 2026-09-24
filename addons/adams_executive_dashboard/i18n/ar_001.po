@@ -5402,3 +5402,108 @@ msgstr "بانتظار التسليم"
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "Quotation sent"
 msgstr "عرض السعر مرسل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Current worklist"
+msgstr "قائمة العمل الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Expected revenue ·"
+msgstr "الإيرادات المتوقعة ·"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Inspect stages, probability and next actions in the standard pipeline."
+msgstr "راجع المراحل والاحتمالات والإجراءات التالية في مسار المبيعات القياسي."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Overdue now"
+msgstr "متأخرة حاليًا"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Purchase orders"
+msgstr "أوامر الشراء"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Purchases follow the period; worklists show current items"
+msgstr "تتبع المشتريات الفترة المحددة؛ وتعرض قوائم العمل البنود الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View source worklist"
+msgstr "عرض قائمة العمل المصدر"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "View worklist"
+msgstr "عرض قائمة العمل"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Confirmed purchase orders, excluding tax, by order date in the selected company."
+msgstr "أوامر الشراء المؤكدة، دون ضريبة، حسب تاريخ الطلب في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Confirmed sales orders, excluding tax, by order date in the selected company."
+msgstr "أوامر البيع المؤكدة، دون ضريبة، حسب تاريخ الطلب في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Draft and sent quotations, excluding tax, by order date in the selected company."
+msgstr "عروض الأسعار المسودة والمرسلة، دون ضريبة، حسب تاريخ الطلب في الشركة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Expected revenue before probability weighting for the same open opportunities created in the selected period."
+msgstr "الإيرادات المتوقعة قبل الترجيح بالاحتمال للفرص المفتوحة نفسها التي أُنشئت خلال الفترة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Expected revenue weighted by probability for open opportunities created in the selected period."
+msgstr "الإيرادات المتوقعة المرجحة بالاحتمال للفرص المفتوحة التي أُنشئت خلال الفترة المحددة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Pipeline Analysis"
+msgstr "تحليل مسار المبيعات"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/workspaces.xml:0
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Posted customer invoices less credit notes, excluding tax, by invoice date in the selected company."
+msgstr "فواتير العملاء المرحلة مطروحًا منها الإشعارات الدائنة، دون ضريبة، حسب تاريخ الفاتورة في الشركة المحددة."

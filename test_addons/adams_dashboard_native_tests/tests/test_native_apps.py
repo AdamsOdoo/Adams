@@ -233,6 +233,11 @@ class TestDashboardNativeApps(AccountTestInvoicingCommon):
         order.order_line.qty_delivered = 2
         self.env.flush_all()
         result = self.dashboard.get_fulfillment(self.options)
+        self.assertEqual(result['total_count'], len(result['rows']))
+        self.assertEqual(result['page_size'], 25)
+        recovered = self.dashboard.get_fulfillment(self.options, 100000)
+        self.assertEqual(recovered['offset'], 0)
+        self.assertEqual(recovered['rows'], result['rows'])
         row = result['rows'][0]
         self.assertEqual((row['ordered'], row['delivered'], row['remaining']), (5, 2, 3))
         self.assertEqual(row['unit'], product.uom_id.display_name)

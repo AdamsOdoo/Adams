@@ -10,6 +10,7 @@
         'adams_executive_dashboard/static/src/dashboard.js',
         'adams_executive_dashboard/static/src/dashboard.xml',
         'adams_executive_dashboard/static/src/sales.xml',
+        'adams_executive_dashboard/static/src/workspaces.xml',
         'adams_executive_dashboard/static/src/dashboard.scss',
         'adams_executive_dashboard/static/src/sales.scss',
     ]},
