@@ -30,7 +30,7 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 - Settings → Executive Dashboard → Finance report lines: override lines for Revenue / Gross profit / Net profit (period reports only) and Bank and cash (as-of reports only).
 - Odoo's asset minifier dropped the spaces inside nested template literals (SVG paths broke in the minified bundle only); chart code builds strings by concatenation.
 - Shell fix: the grid columns were on the high-specificity `.o_action_manager > .ed-app.o_action` selector, so the tablet/phone breakpoints never applied (244 px rail kept at 390 px). Now only `display` uses that selector.
-- Review: independent `odoo-reviewer` (read-only). Blocking: native Aged buckets could not be opened; drawer totals not converted across currencies. Should-fix: aged payable sign guess, no savepoint around engine SQL, date mode not checked for override lines, bank override accounts not openable, query-count tests on Enterprise. All fixed with tests where testable locally.
+- Review: independent `odoo-reviewer` (read-only). Blocking: native Aged buckets could not be opened; drawer totals not converted across currencies. Should-fix: aged payable sign guess, no savepoint around engine SQL, date mode not checked for override lines, bank override accounts not openable, query-count tests on Enterprise. All fixed with tests where testable locally; the reviewer's re-check confirmed each fix and found no new blocking issue. Its remaining nit (native Aged sign undetermined when the payable total is near zero) is fixed by using journal items in that case.
 
 ## Verify on Odoo.sh (Enterprise)
 

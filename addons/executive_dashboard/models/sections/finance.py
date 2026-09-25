@@ -417,13 +417,11 @@ class ExecutiveDashboard(models.AbstractModel):
         # Both reports cover the same open items as of today as the journal items. Amounts owed
         # are shown positive: accept the native total only when it equals the journal total
         # up to its sign convention; otherwise the figures come from journal items.
-        currency = scope['company'].currency_id
         tolerance = max(1.0, abs(journal_total) * 0.001)
-        if abs(abs(total) - abs(journal_total)) > tolerance:
+        # A near-zero total cannot show the native sign convention: use journal items then.
+        if abs(journal_total) < tolerance or abs(abs(total) - abs(journal_total)) > tolerance:
             raise UnsupportedScope()
-        sign = -1 if total and journal_total and (total > 0) != (journal_total > 0) else 1
-        if currency.is_zero(journal_total) and not currency.is_zero(total):
-            raise UnsupportedScope()
+        sign = -1 if (total > 0) != (journal_total > 0) else 1
         buckets = []
         for column in options['columns']:
             label = column.get('expression_label') or ''
