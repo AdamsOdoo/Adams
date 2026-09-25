@@ -51,7 +51,8 @@ ENGINE_ERRORS = (UserError, KeyError, TypeError, ValueError, AttributeError, Sto
 
 
 class UnsupportedScope(Exception):
-    """The native report returned other dates, companies or columns than asked for."""
+    """The native report cannot give this figure for the dashboard's scope (the message says why);
+    the dashboard then uses journal items."""
 
 
 class ExecutiveDashboard(models.AbstractModel):
@@ -190,8 +191,12 @@ class ExecutiveDashboard(models.AbstractModel):
         try:
             with self.env.cr.savepoint():
                 return compute()
-        except (UnsupportedScope, AccessError, *ENGINE_ERRORS) as error:
-            _logger.warning('Executive Dashboard: %s engine not used (%s)', what, type(error).__name__)
+        except UnsupportedScope as error:
+            # Expected: a scope the native report cannot represent; journal items give the figure.
+            _logger.info('Executive Dashboard: %s engine not used: %s', what, error)
+            return None
+        except (AccessError, *ENGINE_ERRORS) as error:
+            _logger.warning('Executive Dashboard: %s engine not used (%s: %s)', what, type(error).__name__, error)
             return None
 
     def _fin_report(self, xmlid):
@@ -233,7 +238,7 @@ class ExecutiveDashboard(models.AbstractModel):
                 or {company['id'] for company in options.get('companies', [])} != set(self.env.companies.ids)
                 or len(options.get('column_groups', {})) != 1
                 or any(options.get(k) != v for k, v in extra.items())):
-            raise UnsupportedScope()
+            raise UnsupportedScope('the report changed the requested dates, companies or columns')
         return options
 
     def _fin_totals(self, report, options):
@@ -244,7 +249,7 @@ class ExecutiveDashboard(models.AbstractModel):
     @staticmethod
     def _fin_number(value):
         if type(value) not in (int, float) or not math.isfinite(value):
-            raise UnsupportedScope()
+            raise UnsupportedScope('the report returned a non-numeric value')
         return value
 
     def _fin_report_action(self, report, options):
@@ -360,7 +365,7 @@ class ExecutiveDashboard(models.AbstractModel):
         group = next(iter(options['column_groups']))
         values = native[group][expression]['value']
         if not isinstance(values, list):
-            raise UnsupportedScope()
+            raise UnsupportedScope('the Bank and Cash line did not expand by account')
         return {account_id: self._fin_number(value) for account_id, value in values}
 
     # ------------------------------------------------------------------ receivables and payables
@@ -411,8 +416,13 @@ class ExecutiveDashboard(models.AbstractModel):
         # up to its sign convention; otherwise the figures come from journal items.
         tolerance = max(1.0, abs(journal_total) * 0.001)
         # A near-zero total cannot show the native sign convention: use journal items then.
-        if abs(journal_total) < tolerance or abs(abs(total) - abs(journal_total)) > tolerance:
-            raise UnsupportedScope()
+        if abs(journal_total) < tolerance:
+            raise UnsupportedScope('nothing open, the sign convention cannot be checked')
+        if abs(abs(total) - abs(journal_total)) > tolerance:
+            # Not expected: the same open items should give the same total. Worth a warning.
+            _logger.warning('Executive Dashboard: %s total %s differs from the open journal items %s',
+                            report.display_name, total, journal_total)
+            raise UnsupportedScope('the report total differs from the open journal items')
         sign = -1 if (total > 0) != (journal_total > 0) else 1
         buckets = []
         for column in options['columns']:
@@ -421,7 +431,7 @@ class ExecutiveDashboard(models.AbstractModel):
                 value = self._fin_number(totals[by_label[label].id]['value'])
                 buckets.append({'key': label, 'label': column['name'], 'value': sign * value})
         if not buckets:
-            raise UnsupportedScope()
+            raise UnsupportedScope('the report returned no ageing columns')
         return {'total': sign * total, 'buckets': buckets}
 
     # ------------------------------------------------------------------ drawers

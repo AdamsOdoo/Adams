@@ -160,9 +160,19 @@ class TestPeople(SalesCrmCase):
         self.assertEqual(widgets['kpis']['headcount'],
                          self.env['hr.employee'].search_count([('company_id', '=', self.company.id)]))
         if 'hr.attendance' in self.env:
-            drawer = self.dashboard(self.hr_officer).get_drawer('people.attendance', {})
-            # Full details; no Attendances rights, so no button to that screen.
-            self.assertIsNone(drawer['action'])
+            dashboard = self.dashboard(self.hr_officer)
+            drawer = dashboard.get_drawer('people.attendance', {})
+            # Full details whatever the Attendances rights; the button to that screen is shown
+            # only when the user, with their own rights, sees every record the panel lists.
+            # (Which HR groups grant Attendances rights differs between databases.)
+            if drawer['action'] is None:
+                with self.assertRaises(AccessError):
+                    dashboard.open_action('people.attendance', {})
+            else:
+                action = dashboard.open_action('people.attendance', {})
+                Attendance = self.env['hr.attendance']
+                self.assertEqual(Attendance.with_user(self.hr_officer).search_count(action['domain']),
+                                 Attendance.search_count(action['domain']))
 
     def test_user_without_hr_rights_sees_everything(self):
         result = self.section(self.plain, 'people')

@@ -287,7 +287,12 @@ class TestCrm(SalesCrmCase):
         self.assertEqual(widgets['kpis']['opportunities'], len(native))
         self.assertGreaterEqual(widgets['kpis']['won'], 600.0)
         self.assertGreaterEqual(widgets['kpis']['won_count'], 1)
-        self.assertGreaterEqual(widgets['kpis']['new_leads'], 3)
+        # New leads = active leads and opportunities created in the period (lost ones are
+        # archived by Odoo), as the native Leads list counts them.
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        new = Lead.search_count(Dashboard._crm_new_domain(Dashboard._period_scope('crm', 'month')))
+        self.assertEqual(widgets['kpis']['new_leads'], new)
+        self.assertGreaterEqual(new, 2)
         stage = next(s for s in widgets['stages'] if s['id'] == self.stage.id)
         in_stage = native.filtered(lambda lead: lead.stage_id == self.stage)
         self.assertTrue(currency.is_zero(stage['amount'] - sum(in_stage.mapped('expected_revenue'))))

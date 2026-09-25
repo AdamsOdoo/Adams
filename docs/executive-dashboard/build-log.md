@@ -94,3 +94,13 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 - The standard Net profit expression is looked up as `account_reports.account_financial_report_net_profit0_balance`, then line code `NEP`; if neither exists in this version, the figure falls back to journal items (the report-line settings were removed by owner decision).
 - Aged Payable sign convention (the native total is accepted only when it matches the journal-items total up to sign).
 - Planning (People › Shifts today): install `planning` on the development build, publish a few shifts for today; the KPI, slot tiles and list appear, and "View all" › Open list opens the shifts (check the action id `planning.planning_action_schedule_by_resource` exists; otherwise a plain list opens).
+
+## Odoo.sh build fixes (2026-09-25)
+
+- The first Enterprise build ran 196 tests: 2 failed, 2 errors. All were test assumptions that only hold on Community; no figure was wrong.
+  - Finance: with `account_reports` the Aged buckets are the native columns (`period0`, `period1`, ...), not `not_due`/`d30`/...; the tests now accept either key for the same range.
+  - People: which HR groups grant Attendances rights differs between databases; the test now checks the rule itself (button shown only when the user's own rights cover every listed record, otherwise `open_action` is refused).
+  - CRM: New leads counts active leads created in the period (Odoo archives lost ones); the test now compares with the native count instead of a fixed 3.
+- "aged report engine not used (UnsupportedScope)" warnings: this is the designed fallback to journal items. Each fallback now states its reason and is logged at INFO; a native total that differs from the open journal items stays a WARNING (money mismatch), as do engine and access errors.
+- Not ours: `bus.websocket` `KeyError: 'record'` (Odoo `sendone_wrapper` test helper with Enterprise `ai_fields._create`) during the old `adams_dashboard_finance` browser tests; goes away when that module is uninstalled in Phase 6.
+- Local: `oh test executive_dashboard` 26 passed; kept DB with all Community apps 66 passed, no warnings.

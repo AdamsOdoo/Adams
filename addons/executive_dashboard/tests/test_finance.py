@@ -56,9 +56,14 @@ class TestFinance(AccountTestInvoicingCommon):
         self.assertEqual(result['status'], 'ok')
         return result['widgets']
 
-    @staticmethod
-    def bucket(widget, view, key):
-        return next(b['value'] for b in widget[view] if b['key'] == key)
+    # Aged buckets come from the native Aged reports when Enterprise is installed (period0,
+    # period1, ...) and from journal items otherwise (not_due, d30, ...); same date ranges.
+    NATIVE_AGED = {'not_due': 'period0', 'd30': 'period1', 'd60': 'period2', 'd90': 'period3'}
+
+    @classmethod
+    def bucket(cls, widget, view, key):
+        keys = {key, cls.NATIVE_AGED.get(key)} if view == 'aged' else {key}
+        return next(b['value'] for b in widget[view] if b['key'] in keys)
 
     # -- widgets -------------------------------------------------------------
 
