@@ -653,10 +653,13 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                         if (!open || open.disabled) throw new Error('Revenue value must open its native report');
                         await assertHitTarget(open, 'Revenue value');
                         const datesBeforeReport = [...root.querySelectorAll('.adams_applied_period bdi, .adams_balance_scope > bdi')].map(node => node.textContent.trim());
+                        const dashboardPath = window.location.pathname;
+                        const dashboardBreadcrumb = () => [...document.querySelectorAll('.breadcrumb .o_back_button a[href]')]
+                            .find(link => new URL(link.href).pathname === dashboardPath);
                         open.click();
                         await wait(() => !document.querySelector('.o_adams_dashboard') &&
                             document.body.innerText.includes('100.00'), 'Native report must display independently rendered fixture value');
-                        const back = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                        const back = await wait(dashboardBreadcrumb,
                             'Native financial report must expose dashboard breadcrumb');
                         back.click();
                         const restored = await wait(() => document.querySelector('.o_adams_dashboard .adams_value')?.textContent.trim() === headlineExpected
@@ -673,7 +676,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                             throw new Error('Native payment report must identify its restricted window');
                         if (document.body.innerText.includes('1,128.45'))
                             throw new Error('Native payment drilldown lost its due-window filter');
-                        const paymentBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                        const paymentBack = await wait(dashboardBreadcrumb,
                             'Payment report must expose dashboard breadcrumb');
                         paymentBack.click();
                         await wait(() => document.querySelectorAll('.adams_supplier_windows .adams_card').length === 4,
@@ -689,7 +692,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 document.body.innerText.includes('Aged Receivable') &&
                                 document.body.innerText.includes('Based on Due Date'),
                                 'Overdue control must open the native receivables aging report');
-                            const overdueBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                            const overdueBack = await wait(dashboardBreadcrumb,
                                 'Overdue report must expose the dashboard breadcrumb');
                             overdueBack.click();
                             const ledger = await wait(() => [...(receivableCard()?.querySelectorAll('button') || [])]
@@ -703,7 +706,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                                 'Partner Ledger control must show the native report and accounting partner');
                             if (document.body.innerText.includes('Based on Due Date'))
                                 throw new Error('Partner Ledger link opened Aged Receivable instead');
-                            const ledgerBack = await wait(() => document.querySelector('a[href="/odoo/action-ACTION_ID"]'),
+                            const ledgerBack = await wait(dashboardBreadcrumb,
                                 'Partner Ledger must expose the dashboard breadcrumb');
                             ledgerBack.click();
                             await wait(() => receivableCard()?.querySelector('.adams_overdue_total button'),
@@ -713,7 +716,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     if (WIDTH === 768 || WIDTH === 1024) root.querySelector('#adams-group-liquidity').scrollIntoView({block: 'start'});
                     console.log('test successful');
                 })().catch(error => console.error(error));
-                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width)).replace('ACTION_ID', str(action.id))
+                '''.replace('COMPANY_NAME', json.dumps(self.env.company.name)).replace('COMPANY_ID', str(self.env.company.id)).replace('HAS_EMPLOYEE', json.dumps(bool(employee))).replace('HR_PERIOD', json.dumps({'date_from': hr_start.isoformat(), 'date_to': hr_end.isoformat()})).replace('THEME', json.dumps(theme)).replace('HEADING', json.dumps(heading)).replace('DIRECTION', json.dumps(direction)).replace('WIDTH', str(width))
                 original_wait = ChromeBrowser._wait_code_ok
 
                 def capture_success(browser, *args, **kwargs):
