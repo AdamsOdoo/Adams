@@ -11,6 +11,7 @@ from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 from .finance_mapping import METRICS, PERIOD_KEYS, RATIO_KEYS, BUDGET_KEYS
+from odoo.addons.adams_executive_dashboard.models.access import check_readable
 
 _logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class ExecutiveDashboard(models.AbstractModel):
         self.env['account.move.line'].check_access('read')
         # The native report engine can aggregate through SQL. Preserve field-level
         # restrictions as well as its accounting group and model permissions.
-        self.env['account.move.line'].check_field_access_rights('read', [
+        check_readable(self.env['account.move.line'], [
             'balance', 'debit', 'credit', 'amount_currency', 'account_id',
             'date', 'company_id', 'partner_id', 'date_maturity', 'move_id',
         ])
@@ -543,8 +544,8 @@ class ExecutiveDashboard(models.AbstractModel):
             journals = self.env['account.journal'].with_context(active_test=False)
             accounts.check_access('read')
             journals.check_access('read')
-            accounts.check_field_access_rights('read', ['account_type', 'active', 'company_ids'])
-            journals.check_field_access_rights('read', ['active', 'type', 'company_id', 'default_account_id'])
+            check_readable(accounts, ['account_type', 'active', 'company_ids'])
+            check_readable(journals, ['active', 'type', 'company_id', 'default_account_id'])
             records = accounts.search([
                 ('company_ids', 'in', [self.env.company.id]),
                 ('account_type', '=', 'asset_cash'), ('active', '=', True),

@@ -4,6 +4,7 @@ import logging
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from .access import check_readable
 
 
 _logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ _logger = logging.getLogger(__name__)
 
 HR_MODELS = {'employees': 'hr.employee', 'attendance': 'hr.attendance',
              'time_off': 'hr.leave', 'shifts': 'planning.slot'}
-HR_ACTIONS = {'employees': 'hr.open_view_employee_list',
+HR_ACTIONS = {'employees': 'hr.open_view_employee_list_my',  # Employees menu; open_view_employee_list is form-first
               'attendance': 'hr_attendance.hr_attendance_action',
               'time_off': 'hr_holidays.hr_leave_action_action_approve_department',
               'shifts': 'planning.planning_action_schedule_by_resource'}
@@ -103,7 +104,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 domain.append(('active', '=', filters['status'] == 'active'))
             if filters.get('scope') == 'no_check_in_today':
                 # Native employee snapshot, not subtraction of partially visible sessions.
-                source.check_field_access_rights('read', ['last_check_in'])
+                check_readable(source, ['last_check_in'])
                 today = fields.Date.context_today(self)
                 bounds = self._date_bounds(source, 'last_check_in', [today, today, dates[2]])
                 domain += ['|', ('last_check_in', '=', False), ('last_check_in', '<', bounds[0][2])]
@@ -118,7 +119,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
             start_field, end_field = {'attendance': ('check_in', 'check_out'),
                                       'time_off': ('date_from', 'date_to'),
                                       'shifts': ('start_datetime', 'end_datetime')}[tab]
-            source.check_field_access_rights('read', [company_path.split('.')[0], start_field, end_field])
+            check_readable(source, [company_path.split('.')[0], start_field, end_field])
             if tab == 'attendance' and filters.get('scope') == 'current':
                 domain.append(('check_out', '=', False))
             else:
@@ -159,10 +160,10 @@ class ExecutiveDashboardHR(models.AbstractModel):
             else:
                 domain.append(('employee_id.name', 'ilike', query))
         columns = HR_FIELDS[tab]
-        source.check_field_access_rights('read', columns)
+        check_readable(source, columns)
         # Domain/group/order fields are explicit too; permission failures are not zeros.
         roots = {term[0].split('.')[0] for term in domain if isinstance(term, tuple)}
-        source.check_field_access_rights('read', list(roots))
+        check_readable(source, list(roots))
         return source, domain, columns, order
 
     def _hr_rows(self, tab, records, columns):
@@ -194,7 +195,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                     employees = records.employee_id
                     employees.check_access('read')
                     work_fields = ['job_id', 'work_location_id']
-                    employees.check_field_access_rights('read', work_fields)
+                    check_readable(employees, work_fields)
                     work = {employee['id']: employee for employee in employees.read(work_fields)}
                     for row in rows:
                         employee_id = row.get('employee_id')
@@ -283,6 +284,19 @@ class ExecutiveDashboardHR(models.AbstractModel):
                 'attendance_summary': attendance_summary,
                 'today': fields.Date.context_today(self).isoformat()}
 
+    def _hr_department_options(self):
+        """Department choices for the tab filters, independent of which tab loaded first.
+
+        Same authorization and grouping as the Overview team list; a denial yields no choices.
+        """
+        try:
+            employees, domain = self._workforce_scope()
+            groups = employees._read_group(domain, ['department_id'], ['__count'], order='department_id', limit=500)
+        except AccessError:
+            return []
+        return [{'id': dep.id or False, 'name': dep.display_name if dep else _('Unassigned'), 'count': count}
+                for dep, count in groups]
+
     @api.model
     def get_hr_workspace(self, options, tab='overview', filters=None, offset=0, list_page_size=25):
         scoped, dates = self._scope(options)
@@ -312,6 +326,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
             return {**base, 'status': 'restricted'}
         return {**base, 'status': 'ready' if rows else 'empty', 'rows': rows, 'total': total,
                 'offset': offset, 'has_more': offset + len(rows) < total,
+                'departments': scoped._hr_department_options(),
                 'date_basis': 'current' if tab == 'employees' else filters.get('scope', 'period'),
                 'provenance': {'model': source._name, 'domain': domain, 'source_kind': 'operational_records'}}
 
@@ -337,7 +352,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                     lower=self._date_bounds(source,'date_from',(today,today))[0][2]
                     domain += [('state','=','validate'),('date_to','>=',lower)]
                     order,limit='date_from, id',4
-                source.check_field_access_rights('read', list({term[0].split('.')[0] for term in domain}))
+                check_readable(source, list({term[0].split('.')[0] for term in domain}))
                 records=source.search(domain,order=order,limit=limit)
                 return {'status':'ready' if records else 'empty','rows':self._hr_rows(tab,records,columns),
                         'total':source.search_count(domain),'timezone':self.env.user.tz or 'UTC'}
@@ -363,7 +378,7 @@ class ExecutiveDashboardHR(models.AbstractModel):
                      'work_phone', 'work_location_id', 'resource_calendar_id'):
             if name in employees._fields:
                 try:
-                    employees.check_field_access_rights('read', [name])
+                    check_readable(employees, [name])
                 except AccessError:
                     continue
                 allowed.append(name)
@@ -414,11 +429,11 @@ class ExecutiveDashboardHR(models.AbstractModel):
             report_model = scoped.env['hr.leave.report']
             for key in ('employee_id', 'department_id'):
                 if filters.get(key):
-                    report_model.check_field_access_rights('read', [key])
+                    check_readable(report_model, [key])
                     action['domain'].append((key, '=', filters[key]))
             if filters.get('department_unassigned'):
-                report_model.check_field_access_rights('read', ['employee_id'])
-                scoped.env['hr.employee'].check_field_access_rights('read', ['department_id'])
+                check_readable(report_model, ['employee_id'])
+                check_readable(scoped.env['hr.employee'], ['department_id'])
                 action['domain'].append(('employee_id.department_id', '=', False))
             return action
         action = scoped.env['ir.actions.actions']._for_xml_id(action_id)

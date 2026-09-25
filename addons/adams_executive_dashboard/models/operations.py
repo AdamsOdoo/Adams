@@ -8,6 +8,7 @@ import pytz
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from .access import check_readable
 
 
 class ExecutiveDashboardOperations(models.AbstractModel):
@@ -36,7 +37,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             context['to_date'] = fields.Datetime.to_string(cutoff)
         products = products.with_context(context)
         products.check_access('read')
-        products.check_field_access_rights('read', ['is_storable', 'company_id', 'display_name', 'uom_id', 'qty_available'])
+        check_readable(products, ['is_storable', 'company_id', 'display_name', 'uom_id', 'qty_available'])
         self.env['stock.quant'].check_access('read')
         self.env['stock.move'].check_access('read')
         domain = [('is_storable', '=', True), ('company_id', 'in', [False, self.env.company.id])]
@@ -65,7 +66,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
                 raise ValidationError(_('Invalid stock filter.'))
         locations = scoped.env['stock.location'].with_context(active_test=False)
         locations.check_access('read')
-        locations.check_field_access_rights('read', ['complete_name', 'usage', 'company_id', 'parent_path'])
+        check_readable(locations, ['complete_name', 'usage', 'company_id', 'parent_path'])
         warehouses = scoped.env['stock.warehouse'].search([('company_id', '=', scoped.env.company.id)])
         location_domain = [('usage', '=', 'internal'), ('company_id', 'in', [False, scoped.env.company.id])]
         if filters.get('warehouse_id'):
@@ -134,13 +135,13 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         quant.check_access('read')
         # An empty source is not an authorization result: require the same
         # aggregate fields as the native search before omitting any location.
-        quant.check_field_access_rights('read', ['location_id', 'product_id', 'quantity', 'reserved_quantity'])
+        check_readable(quant, ['location_id', 'product_id', 'quantity', 'reserved_quantity'])
         occupied = {location.id for location, in quant._read_group(
             [('location_id', 'in', locations.ids)], ['location_id'], [])}
         if mode == 'historical':
             move = products.env['stock.move'].with_context(active_test=False)
             move.check_access('read')
-            move.check_field_access_rights('read', ['state', 'date', 'location_id', 'location_dest_id',
+            check_readable(move, ['state', 'date', 'location_id', 'location_dest_id',
                                                    'product_id', 'quantity', 'product_uom', 'product_qty'])
             for field in ('location_id', 'location_dest_id'):
                 occupied.update(location.id for location, in move._read_group(
@@ -154,10 +155,10 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         columns = ['display_name', 'default_code', 'qty_available', 'uom_id', 'active', 'categ_id']
         if mode == 'current':
             columns += ['free_qty', 'incoming_qty', 'outgoing_qty', 'virtual_available']
-        products.check_field_access_rights('read', columns)
+        check_readable(products, columns)
         rows, total = [], 0
         sort_by = filters.get('sort', 'name')
-        products.check_field_access_rights('read', ['name'])
+        check_readable(products, ['name'])
         warehouse_paths = [(w.view_location_id.parent_path, w.name, w.id) for w in warehouses]
 
         quantity_filter = any(isinstance(term, (tuple, list)) and term[0] == 'qty_available' for term in domain)
@@ -243,7 +244,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         reservations = {}
         if mode == 'current' and page:
             quants = scoped.env['stock.quant'].with_context(products.env.context)
-            quants.check_field_access_rights('read', ['product_id', 'location_id', 'reserved_quantity'])
+            check_readable(quants, ['product_id', 'location_id', 'reserved_quantity'])
             reservation_domain = [('company_id', 'in', [False, scoped.env.company.id]),
                                   ('product_id', 'in', list({pair[1] for pair in page})),
                                   ('location_id', 'in', list({pair[0] for pair in page}))]
@@ -311,7 +312,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise AccessError(_('The product is unavailable in the selected scope.'))
         quants = scoped.env['stock.quant']
         quants.check_access('read')
-        quants.check_field_access_rights('read', ['product_id', 'location_id', 'reserved_quantity'])
+        check_readable(quants, ['product_id', 'location_id', 'reserved_quantity'])
         action = scoped.env['ir.actions.actions']._for_xml_id('stock.stock_quant_action')
         action.update(name=_('Current direct-product reservations'),
                       domain=[('company_id', 'in', [False, scoped.env.company.id]),
@@ -327,7 +328,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         scoped, dates, products, domain, locations, warehouses = self._inventory_filter_scope(options, mode, filters)
         if 'total_value' not in products._fields:
             raise ValidationError(_('Inventory valuation is not installed.'))
-        products.check_field_access_rights('read', ['total_value', 'company_currency_id'])
+        check_readable(products, ['total_value', 'company_currency_id'])
         # Value and quantity must both use company/warehouse scope. A location
         # filter never allocates company value to that location's quantity.
         domain = [term for term in domain
@@ -364,13 +365,13 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         columns = ['display_name', 'qty_available', 'uom_id', 'active']
         if mode == 'current':
             columns += ['free_qty', 'virtual_available']
-        products.check_field_access_rights('read', columns)
+        check_readable(products, columns)
         records = products.search(domain, order='id', offset=offset, limit=26)
         rows = records[:25].read(columns)
         value_status = 'not_installed'
         if 'total_value' in products._fields:
             try:
-                products.check_field_access_rights('read', ['total_value', 'company_currency_id'])
+                check_readable(products, ['total_value', 'company_currency_id'])
                 values = {r['id']: r for r in records[:25].read(['total_value', 'company_currency_id'])}
                 for row in rows:
                     row['total_value'] = values[row['id']]['total_value']
@@ -404,7 +405,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
         if route == 'forecast':
             # The native Stock report exposes each product's Forecast action.
             # There is no arbitrary-period aggregate forecast calculation here.
-            products.check_field_access_rights('read', ['virtual_available'])
+            check_readable(products, ['virtual_available'])
             context = dict(products.env.context, location=locations.ids, default_is_storable=True)
             if filters and filters.get('warehouse_id'):
                 context['warehouse_id'] = filters['warehouse_id']
@@ -474,7 +475,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise AccessError(_('HR reporting access is required.'))
         employees = self.env['hr.employee']
         employees.check_access('read')
-        employees.check_field_access_rights('read', ['active', 'company_id', 'department_id'])
+        check_readable(employees, ['active', 'company_id', 'department_id'])
         return employees, [('active', '=', True), ('company_id', '=', self.env.company.id)]
 
     @api.model
@@ -502,7 +503,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             if department_id is not False and (type(department_id) is not int or department_id < 1):
                 raise ValidationError(_('Invalid report dimension.'))
             domain += [('department_id', '=', department_id)]
-        action = scoped.env['ir.actions.actions']._for_xml_id('hr.open_view_employee_list')
+        action = scoped.env['ir.actions.actions']._for_xml_id('hr.open_view_employee_list_my')
         action.update(domain=domain, context=dict(scoped.env.context))
         return action
 
@@ -513,7 +514,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             raise AccessError(_('Purchase reporting access is required.'))
         orders = self.env['purchase.order']
         orders.check_access('read')
-        orders.check_field_access_rights('read', ['company_id', 'state', 'is_late'])
+        check_readable(orders, ['company_id', 'state', 'is_late'])
         domain = [('company_id', '=', self.env.company.id)]
         domain += [('state', '=', 'to approve')] if kind == 'approvals' else [('state', '=', 'purchase'), ('is_late', '=', True)]
         return orders, domain
@@ -527,7 +528,7 @@ class ExecutiveDashboardOperations(models.AbstractModel):
             return {'status': 'not_installed', 'rows': [], 'mode': kind}
         orders, domain = scoped._procurement_scope(kind)
         columns = ['name', 'partner_id', 'date_order', 'date_planned', 'amount_untaxed', 'currency_id', 'state']
-        orders.check_field_access_rights('read', columns)
+        check_readable(orders, columns)
         records = orders.search(domain, order='date_planned, id', offset=offset, limit=26)
         rows = records[:25].read(columns)
         for row, order in zip(rows, records[:25]):

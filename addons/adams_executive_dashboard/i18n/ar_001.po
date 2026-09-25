@@ -318,7 +318,7 @@ msgstr "تعذر تحميل هذا القسم. تحقق من المرشحات و
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 #, python-format
-msgid "report mapping awaits verification."
+msgid "Report mapping awaits verification."
 msgstr "ربط التقرير الأصلي بانتظار التحقق."
 
 #. module: adams_executive_dashboard
@@ -1290,14 +1290,14 @@ msgstr "المحاسبة والمالية"
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Commercial performance and fulfillment."
-msgstr "الأداء التجاري وتنفيذ الطلبات."
+msgid "Orders, invoiced sales and delivery — clearly separated."
+msgstr "الطلبات والمبيعات المفوترة والتسليم، كلٌّ منها على حدة."
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Your pipeline at a glance."
-msgstr "لمحة عن فرص المبيعات."
+msgid "Opportunities and pipeline for the selected period."
+msgstr "الفرص ومسار المبيعات للفترة المحددة."
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
@@ -1308,14 +1308,14 @@ msgstr "المخزون والقيمة والتوفر."
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Commitments and supplier follow-up."
-msgstr "الالتزامات ومتابعة الموردين."
+msgid "Purchasing activity and deliveries that need attention."
+msgstr "نشاط الشراء والاستلامات التي تحتاج إلى متابعة."
 
 #. module: adams_executive_dashboard
 #. odoo-javascript
 #: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
-msgid "Workforce and approved leave."
-msgstr "القوى العاملة والإجازات المعتمدة."
+msgid "Attendance, time off, shifts and employee work profiles."
+msgstr "الحضور والإجازات والورديات والملفات الوظيفية للموظفين."
 
 #. module: adams_executive_dashboard
 #: model:ir.model.fields,field_description:adams_executive_dashboard.field_res_company__adams_dashboard_hr
@@ -2034,8 +2034,6 @@ msgstr "تشمل الثلاثون يومًا القادمة أول سبعة أي
 #. module: adams_executive_dashboard
 #. odoo-python
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
-#. odoo-javascript
-#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
 msgid "report warning"
 msgstr "تحذير في تقرير أودو"
 
@@ -2473,7 +2471,10 @@ msgstr "يلزم امتلاك صلاحية تقارير المخزون."
 
 #. module: adams_executive_dashboard
 #. odoo-python
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
 #: code:addons/adams_executive_dashboard/models/dashboard.py:0
+#: code:addons/adams_executive_dashboard/models/hr_workspace.py:0
 msgid "Select a period of up to three years with the start before the end."
 msgstr "اختر فترة لا تتجاوز ثلاث سنوات ويكون تاريخ بدايتها قبل نهايتها."
 
@@ -5786,3 +5787,93 @@ msgstr "عرض الموظفين"
 #: code:addons/adams_executive_dashboard/static/src/hr.xml:0
 msgid "View attendance"
 msgstr "عرض الحضور"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Choose a valid product and unit from the delivery report."
+msgstr "اختر منتجًا ووحدة صالحين من تقرير التسليم."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "The product and unit are unavailable in the selected scope."
+msgstr "المنتج والوحدة غير متاحين ضمن النطاق المحدد."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Posted invoices and credit notes · Untaxed document values"
+msgstr "الفواتير والإشعارات الدائنة المُرحّلة · قيم المستندات دون ضرائب"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/dashboard.py:0
+msgid "Untaxed order values"
+msgstr "قيم الطلبات دون ضرائب"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Choose a supported stock sort order."
+msgstr "اختر ترتيبًا مدعومًا لعرض المخزون."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Select a product for its forecast."
+msgstr "اختر منتجًا لعرض مخزونه المتوقع."
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Stock history — selected period"
+msgstr "سجل حركة المخزون — الفترة المحددة"
+
+#. module: adams_executive_dashboard
+#. odoo-python
+#: code:addons/adams_executive_dashboard/models/operations.py:0
+msgid "Replenishment — current rules"
+msgstr "إعادة التزويد — القواعد الحالية"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "The chart needs Revenue, Gross profit and Net profit."
+msgstr "يتطلب الرسم الإيرادات ومجمل الربح وصافي الربح."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Not available: this company has no approved financial report mapping for this section, or the financial reports addon is not installed."
+msgstr "غير متاح: لا يوجد لهذه الشركة ربط معتمد بالتقرير المالي لهذا القسم، أو أن إضافة التقارير المالية غير مثبتة."
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.xml:0
+msgid "Report warning"
+msgstr "تحذير في تقرير أودو"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Employees is not installed"
+msgstr "تطبيق الموظفين غير مثبت"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Attendances is not installed"
+msgstr "تطبيق الحضور غير مثبت"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Time Off is not installed"
+msgstr "تطبيق الإجازات غير مثبت"
+
+#. module: adams_executive_dashboard
+#. odoo-javascript
+#: code:addons/adams_executive_dashboard/static/src/dashboard.js:0
+msgid "Planning is not installed"
+msgstr "تطبيق التخطيط غير مثبت"

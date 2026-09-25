@@ -3,6 +3,7 @@ import logging
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
+from .access import check_readable
 
 _logger = logging.getLogger(__name__)
 
@@ -20,14 +21,14 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
                        'amount_untaxed', 'currency_id', 'state']
             if 'receipt_status' in source._fields:
                 columns.append('receipt_status')
-            source.check_field_access_rights('read', ['company_id', *columns])
+            check_readable(source, ['company_id', *columns])
             domain = [('company_id', '=', self.env.company.id), ('state', '=', 'purchase'),
                       *self._date_bounds(source, 'date_order', dates)]
             return source, domain, columns, 'date_order desc, id desc', 'purchase.purchase_form_action'
         source, domain, aggregate, action_id = self._native_scope('crm', dates)
         columns = ['name', 'partner_id', 'user_id', 'stage_id', 'expected_revenue',
                    'prorated_revenue', 'probability', 'date_deadline', 'create_date']
-        source.check_field_access_rights('read', columns)
+        check_readable(source, columns)
         return source, domain, columns, 'expected_revenue desc, id desc', action_id
 
     def _workspace_record_rows(self, source, records, columns):
@@ -62,7 +63,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
     def _workspace_amount(self, key, dates, measure=None):
         source, domain, aggregate, action_id = self._native_scope(key, dates)
         aggregate = measure or aggregate
-        source.check_field_access_rights('read', [aggregate.split(':')[0]])
+        check_readable(source, [aggregate.split(':')[0]])
         value, count = source._read_group(domain, [], [aggregate, '__count'])[0]
         return {'status': 'ready' if count else 'empty', 'value': value if count else None,
                 'provenance': self._provenance(key, domain, aggregate)}
@@ -70,7 +71,7 @@ class ExecutiveDashboardWorkspaceDetails(models.AbstractModel):
     def _workspace_attention(self, kind):
         source, domain = self._procurement_scope(kind)
         columns = ['name', 'partner_id', 'date_order', 'date_planned', 'amount_untaxed', 'currency_id', 'state']
-        source.check_field_access_rights('read', columns)
+        check_readable(source, columns)
         records = source.search(domain, order='date_planned, id', limit=5)
         return {'status': 'ready' if records else 'empty', 'total': source.search_count(domain),
                 'rows': self._workspace_record_rows(source, records, columns), 'date_basis': 'current',
