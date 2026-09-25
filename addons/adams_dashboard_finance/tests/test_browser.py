@@ -436,9 +436,13 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                     const windows = liquidity.querySelectorAll('.adams_supplier_windows .adams_card');
                     if (windows.length !== 4) throw new Error('Four approved supplier windows must render');
                     const paymentValue = new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(129.45);
-                    if (windows[2].querySelector('.adams_value').textContent.trim() !== paymentValue ||
-                        windows[3].querySelector('.adams_value').textContent.trim() !== paymentValue)
-                        throw new Error('Native supplier window must show 129.45 excluding day 31');
+                    const paymentHeadline = new Intl.NumberFormat(document.documentElement.lang || 'en', {maximumFractionDigits: 0}).format(129);
+                    for (const windowCard of [windows[2], windows[3]]) {
+                        const value = windowCard.querySelector('.adams_value');
+                        if (value?.textContent.trim() !== paymentHeadline ||
+                            value.querySelector('bdi')?.title !== paymentValue)
+                            throw new Error('Native supplier window must retain its exact 129.45 while displaying whole units, excluding day 31');
+                    }
                     for (const date of root.querySelectorAll('.adams_card_date')) {
                         if (getComputedStyle(date).direction !== 'ltr') throw new Error('ISO date ranges must preserve order in RTL');
                     }

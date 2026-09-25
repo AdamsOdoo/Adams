@@ -504,7 +504,7 @@ class TestDashboardVisualReference(AccountTestInvoicingHttpCommon):
                 capture(browser,'odoo-hr-overview-snapshot','.adams_hr_snapshot_grid')
                 capture(browser,'odoo-hr-overview-previews','.adams_hr_upcoming_heading','.adams_hr_upcoming_heading + .adams_hr_grid')
                 for index,tab in [(1,'attendance'),(2,'time-off'),(3,'shifts'),(4,'employees')]:
-                    hr_action("document.querySelectorAll('.adams_hr_tabs button')["+str(index)+"].click()", "!document.querySelector('#adams-hr .adams_message[role=status]') && !!document.querySelector('.adams_hr_filters')")
+                    hr_action("document.querySelectorAll('.adams_hr_tabs button')["+str(index)+"].click()", "document.querySelectorAll('.adams_hr_tabs button')["+str(index)+"]?.classList.contains('active') && !document.querySelector('#adams-hr .adams_message[role=status]') && document.querySelectorAll('.adams_hr_filters select').length===2" + (" && document.querySelectorAll('.adams_hr_day').length===7" if tab=='shifts' else ""))
                     if tab=='shifts':
                         hr_action("const status=document.querySelectorAll('.adams_hr_filters select')[1];status.value='all';status.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('.adams_hr_filters').requestSubmit()", "document.querySelectorAll('.adams_hr_day').length===7")
                         capture(browser,'odoo-hr-shifts-week','.adams_hr_tabs + .adams_group_heading','.adams_hr_tabs + .adams_group_heading + .adams_panel')
