@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.PeopleSection">
+        <t t-set="kpiList" t-value="kpis"/>
+        <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
+            <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num" t-esc="kpi.value"/>
+                <span class="ed-kpi-cap"><bdi t-esc="kpi.cap"/></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <section t-if="w.attendance" t-att-class="'ed-panel ' + (w.leave ? 'ed-span-7' : 'ed-span-12')">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Attendance today</h2>
+                        <p>First check-in and last check-out</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('attendance', {})">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.attendance.rows.length" class="ed-note">Nobody has checked in today.</p>
+                <div t-else="" class="ed-tbl-wrap">
+                    <table>
+                        <thead><tr>
+                            <th>Employee</th><th class="n">Check in</th><th class="n">Check out</th>
+                            <th class="n">Worked</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-foreach="w.attendance.rows" t-as="r" t-key="r.employee_id" class="click" tabindex="0"
+                                t-on-click="() => this.openEmployee(r.employee_id)"
+                                t-on-keydown="(ev) => ev.key === 'Enter' and this.openEmployee(r.employee_id)">
+                                <td t-att-data-label="labels.employee">
+                                    <t t-set="av" t-value="avatar(r.name)"/>
+                                    <span class="ed-who"><span class="ed-avatar" t-att-style="'background:' + av.color" t-esc="av.initials"/>
+                                        <span><t t-esc="r.name"/><small t-esc="r.department"/></span></span>
+                                </td>
+                                <td t-att-data-label="labels.checkIn" class="n ed-num" t-esc="r.in or '—'"/>
+                                <td t-att-data-label="labels.checkOut" class="n ed-num" t-esc="r.out or '—'"/>
+                                <td t-att-data-label="labels.worked" class="n ed-num" t-esc="hours(r.hours)"/>
+                                <td t-att-data-label="labels.status">
+                                    <t t-set="chip" t-value="stateChip(r.state)"/>
+                                    <span t-att-class="'ed-chip ' + chip.cls" t-esc="chip.label"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section t-if="w.leave" t-att-class="'ed-panel ' + (w.attendance ? 'ed-span-5' : 'ed-span-12')">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Time off</h2>
+                        <p>Today and the next 7 days</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('leave', {})">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <t t-foreach="['today', 'next']" t-as="group" t-key="group">
+                    <div class="ed-group-label">
+                        <span t-if="group === 'today'">Today</span><span t-else="">Next 7 days</span>
+                        <span class="ed-num" t-esc="w.leave[group].count"/>
+                    </div>
+                    <p t-if="!w.leave[group].rows.length" class="ed-note">No approved time off.</p>
+                    <div class="ed-rows">
+                        <button t-foreach="w.leave[group].rows" t-as="l" t-key="l.id" type="button"
+                                class="ed-row click w-100 border-0 bg-transparent text-start"
+                                t-on-click="() => this.openEmployee(l.employee_id)">
+                            <t t-set="av" t-value="avatar(l.name)"/>
+                            <span class="ed-l"><span class="ed-avatar" t-att-style="'background:' + av.color" t-esc="av.initials"/>
+                                <span><t t-esc="l.name"/><small><t t-esc="l.type"/><t t-if="l.type and l.dates"> · </t><bdi t-esc="l.dates"/></small></span></span>
+                        </button>
+                    </div>
+                </t>
+            </section>
+
+            <section t-if="w.shifts" class="ed-panel ed-span-6">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Shifts today</h2>
+                        <p>Planned shifts by time slot</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('shifts', {})">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.shifts.rows.length" class="ed-note">No published shifts today.</p>
+                <t t-else="">
+                    <div class="ed-tiles" t-att-style="'--tn:' + w.shifts.slots.length">
+                        <button t-foreach="w.shifts.slots" t-as="slot" t-key="slot.time" type="button" class="ed-tile sec"
+                                t-on-click="() => this.open('shifts', {})">
+                            <b class="ed-num" t-esc="whole(slot.count)"/>
+                            <span class="ed-num"><bdi dir="ltr" t-esc="slot.time"/></span>
+                        </button>
+                    </div>
+                    <div class="ed-rows">
+                        <button t-foreach="w.shifts.rows" t-as="s" t-key="s.id" type="button"
+                                class="ed-row click w-100 border-0 bg-transparent text-start"
+                                t-att-disabled="!s.employee_id" t-on-click="() => this.openEmployee(s.employee_id)">
+                            <t t-set="av" t-value="avatar(s.name)"/>
+                            <span class="ed-l"><span class="ed-avatar" t-att-style="'background:' + av.color" t-esc="av.initials"/>
+                                <span><t t-esc="s.name"/><small t-esc="s.role"/></span></span>
+                            <span class="ed-r ed-num"><bdi dir="ltr" t-esc="s.time"/></span>
+                        </button>
+                    </div>
+                </t>
+            </section>
+
+            <section t-att-class="'ed-panel ' + departmentSpan">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Headcount by department</h2>
+                        <p>Select a department to see its employees</p>
+                    </div>
+                </header>
+                <p t-if="!w.departments.length" class="ed-note">No active employees.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.departments" t-as="d" t-key="d.id or 0" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openDepartment(d)">
+                        <span class="ed-l"><span t-esc="d.name"/></span>
+                        <span class="ed-r ed-num" t-esc="whole(d.count)"/>
+                    </button>
+                </div>
+            </section>
+
+            <section class="ed-panel ed-span-12">
+                <EmployeeDirectory directory="w.directory" openPanel="props.openPanel"/>
+            </section>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.EmployeeDirectory">
+        <t t-set="data" t-value="state.data"/>
+        <header class="ed-panel-head">
+            <div>
+                <h2>Employees directory</h2>
+            </div>
+            <button type="button" class="ed-link" t-on-click="openInOdoo">
+                Open in Odoo <Icon name="'arrow'" flip="true"/>
+            </button>
+        </header>
+        <div class="ed-filters">
+            <select class="ed-field" aria-label="Department" t-on-change="onDepartment">
+                <option value="">All departments</option>
+                <option t-foreach="props.directory.options" t-as="dep" t-key="dep.id" t-att-value="dep.id"
+                        t-att-selected="('' + dep.id) === state.department_id" t-esc="dep.name"/>
+            </select>
+            <input class="ed-field ed-grow" type="search" autocomplete="off" placeholder="Search employee name"
+                   t-att-value="state.query" t-on-input="onQuery"/>
+        </div>
+        <p t-if="!data.rows.length" class="ed-note">No matches.</p>
+        <div t-else="" class="ed-tbl-wrap" t-att-aria-busy="state.loading ? 'true' : 'false'"
+             t-att-style="state.loading ? 'opacity:.6' : ''">
+            <table>
+                <thead><tr>
+                    <th>Employee</th><th>Department</th>
+                    <th t-if="data.attendance" class="n">Check in</th><th>Status</th>
+                </tr></thead>
+                <tbody>
+                    <tr t-foreach="data.rows" t-as="r" t-key="r.employee_id" class="click" tabindex="0"
+                        t-on-click="() => this.open(r)" t-on-keydown="(ev) => ev.key === 'Enter' and this.open(r)">
+                        <td t-att-data-label="labels.employee">
+                            <t t-set="av" t-value="avatar(r.name)"/>
+                            <span class="ed-who"><span class="ed-avatar" t-att-style="'background:' + av.color" t-esc="av.initials"/>
+                                <span><t t-esc="r.name"/><small t-esc="r.job"/></span></span>
+                        </td>
+                        <td t-att-data-label="labels.department" t-esc="r.department or '—'"/>
+                        <td t-if="data.attendance" t-att-data-label="labels.checkIn" class="n ed-num" t-esc="r.in or '—'"/>
+                        <td t-att-data-label="labels.status">
+                            <t t-set="chip" t-value="stateChip(r.state)"/>
+                            <span t-att-class="'ed-chip ' + chip.cls" t-esc="chip.label"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="ed-pager">
+            <t t-set="rng" t-value="range"/>
+            <span class="ed-num"><t t-esc="rng.from"/>–<t t-esc="rng.to"/> / <t t-esc="rng.count"/></span>
+            <div>
+                <button type="button" class="ed-btn" t-att-disabled="state.loading or data.page === 0"
+                        t-on-click="() => this.load(data.page - 1)">Previous</button>
+                <button type="button" class="ed-btn" t-att-disabled="state.loading or data.page >= lastPage"
+                        t-on-click="() => this.load(data.page + 1)">Next</button>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.AttendanceDrawer">
+        <t t-if="props.data">
+            <p t-if="!props.data.rows.length" class="ed-note">Nobody has checked in today.</p>
+            <div t-else="" class="ed-tbl-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Employee</th><th class="n">Check in</th><th class="n">Check out</th>
+                        <th class="n">Worked</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr t-foreach="props.data.rows" t-as="r" t-key="r.employee_id" class="click" tabindex="0"
+                            t-on-click="() => this.openRow(r)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openRow(r)">
+                            <td t-att-data-label="labels.employee">
+                                <span><t t-esc="r.name"/><small t-esc="r.department"/></span>
+                            </td>
+                            <td t-att-data-label="labels.checkIn" class="n ed-num" t-esc="r.in or '—'"/>
+                            <td t-att-data-label="labels.checkOut" class="n ed-num" t-esc="r.out or '—'"/>
+                            <td t-att-data-label="labels.worked" class="n ed-num" t-esc="hours(r.hours)"/>
+                            <td t-att-data-label="labels.status">
+                                <t t-set="chip" t-value="stateChip(r.state)"/>
+                                <span t-att-class="'ed-chip ' + chip.cls" t-esc="chip.label"/>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p t-if="more" class="ed-note" t-esc="more"/>
+        </t>
+    </t>
+
+    <t t-name="executive_dashboard.EmployeeDrawer">
+        <t t-if="props.data">
+            <t t-set="chip" t-value="stateChip(props.data.state)"/>
+            <p><span t-att-class="'ed-chip ' + chip.cls" t-esc="chip.label"/></p>
+            <dl class="ed-kv">
+                <t t-foreach="props.data.rows" t-as="row" t-key="row_index">
+                    <dt t-esc="row.label"/>
+                    <dd class="ed-num"><bdi t-esc="row.value"/></dd>
+                </t>
+            </dl>
+        </t>
+    </t>
+</templates>
