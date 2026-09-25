@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, onWillUnmount, onWillUpdateProps, useEffect, useRef, useState } from "@odoo/owl";
+import { Component, onWillStart, onWillUnmount, onWillUpdateProps, useEffect, useRef, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
@@ -39,6 +39,8 @@ export class SidePanel extends Component {
         this.closeBtn = useRef("closeBtn");
         this.seq = 0;
         this.state = useState({ data: null, loading: false, query: "", results: null, searching: false });
+        // A panel restored from the breadcrumb (coming back from a native screen) loads at once.
+        onWillStart(() => this.props.panel && this.reset(this.props.panel));
         onWillUpdateProps((next) => {
             if (next.panel !== this.props.panel) {
                 this.reset(next.panel);
@@ -140,7 +142,7 @@ export class SidePanel extends Component {
     async openTarget(target) {
         if (target) {
             const action = await this.orm.call(MODEL, "open_action", [target.key, target.args || {}]);
-            this.props.close();
+            // The panel stays open: the breadcrumb brings the user back to it.
             await this.action.doAction(action);
         }
     }

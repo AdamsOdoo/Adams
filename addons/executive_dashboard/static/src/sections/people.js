@@ -49,9 +49,18 @@ export class EmployeeDirectory extends Component {
         this.stateChip = stateChip;
         this.seq = 0;
         const { filters } = this.props.directory;
-        this.state = useState({ data: this.props.directory, loading: false, query: filters.query,
-                                // Select values are strings.
-                                department_id: filters.department_id ? `${filters.department_id}` : "" });
+        // Filters and page kept when the user left for a native screen and came back.
+        const kept = this.env.edRecall?.("directory");
+        this.state = useState(kept ? { ...kept, loading: false } : {
+            data: this.props.directory, loading: false, query: filters.query,
+            // Select values are strings.
+            department_id: filters.department_id ? `${filters.department_id}` : "" });
+        this.env.edRemember?.("directory", () => ({ ...this.state }));
+        if (kept && !kept.data) {
+            // Back from the browser's Back button: filters only, so load the first page with them.
+            this.state.data = this.props.directory;
+            this.load(0);
+        }
         this.labels = { employee: _t("Employee"), department: _t("Department"), checkIn: _t("Check in"),
                         status: _t("Status") };
         onWillUpdateProps((next) => {

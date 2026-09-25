@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
+    <t t-name="executive_dashboard.PanelRow">
+        <button t-if="row.open or row.action" type="button" class="ed-row click w-100 border-0 bg-transparent text-start"
+                t-att-title="row.action ? openLabel(row.action.kind) : null" t-on-click="() => this.openRow(row)">
+            <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
+            <span class="ed-r ed-num"><t t-esc="row.value"/><Icon t-if="row.action" name="'arrow'" flip="true"/></span>
+        </button>
+        <div t-else="" class="ed-row">
+            <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
+            <span class="ed-r ed-num" t-esc="row.value"/>
+        </div>
+    </t>
+
     <t t-name="executive_dashboard.SidePanel">
         <div t-att-class="{ 'ed-scrim': true, on: isOpen }" t-on-click="props.close"/>
         <aside t-ref="drawer" t-att-class="{ 'ed-drawer': true, on: isOpen }" role="dialog" aria-modal="true"
@@ -66,17 +78,18 @@
                         <t t-component="customBody" data="state.data" open="props.open" panel="props.panel"/>
                     </t>
                     <t t-elif="state.data">
+                        <t t-foreach="state.data.groups or []" t-as="group" t-key="group_index">
+                            <h3 class="ed-group-title" t-esc="group.title"/>
+                            <div class="ed-rows">
+                                <t t-foreach="group.rows" t-as="row" t-key="row_index">
+                                    <t t-call="executive_dashboard.PanelRow"/>
+                                </t>
+                            </div>
+                        </t>
+                        <h3 t-if="state.data.rows_title and state.data.rows?.length" class="ed-group-title" t-esc="state.data.rows_title"/>
                         <div class="ed-rows">
                             <t t-foreach="state.data.rows or []" t-as="row" t-key="row_index">
-                                <button t-if="row.open or row.action" type="button" class="ed-row click w-100 border-0 bg-transparent text-start"
-                                        t-att-title="row.action ? openLabel(row.action.kind) : null" t-on-click="() => this.openRow(row)">
-                                    <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
-                                    <span class="ed-r ed-num"><t t-esc="row.value"/><Icon t-if="row.action" name="'arrow'" flip="true"/></span>
-                                </button>
-                                <div t-else="" class="ed-row">
-                                    <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
-                                    <span class="ed-r ed-num" t-esc="row.value"/>
-                                </div>
+                                <t t-call="executive_dashboard.PanelRow"/>
                             </t>
                         </div>
                         <div t-if="state.data.total" class="ed-total-row">

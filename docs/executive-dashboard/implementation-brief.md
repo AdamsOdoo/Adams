@@ -19,7 +19,7 @@ handover; nothing else from earlier sessions is needed.
 - Stock report: warehouse (all/one), category, search by name or internal reference, one checkbox "Hide zero and negative stock" (on by default).
 - People = attendance (check-in/out today), time off, headcount by department, directory, shifts (Planning).
 - Direction follows the user's language through Odoo (`localization.direction`); no manual switch. Dark mode follows Odoo's user setting.
-- The old modules `adams_executive_dashboard` and `adams_dashboard_finance` stay untouched until the final phase (data move + uninstall on a staging copy).
+- The old modules `adams_executive_dashboard` and `adams_dashboard_finance` (and their test module) were removed from the repository on 2026-09-25 for UAT. They were never deployed to production, so no data move is needed; a staging database that still has them installed uninstalls them from Apps first.
 
 ### Owner decisions (2026-09-25, after Phase 5)
 
@@ -28,6 +28,13 @@ handover; nothing else from earlier sessions is needed.
 - **Sales, recent orders**: a row opens a side panel with the order's details (customer, order date, salesperson, untaxed and total amounts, Delivery Status and Invoice Status as stored, lines with quantity ordered, delivered and invoiced). "Deliveries" lists the order's delivery orders (each opens in Inventory); the record button opens the sales order.
 - **Sales, recent quotations**: a separate full-width box under Recent orders (no tabs): latest quotations (draft or sent) with reference, customer, date, validity date, amount and status; a row opens the same panel; the record button opens the quotation.
 - **Button wording**: "Open record" (one record), "Open list" (filtered list), "Open report" (report); Arabic فتح السجل / فتح القائمة / فتح التقرير. The destination line under the button stays.
+
+### Owner decisions (2026-09-25, Finance usability, before UAT)
+
+- An account (Bank & Cash, or a receivable/payable account under "By account" in the Receivables/Payables panel) opens the native **Trial Balance** filtered on that account, fiscal year to date; without it the General Ledger unfolded on the account; journal items only without the Enterprise reports. A partner opens the **Partner Ledger** for that partner; a bucket opens the Aged report.
+- Receivables and Payables each have two boxes, **Aged** and **Expected**, side by side (no tabs): total, overdue chip, one bar row per bucket with amount and share.
+- Leaving for a native screen and coming back (breadcrumb, phone back arrow or browser Back) returns to the same section, period, dates, open side panel, scroll position and table filters.
+- The period's dates are always shown next to the period selector, read-only; they become editable only when Custom is chosen (no layout shift).
 
 ## Data sources (verify each field with `.odoo-harness/oh src` before use)
 
@@ -104,7 +111,7 @@ prefetch a section on menu hover without rendering it; charts are inline SVG.
 | 3 | Sales and CRM | Delivery Status shows the native value; drawers open delivery orders and opportunities |
 | 4 | Procurement and Inventory (stock report with filters and paging) | Stock report paging and filters run server-side; zero/negative filter works |
 | 5 | People (attendance, time off, shifts, departments, directory) | Attendance matches `hr.attendance` for today; Planning hidden when absent |
-| 6 | Search, Needs attention, Definitions, performance tests, Arabic review, phone check; data move from old modules and uninstall steps written for a staging copy; final reviewer pass | Section payload < 300 ms and drawer < 200 ms on demo data; owner checklist for the Odoo.sh build written |
+| 6 | Search, Needs attention, Definitions, performance tests, Arabic review, phone check; final reviewer pass (old modules already removed) | Section payload < 300 ms and drawer < 200 ms on demo data; owner checklist for the Odoo.sh build written |
 
 At the end of each phase: update `.odoo-harness/HANDOFF.md` (under 40 lines) with the
 next phase's exact first step, append the build-log line, commit, push.

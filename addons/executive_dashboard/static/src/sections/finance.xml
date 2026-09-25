@@ -53,41 +53,34 @@
                 </div>
             </section>
 
-            <t t-foreach="openItemsPanels()" t-as="p" t-key="p.kind">
+            <t t-foreach="openItemsPanels()" t-as="p" t-key="p.id">
                 <section class="ed-panel ed-span-6">
                     <header class="ed-panel-head">
                         <div>
                             <h2 t-esc="p.title"/>
                             <p t-esc="p.sub"/>
                         </div>
-                        <div class="ed-tabs" role="tablist">
-                            <button type="button" role="tab" t-att-aria-selected="p.view === 'aged' ? 'true' : 'false'"
-                                    t-on-click="() => this.setView(p.kind, 'aged')">Aged</button>
-                            <button type="button" role="tab" t-att-aria-selected="p.view === 'expected' ? 'true' : 'false'"
-                                    t-on-click="() => this.setView(p.kind, 'expected')">Expected</button>
-                        </div>
+                        <button type="button" class="ed-link" t-on-click="() => this.openItems(p.kind, p.view)">
+                            Details <Icon name="'arrow'" flip="true"/>
+                        </button>
                     </header>
-                    <div class="ed-big ed-num"><t t-esc="compact(p.total)"/> <small t-esc="currency"/></div>
-                    <t t-if="p.view === 'aged'">
-                        <div class="ed-stack" role="img">
-                            <t t-foreach="p.aged" t-as="b" t-key="b.key">
-                                <button t-if="b.flex > 0" type="button"
-                                        t-att-style="'flex:' + b.flex + ';background:' + b.color"
-                                        t-att-title="b.label + ': ' + compact(b.value)" t-att-aria-label="b.label + ': ' + compact(b.value)"
-                                        t-on-click="() => this.openItems(p.kind, 'aged', b.key)"/>
-                            </t>
-                        </div>
-                        <div class="ed-age-legend" t-att-style="'--n:' + p.aged.length">
-                            <button t-foreach="p.aged" t-as="b" t-key="b.key" type="button" t-on-click="() => this.openItems(p.kind, 'aged', b.key)">
-                                <span><i t-att-style="'background:' + b.color"/><t t-esc="b.label"/></span>
-                                <b class="ed-num" t-esc="compact(b.value)"/>
-                            </button>
-                        </div>
-                    </t>
-                    <t t-else="">
-                        <ColumnChart items="p.columns" onSelect="(i) => this.openItems(p.kind, 'expected', p.columns[i].key)"/>
-                        <p class="ed-note" t-esc="p.note"/>
-                    </t>
+                    <div class="ed-bucket-head">
+                        <div class="ed-big ed-num"><t t-esc="compact(p.total)"/> <small t-esc="currency"/></div>
+                        <span t-if="p.overdue > 0" class="ed-chip crit">
+                            Overdue <b class="ed-num" t-esc="compact(p.overdue)"/><t t-if="p.overduePct !== null"> · <t t-esc="p.overduePct"/>%</t>
+                        </span>
+                        <span t-else="" class="ed-chip good">Nothing overdue</span>
+                    </div>
+                    <div class="ed-buckets" role="list">
+                        <button t-foreach="p.rows" t-as="b" t-key="b.key" type="button" role="listitem" class="ed-bucket"
+                                t-att-title="b.label + ': ' + whole(b.value) + ' ' + currency"
+                                t-on-click="() => this.openItems(p.kind, p.view, b.key)">
+                            <span class="ed-bucket-label" t-esc="b.label"/>
+                            <span class="ed-bucket-track"><i t-att-style="'width:' + b.width + '%;background:' + b.color"/></span>
+                            <b class="ed-num" t-esc="compact(b.value)"/>
+                            <small class="ed-num"><t t-if="b.share !== null"><t t-esc="b.share"/>%</t></small>
+                        </button>
+                    </div>
                 </section>
             </t>
         </div>

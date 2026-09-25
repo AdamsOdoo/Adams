@@ -13,8 +13,7 @@
     "ar_001"
   ],
   "addons_paths": [
-    "addons",
-    "test_addons"
+    "addons"
   ],
   "enterprise_path": null,
   "enterprise_repo": null,

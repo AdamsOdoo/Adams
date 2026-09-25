@@ -60,12 +60,15 @@
                                     t-on-click="() => this.setPeriod(p.key)" t-esc="p.label"/>
                         </t>
                     </div>
-                    <span t-if="showPeriod and state.period === 'custom'" class="ed-custom">
-                        <input type="date" class="ed-field" aria-label="From" t-att-value="state.customFrom"
-                               t-att-max="state.customTo" t-on-change="(ev) => this.onCustomDate('customFrom', ev)"/>
+                    <span t-if="showPeriod" t-att-class="{ 'ed-custom': true, 'ed-custom-on': isCustom }"
+                          t-att-title="isCustom ? null : customHint">
+                        <input type="date" class="ed-field" aria-label="From" t-att-value="dateFrom"
+                               t-att-readonly="!isCustom" t-att-tabindex="isCustom ? null : -1"
+                               t-att-max="isCustom ? state.customTo : null" t-on-change="(ev) => this.onCustomDate('customFrom', ev)"/>
                         <span>–</span>
-                        <input type="date" class="ed-field" aria-label="To" t-att-value="state.customTo"
-                               t-att-min="state.customFrom" t-on-change="(ev) => this.onCustomDate('customTo', ev)"/>
+                        <input type="date" class="ed-field" aria-label="To" t-att-value="dateTo"
+                               t-att-readonly="!isCustom" t-att-tabindex="isCustom ? null : -1"
+                               t-att-min="isCustom ? state.customFrom : null" t-on-change="(ev) => this.onCustomDate('customTo', ev)"/>
                     </span>
                     <button type="button" class="ed-icon-btn ed-tb-compact" title="Search" aria-label="Search"
                             t-on-click="() => this.openPanel({ kind: 'search' })">

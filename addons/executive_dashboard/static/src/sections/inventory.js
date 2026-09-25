@@ -25,10 +25,19 @@ export class StockReport extends Component {
         this.whole = whole;
         this.seq = 0;
         const { filters } = this.props.stock;
-        this.state = useState({ data: this.props.stock, loading: false, ...filters,
-                                // Select values are strings.
-                                warehouse_id: filters.warehouse_id ? `${filters.warehouse_id}` : "",
-                                category_id: filters.category_id ? `${filters.category_id}` : "" });
+        // Filters and page kept when the user left for a native screen and came back.
+        const kept = this.env.edRecall?.("stock");
+        this.state = useState(kept ? { ...kept, loading: false } : {
+            data: this.props.stock, loading: false, ...filters,
+            // Select values are strings.
+            warehouse_id: filters.warehouse_id ? `${filters.warehouse_id}` : "",
+            category_id: filters.category_id ? `${filters.category_id}` : "" });
+        this.env.edRemember?.("stock", () => ({ ...this.state }));
+        if (kept && !kept.data) {
+            // Back from the browser's Back button: filters only, so load the first page with them.
+            this.state.data = this.props.stock;
+            this.load(0);
+        }
         this.labels = {
             ref: _t("Reference"), product: _t("Product"), warehouse: _t("Warehouse"), onHand: _t("On hand"),
             reserved: _t("Reserved"), available: _t("Available"), unit: _t("Unit"), value: _t("Value"),

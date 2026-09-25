@@ -1,26 +1,25 @@
 /** @odoo-module **/
-import { Component, useState } from "@odoo/owl";
+import { Component } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { deserializeDate } from "@web/core/l10n/dates";
 import { sectionRegistry } from "../section";
 import { Icon } from "../icons";
-import { ColumnChart, LineChart } from "../widgets/charts";
+import { LineChart } from "../widgets/charts";
 import { compact, percent, whole } from "../widgets/format";
 
 const AGE_RAMP = ["--a1", "--a2", "--a3", "--a4", "--a5"];
 
 /**
  * Finance: six figures, revenue & net profit by month, Bank & Cash, and
- * Receivables / Payables with Aged and Expected views. Every figure opens its
+ * Receivables and Payables, each in an Aged and an Expected box. Every figure opens its
  * detail in the side panel; the panel's button (Open record / Open list / Open report) opens the native screen.
  */
 export class FinanceSection extends Component {
     static template = "executive_dashboard.FinanceSection";
-    static components = { Icon, LineChart, ColumnChart };
+    static components = { Icon, LineChart };
     static props = { data: Object, openPanel: Function };
 
     setup() {
-        this.state = useState({ receivables: "aged", payables: "aged" });
         this.compact = compact;
         this.whole = whole;
     }
@@ -84,31 +83,41 @@ export class FinanceSection extends Component {
             : _t("Bank and cash accounts · as of today");
     }
 
+    /**
+     * Four boxes: Receivables and Payables, each Aged (by days overdue) and Expected
+     * (by due date). Each bucket is one bar row: label, bar scaled to the largest
+     * bucket, amount and share of the total. A row opens its detail.
+     */
     openItemsPanels() {
-        return ["receivables", "payables"].map((kind) => {
+        const panels = [];
+        for (const kind of ["receivables", "payables"]) {
             const widget = this.w[kind];
-            const view = this.state[kind];
+            const name = kind === "receivables" ? _t("Receivables") : _t("Payables");
             const aged = widget.aged;
-            return {
-                kind,
-                view,
-                title: kind === "receivables" ? _t("Receivables") : _t("Payables"),
-                sub: `${kind === "receivables" ? _t("Open customer invoices") : _t("Open vendor bills")} · ${_t("as of today")}`,
-                note: kind === "receivables"
-                    ? _t("Amounts customers are due to pay, by invoice due date.")
-                    : _t("Amounts due to suppliers, by bill due date."),
-                total: view === "aged" ? widget.total : widget.expected.reduce((s, b) => s + b.value, 0),
-                aged: aged.map((b, i) => ({
-                    ...b,
-                    color: `var(${AGE_RAMP[aged.length > 1 ? Math.round((i * 4) / (aged.length - 1)) : 0]})`,
-                    flex: Math.max(0, b.value),
-                })),
-                columns: widget.expected.map((b) => ({
-                    label: b.label, value: b.value, key: b.key,
-                    color: b.key === "overdue" ? "var(--crit)" : null,
-                })),
-            };
-        });
+            panels.push(this.bucketPanel(kind, "aged", `${name} · ${_t("Aged")}`,
+                _t("By days overdue · as of today"), widget.total, widget.overdue,
+                aged.map((b, i) => ({
+                    ...b, color: `var(${AGE_RAMP[aged.length > 1 ? Math.round((i * 4) / (aged.length - 1)) : 0]})`,
+                }))));
+            panels.push(this.bucketPanel(kind, "expected", `${name} · ${_t("Expected")}`,
+                kind === "receivables" ? _t("Customer payments by due date") : _t("Supplier payments by due date"),
+                widget.expected.reduce((sum, b) => sum + b.value, 0), widget.overdue,
+                widget.expected.map((b) => ({ ...b, color: b.key === "overdue" ? "var(--crit)" : "var(--sec)" }))));
+        }
+        return panels;
+    }
+
+    bucketPanel(kind, view, title, sub, total, overdue, buckets) {
+        const max = Math.max(0, ...buckets.map((b) => b.value));
+        return {
+            id: `${kind}-${view}`, kind, view, title, sub, total, overdue,
+            overduePct: percent(overdue, total),
+            rows: buckets.map((b) => ({
+                ...b,
+                width: max > 0 ? Math.max(0, (b.value / max) * 100) : 0,
+                share: percent(b.value, total),
+            })),
+        };
     }
 
     // ------------------------------------------------------------ side panel
@@ -125,9 +134,6 @@ export class FinanceSection extends Component {
         this.open("account", { account_id: row.id }, _t("Bank & Cash"));
     }
 
-    setView(kind, view) {
-        this.state[kind] = view;
-    }
 }
 
 sectionRegistry.add("finance", FinanceSection);

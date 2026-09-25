@@ -197,7 +197,7 @@ msgstr "مدير"
 
 #. module: executive_dashboard
 #. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Aged"
 msgstr "حسب العمر"
 
@@ -230,18 +230,6 @@ msgstr "كل الأقسام"
 #: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "All warehouses"
 msgstr "كل المستودعات"
-
-#. module: executive_dashboard
-#. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.js:0
-msgid "Amounts customers are due to pay, by invoice due date."
-msgstr "المبالغ المستحقة على العملاء، حسب تاريخ استحقاق الفاتورة."
-
-#. module: executive_dashboard
-#. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.js:0
-msgid "Amounts due to suppliers, by bill due date."
-msgstr "المبالغ المستحقة للموردين، حسب تاريخ استحقاق الفاتورة."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -337,12 +325,30 @@ msgid "Bank and cash items"
 msgstr "قيود البنوك والنقدية"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "By account"
+msgstr "حسب الحساب"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "By days overdue · as of today"
+msgstr "حسب أيام التأخير · حتى اليوم"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
 msgid "By expected closing date"
 msgstr "حسب تاريخ الإغلاق المتوقع"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "By partner"
+msgstr "حسب الشريك"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -399,6 +405,12 @@ msgstr "سجّلوا الحضور اليوم"
 #: code:addons/executive_dashboard/static/src/sections/people.js:0
 msgid "Checked out"
 msgstr "انصرف"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/dashboard.js:0
+msgid "Choose Custom to change the dates"
+msgstr "اختر \"مخصص\" لتغيير التواريخ"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -501,6 +513,12 @@ msgstr "فواتير العملاء"
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Customer payments"
 msgstr "مدفوعات العملاء"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Customer payments by due date"
+msgstr "دفعات العملاء حسب تاريخ الاستحقاق"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -617,6 +635,12 @@ msgid "Department"
 msgstr "القسم"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+msgid "Details"
+msgstr "التفاصيل"
+
+#. module: executive_dashboard
 #: model:ir.model.fields,field_description:executive_dashboard.field_executive_dashboard__display_name
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_company__display_name
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__display_name
@@ -683,7 +707,7 @@ msgstr "لوحة المعلومات التنفيذية"
 
 #. module: executive_dashboard
 #. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Expected"
 msgstr "المتوقع"
 
@@ -734,6 +758,12 @@ msgstr "من"
 #: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "From %s suppliers"
 msgstr "من %s موردين"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "General Ledger"
+msgstr "دفتر الأستاذ العام"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1126,6 +1156,12 @@ msgstr "لم تُستلم بعد · %s طلبات"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+msgid "Nothing overdue"
+msgstr "لا توجد مبالغ متأخرة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "Oldest %s days"
 msgstr "الأقدم منذ %s أيام"
@@ -1160,12 +1196,6 @@ msgstr "في إجازة"
 #: code:addons/executive_dashboard/static/src/sections/people.js:0
 msgid "On time off today"
 msgstr "في إجازة اليوم"
-
-#. module: executive_dashboard
-#. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.js:0
-msgid "Open customer invoices"
-msgstr "فواتير العملاء المفتوحة"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -1248,12 +1278,6 @@ msgstr "فتح التقرير"
 #: code:addons/executive_dashboard/models/sections/people.py:0
 msgid "Open shift"
 msgstr "وردية مفتوحة"
-
-#. module: executive_dashboard
-#. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/finance.js:0
-msgid "Open vendor bills"
-msgstr "فواتير الموردين المفتوحة"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -1358,8 +1382,10 @@ msgid "Over 90 days"
 msgstr "أكثر من 90 يوماً"
 
 #. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "Overdue"
 msgstr "متأخر"
 
@@ -1368,6 +1394,12 @@ msgstr "متأخر"
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Overdue %s"
 msgstr "متأخر %s"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "Partner Ledger"
+msgstr "دفتر الشركاء"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1883,6 +1915,12 @@ msgstr "المورد"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Supplier payments by due date"
+msgstr "دفعات الموردين حسب تاريخ الاستحقاق"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "This month"
 msgstr "هذا الشهر"
@@ -2003,6 +2041,12 @@ msgstr "الإجمالي · قبل الضريبة"
 #: code:addons/executive_dashboard/models/sections/inventory.py:0
 msgid "Transfer"
 msgstr "التحويل"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "Trial Balance"
+msgstr "ميزان المراجعة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -2164,7 +2208,6 @@ msgstr "ليست لديك صلاحية الوصول إلى بيانات هذا �
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/dashboard.js:0
-#: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "as of today"
 msgstr "حتى اليوم"
 

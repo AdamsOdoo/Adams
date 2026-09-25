@@ -176,6 +176,31 @@ class TestFinance(AccountTestInvoicingCommon):
         pnl = self.Dashboard.open_action('finance.pnl', {'period': 'month'})
         self.assertIn(pnl['type'], ('ir.actions.act_window', 'ir.actions.client'))
 
+    def test_accounts_open_the_trial_balance(self):
+        """Receivables list their accounts; an account opens the Trial Balance filtered on it
+        (Enterprise), else its journal items. A partner opens the Partner Ledger."""
+        invoice = self._move('out_invoice', self.partner, self.revenue_account, 250.0, 10)
+        account = invoice.line_ids.filtered(lambda l: l.display_type == 'payment_term').account_id
+        drawer = self.Dashboard.get_drawer('finance.open_items', {'kind': 'receivables', 'view': 'aged'})
+        by_account = drawer['groups'][0]['rows']
+        row = next(r for r in by_account if r['open']['args']['account_id'] == account.id)
+        detail = self.Dashboard.get_drawer(row['open']['key'], row['open']['args'])
+        self.assertEqual(detail['action']['key'], 'finance.account')
+        action = self.Dashboard.open_action('finance.account', {'account_id': account.id})
+        trial = self.env.ref('account_reports.trial_balance_report', raise_if_not_found=False)
+        if trial:
+            self.assertEqual(action['type'], 'ir.actions.client')
+            self.assertEqual(detail['dest'], 'Trial Balance')
+        else:
+            self.assertEqual(action['res_model'], 'account.move.line')
+            self.assertEqual(set(self.env['account.move.line'].search(action['domain']).account_id), {account})
+        partner_args = {'kind': 'receivables', 'view': 'aged', 'partner_id': self.partner.id}
+        action = self.Dashboard.open_action('finance.open_items', partner_args)
+        if self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False):
+            self.assertEqual(action['type'], 'ir.actions.client')
+        else:
+            self.assertEqual(self.env['account.move.line'].search(action['domain']).move_id, invoice)
+
     def test_drawer_arguments_are_validated(self):
         for args in ({'kind': 'assets'}, {'kind': 'receivables', 'view': 'soon'},
                      {'kind': 'receivables', 'bucket': 'd365'}, {'kind': 'receivables', 'partner_id': '1'}):
