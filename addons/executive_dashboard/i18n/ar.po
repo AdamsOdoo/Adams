@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-25 19:03+0000\n"
-"PO-Revision-Date: 2026-09-25 19:03+0000\n"
+"POT-Creation-Date: 2026-09-25 19:34+0000\n"
+"PO-Revision-Date: 2026-09-25 19:34+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -20,6 +20,12 @@ msgstr ""
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "%s accounts · as of today"
 msgstr "%s حسابات · حتى اليوم"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "%s days"
+msgstr "%s أيام"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -56,7 +62,9 @@ msgstr "%s فرص · حتى اليوم"
 #. module: executive_dashboard
 #. odoo-javascript
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 msgid "%s orders"
 msgstr "%s طلبات"
@@ -74,10 +82,28 @@ msgid "%s quotations · as of today"
 msgstr "%s عروض أسعار · حتى اليوم"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "%s ready"
+msgstr "%s جاهزة"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 msgid "%s records"
 msgstr "%s سجلات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+msgid "%s suppliers"
+msgstr "%s موردين"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "%s transfers"
+msgstr "%s تحويلات"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -142,6 +168,18 @@ msgstr "أعمار الذمم المدينة"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "All categories"
+msgstr "كل الفئات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "All warehouses"
+msgstr "كل المستودعات"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Amounts customers are due to pay, by invoice due date."
 msgstr "المبالغ المستحقة على العملاء، حسب تاريخ استحقاق الفاتورة."
@@ -154,6 +192,12 @@ msgstr "المبالغ المستحقة للموردين، حسب تاريخ ا�
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "As of today"
+msgstr "حتى اليوم"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Attendance today"
 msgstr "الحضور اليوم"
@@ -163,6 +207,13 @@ msgstr "الحضور اليوم"
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Attendance, time off, shifts, headcount and directory"
 msgstr "الحضور والإجازات والورديات وعدد الموظفين والدليل"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Available"
+msgstr "متاح"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -244,6 +295,12 @@ msgid "CRM"
 msgstr "إدارة العملاء"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Category"
+msgstr "الفئة"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/dashboard.py:0
 msgid "Choose a period of up to three years, starting before it ends."
@@ -305,6 +362,12 @@ msgstr "تهيئة الإعدادات"
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 msgid "Confirmed orders"
 msgstr "الطلبات المؤكدة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Confirmed purchase orders ·"
+msgstr "أوامر الشراء المؤكدة ·"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -420,10 +483,32 @@ msgstr "التاريخ"
 #. module: executive_dashboard
 #. odoo-javascript
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "Deliveries"
 msgstr "أوامر التسليم"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Deliveries due today"
+msgstr "تسليمات مستحقة اليوم"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Deliveries waiting"
+msgstr "تسليمات بانتظار"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Deliveries · next 7 days"
+msgstr "التسليمات · الأيام السبعة القادمة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -468,6 +553,12 @@ msgstr "تم في %s"
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "Due %s"
 msgstr "مستحق في %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Due today"
+msgstr "مستحق اليوم"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -529,6 +620,12 @@ msgstr "من"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "From %s suppliers"
+msgstr "من %s موردين"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/welcome.js:0
 msgid "Greetings, %(name)s"
 msgstr "أهلاً بك، %(name)s"
@@ -547,6 +644,12 @@ msgid "Hide figures and return to Welcome"
 msgstr "إخفاء الأرقام والعودة إلى الترحيب"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Hide zero and negative stock"
+msgstr "إخفاء المخزون الصفري والسالب"
+
+#. module: executive_dashboard
 #: model:ir.model.fields,field_description:executive_dashboard.field_executive_dashboard__id
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_company__id
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__id
@@ -555,10 +658,23 @@ msgstr "المعرف"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Incoming, not done"
+msgstr "واردة، غير مكتملة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 #: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
 msgid "Inventory"
 msgstr "المخزون"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Inventory value"
+msgstr "قيمة المخزون"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -602,7 +718,25 @@ msgstr "الشهر الماضي"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Late"
+msgstr "متأخر"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Late deliveries"
+msgstr "تسليمات متأخرة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 msgid "Late receipts"
 msgstr "استلامات متأخرة"
 
@@ -675,8 +809,16 @@ msgid "New leads"
 msgstr "عملاء محتملون جدد"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Next"
+msgstr "التالي"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "Next 7 days"
 msgstr "الأيام السبعة القادمة"
 
@@ -730,6 +872,13 @@ msgstr "لا توجد فواتير في هذه الفترة."
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "No late receipts."
+msgstr "لا توجد استلامات متأخرة."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "No matches."
 msgstr "لا توجد نتائج."
@@ -745,6 +894,18 @@ msgstr "لا توجد فرص مفتوحة."
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "No partner"
 msgstr "بدون شريك"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "No purchase orders are waiting for approval."
+msgstr "لا توجد أوامر شراء بانتظار الموافقة."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "No purchases confirmed in this period."
+msgstr "لا توجد مشتريات مؤكدة في هذه الفترة."
 
 #. module: executive_dashboard
 #. odoo-python
@@ -771,9 +932,46 @@ msgstr "بدون مرحلة"
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "No warehouse"
+msgstr "بدون مستودع"
+
+#. module: executive_dashboard
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "Not due"
 msgstr "غير مستحق"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+msgid "Not yet received · %s orders"
+msgstr "لم تُستلم بعد · %s طلبات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Oldest %s days"
+msgstr "الأقدم منذ %s أيام"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Oldest first"
+msgstr "الأقدم أولاً"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "On hand"
+msgstr "الكمية المتوفرة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "On hand by warehouse"
+msgstr "الكمية المتوفرة حسب المستودع"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -789,6 +987,7 @@ msgstr "فواتير العملاء المفتوحة · حتى اليوم"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "Open in Odoo"
 msgstr "فتح في أودو"
@@ -819,6 +1018,14 @@ msgstr "الذمم الدائنة المفتوحة"
 #: code:addons/executive_dashboard/static/src/sections/crm.js:0
 msgid "Open pipeline"
 msgstr "مسار الفرص المفتوح"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+msgid "Open purchase value"
+msgstr "قيمة المشتريات المفتوحة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -882,6 +1089,19 @@ msgid "Opportunity"
 msgstr "الفرصة"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Order deadline"
+msgstr "الموعد النهائي للطلب"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Ordered %(ordered)s · received %(received)s %(unit)s"
+msgstr "المطلوب %(ordered)s · المستلم %(received)s %(unit)s"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Orders to Invoice"
@@ -894,6 +1114,12 @@ msgstr "طلبات بانتظار الفوترة"
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 msgid "Orders to invoice"
 msgstr "طلبات بانتظار الفوترة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Outgoing, not done"
+msgstr "صادرة، غير مكتملة"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -918,6 +1144,12 @@ msgstr "متأخر"
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Overdue %s"
 msgstr "متأخر %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Past their scheduled date"
+msgstr "تجاوزت الموعد المحدد"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1002,6 +1234,12 @@ msgstr "قيود مرحّلة · آخر 12 شهراً · الشهر الحالي
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Previous"
+msgstr "السابق"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/static/src/sections/crm.js:0
@@ -1012,9 +1250,17 @@ msgstr "الاحتمالية"
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
 #: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
 msgid "Procurement"
 msgstr "المشتريات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Product"
+msgstr "المنتج"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1031,16 +1277,55 @@ msgid "Profit and Loss items"
 msgstr "قيود الأرباح والخسائر"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Purchase Order"
+msgstr "أمر الشراء"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Purchase Orders"
+msgstr "أوامر الشراء"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Purchase Orders · not fully received"
+msgstr "أوامر الشراء · غير مستلمة بالكامل"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 msgid "Purchases by month"
 msgstr "المشتريات شهرياً"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+msgid "Purchases confirmed"
+msgstr "المشتريات المؤكدة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Purchases confirmed in the period"
+msgstr "المشتريات المؤكدة في الفترة"
 
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Purchases, approvals, receipts and suppliers"
 msgstr "المشتريات والموافقات والاستلامات والموردون"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Quantities by warehouse · now"
+msgstr "الكميات حسب المستودع · الآن"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1057,9 +1342,32 @@ msgstr "عروض الأسعار"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "Receipts"
 msgstr "الاستلامات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Receipts due today"
+msgstr "استلامات مستحقة اليوم"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Receipts waiting"
+msgstr "استلامات بانتظار"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Receipts · next 7 days"
+msgstr "الاستلامات · الأيام السبعة القادمة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1080,6 +1388,10 @@ msgstr "أحدث الطلبات"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Reference"
@@ -1090,6 +1402,25 @@ msgstr "المرجع"
 #: code:addons/executive_dashboard/static/src/dashboard.xml:0
 msgid "Refresh"
 msgstr "تحديث"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Requests for Quotation · To Approve"
+msgstr "طلبات عروض الأسعار · بانتظار الموافقة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Reserved"
+msgstr "محجوز"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Reserved %(reserved)s · available %(available)s"
+msgstr "محجوز %(reserved)s · متاح %(available)s"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1158,6 +1489,12 @@ msgstr "مجدول في %s"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Scheduled before today"
+msgstr "مجدولة قبل اليوم"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/dashboard.xml:0
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "Search"
@@ -1169,6 +1506,12 @@ msgstr "بحث"
 #: code:addons/executive_dashboard/static/src/welcome.xml:0
 msgid "Search orders, invoices, contacts, products, employees…"
 msgstr "ابحث في الطلبات والفواتير وجهات الاتصال والمنتجات والموظفين…"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Search product name or internal reference"
+msgstr "ابحث باسم المنتج أو المرجع الداخلي"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1206,8 +1549,16 @@ msgid "Stage"
 msgstr "المرحلة"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Stock"
+msgstr "المخزون"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "Stock report"
 msgstr "تقرير المخزون"
 
@@ -1216,6 +1567,13 @@ msgstr "تقرير المخزون"
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Stock report, deliveries and receipts"
 msgstr "تقرير المخزون وأوامر التسليم والاستلام"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Supplier"
+msgstr "المورد"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1244,6 +1602,7 @@ msgstr "هذا القسم غير متاح للشركة الحالية."
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/dashboard.py:0
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
 msgid "This section is not available to you."
 msgstr "هذا القسم غير متاح لك."
 
@@ -1261,6 +1620,12 @@ msgstr "إلى"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+msgid "To approve"
+msgstr "بانتظار الموافقة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Top customers by payments received"
 msgstr "أعلى العملاء حسب المدفوعات المستلمة"
@@ -1274,6 +1639,12 @@ msgstr "أعلى المنتجات حسب الكمية"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "Top suppliers by purchase value"
+msgstr "أعلى الموردين حسب قيمة المشتريات"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/models/sections/finance.py:0
@@ -1283,16 +1654,37 @@ msgid "Total"
 msgstr "الإجمالي"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
+msgid "Total · untaxed"
+msgstr "الإجمالي · قبل الضريبة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "Transfer"
+msgstr "التحويل"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "Type at least 2 characters."
 msgstr "اكتب حرفين على الأقل."
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Unit"
+msgstr "الوحدة"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/dashboard.py:0
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Unknown detail."
 msgstr "تفاصيل غير معروفة."
@@ -1327,6 +1719,10 @@ msgstr "مستخدم"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Value"
@@ -1335,15 +1731,40 @@ msgstr "القيمة"
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "View all"
 msgstr "عرض الكل"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Waiting"
+msgstr "بانتظار"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/procurement.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.js:0
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 msgid "Waiting for approval"
 msgstr "بانتظار الموافقة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+msgid "Waiting for stock"
+msgstr "بانتظار المخزون"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/inventory.js:0
+#: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+msgid "Warehouse"
+msgstr "المستودع"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1393,6 +1814,18 @@ msgstr "حتى اليوم"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "days"
+msgstr "أيام"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "incoming"
+msgstr ""
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "invoices"
 msgstr "فواتير"
@@ -1402,6 +1835,18 @@ msgstr "فواتير"
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
 msgid "opportunities"
 msgstr "فرص"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
+msgid "orders"
+msgstr "طلبات"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/inventory.py:0
+msgid "outgoing"
+msgstr ""
 
 #. module: executive_dashboard
 #. odoo-javascript
