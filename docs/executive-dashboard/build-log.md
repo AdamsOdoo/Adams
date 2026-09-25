@@ -120,3 +120,7 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
   - Browser-Back memory: written only when a dashboard button opens a native screen, always consumed on the next open, removed otherwise (menu switch, Welcome). A menu reopen lands on Welcome (checked).
   - Stock/directory filters stored when the section unmounts (plain copies) and reloaded with their page; dates cleared while a new period loads; the account panel names its real destination; box titles are whole translatable strings; test for another company's receivable account.
 - Local after the fixes: 67 passed, no warnings; browser: breadcrumb, phone arrow and browser Back restore section, panel and scroll at 1440 / 1024 / 390 px; menu switch reopens on Welcome; stock filters survive a section switch; no console errors.
+
+## UAT candidate
+
+- Branch `uat/executive-dashboard` (`4be9282`), built on `origin/staging` (`a653e81`) like earlier stagings: `executive_dashboard` from `73cfd09` added, `adams_executive_dashboard` and `adams_dashboard_finance` removed, `adams_base` and `adams_shopify` unchanged. It is a fast-forward of `staging`; the owner moves `staging` to it (Odoo.sh or GitHub), after uninstalling the old dashboards on the staging database if they are installed. Then install Executive Dashboard from Apps and follow `uat-checklist.md`.
