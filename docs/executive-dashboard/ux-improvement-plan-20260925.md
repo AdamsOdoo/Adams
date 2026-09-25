@@ -1,8 +1,8 @@
-# Executive Dashboard — redesign plan (2026-09-25, revision 2)
+# Executive Dashboard — redesign plan (2026-09-25, revision 3)
 
-Status: **agreed direction, not implemented.** Revision 2 incorporates the
-owner's review of the first reference design. Each change against the approved
-HTML is recorded as a deviation (D19 onward) before implementation.
+Status: **agreed direction, not implemented.** Revision 3 incorporates the
+owner's second review. Each change against the approved HTML is recorded as a
+deviation (D19 onward) before implementation.
 
 Reference design: `reference/executive-360-concept.html`
 (published copy: https://claude.ai/artifact/3JGeUFdrqBkgAgrDgkRbEY). Example
@@ -12,110 +12,112 @@ figures only.
 
 | # | Rule |
 |---|---|
-| R1 | The product is **Executive Dashboard**, reusable for any customer. No customer name in module names, titles, code, data or UI. |
-| R2 | Navigation order: **Welcome, Finance, Sales, CRM, Procurement, Inventory, People**. |
-| R3 | **Welcome** shows no figures (privacy when the screen is visible to others): greeting, date, company and the sections the user can open. |
-| R4 | **No comparisons anywhere** (no deltas, no "vs prior period", no sparklines). |
-| R5 | Periods: **This month, Last month, This quarter, Year to date, Custom** (from/to dates). Balances (bank, receivables, payables, stock) are always as of today. |
-| R6 | Layout direction follows the **user's language** in Odoo (Arabic → right to left) using Odoo's standard localization. No manual switch. |
-| R7 | Detail opens in a **side panel**; every figure opens the records behind it; "Open in Odoo" goes to the native screen with the same filters. |
-| R8 | **Search** covers the whole database the user may read (not the dashboard's filters or displayed rows). |
-| R9 | Loading must be fast: the page frame appears immediately, each widget loads independently, drawers load on demand. |
+| R1 | **One module, `executive_dashboard`, named "Executive Dashboard"**, installable on any Odoo 19 database. No customer name in code, data or UI. |
+| R2 | Navigation: **Welcome, Finance, Sales, CRM, Procurement, Inventory, People**. A section appears only when its app is installed and the user may read its data. |
+| R3 | **Welcome** shows no figures: "Greetings, <name>", date, company, search and the section cards. |
+| R4 | **No comparisons** (no deltas, no "vs" labels). |
+| R5 | Periods: This month, Last month, This quarter, Year to date, Custom. Inventory and People show the current position and have no period selector. |
+| R6 | Direction follows the user's language through Odoo's localization. |
+| R7 | Detail opens in a side panel; every figure opens its records; "Open in Odoo" opens the native screen with the same filters. |
+| R8 | Search covers every record the user may read, not the dashboard's filters. |
+| R9 | Use native Odoo values wherever they exist (e.g. the sales order **Delivery Status** field, as is). |
+| R10 | Fast and smooth on computer, iPad and iPhone (sections 4 and 5). |
 
 ## 2. Sections
 
-### Welcome
-Greeting with the user's name, today's date, company logo and name; one card
-per section the user has access to (hidden when the app is not installed or the
-user lacks rights). Search is available; no figures.
-
 ### Finance
-- Figures: Revenue, Gross profit (with margin %), Net profit, **Bank & Cash**, Receivables, Payables.
-- Revenue & net profit by month (12 months; the current month drawn dashed as month-to-date).
-- **Bank & Cash**: the accounts under the Balance Sheet's "Bank and Cash Accounts" line, each with its balance, and the line total. Nothing else: no bank/cash split, no reconciliation message, no extra calculation. Clicking an account opens its General Ledger.
-- **Receivables**: two views, *Aged* (not due, 1–30, 31–60, 61–90, over 90 days) and *Expected* (open customer invoices by due date: next 7 days, 8–30, 31–60, 61–90, later). Source: Aged Receivable report / open posted invoices' residual amounts.
-- **Payables**: the same two views for vendor bills.
+Revenue, Gross profit, Net profit, Bank & Cash, Receivables, Payables ·
+Revenue & net profit by month · **Bank & Cash**: the accounts under the Balance
+Sheet line "Bank and Cash Accounts" with their balances and total, nothing
+else · **Receivables** and **Payables**, each with *Aged* and *Expected* (by
+due date: overdue, next 7 days, 8–30, 31–60, later).
 
 ### Sales
-- Figures: Invoiced sales, Confirmed orders, Open quotations, Orders to invoice.
-- Invoiced sales by month.
-- **Salespeople by invoiced sales**, **Top products by quantity sold** (per unit of measure), **Top customers by payments received** in the period.
-- Recent orders with **delivery status** (rule below). The status opens that order's delivery orders.
+Invoiced sales, Confirmed orders, Open quotations, Orders to invoice ·
+Invoiced sales by month · Salespeople by invoiced sales · Top products by
+quantity · Top customers by payments received · Recent orders with the order's
+own **Delivery Status** field (`sale_stock`: Not Delivered, Started, Partially
+Delivered, Fully Delivered) shown exactly as Odoo shows it; clicking it lists
+that order's delivery orders.
 
-**Delivery status rule.** Odoo's native `delivery_status` is `full` when every
-picking is done *or cancelled* (`sale_stock/models/sale_order.py`,
-`_compute_delivery_status`). The dashboard shows **Delivered** only when every
-outgoing delivery order of the order is **done** and none was cancelled with
-quantity left; otherwise **Partially delivered**, **Not delivered** or **Late**
-(a delivery order past its scheduled date). Returns are excluded.
-
-### CRM (new)
-- Figures: Open pipeline (expected revenue), Weighted pipeline (by probability), New leads, Won (count and value) in the period.
-- Pipeline by stage (value and count per stage; a stage opens its opportunities).
-- Opportunities closing soonest, by expected revenue.
-- Pipeline by salesperson.
+### CRM
+Open pipeline, Weighted pipeline, New leads, Won · Pipeline by stage ·
+Pipeline by salesperson · Closing soonest.
 
 ### Procurement
-- Figures: Purchases confirmed, Purchase orders to approve, Late receipts, Open purchase value.
-- Waiting for approval (oldest first), Late receipts, Top suppliers by purchase value.
+Purchases confirmed, To approve, Late receipts, Open purchase value · Waiting
+for approval · Late receipts · Top suppliers by purchase value · Purchases by month.
 
 ### Inventory
-- Figures: Inventory value, Late deliveries, Deliveries due today, Receipts due today.
-- Delivery status tiles: Late, Due today, Next 7 days, Waiting for stock (each opens the delivery orders).
-- **Stock report**: filters for **warehouse** (all or one), **product category**, and **search by name or internal reference**; columns: reference, product, category, warehouse, on hand, reserved, available, unit, value; server-side paging; a row opens the product's stock by location.
-- Removed: "Below reorder point".
+Inventory value, Late deliveries, Deliveries due today, Receipts due today ·
+Deliveries (late, today, next 7 days, waiting) and Receipts (late, today, next
+7 days, waiting) · **Stock report** with warehouse, category and
+name/internal-reference filters and one checkbox **"Hide zero and negative
+stock"** (on by default).
 
 ### People
-- Figures: Headcount, **On shift now**, On leave today.
-- **On shift now**: employees whose Planning shift covers the current time (Enterprise Planning); if Planning is not installed, employees checked in (Attendances).
-- **Headcount by department**: a department opens its employees.
-- **Employees directory**: search by name, filter by department; a row opens the employee.
-- Removed: Open positions, Contracts ending.
+Tracks attendance, time off, headcount, the directory and shifts.
+- Figures: Headcount, **Checked in today**, On time off today, Shifts today.
+- **Attendance today** (Attendances app): each employee's first check-in, last check-out, worked hours and whether they are still in.
+- **Time off**: today and the next 7 days, with leave type.
+- **Shifts today** (Planning, Enterprise): by time slot and role.
+- **Headcount by department** (a department opens its employees) and **Employees directory** (search, department filter).
+Widgets whose app is not installed are hidden.
 
-### Quick access
-Search (whole database), Needs attention (ranked items across sections),
-Definitions. Each opens the side panel.
+## 3. One module, plug and play
 
-## 3. Architecture and refactor (for R1 and R9)
+- `executive_dashboard` depends only on `web` and `account` (Invoicing is present in practically every database). All other apps (`sale`, `sale_stock`, `crm`, `purchase`, `stock`, `hr`, `hr_attendance`, `hr_holidays`, `planning`, `account_reports`) are **detected at runtime** (`'sale.order' in env`, `env.ref(..., raise_if_not_found=False)`).
+- Consequences of one module: it does not extend other apps' models or views and does not reference their XML ids in data files; actions are resolved when clicked. This keeps installation and uninstallation clean on any database.
+- Financial statements: Enterprise `account_reports` engines when installed (Balance Sheet, P&L, aged reports); on Community, the same figures from posted journal items with the equivalent account types.
+- Settings screen: which sections are enabled, and which report lines are used when a localization renames them.
+- Replacing the current `adams_executive_dashboard` + `adams_dashboard_finance` on this database: install `executive_dashboard`, run a one-time data move (settings, saved views, report mappings), uninstall the old modules. Tested on a staging copy first.
 
-### Module family (plug and play)
-| Module | Depends | Provides |
+## 4. Speed and smoothness
+
+Goal: switching sections feels instant; first data appears in under a second
+on a production-size database; nothing freezes while loading.
+
+### Backend (server)
+1. **One request per section.** `get_section(section, period)` returns every widget of that section in a single call, instead of one call per widget (the current dashboard makes many separate calls).
+2. **Totals are computed in the database, not in Python.** Every figure uses grouped SQL through `_read_group` or the native report engine, run once per section. No Python loops over records, and no per-account fallback calls (the current bank/cash code can call the report engine once per account).
+3. **Only stored, indexed fields.** Example: the stock report groups `stock.quant` by product and warehouse instead of reading `qty_available` (computed per product, slow). Delivery status is a stored field. Product search uses Odoo's trigram index on the name.
+4. **Paging on the server.** Lists return 10–25 rows plus a total count; filters and search run in SQL.
+5. **Short-lived cache.** Section results are kept 60 seconds per company, user rights, section, period and language. Repeated opens and back-and-forth navigation read from the cache; the Refresh button bypasses it.
+6. **Drawers load on demand** with only the rows they show.
+7. **Search in one request:** up to 5 results per model across all models, with record rules applied.
+8. **Performance tests** with limits: maximum number of SQL queries per section, and time limits (section under 300 ms and drawer under 200 ms on a staging-size copy). A slow widget fails the build.
+
+### Frontend (browser)
+1. **Instant frame.** Navigation, title and empty cards appear immediately; each widget shows a placeholder and fills in when its data arrives.
+2. **Browser cache per section and period** for the session: returning to a section shows the last result at once and refreshes it quietly in the background.
+3. **Prefetch.** While the user is on Welcome or pointing at a section in the menu, that section's data is requested in advance. Nothing is shown until the section is opened, so Welcome stays private.
+4. **Cancel stale requests.** Switching period or section drops requests the user no longer needs.
+5. **Light code.** Charts are small inline SVG (no chart library to download); the dashboard code is split into small components and loaded only when the dashboard opens.
+6. **Search** waits 250 ms after typing stops, then shows grouped results.
+
+## 5. Screen sizes
+
+| Width | Device | Layout |
 |---|---|---|
-| `executive_dashboard` | `web` | Shell, Welcome, side panel, search, settings, access groups, widget registry |
-| `executive_dashboard_account` | core, `account` (auto-install) | Finance widgets from native reports; Enterprise `account_reports` used when present |
-| `executive_dashboard_sale` | core, `sale_management`, `sale_stock` (auto-install) | Sales widgets, delivery status rule |
-| `executive_dashboard_crm` | core, `crm` (auto-install) | CRM widgets |
-| `executive_dashboard_purchase` | core, `purchase` (auto-install) | Procurement widgets |
-| `executive_dashboard_stock` | core, `stock` (auto-install) | Inventory widgets and stock report |
-| `executive_dashboard_hr` | core, `hr` (auto-install); Planning/Attendance optional | People widgets |
+| ≥ 1200 px | Computer | Full sidebar with labels; 12-column grid; up to 6 figures per row |
+| 768–1199 px | iPad, small laptop | Icon-only sidebar; 3 figures per row; panels pair up or go full width |
+| < 768 px | iPhone | Section tabs scroll across the top; 2 figures per row; one panel per row; tables turn into cards; the side panel opens full screen |
 
-A customer installs `executive_dashboard`; the bridge for each installed app
-installs itself. Sections without their app never appear.
+**No empty gaps:** panels in the same row stretch to equal height; paired
+panels are designed with the same number of rows (for example top-5 lists side
+by side); charts grow to fill their card; on very wide screens content stops at
+1,680 px and is centred.
 
-**Renaming.** Odoo cannot rename an installed module. Recommended: publish the
-new modules, add a one-time migration for this database (settings, saved
-views, report mappings), then uninstall the old `adams_*` dashboard modules.
-**Owner decision needed** before implementation (alternative: keep the
-technical names and change only the displayed names).
+## 6. Colour
 
-### Backend
-- One call per section, `get_section(section, period)`, returns every widget's payload; each widget is a small provider registered by its bridge module.
-- Aggregates use `_read_group` / native report engines; no per-record Python loops for totals; lists are limited and paged on the server.
-- Each provider checks access and returns `restricted` / `not_installed` states instead of failing the section.
-- Drawer content is fetched only when a drawer opens.
-- Global search: `name_search`-style lookups on a configurable list of models, 5 results per model, record rules applied, 250 ms debounce.
-- Performance budget (checked by `test_performance` query counts and timings on a staging-size dataset): section payload under 300 ms; drawer under 200 ms; search under 300 ms.
+Each section has its own colour for its menu icon, card icons and page wash:
+Finance teal, Sales blue, CRM violet, Procurement amber, Inventory green,
+People rose. Status colours (red, amber, green) are kept separate and always
+come with a label. Figures and text stay in neutral ink. Dark mode has lighter
+versions of the same colours.
 
-### Frontend
-- One Owl component per widget with its own skeleton, error and empty state; the frame and navigation render before any data.
-- Section payloads are cached per period in the browser for the session and refreshed in the background (stale while revalidate); changing period does not rebuild the page.
-- CSS uses logical properties only; direction comes from Odoo (`localization.direction`); all strings go through `_t` with Arabic translations.
-- Dark mode follows Odoo's user setting (Enterprise).
-
-## 4. Order of work
-1. Owner decision on module renaming; record deviations D19+.
-2. Core refactor: registry, `get_section`, side panel, Welcome, period selector, removal of comparisons.
-3. Finance (Bank & Cash from the Balance Sheet, expected receivables/payables).
-4. Sales (delivery status rule, three rankings) and Inventory (stock report).
-5. CRM, Procurement, People (on shift now, directory).
-6. Global search, performance budget tests, Arabic/RTL, dark mode on Odoo.sh.
+## 7. Order of work
+1. Record deviations D19+; create `executive_dashboard` with the shell, Welcome, side panel, period selector, section cache and `get_section`.
+2. Finance, Sales, Inventory (stock report), then CRM, Procurement, People.
+3. Search, performance tests, Arabic, dark mode, iPad and iPhone checks.
+4. Data move from the old modules on a staging copy; owner acceptance.
