@@ -17,8 +17,8 @@ class TestProcurement(SalesCrmCase):
         super().setUpClass()
         cls.buyer = new_test_user(
             cls.env, login='ed_purchase_manager', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,purchase.group_purchase_manager')
-        cls.plain = new_test_user(cls.env, login='ed_purchase_plain', groups='executive_dashboard.group_user')
+            groups='executive_dashboard.group_admin,purchase.group_purchase_manager')
+        cls.plain = new_test_user(cls.env, login='ed_purchase_plain', groups='executive_dashboard.group_admin')
         product_vals = {'name': 'Example Board', 'standard_price': 10.0}
         if 'is_storable' in cls.env['product.template']._fields:
             product_vals.update(type='consu', is_storable=True)
@@ -90,10 +90,16 @@ class TestProcurement(SalesCrmCase):
         with self.assertRaises(ValidationError):
             dashboard.get_drawer('procurement.orders', {'kind': 'other'})
 
-    def test_user_without_purchase_rights_is_restricted(self):
-        self.assertEqual(self.section(self.plain, 'procurement')['status'], 'restricted')
+    def test_user_without_purchase_rights_sees_everything(self):
+        self._order()
+        result = self.section(self.plain, 'procurement')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets']['kpis'], self.section(self.buyer, 'procurement')['widgets']['kpis'])
+        plain = self.env['executive.dashboard'].with_user(self.plain)
+        drawer = plain.get_drawer('procurement.orders', {'kind': 'approve'})
+        self.assertIsNone(drawer['action'])
         with self.assertRaises(AccessError):
-            self.env['executive.dashboard'].with_user(self.plain).get_drawer('procurement.orders', {'kind': 'approve'})
+            plain.open_action('procurement.orders', {'kind': 'approve'})
 
     def test_query_limit(self):
         self._order()
@@ -114,11 +120,11 @@ class TestInventory(SalesCrmCase):
         super().setUpClass()
         cls.keeper = new_test_user(
             cls.env, login='ed_stock_manager', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,stock.group_stock_manager')
+            groups='executive_dashboard.group_admin,stock.group_stock_manager')
         cls.stock_user = new_test_user(
             cls.env, login='ed_stock_user', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,stock.group_stock_user')
-        cls.plain = new_test_user(cls.env, login='ed_stock_plain', groups='executive_dashboard.group_user')
+            groups='executive_dashboard.group_admin,stock.group_stock_user')
+        cls.plain = new_test_user(cls.env, login='ed_stock_plain', groups='executive_dashboard.group_admin')
         cls.warehouse = cls.env['stock.warehouse'].search([('company_id', '=', cls.company.id)], limit=1)
         cls.location = cls.warehouse.lot_stock_id
         cls.category = cls.env['product.category'].create({'name': 'Example Category'})
@@ -181,16 +187,17 @@ class TestInventory(SalesCrmCase):
             with self.assertRaises(ValidationError):
                 self.stock(self.keeper, **bad)
 
-    def test_value_only_for_inventory_administrators(self):
+    def test_value_for_every_administrator(self):
         if 'value' not in self.env['stock.quant']._fields:
             self.skipTest('stock_account not installed')
         manager = self.section(self.keeper, 'inventory')['widgets']
         self.assertIsNotNone(manager['kpis']['value'])
         self.assertTrue(manager['stock']['valued'])
-        user = self.section(self.stock_user, 'inventory')['widgets']
-        self.assertIsNone(user['kpis']['value'])
-        self.assertFalse(user['stock']['valued'])
-        self.assertIsNone(user['stock']['rows'][0]['value'] if user['stock']['rows'] else None)
+        # Stock users (and users without Inventory rights) see the same value.
+        for user in (self.stock_user, self.plain):
+            widgets = self.section(user, 'inventory')['widgets']
+            self.assertEqual(widgets['kpis']['value'], manager['kpis']['value'])
+            self.assertTrue(widgets['stock']['valued'])
 
     def test_picking_tiles_match_native_filters(self):
         Picking = self.env['stock.picking']
@@ -232,10 +239,17 @@ class TestInventory(SalesCrmCase):
         self.assertEqual(action['res_model'], 'stock.quant')
         self.assertEqual(self.env['stock.quant'].search(action['domain']).product_id, self.positive)
 
-    def test_user_without_stock_rights_is_restricted(self):
-        self.assertEqual(self.section(self.plain, 'inventory')['status'], 'restricted')
-        with self.assertRaises(AccessError):
-            self.stock(self.plain)
+    def test_user_without_stock_rights_sees_everything(self):
+        result = self.section(self.plain, 'inventory')
+        self.assertEqual(result['status'], 'ok')
+        # The stock list button follows the user's own rights on the quants shown.
+        quants = self.env['stock.quant'].with_user(self.plain)
+        self.assertEqual(result['widgets']['stock']['can_open'], quants.has_access('read'))
+        self.assertTrue(self.section(self.keeper, 'inventory')['widgets']['stock']['can_open'])
+        self.assertEqual(self.stock(self.plain)['rows'], self.stock(self.keeper)['rows'])
+        if not quants.has_access('read'):
+            with self.assertRaises(AccessError):
+                self.env['executive.dashboard'].with_user(self.plain).open_action('inventory.stock', {})
 
     def test_query_limit(self):
         dashboard = self.env['executive.dashboard'].with_user(self.keeper)

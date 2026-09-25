@@ -164,7 +164,7 @@ class ExecutiveDashboard(models.AbstractModel):
         lead = self.env['crm.lead'].browse(self._positive_id(args, 'lead_id')).exists()
         if not lead:
             raise ValidationError(self.env._('Unknown detail.'))
-        lead.check_access('read')
+        self._check_company(lead)
         return lead
 
     def _drawer_crm_opportunity(self, args):

@@ -190,9 +190,12 @@ export class AttendanceDrawer extends Component {
 
     get more() {
         const { count, rows } = this.props.data || {};
-        return count > (rows || []).length
-            ? _t("Showing %(shown)s of %(count)s. Open in Odoo for the full list.", { shown: rows.length, count })
-            : "";
+        if (count <= (rows || []).length) {
+            return "";
+        }
+        return this.props.data.action
+            ? _t("Showing %(shown)s of %(count)s. Open list shows them all.", { shown: rows.length, count })
+            : _t("Showing %(shown)s of %(count)s.", { shown: rows.length, count });
     }
 
     openRow(row) {

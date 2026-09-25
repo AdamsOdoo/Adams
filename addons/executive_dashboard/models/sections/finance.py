@@ -38,11 +38,6 @@ PNL_EXPRESSIONS = {
     'gross_profit': ('account_reports.account_financial_report_gross_profit0_balance', 'GRP'),
     'net_profit': ('account_reports.account_financial_report_net_profit0_balance', 'NEP'),
 }
-PNL_OVERRIDES = {
-    'revenue': 'executive_dashboard_line_revenue_id',
-    'gross_profit': 'executive_dashboard_line_gross_id',
-    'net_profit': 'executive_dashboard_line_net_id',
-}
 PNL_REPORT = 'account_reports.profit_and_loss'
 BS_REPORT = 'account_reports.balance_sheet'
 BANK_LINE = 'account_reports.account_financial_report_bank_view0'
@@ -209,15 +204,13 @@ class ExecutiveDashboard(models.AbstractModel):
         return record if hasattr(record, 'get_report_information') else None
 
     def _fin_expression(self, key):
-        """Balance expression of the P&L line for ``key``: the company's override, else the standard line."""
-        line = self.env.company[PNL_OVERRIDES[key]]
-        if not line:
-            xmlid, code = PNL_EXPRESSIONS[key]
-            expression = self.env.ref(xmlid, raise_if_not_found=False)
-            if expression is not None and expression._name == 'account.report.expression':
-                return expression
-            report = self._fin_report(PNL_REPORT)
-            line = report and report.line_ids.filtered(lambda l: l.code == code)[:1]
+        """Balance expression of Odoo's standard P&L line for ``key`` (None: journal items instead)."""
+        xmlid, code = PNL_EXPRESSIONS[key]
+        expression = self.env.ref(xmlid, raise_if_not_found=False)
+        if expression is not None and expression._name == 'account.report.expression':
+            return expression
+        report = self._fin_report(PNL_REPORT)
+        line = report and report.line_ids.filtered(lambda l: l.code == code)[:1]
         return line and line.expression_ids.filtered(lambda e: e.label == 'balance')[:1]
 
     def _fin_options(self, report, date_from, date_to, **extra):
@@ -348,8 +341,7 @@ class ExecutiveDashboard(models.AbstractModel):
         return account.with_company(company).code or ''
 
     def _fin_bank_line(self):
-        line = self.env.company.executive_dashboard_line_bank_id
-        return line or self.env.ref(BANK_LINE, raise_if_not_found=False)
+        return self.env.ref(BANK_LINE, raise_if_not_found=False)
 
     def _fin_bank_cash_report(self, scope):
         """``{account_id: balance}`` from the Balance Sheet line expanded by account, or None."""
@@ -470,11 +462,11 @@ class ExecutiveDashboard(models.AbstractModel):
         account_id = args.get('account_id')
         if type(account_id) is not int:
             raise ValidationError(self.env._('Unknown detail.'))
-        # Only the accounts the Bank & Cash widget lists (an override line may include other types).
+        # Only the accounts the Bank & Cash widget lists.
         if account_id not in {row['id'] for row in self._fin_bank_cash(self._fin_scope({}))['rows']}:
             raise ValidationError(self.env._('Unknown detail.'))
         account = self.env['account.account'].browse(account_id)
-        account.check_access('read')
+        self._check_company(account)
         return account
 
     def _fin_sum(self, scope, domain, measure):

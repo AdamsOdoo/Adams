@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from odoo import fields
-from odoo.exceptions import AccessError, ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.tests import new_test_user, tagged
 
 from odoo.addons.account.tests.common import AccountTestInvoicingCommon
@@ -17,10 +17,10 @@ class TestFinance(AccountTestInvoicingCommon):
         company = cls.env.company
         cls.user = new_test_user(
             cls.env, login='ed_fin', company_id=company.id, company_ids=[company.id],
-            groups='executive_dashboard.group_user,account.group_account_readonly')
+            groups='executive_dashboard.group_admin,account.group_account_readonly')
         cls.billing = new_test_user(
             cls.env, login='ed_billing', company_id=company.id, company_ids=[company.id],
-            groups='executive_dashboard.group_user,account.group_account_invoice')
+            groups='executive_dashboard.group_admin,account.group_account_invoice')
         cls.Dashboard = cls.env['executive.dashboard'].with_user(cls.user)
         cls.today = fields.Date.context_today(cls.Dashboard)
         data = cls.company_data
@@ -125,11 +125,19 @@ class TestFinance(AccountTestInvoicingCommon):
 
     # -- access --------------------------------------------------------------
 
-    def test_invoicing_user_is_restricted(self):
-        result = self.env['executive.dashboard'].with_user(self.billing).get_section('finance', 'month')
-        self.assertEqual(result['status'], 'restricted')
-        with self.assertRaises(AccessError):
-            self.env['executive.dashboard'].with_user(self.billing).get_drawer('finance.bank_cash')
+    def test_invoicing_user_sees_every_figure(self):
+        self._move('out_invoice', self.partner, self.revenue_account, 250.0, -10)
+        billing = self.env['executive.dashboard'].with_user(self.billing)
+        result = billing.get_section('finance', 'month')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets'], self.finance())
+        self.assertIn('total', billing.get_drawer('finance.bank_cash'))
+
+    def test_other_company_account_is_refused(self):
+        data = self.setup_other_company(name='Finance Example Other')
+        account = data['default_journal_bank'].default_account_id
+        with self.assertRaises(UserError):
+            self.Dashboard.get_drawer('finance.account', {'account_id': account.id})
 
     # -- drawers and actions -------------------------------------------------
 
@@ -207,7 +215,7 @@ class TestFinance(AccountTestInvoicingCommon):
         user = new_test_user(
             self.env, login='ed_fin_two', company_id=self.env.company.id,
             company_ids=[self.env.company.id, company_b.id],
-            groups='executive_dashboard.group_user,account.group_account_readonly')
+            groups='executive_dashboard.group_admin,account.group_account_readonly')
         dashboard = self.env['executive.dashboard'].with_user(user).with_context(
             allowed_company_ids=[self.env.company.id, company_b.id])
         before = dashboard.get_section('finance', 'month')['widgets']

@@ -16,13 +16,6 @@
                         <setting id="executive_dashboard_inventory" string="Inventory" company_dependent="1"><field name="executive_dashboard_inventory"/></setting>
                         <setting id="executive_dashboard_people" string="People" company_dependent="1"><field name="executive_dashboard_people"/></setting>
                     </block>
-                    <block title="Finance report lines" name="executive_dashboard_report_lines">
-                        <div class="text-muted mb-3">Used only with the Accounting reports (Enterprise). Leave empty to use the standard Profit and Loss and Balance Sheet lines; choose a line when your localization renames or replaces it.</div>
-                        <setting id="executive_dashboard_line_revenue" string="Revenue" company_dependent="1"><field name="executive_dashboard_line_revenue_id" options="{'no_create': True}"/></setting>
-                        <setting id="executive_dashboard_line_gross" string="Gross profit" company_dependent="1"><field name="executive_dashboard_line_gross_id" options="{'no_create': True}"/></setting>
-                        <setting id="executive_dashboard_line_net" string="Net profit" company_dependent="1"><field name="executive_dashboard_line_net_id" options="{'no_create': True}"/></setting>
-                        <setting id="executive_dashboard_line_bank" string="Bank and cash" company_dependent="1"><field name="executive_dashboard_line_bank_id" options="{'no_create': True}"/></setting>
-                    </block>
                 </app>
             </xpath>
         </field>

@@ -154,7 +154,7 @@ export class InventorySection extends Component {
         const list = [];
         if (k.value) {
             list.push({ key: "value", icon: "box", label: _t("Inventory value"), value: compact(k.value.amount),
-                money: true, cap: _t("As of today"), open: () => this.openStock() });
+                money: true, cap: _t("As of today"), open: () => this.w.stock.can_open && this.openStock() });
         }
         list.push(
             { key: "late", icon: "truck", label: _t("Late deliveries"), value: whole(k.late.count),

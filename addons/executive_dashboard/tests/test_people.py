@@ -15,7 +15,7 @@ class TestPeople(SalesCrmCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        groups = ['executive_dashboard.group_user', 'hr.group_hr_user']
+        groups = ['executive_dashboard.group_admin', 'hr.group_hr_user']
         for xmlid in ('hr_attendance.group_hr_attendance_manager', 'hr_holidays.group_hr_holidays_user'):
             if cls.env.ref(xmlid, raise_if_not_found=False):
                 groups.append(xmlid)
@@ -23,8 +23,8 @@ class TestPeople(SalesCrmCase):
                                     company_ids=[cls.company.id], groups=','.join(groups))
         cls.hr_officer = new_test_user(cls.env, login='ed_hr_officer', company_id=cls.company.id,
                                        company_ids=[cls.company.id],
-                                       groups='executive_dashboard.group_user,hr.group_hr_user')
-        cls.plain = new_test_user(cls.env, login='ed_people_plain', groups='executive_dashboard.group_user')
+                                       groups='executive_dashboard.group_admin,hr.group_hr_user')
+        cls.plain = new_test_user(cls.env, login='ed_people_plain', groups='executive_dashboard.group_admin')
         cls.department = cls.env['hr.department'].create({'name': 'Example Department', 'company_id': cls.company.id})
         cls.alpha, cls.beta, cls.gamma = cls.env['hr.employee'].create([
             {'name': name, 'department_id': cls.department.id, 'company_id': cls.company.id}
@@ -153,20 +153,28 @@ class TestPeople(SalesCrmCase):
         action = dashboard.open_action('people.directory', {'query': 'Example Be'})
         self.assertEqual(self.env['hr.employee'].search(action['domain']), self.beta)
 
-    def test_widgets_follow_app_rights(self):
+    def test_widgets_do_not_depend_on_app_rights(self):
         widgets = self.section(self.hr_officer, 'people')['widgets']
-        self.assertIsNone(widgets['attendance'], 'no Attendances rights')
-        self.assertIsNone(widgets['leave'], 'no Time Off officer rights')
+        self.assertEqual(widgets['attendance'] is None, 'hr.attendance' not in self.env)
+        self.assertEqual(widgets['leave'] is None, 'hr.leave' not in self.env)
         self.assertEqual(widgets['kpis']['headcount'],
                          self.env['hr.employee'].search_count([('company_id', '=', self.company.id)]))
         if 'hr.attendance' in self.env:
-            with self.assertRaises(AccessError):
-                self.dashboard(self.hr_officer).get_drawer('people.attendance', {})
+            drawer = self.dashboard(self.hr_officer).get_drawer('people.attendance', {})
+            # Full details; no Attendances rights, so no button to that screen.
+            self.assertIsNone(drawer['action'])
 
-    def test_user_without_hr_rights_is_restricted(self):
-        self.assertEqual(self.section(self.plain, 'people')['status'], 'restricted')
+    def test_user_without_hr_rights_sees_everything(self):
+        result = self.section(self.plain, 'people')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets']['kpis']['headcount'], self.section(self.hr_user, 'people')['widgets']['kpis']['headcount'])
+        self.assertFalse(result['widgets']['directory']['can_open'])
+        drawer = self.dashboard(self.plain).get_drawer('people.employee', {'employee_id': self.alpha.id})
+        self.assertIsNone(drawer['action'])
         with self.assertRaises(AccessError):
-            self.dashboard(self.plain).get_drawer('people.employees', {})
+            self.dashboard(self.plain).open_action('people.employee', {'employee_id': self.alpha.id})
+        target = self.dashboard(self.hr_user).get_drawer('people.employee', {'employee_id': self.alpha.id})['action']
+        self.assertEqual(target['kind'], 'record')
 
     def test_query_limit(self):
         dashboard = self.dashboard()

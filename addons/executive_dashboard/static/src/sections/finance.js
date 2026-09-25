@@ -12,7 +12,7 @@ const AGE_RAMP = ["--a1", "--a2", "--a3", "--a4", "--a5"];
 /**
  * Finance: six figures, revenue & net profit by month, Bank & Cash, and
  * Receivables / Payables with Aged and Expected views. Every figure opens its
- * detail in the side panel; the panel's "Open in Odoo" opens the native screen.
+ * detail in the side panel; the panel's button (Open record / Open list / Open report) opens the native screen.
  */
 export class FinanceSection extends Component {
     static template = "executive_dashboard.FinanceSection";

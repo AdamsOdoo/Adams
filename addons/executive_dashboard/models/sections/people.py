@@ -7,11 +7,11 @@ Current position only (no period). Days are the user's (``_utc_bounds``).
 - Attendance today (Attendances): ``hr.attendance`` with ``check_in`` today, one line per
   employee: first check-in, last check-out, worked hours (``worked_hours`` of closed
   attendances plus the time since check-in of an open one). Still in = an open attendance.
-  Shown to Attendance officers and above; record rules apply.
+  Shown when Attendances is installed.
 - Time off (Time Off): approved ``hr.leave`` (``state = 'validate'``) overlapping today, and
-  those starting in the next 7 days. Shown to Time Off officers and responsibles.
+  those starting in the next 7 days. Shown when Time Off is installed.
 - Shifts today (Planning, Enterprise): published ``planning.slot`` overlapping today,
-  grouped by time slot. ``None`` when Planning is not installed or not readable.
+  grouped by time slot. ``None`` when Planning is not installed.
 - Directory: employees paged on the server (department and name filters), with today's
   attendance status.
 """
@@ -30,8 +30,6 @@ DRAWER_ROWS = 50
 DIRECTORY_PAGE = 10
 QUERY_MAX = 100
 LEAVE_DAYS = 7
-ATTENDANCE_GROUPS = ('hr_attendance.group_hr_attendance_officer',)
-LEAVE_GROUPS = ('hr_holidays.group_hr_holidays_user', 'hr_holidays.group_hr_holidays_responsible')
 
 
 class ExecutiveDashboard(models.AbstractModel):
@@ -41,7 +39,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _section_people(self, scope):
         """People widgets: ``kpis``, ``attendance``, ``leave``, ``shifts``, ``departments``,
-        ``directory``; a widget whose app is missing or that the user may not read is ``None``."""
+        ``directory``; a widget whose app is missing is ``None``."""
         attendance = self._ppl_attendance(scope, PANEL_ROWS) if self._ppl_can('attendance') else None
         leave = self._ppl_leave(scope, LEAVE_ROWS) if self._ppl_can('leave') else None
         shifts = self._ppl_shifts(scope, SHIFT_ROWS) if self._ppl_can('shifts') else None
@@ -57,29 +55,26 @@ class ExecutiveDashboard(models.AbstractModel):
             'leave': leave,
             'shifts': shifts,
             'departments': departments,
+            # ``can_open``: the user may open Odoo's employee list with their own rights.
             'directory': dict(self._ppl_directory(scope, {}), options=[
-                {'id': d['id'], 'name': d['name']} for d in departments if d['id']]),
+                {'id': d['id'], 'name': d['name']} for d in departments if d['id']],
+                can_open=self._can_list('hr.employee', list(self._ppl_employee_domain(scope)))),
         }
 
     # ------------------------------------------------------------------ access
 
     def _ppl_can(self, widget):
-        """Whether the app behind ``widget`` is installed and the user may read it."""
+        """Whether the app behind ``widget`` is installed."""
         if widget == 'attendance':
-            return self._sal_can_read('hr.attendance') and self._ppl_in_groups(ATTENDANCE_GROUPS)
+            return self._sal_can_read('hr.attendance')
         if widget == 'leave':
-            return self._sal_can_read('hr.leave') and self._ppl_in_groups(LEAVE_GROUPS)
+            return self._sal_can_read('hr.leave')
         if widget == 'shifts':
             if not self._sal_can_read('planning.slot'):
                 return False
             names = self.env['planning.slot']._fields
             return all(name in names for name in ('start_datetime', 'end_datetime', 'resource_id'))
         raise ValidationError(self.env._('Unknown detail.'))
-
-    def _ppl_in_groups(self, groups):
-        user = self.env.user
-        return self.env.is_superuser() or any(
-            self.env.ref(group, raise_if_not_found=False) and user.has_group(group) for group in groups)
 
     def _ppl_check(self, widget):
         if not self._ppl_can(widget):
@@ -116,7 +111,7 @@ class ExecutiveDashboard(models.AbstractModel):
         employee = self.env['hr.employee'].browse(self._positive_id(args, 'employee_id')).exists()
         if not employee:
             raise ValidationError(self.env._('Unknown detail.'))
-        employee.check_access('read')
+        self._check_company(employee)
         return employee
 
     def _ppl_department_id(self, args):

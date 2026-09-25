@@ -9,7 +9,7 @@
     <menuitem id="menu_root" name="Executive Dashboard" sequence="14"
               action="action_dashboard"
               web_icon="executive_dashboard,static/description/icon.png"
-              groups="group_user"/>
+              groups="group_admin"/>
     <menuitem id="menu_dashboard" name="Dashboard" parent="menu_root" sequence="1"
               action="action_dashboard"/>
     <menuitem id="menu_settings" name="Settings" parent="menu_root" sequence="90"

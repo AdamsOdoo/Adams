@@ -140,8 +140,8 @@
             <div>
                 <h2>Employees directory</h2>
             </div>
-            <button type="button" class="ed-link" t-on-click="openInOdoo">
-                Open in Odoo <Icon name="'arrow'" flip="true"/>
+            <button t-if="props.directory.can_open" type="button" class="ed-link" t-on-click="openInOdoo">
+                Open list <Icon name="'arrow'" flip="true"/>
             </button>
         </header>
         <div class="ed-filters">

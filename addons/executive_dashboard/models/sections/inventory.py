@@ -9,7 +9,7 @@ user's.
 The stock report groups ``stock.quant`` on internal locations by product and warehouse
 (never ``qty_available``); filters, "Hide zero and negative stock" and paging run in the
 query. Values are Odoo 19's own quant valuation (``stock.quant.value``, ``stock_account``),
-shown only to users who may read it (Inventory Administrator).
+read with the dashboard's elevated rights.
 """
 from datetime import timedelta
 
@@ -51,7 +51,9 @@ class ExecutiveDashboard(models.AbstractModel):
             },
             'deliveries': tiles['outgoing'],
             'receipts': tiles['incoming'],
-            'stock': dict(self._inv_stock(scope, {}), options=self._inv_stock_options(scope)),
+            # ``can_open``: the user may open Odoo's stock list with their own rights.
+            'stock': dict(self._inv_stock(scope, {}), options=self._inv_stock_options(scope),
+                          can_open=self._can_list('stock.quant', list(self._inv_stock_domain(scope, False, False, '')))),
         }
 
     # ------------------------------------------------------------------ transfers
@@ -162,7 +164,7 @@ class ExecutiveDashboard(models.AbstractModel):
         picking = self.env['stock.picking'].browse(self._positive_id(args, 'picking_id')).exists()
         if not picking:
             raise ValidationError(self.env._('Unknown detail.'))
-        picking.check_access('read')
+        self._check_company(picking)
         return picking
 
     def _inv_picking_drawer(self, args, key):
@@ -292,7 +294,7 @@ class ExecutiveDashboard(models.AbstractModel):
         product = self.env['product.product'].browse(self._positive_id(args, 'product_id')).exists()
         if not product:
             raise ValidationError(self.env._('Unknown detail.'))
-        product.check_access('read')
+        self._check_company(product)
         return product
 
     def _drawer_inventory_product(self, args):

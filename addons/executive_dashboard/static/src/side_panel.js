@@ -1,5 +1,6 @@
 /** @odoo-module **/
 import { Component, onWillUnmount, onWillUpdateProps, useEffect, useRef, useState } from "@odoo/owl";
+import { _t } from "@web/core/l10n/translation";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { Icon } from "./icons";
@@ -14,8 +15,11 @@ export const drawerRegistry = registry.category("executive_dashboard.drawers");
  * Side panel. `panel` is null (closed), `{ kind: "search" }`, or
  * `{ kind: "drawer", key: "<section>.<name>", args, crumb, back }` whose
  * content comes from `get_drawer` when it opens. The generic body shows
- * `rows` (each may open a nested drawer), an optional `total` and an
- * "Open in Odoo" button when the drawer names an `action`.
+ * `rows` (each may open a nested drawer, or a native screen through its own
+ * `action`), an optional `total` and a button to the native screen when the
+ * drawer names an `action`. The server keeps an `action` only when the user may
+ * open that screen; its `kind` names the button: Open record, Open list or
+ * Open report.
  */
 export class SidePanel extends Component {
     static template = "executive_dashboard.SidePanel";
@@ -128,8 +132,12 @@ export class SidePanel extends Component {
 
     // ------------------------------------------------------------ actions
 
-    async openInOdoo() {
-        const target = this.state.data?.action;
+    /** Button label of a native screen: `kind` is record, list or report. */
+    openLabel(kind) {
+        return { record: _t("Open record"), report: _t("Open report") }[kind] || _t("Open list");
+    }
+
+    async openTarget(target) {
         if (target) {
             const action = await this.orm.call(MODEL, "open_action", [target.key, target.args || {}]);
             this.props.close();
@@ -137,9 +145,15 @@ export class SidePanel extends Component {
         }
     }
 
+    openNative() {
+        return this.openTarget(this.state.data?.action);
+    }
+
     openRow(row) {
         if (row.open) {
-            this.props.open({ kind: "drawer", ...row.open, back: this.props.panel });
+            this.props.open({ kind: "drawer", sec: this.props.panel.sec, ...row.open, back: this.props.panel });
+        } else if (row.action) {
+            this.openTarget(row.action);
         }
     }
 

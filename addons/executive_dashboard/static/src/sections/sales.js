@@ -2,6 +2,7 @@
 import { Component } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { deserializeDate } from "@web/core/l10n/dates";
+import { formatFloat } from "@web/core/utils/numbers";
 import { sectionRegistry } from "../section";
 import { drawerRegistry } from "../side_panel";
 import { Icon } from "../icons";
@@ -10,8 +11,9 @@ import { compact, deliveryChip, periodLabel, whole } from "../widgets/format";
 
 /**
  * Sales: four figures, invoiced sales by month, salespeople, top products by
- * quantity, top customers by payments, and recent orders with the order's own
- * Delivery Status. A widget the user may not read arrives as null and is left out.
+ * quantity, top customers by payments, recent orders with the order's own
+ * Delivery Status, and recent quotations. A widget whose app is missing arrives
+ * as null and is left out.
  */
 export class SalesSection extends Component {
     static template = "executive_dashboard.SalesSection";
@@ -25,7 +27,7 @@ export class SalesSection extends Component {
         // Column names repeated on each card at phone width.
         this.labels = {
             ref: _t("Reference"), customer: _t("Customer"), date: _t("Date"), value: _t("Value"),
-            delivery: _t("Delivery Status"),
+            delivery: _t("Delivery Status"), validity: _t("Expiration"), status: _t("Status"),
         };
     }
 
@@ -95,19 +97,45 @@ export class SalesSection extends Component {
     openOrder(row) {
         this.open("order", { order_id: row.id }, _t("Recent orders"));
     }
+
+    openQuotation(row) {
+        this.open("order", { order_id: row.id }, _t("Recent quotations"));
+    }
 }
 
-/** Side panel of one order: its Delivery Status and its delivery orders. */
+/**
+ * Side panel of one order or quotation: its details, Delivery Status and
+ * Invoice Status as Odoo stores them, and its lines (ordered, delivered,
+ * invoiced). "Deliveries" lists its delivery orders in a nested panel.
+ */
 export class SalesOrderDrawer extends Component {
     static template = "executive_dashboard.SalesOrderDrawer";
+    static components = { Icon };
     static props = { data: { type: [Object, { value: null }], optional: true }, open: Function, panel: Object };
 
     setup() {
         this.deliveryChip = deliveryChip;
+        this.whole = whole;
+        this.labels = { product: _t("Product"), ordered: _t("Ordered"), delivered: _t("Delivered"),
+                        invoiced: _t("Invoiced") };
     }
 
-    pickingChip(state) {
-        return { done: "good", assigned: "info", cancel: "neutral" }[state] || "neutral";
+    formatDate(value) {
+        return value ? deserializeDate(value).toFormat("d MMM yyyy") : "—";
+    }
+
+    quantity(value) {
+        return formatFloat(value, { digits: [false, 2] });
+    }
+
+    invoiceChip(status) {
+        return { invoiced: "good", "to invoice": "warn", upselling: "info" }[status] || "neutral";
+    }
+
+    openDeliveries() {
+        const { panel } = this.props;
+        this.props.open({ kind: "drawer", key: "sales.deliveries", args: panel.args, crumb: this.props.data.title,
+                          sec: panel.sec, back: panel });
     }
 }
 

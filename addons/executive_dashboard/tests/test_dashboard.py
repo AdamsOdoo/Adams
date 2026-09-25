@@ -1,5 +1,6 @@
 from datetime import date
 
+from odoo import Command
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import TransactionCase, freeze_time, new_test_user, tagged
 
@@ -13,10 +14,10 @@ class TestDashboard(TransactionCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.Dashboard = cls.env['executive.dashboard']
-        # Dashboard user with accounting read access, and one without any app rights.
+        # Dashboard administrators with accounting read access and without any app rights.
         cls.finance_user = new_test_user(
-            cls.env, login='ed_finance', groups='executive_dashboard.group_user,account.group_account_readonly')
-        cls.plain_user = new_test_user(cls.env, login='ed_plain', groups='executive_dashboard.group_user')
+            cls.env, login='ed_finance', groups='executive_dashboard.group_admin,account.group_account_readonly')
+        cls.plain_user = new_test_user(cls.env, login='ed_plain', groups='executive_dashboard.group_admin')
         cls.outsider = new_test_user(cls.env, login='ed_outsider', groups='base.group_user')
 
     def setUp(self):
@@ -31,9 +32,14 @@ class TestDashboard(TransactionCase):
     def test_install(self):
         action = self.env.ref('executive_dashboard.action_dashboard')
         self.assertEqual(action.tag, 'executive_dashboard.dashboard')
-        self.assertIn(self.env.ref('executive_dashboard.group_user'),
-                      self.env.ref('executive_dashboard.menu_root').group_ids)
-        self.assertTrue(self.env.ref('base.user_admin').has_group('executive_dashboard.group_manager'))
+        self.assertEqual(self.env.ref('executive_dashboard.menu_root').group_ids,
+                         self.env.ref('executive_dashboard.group_admin'))
+        self.assertTrue(self.env.ref('base.user_admin').has_group('executive_dashboard.group_admin'))
+        # One access level only: the former User/Manager groups are gone.
+        for xmlid in ('executive_dashboard.group_user', 'executive_dashboard.group_manager'):
+            self.assertIsNone(self.env.ref(xmlid, raise_if_not_found=False))
+        # The Finance report-line settings are gone.
+        self.assertNotIn('executive_dashboard_line_revenue_id', self.env['res.company']._fields)
         self.assertTrue(self.env.company.executive_dashboard_finance)
 
     # -- access --------------------------------------------------------------
@@ -44,13 +50,34 @@ class TestDashboard(TransactionCase):
         with self.assertRaises(AccessError):
             self.as_user(self.outsider).get_section('finance', 'month')
 
-    def test_user_without_app_rights_gets_restricted(self):
-        result = self.as_user(self.plain_user).get_section('finance', 'month')
-        self.assertEqual(result['status'], 'restricted')
-        self.assertEqual(result['widgets'], {})
-        self.assertNotIn('finance', [s['key'] for s in self.as_user(self.plain_user).get_bootstrap()['sections']])
+    def test_system_administrator_needs_the_dashboard_group(self):
+        system = new_test_user(self.env, login='ed_system', groups='base.group_system')
         with self.assertRaises(AccessError):
-            self.as_user(self.plain_user).get_drawer('finance.anything')
+            self.as_user(system).get_bootstrap()
+
+    def test_administrator_sees_everything_without_app_rights(self):
+        plain = self.as_user(self.plain_user)
+        result = plain.get_section('finance', 'month')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets'], self.as_user(self.finance_user).get_section('finance', 'month')['widgets'])
+        self.assertIn('finance', [s['key'] for s in plain.get_bootstrap()['sections']])
+        # Full details in the side panel, but no button to a screen the user may not open.
+        drawer = plain.get_drawer('finance.revenue', {'period': 'month'})
+        self.assertEqual(len(drawer['rows']), 12)
+        self.assertIsNone(drawer['action'])
+        with self.assertRaises(AccessError):
+            plain.open_action('finance.pnl', {'period': 'month'})
+        # A user who may open the screen gets the button, named after what it opens.
+        target = self.as_user(self.finance_user).get_drawer('finance.revenue', {'period': 'month'})['action']
+        self.assertEqual(target['key'], 'finance.pnl')
+        self.assertIn(target['kind'], ('list', 'report'))
+
+    def test_only_the_users_companies(self):
+        other = self.env['res.company'].create({'name': 'Executive Other Company'})
+        with self.assertRaises(AccessError):
+            self.as_user(self.plain_user).with_context(allowed_company_ids=[other.id]).get_section('finance')
+        with self.assertRaises(AccessError):
+            self.as_user(self.plain_user).with_context(allowed_company_ids=[other.id]).global_search('Example')
 
     def test_bootstrap_has_no_figures(self):
         boot = self.as_user(self.finance_user).get_bootstrap()
@@ -136,7 +163,18 @@ class TestDashboard(TransactionCase):
         self.assertEqual(dashboard.global_search('e'), [])
         groups = dashboard.global_search('search example')
         partners = next(g for g in groups if g['model'] == 'res.partner')
-        self.assertIn({'id': partner.id, 'name': partner.display_name}, partners['records'])
+        self.assertIn({'id': partner.id, 'name': partner.display_name, 'can_open': True}, partners['records'])
         self.assertLessEqual(max(len(g['records']) for g in groups), 5)
-        # No group for a model the user may not read.
-        self.assertNotIn('account.move', [g['model'] for g in self.as_user(self.plain_user).global_search('INV')])
+        # Search covers everything, but a record opens only when the user may open it.
+        move = self.env['account.move'].create({
+            'move_type': 'out_invoice', 'partner_id': partner.id,
+            'invoice_line_ids': [Command.create({'name': 'Example', 'quantity': 1, 'price_unit': 10.0})]})
+        move.action_post()
+        records = next(g for g in self.as_user(self.plain_user).global_search(move.name)
+                       if g['model'] == 'account.move')['records']
+        self.assertIn({'id': move.id, 'name': move.display_name, 'can_open': False}, records)
+        # Records of a company the user does not use are left out.
+        other = self.env['res.company'].create({'name': 'Executive Other Company'})
+        self.env['res.partner'].create({'name': 'Search Example Elsewhere', 'company_id': other.id})
+        names = [r['name'] for g in dashboard.global_search('search example elsewhere') for r in g['records']]
+        self.assertNotIn('Search Example Elsewhere', names)

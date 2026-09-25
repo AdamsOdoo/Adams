@@ -40,11 +40,11 @@ class TestSales(SalesCrmCase):
         super().setUpClass()
         cls.manager = new_test_user(
             cls.env, login='ed_sales_manager', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,sales_team.group_sale_manager,account.group_account_readonly')
+            groups='executive_dashboard.group_admin,sales_team.group_sale_manager,account.group_account_readonly')
         cls.salesman = new_test_user(
             cls.env, login='ed_salesman', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,sales_team.group_sale_salesman')
-        cls.plain = new_test_user(cls.env, login='ed_sales_plain', groups='executive_dashboard.group_user')
+            groups='executive_dashboard.group_admin,sales_team.group_sale_salesman')
+        cls.plain = new_test_user(cls.env, login='ed_sales_plain', groups='executive_dashboard.group_admin')
         product_vals = {'name': 'Example Tile', 'list_price': 100.0, 'invoice_policy': 'order'}
         if 'is_storable' in cls.env['product.template']._fields:
             product_vals.update(type='consu', is_storable=True)
@@ -77,7 +77,8 @@ class TestSales(SalesCrmCase):
         result = self.section(self.manager, 'sales')
         self.assertEqual(result['status'], 'ok')
         self.assertEqual(set(result['widgets']),
-                         {'currency', 'kpis', 'trend', 'salespeople', 'products', 'customers', 'orders'})
+                         {'currency', 'kpis', 'trend', 'salespeople', 'products', 'customers', 'orders',
+                          'quotations'})
         self.assertEqual(set(result['widgets']['kpis']), {'invoiced', 'orders', 'quotations', 'to_invoice'})
         self.assertEqual(len(result['widgets']['trend']['months']), 12)
 
@@ -128,13 +129,57 @@ class TestSales(SalesCrmCase):
         self.assertEqual(row['delivery_status'], order.delivery_status)
         labels = dict(order._fields['delivery_status']._description_selection(self.env))
         self.assertEqual(row['delivery_label'], labels[order.delivery_status])
-        # The drawer lists the order's delivery orders; Open in Odoo opens them.
+        # The order panel shows the stored statuses; Deliveries lists the delivery orders,
+        # each opening in Inventory.
         drawer = Dashboard.get_drawer('sales.order', {'order_id': order.id})
         self.assertEqual(drawer['delivery_status'], order.delivery_status)
-        self.assertEqual([r['label'] for r in drawer['rows']], order.picking_ids.sorted('scheduled_date').mapped('name'))
+        self.assertEqual(drawer['deliveries'], len(order.picking_ids))
+        deliveries = Dashboard.get_drawer('sales.deliveries', {'order_id': order.id})
+        self.assertEqual([r['label'] for r in deliveries['rows']],
+                         order.picking_ids.sorted('scheduled_date').mapped('name'))
+        row = deliveries['rows'][0]
+        self.assertEqual(row['action']['kind'], 'record')
+        action = Dashboard.open_action(row['action']['key'], row['action']['args'])
+        self.assertEqual((action['res_model'], action['res_id']), ('stock.picking', order.picking_ids[:1].id))
+        # A delivery order of another order is refused.
+        other = self._order()
+        with self.assertRaises(ValidationError):
+            Dashboard.open_action('sales.picking', {'order_id': order.id, 'picking_id': other.picking_ids[:1].id})
+
+    def test_order_panel_details(self):
+        order = self._order(qty=4.0)
+        order.user_id = self.salesman
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        drawer = Dashboard.get_drawer('sales.order', {'order_id': order.id})
+        self.assertEqual((drawer['customer'], drawer['salesperson']), (self.partner.display_name, self.salesman.name))
+        self.assertEqual((drawer['untaxed'], drawer['total']), (order.amount_untaxed, order.amount_total))
+        self.assertEqual(drawer['invoice_status'], order.invoice_status)
+        labels = dict(order._fields['invoice_status']._description_selection(self.env))
+        self.assertEqual(drawer['invoice_label'], labels[order.invoice_status])
+        line = order.order_line
+        self.assertEqual(drawer['lines'], [{'name': line.product_id.display_name, 'unit': line.product_uom_id.name,
+                                            'ordered': 4.0, 'delivered': line.qty_delivered,
+                                            'invoiced': line.qty_invoiced}])
+        self.assertEqual(drawer['action']['kind'], 'record')
         action = Dashboard.open_action('sales.order', {'order_id': order.id})
-        self.assertEqual(action['res_model'], 'stock.picking')
-        self.assertEqual(action['domain'], [('id', 'in', order.picking_ids.ids)])
+        self.assertEqual((action['res_model'], action['res_id']), ('sale.order', order.id))
+
+    def test_recent_quotations(self):
+        quotation = self._order(confirm=False)
+        quotation.validity_date = self.today + timedelta(days=30)
+        confirmed = self._order()
+        widgets = self.section(self.manager, 'sales')['widgets']
+        rows = widgets['quotations']['rows']
+        row = next(r for r in rows if r['id'] == quotation.id)
+        self.assertNotIn(confirmed.id, [r['id'] for r in rows])
+        self.assertEqual(widgets['quotations']['count'], self.env['sale.order'].search_count([
+            ('state', 'in', ('draft', 'sent')), ('company_id', '=', self.company.id)]))
+        self.assertEqual(row['validity_date'], fields.Date.to_string(quotation.validity_date))
+        self.assertEqual((row['state'], row['amount']), ('draft', quotation.amount_untaxed))
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        self.assertEqual(Dashboard.get_drawer('sales.order', {'order_id': quotation.id})['state'], 'draft')
+        action = Dashboard.open_action('sales.order', {'order_id': quotation.id})
+        self.assertEqual((action['res_model'], action['res_id']), ('sale.order', quotation.id))
 
     def test_drawers(self):
         self._invoice('out_invoice', 500.0)
@@ -158,7 +203,7 @@ class TestSales(SalesCrmCase):
             with self.assertRaises(ValidationError, msg=key):
                 Dashboard.get_drawer(key, args)
 
-    def test_salesman_sees_own_documents_only(self):
+    def test_salesman_sees_every_order(self):
         mine = self._order()
         mine.user_id = self.salesman
         other = self._order()
@@ -166,15 +211,27 @@ class TestSales(SalesCrmCase):
         widgets = self.section(self.salesman, 'sales')['widgets']
         ids = [r['id'] for r in widgets['orders']['rows']]
         self.assertIn(mine.id, ids)
-        self.assertNotIn(other.id, ids)
-        # No accounting rights: payments are not readable, so that widget is left out.
-        self.assertIsNone(widgets['customers'])
-        self.assertIsNotNone(widgets['kpis']['invoiced'])
+        self.assertIn(other.id, ids)
+        self.assertIsNotNone(widgets['customers'])
+        Dashboard = self.env['executive.dashboard'].with_user(self.salesman)
+        # Full details of another salesperson's order, but no button: the salesman may not open it.
+        self.assertEqual(Dashboard.get_drawer('sales.order', {'order_id': other.id})['action'], None)
+        self.assertEqual(Dashboard.get_drawer('sales.order', {'order_id': mine.id})['action']['kind'], 'record')
         with self.assertRaises(AccessError):
-            self.env['executive.dashboard'].with_user(self.salesman).get_drawer('sales.order', {'order_id': other.id})
+            Dashboard.open_action('sales.order', {'order_id': other.id})
 
-    def test_user_without_sales_rights_is_restricted(self):
-        self.assertEqual(self.section(self.plain, 'sales')['status'], 'restricted')
+    def test_order_of_another_company_is_refused(self):
+        other_company = self.env['res.company'].create({'name': 'Sales Example Other'})
+        order = self.env['sale.order'].with_company(other_company).create({
+            'partner_id': self.partner.id, 'company_id': other_company.id})
+        with self.assertRaises(AccessError):
+            self.env['executive.dashboard'].with_user(self.manager).get_drawer('sales.order', {'order_id': order.id})
+
+    def test_user_without_sales_rights_sees_everything(self):
+        self._order()
+        result = self.section(self.plain, 'sales')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets']['kpis'], self.section(self.manager, 'sales')['widgets']['kpis'])
 
     def test_query_limit(self):
         self._invoice('out_invoice', 100.0)
@@ -196,8 +253,8 @@ class TestCrm(SalesCrmCase):
         super().setUpClass()
         cls.manager = new_test_user(
             cls.env, login='ed_crm_manager', company_id=cls.company.id, company_ids=[cls.company.id],
-            groups='executive_dashboard.group_user,sales_team.group_sale_manager')
-        cls.plain = new_test_user(cls.env, login='ed_crm_plain', groups='executive_dashboard.group_user')
+            groups='executive_dashboard.group_admin,sales_team.group_sale_manager')
+        cls.plain = new_test_user(cls.env, login='ed_crm_plain', groups='executive_dashboard.group_admin')
         cls.stage = cls.env['crm.stage'].search([('is_won', '=', False)], limit=1)
         cls.today = fields.Date.context_today(cls.env['executive.dashboard'].with_user(cls.manager))
 
@@ -253,8 +310,13 @@ class TestCrm(SalesCrmCase):
         with self.assertRaises(ValidationError):
             Dashboard.get_drawer('crm.list', {'kind': 'stage', 'stage_id': 'x'})
 
-    def test_user_without_crm_rights_is_restricted(self):
-        self.assertEqual(self.section(self.plain, 'crm')['status'], 'restricted')
+    def test_user_without_crm_rights_sees_everything(self):
+        lead = self._opportunity(700.0)
+        result = self.section(self.plain, 'crm')
+        self.assertEqual(result['status'], 'ok')
+        self.assertEqual(result['widgets']['kpis'], self.section(self.manager, 'crm')['widgets']['kpis'])
+        plain = self.env['executive.dashboard'].with_user(self.plain)
+        self.assertIsNone(plain.get_drawer('crm.opportunity', {'lead_id': lead.id})['action'])
 
     def test_query_limit(self):
         self._opportunity(100.0)

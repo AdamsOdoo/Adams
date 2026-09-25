@@ -6,7 +6,7 @@ To approve is ``state = 'to approve'``. Late receipts are incoming transfers sch
 today and not done or cancelled (Inventory's own "Late" filter, see ``inventory.py``). The
 open purchase value is what confirmed orders still have to receive (``purchase_stock``).
 
-Every total is one grouped query (``_read_group``); record rules apply throughout.
+Every total is one grouped query (``_read_group``); filtered on the user's current companies.
 """
 from collections import defaultdict
 
@@ -30,7 +30,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _section_procurement(self, scope):
         """Procurement widgets: ``currency``, ``kpis``, ``approve``, ``late``, ``suppliers``, ``trend``;
-        a widget the user may not read or whose app is missing is ``None``."""
+        a widget whose app is missing is ``None``."""
         currency = scope['company'].currency_id
         receipts = self._sal_can_read('stock.picking')
         late = self._inv_pickings_summary(scope, 'incoming', 'late', PANEL_ROWS) if receipts else None
@@ -214,7 +214,7 @@ class ExecutiveDashboard(models.AbstractModel):
         order = self.env['purchase.order'].browse(self._positive_id(args, 'order_id')).exists()
         if not order:
             raise ValidationError(self.env._('Unknown detail.'))
-        order.check_access('read')
+        self._check_company(order)
         return order
 
     def _drawer_procurement_order(self, args):

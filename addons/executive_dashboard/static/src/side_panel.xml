@@ -19,7 +19,7 @@
                             <t t-if="props.panel.kind === 'search'">Search</t>
                             <t t-else="" t-esc="state.data?.title or props.panel.title or ''"/>
                         </h2>
-                        <p t-if="props.panel.kind === 'search'">Searches the whole database with your access rights, not only what the dashboard shows.</p>
+                        <p t-if="props.panel.kind === 'search'">Searches the whole database for the companies you use, not only what the dashboard shows.</p>
                         <p t-elif="state.data?.sub" t-esc="state.data.sub"/>
                     </div>
                     <button type="button" class="ed-icon-btn" t-ref="closeBtn" title="Close" aria-label="Close" t-on-click="props.close">
@@ -37,15 +37,24 @@
                         <t t-foreach="state.results or []" t-as="group" t-key="group.model">
                             <div class="ed-group-label"><span t-esc="group.label"/><span class="ed-num" t-esc="group.records.length"/></div>
                             <div class="ed-rows">
-                                <button t-foreach="group.records" t-as="rec" t-key="rec.id" type="button"
-                                        class="ed-row click w-100 border-0 bg-transparent text-start"
-                                        t-on-click="() => props.openRecord(group.model, rec.id)">
-                                    <span class="ed-l"><span>
-                                        <t t-foreach="highlight(rec.name)" t-as="part" t-key="part_index">
-                                            <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
-                                        </t>
-                                    </span></span>
-                                </button>
+                                <t t-foreach="group.records" t-as="rec" t-key="rec.id">
+                                    <button t-if="rec.can_open" type="button" title="Open record"
+                                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                                            t-on-click="() => props.openRecord(group.model, rec.id)">
+                                        <span class="ed-l"><span>
+                                            <t t-foreach="highlight(rec.name)" t-as="part" t-key="part_index">
+                                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                                            </t>
+                                        </span></span>
+                                    </button>
+                                    <div t-else="" class="ed-row">
+                                        <span class="ed-l"><span>
+                                            <t t-foreach="highlight(rec.name)" t-as="part" t-key="part_index">
+                                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                                            </t>
+                                        </span></span>
+                                    </div>
+                                </t>
                             </div>
                         </t>
                     </t>
@@ -59,9 +68,10 @@
                     <t t-elif="state.data">
                         <div class="ed-rows">
                             <t t-foreach="state.data.rows or []" t-as="row" t-key="row_index">
-                                <button t-if="row.open" type="button" class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openRow(row)">
+                                <button t-if="row.open or row.action" type="button" class="ed-row click w-100 border-0 bg-transparent text-start"
+                                        t-att-title="row.action ? openLabel(row.action.kind) : null" t-on-click="() => this.openRow(row)">
                                     <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
-                                    <span class="ed-r ed-num" t-esc="row.value"/>
+                                    <span class="ed-r ed-num"><t t-esc="row.value"/><Icon t-if="row.action" name="'arrow'" flip="true"/></span>
                                 </button>
                                 <div t-else="" class="ed-row">
                                     <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
@@ -76,8 +86,8 @@
                 </div>
 
                 <div t-if="state.data?.action" class="ed-drawer-foot">
-                    <button type="button" class="ed-btn primary" t-on-click="openInOdoo">
-                        Open in Odoo <Icon name="'arrow'" flip="true"/>
+                    <button type="button" class="ed-btn primary" t-on-click="openNative">
+                        <t t-esc="openLabel(state.data.action.kind)"/> <Icon name="'arrow'" flip="true"/>
                     </button>
                     <span t-if="state.data.dest" class="ed-dest">Opens: <t t-esc="state.data.dest"/></span>
                 </div>

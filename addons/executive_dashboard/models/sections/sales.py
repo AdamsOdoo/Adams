@@ -3,10 +3,9 @@
 Invoiced sales are posted customer invoices and credit notes (``amount_untaxed_signed``,
 accounting date in the period), the same documents as Accounting › Customers ›
 Invoices. Orders come from ``sale.order``; the Delivery Status is the order's own
-``delivery_status`` field (``sale_stock``), shown with Odoo's labels. Figures the user
-may not read (e.g. payments without accounting rights) are left out (``None``).
+``delivery_status`` field (``sale_stock``), shown with Odoo's labels.
 
-Every total is one grouped query (``_read_group``); record rules apply throughout.
+Every total is one grouped query (``_read_group``), filtered on the user's current companies.
 """
 from collections import defaultdict
 from datetime import datetime, time, timedelta
@@ -23,6 +22,7 @@ TREND_MONTHS = 12
 TOP_ROWS = 5
 RECENT_ROWS = 10
 DRAWER_ROWS = 25
+LINE_ROWS = 50
 INVOICE_TYPES = ('out_invoice', 'out_refund')
 
 
@@ -33,7 +33,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _section_sales(self, scope):
         """Sales widgets: ``currency``, ``kpis``, ``trend``, ``salespeople``, ``products``,
-        ``customers``, ``orders``; a widget the user may not read is ``None``."""
+        ``customers``, ``orders``, ``quotations``; a widget whose app is missing is ``None``."""
         currency = scope['company'].currency_id
         invoices = self._sal_can_read('account.move')
         orders = self._sal_orders_kpi(scope, self._sal_confirmed_domain(scope))
@@ -52,11 +52,13 @@ class ExecutiveDashboard(models.AbstractModel):
             'products': self._sal_products(scope) if self._sal_can_read('account.move.line') else None,
             'customers': self._sal_customers(scope) if self._sal_can_read('account.payment') else None,
             'orders': self._sal_recent(scope),
+            'quotations': self._sal_recent_quotations(scope),
         }
 
     # ------------------------------------------------------------------ helpers
 
     def _sal_can_read(self, model):
+        """Whether ``model`` is installed (the dashboard reads with elevated rights)."""
         return model in self.env and self.env[model].has_access('read')
 
     def _utc_bounds(self, date_from, date_to):
@@ -241,6 +243,19 @@ class ExecutiveDashboard(models.AbstractModel):
         return {'rows': [self._sal_order_row(order, delivery) for order in orders],
                 'count': SaleOrder.search_count(domain), 'delivery': delivery}
 
+    def _sal_recent_quotations(self, scope):
+        """Latest open quotations (draft or sent), as of today like the Open quotations figure."""
+        SaleOrder = self.env['sale.order']
+        domain = self._sal_quotation_domain(scope)
+        quotations = SaleOrder.search(domain, order='date_order desc, id desc', limit=RECENT_ROWS)
+        return {'rows': [{
+            'id': order.id, 'name': order.name, 'customer': order.partner_id.display_name,
+            'date': fields.Date.to_string(fields.Datetime.context_timestamp(self, order.date_order)),
+            'validity_date': fields.Date.to_string(order.validity_date) if order.validity_date else False,
+            'amount': order.amount_untaxed, 'currency': order.currency_id.name,
+            'state': order.state, 'state_label': self._sal_selection('sale.order', 'state', order.state),
+        } for order in quotations], 'count': SaleOrder.search_count(domain)}
+
     # ------------------------------------------------------------------ drawers
 
     def _sal_invoice_rows(self, moves):
@@ -376,19 +391,60 @@ class ExecutiveDashboard(models.AbstractModel):
         order = self.env['sale.order'].browse(self._positive_id(args, 'order_id')).exists()
         if not order:
             raise ValidationError(self.env._('Unknown detail.'))
-        order.check_access('read')
+        self._check_company(order)
         return order
 
+    def _sal_pickings(self, order):
+        """The order's delivery orders (``picking_ids`` comes with ``sale_stock``), or None."""
+        if 'picking_ids' not in order._fields or not self._sal_can_read('stock.picking'):
+            return None
+        return order.picking_ids.sorted(lambda p: (p.scheduled_date or datetime.max, p.id))
+
     def _drawer_sales_order(self, args):
-        """One order's delivery orders (``picking_ids``) and its Delivery Status."""
+        """One order or quotation: its details, statuses as Odoo stores them, and its lines."""
         order = self._sal_order(args)
         _ = self.env._
         delivery = 'delivery_status' in order._fields
         row = self._sal_order_row(order, delivery)
-        # ``picking_ids`` comes with ``sale_stock``, like the Delivery Status.
-        pickings = order.picking_ids if delivery and self._sal_can_read('stock.picking') else None
+        pickings = self._sal_pickings(order)
+        lines = order.order_line.filtered(lambda l: not l.display_type)
+        quotation = order.state in ('draft', 'sent')
+        return {
+            'title': order.name, 'sub': order.partner_id.display_name,
+            'customer': order.partner_id.display_name,
+            'date': row['date'],
+            'validity_date': fields.Date.to_string(order.validity_date) if order.validity_date else False,
+            'salesperson': order.user_id.name or '',
+            'untaxed': order.amount_untaxed, 'total': order.amount_total, 'currency': order.currency_id.name,
+            'state': order.state, 'state_label': self._sal_selection('sale.order', 'state', order.state),
+            'delivery_status': row['delivery_status'], 'delivery_label': row['delivery_label'],
+            'invoice_status': order.invoice_status or False,
+            'invoice_label': self._sal_selection('sale.order', 'invoice_status', order.invoice_status)
+            if order.invoice_status else '',
+            'lines': [{
+                'name': line.product_id.display_name or line.name,
+                'unit': line.product_uom_id.name or '',
+                'ordered': line.product_uom_qty, 'delivered': line.qty_delivered, 'invoiced': line.qty_invoiced,
+            } for line in lines[:LINE_ROWS]],
+            'line_count': len(lines),
+            'deliveries': len(pickings) if pickings is not None else None,
+            'action': {'key': 'sales.order', 'args': {'order_id': order.id}},
+            'dest': _('Quotation') if quotation else _('Sales Order'),
+        }
+
+    def _action_sales_order(self, args):
+        order = self._sal_order(args)
+        if order.state in ('draft', 'sent'):
+            return self._window('sale.action_quotations', order.name, 'sale.order', [('id', '=', order.id)],
+                                res_id=order.id)
+        return self._window('sale.action_orders', order.name, 'sale.order', [('id', '=', order.id)], res_id=order.id)
+
+    def _drawer_sales_deliveries(self, args):
+        """The order's delivery orders; each opens in Inventory."""
+        order = self._sal_order(args)
+        _ = self.env._
         rows = []
-        for picking in pickings.sorted(lambda p: (p.scheduled_date or datetime.max, p.id)) if pickings else ():
+        for picking in self._sal_pickings(order) or ():
             done = picking.state == 'done' and picking.date_done
             when = fields.Datetime.context_timestamp(self, done or picking.scheduled_date) \
                 if (done or picking.scheduled_date) else None
@@ -397,17 +453,17 @@ class ExecutiveDashboard(models.AbstractModel):
                 'sub': (_('Done %s', format_date(self.env, when)) if done else
                         _('Scheduled %s', format_date(self.env, when)) if when else ''),
                 'value': self._sal_selection('stock.picking', 'state', picking.state),
-                'state': picking.state,
+                'action': {'key': 'sales.picking', 'args': {'order_id': order.id, 'picking_id': picking.id}},
             })
         return {'title': _('Deliveries'), 'sub': '%s · %s' % (order.name, order.partner_id.display_name),
-                'delivery_status': row['delivery_status'], 'delivery_label': row['delivery_label'],
-                'rows': rows, 'action': {'key': 'sales.order', 'args': {'order_id': order.id}},
-                'dest': _('Delivery orders') if pickings else _('Sales Order')}
+                'rows': rows}
 
-    def _action_sales_order(self, args):
+    def _action_sales_picking(self, args):
+        """One delivery order of the order, in Inventory."""
         order = self._sal_order(args)
-        if 'picking_ids' in order._fields and order.picking_ids and self._sal_can_read('stock.picking'):
-            return self._window('stock.action_picking_tree_all', order.name, 'stock.picking',
-                                [('id', 'in', order.picking_ids.ids)],
-                                res_id=order.picking_ids.id if len(order.picking_ids) == 1 else None)
-        return self._window('sale.action_orders', order.name, 'sale.order', [('id', '=', order.id)], res_id=order.id)
+        picking_id = self._positive_id(args, 'picking_id')
+        pickings = self._sal_pickings(order)
+        if not pickings or picking_id not in pickings.ids:
+            raise ValidationError(self.env._('Unknown detail.'))
+        return self._window('stock.action_picking_tree_all', pickings.browse(picking_id).name, 'stock.picking',
+                            [('id', '=', picking_id)], res_id=picking_id)
