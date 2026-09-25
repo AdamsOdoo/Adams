@@ -458,8 +458,13 @@ class TestDashboardHRWorkspace(TransactionCase):
                 raise RuntimeError('Controlled adapter failure')
             return original(model, tab, filters, dates)
 
-        with patch.object(service_type, '_hr_source_scope', failed):
+        with patch.object(service_type, '_hr_source_scope', failed), self.assertLogs(
+                'odoo.addons.adams_executive_dashboard.models.hr_workspace', level='WARNING') as logs:
             result = self.dashboard.get_hr_workspace(self.options)
+        self.assertEqual(
+            [record.getMessage() for record in logs.records],
+            ['Dashboard HR source attendance failed: RuntimeError'],
+        )
         metrics = {item['key']: item for item in result['metrics']}
         self.assertEqual(metrics['checked_in']['status'], 'error')
         self.assertNotIn('value', metrics['checked_in'])

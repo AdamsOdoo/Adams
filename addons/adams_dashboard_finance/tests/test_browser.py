@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from odoo import Command, api, fields
 from odoo.exceptions import UserError
-from odoo.tools import config
+from odoo.tools import config, mute_logger
 from odoo.tools.pdf import PdfReader
 from odoo.tests import new_test_user, tagged
 from odoo.tests.common import ChromeBrowser
@@ -147,7 +147,7 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 throw new Error('Recovery reloaded the document or whole dashboard');
             console.log('test successful');
         })().catch(error=>console.error(error));""".replace('PERIOD', json.dumps(period)).replace('EMPLOYEE', json.dumps(employee.name))
-        with patch.object(model, 'get_hr_workspace', fail_once):
+        with patch.object(model, 'get_hr_workspace', fail_once), mute_logger('odoo.http'):
             self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=75)
         self.assertEqual(len(attempts), 2, 'Exactly one failed request followed by its successful Retry')
         self.assertEqual(attempts[0], attempts[1], 'Retry must preserve the exact company, period, filter and page')
@@ -210,7 +210,8 @@ class TestDashboardFinanceBrowser(AccountTestInvoicingHttpCommon):
                 console.log('test successful');
             })().catch(error => console.error(error));
             '''.replace('OPTIONS', json.dumps(options)).replace('ROLE', json.dumps(role)).replace('FOREIGN', str(foreign.id))
-            self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=60)
+            with mute_logger('odoo.http'):
+                self.browser_js(f'/odoo/action-{action.id}', code, login=user.login, timeout=60)
 
     def test_bilingual_finance_reflow_and_native_drilldown(self):
         self.partner_a.name = 'Dashboard Search Fixture'
