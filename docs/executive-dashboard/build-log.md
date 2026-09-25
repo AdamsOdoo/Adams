@@ -6,6 +6,7 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 |---|---|---|---|---|
 | 1 | 2026-09-25 | `c1b9a3a2` | `oh test executive_dashboard`: 12 run, 12 passed (Community, demo). `oh shot /odoo/executive` EN + AR desktop: 2/2 ok. Extra local browser check at 1440 / 1024 / 390 px: no horizontal overflow | **completed** locally; dark mode not verified (Enterprise) |
 | 2 | 2026-09-25 | `e8fa1abc` | `oh test executive_dashboard`: 23 run, 23 passed (Community, demo). `oh shot /odoo/executive` EN + AR: 2/2 ok. Local browser check of Finance at 1440 / 1024 / 390 px, EN + AR: no console errors, no horizontal overflow, drawers and Open in Odoo work. Independent `odoo-reviewer` pass + re-check | **completed** locally; Enterprise report path **not verified** (see below) |
+| 3 | 2026-09-25 | `c74f63f` | `oh test executive_dashboard`: 23 run, 23 passed, Sales/CRM classes skipped (only `web` + `account` installed). Kept DB + `sale_stock,crm`: 37 run, 37 passed (Sales 9, CRM 5). `oh shot /odoo/executive` EN + AR: 2/2 ok. Local browser check of Sales and CRM at 1440 / 1024 / 390 px, EN + AR: 12/12, no console errors, no horizontal overflow, order and opportunity drawers open, Open in Odoo opens the delivery order and the opportunity | **completed** locally; no Enterprise-only part in this phase |
 
 ## Phase 1 notes
 
@@ -31,6 +32,19 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 - Odoo's asset minifier dropped the spaces inside nested template literals (SVG paths broke in the minified bundle only); chart code builds strings by concatenation.
 - Shell fix: the grid columns were on the high-specificity `.o_action_manager > .ed-app.o_action` selector, so the tablet/phone breakpoints never applied (244 px rail kept at 390 px). Now only `display` uses that selector.
 - Review: independent `odoo-reviewer` (read-only). Blocking: native Aged buckets could not be opened; drawer totals not converted across currencies. Should-fix: aged payable sign guess, no savepoint around engine SQL, date mode not checked for override lines, bank override accounts not openable, query-count tests on Enterprise. All fixed with tests where testable locally; the reviewer's re-check confirmed each fix and found no new blocking issue. Its remaining nit (native Aged sign undetermined when the payable total is near zero) is fixed by using journal items in that case.
+
+## Phase 3 notes
+
+- Sales is one `get_section` call (32 queries on demo data, test limit 35); CRM 18 (limit 20).
+- Invoiced sales = posted `out_invoice` + `out_refund`, `amount_untaxed_signed`, **accounting date** in the period (same date field as Finance, so the invoice counts agree); credit notes are deducted. Salespeople group the same invoices by `invoice_user_id` ("No salesperson" when empty).
+- Top products: posted invoice lines (`display_type = 'product'`) by `product_id` + `product_uom_id`, credit-note quantities deducted; different units are never added.
+- Top customers: `account.payment` inbound customer payments `in_process`/`paid`, `date` in the period, `amount_company_currency_signed`. Hidden (widget `null`) when the user may not read payments, e.g. a salesman without accounting rights.
+- Confirmed orders: `state = 'sale'`, `date_order` in the period (user's timezone). Open quotations (`draft`/`sent`) and Orders to invoice (`invoice_status = 'to invoice'`, amount = lines' `untaxed_amount_to_invoice`) are as of today. Order amounts are converted from the order currency at the period end (today for the as-of figures).
+- Recent orders: the 10 latest confirmed orders of the period; Delivery Status is the stored `delivery_status` with Odoo's own (translated) label, shown only when `sale_stock` is installed. The order drawer lists `picking_ids` with their native state; Open in Odoo opens those delivery orders (the form when there is one).
+- CRM: open pipeline = active opportunities with `won_status = 'pending'` (`expected_revenue`, weighted = `prorated_revenue`), as of today; Won = `won_status = 'won'` with `date_closed` in the period; New leads = leads and opportunities created in the period. Leads without a company count in the dashboard company's currency.
+- Record rules apply everywhere (a salesman sees only their own orders; test `test_salesman_sees_own_documents_only`).
+- Native screens are opened with their own actions (`account.action_move_out_invoice`, `sale.action_orders`, `sale.action_quotations`, `sale.action_orders_to_invoice`, `stock.action_picking_tree_all`, `account.action_account_payments`, `crm.crm_lead_action_pipeline`, `crm.crm_lead_all_leads`), resolved at click time; a plain list/form action is used if one is missing.
+- Test setup: `oh test` installs only the dependencies, so `TestSales`/`TestCrm` skip there. Run them in the kept DB after `odoo-bin -i sale_stock,crm` (see the handoff).
 
 ## Verify on Odoo.sh (Enterprise)
 
