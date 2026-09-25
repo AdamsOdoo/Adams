@@ -1,5 +1,6 @@
 /** @odoo-module **/
 import { localization } from "@web/core/l10n/localization";
+import { deserializeDate } from "@web/core/l10n/dates";
 import { formatFloat, humanNumber } from "@web/core/utils/numbers";
 
 /** Short figure for cards and charts, e.g. 15.2M, 84k, 622. */
@@ -34,4 +35,29 @@ export function niceScale(min, max) {
     const mag = Math.pow(10, Math.floor(Math.log10(raw)));
     const step = [1, 2, 2.5, 5, 10].find((m) => m * mag >= raw) * mag;
     return { lo: Math.floor(min / step) * step, hi: Math.ceil(max / step) * step, step };
+}
+
+/** "1 Sep – 25 Sep 2026" for a `get_section` period ({ date_from, date_to }). */
+export function periodLabel(period) {
+    const from = deserializeDate(period.date_from);
+    const to = deserializeDate(period.date_to);
+    if (from.equals(to)) {
+        return to.toFormat("d MMM yyyy");
+    }
+    return from.toFormat(from.year === to.year ? "d MMM" : "d MMM yyyy") + " – " + to.toFormat("d MMM yyyy");
+}
+
+const AVATAR_COLORS = ["#0b7a6d", "#2563c9", "#6d45c4", "#a35705", "#3b7a1a", "#b53461"];
+
+/** Initials and a stable colour for a person's name, as on the reference page. */
+export function avatar(name) {
+    const text = name || "?";
+    const sum = [...text].reduce((s, c) => s + c.charCodeAt(0), 0);
+    const initials = text.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+    return { initials, color: AVATAR_COLORS[sum % AVATAR_COLORS.length] };
+}
+
+/** Chip colour of the native sales order Delivery Status (blue / orange / green, as Odoo's help says). */
+export function deliveryChip(status) {
+    return { pending: "info", started: "info", partial: "warn", full: "good" }[status] || "neutral";
 }
