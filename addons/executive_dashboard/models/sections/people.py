@@ -271,13 +271,15 @@ class ExecutiveDashboard(models.AbstractModel):
         """Published shifts today: count, the largest time slots and the first ``limit`` shifts."""
         Slot = self.env['planning.slot']
         domain = self._ppl_shift_domain(scope)
-        groups = Slot._read_group(domain, ['start_datetime', 'end_datetime'], ['__count'])
+        # _read_group cannot group a datetime without a granularity, and hour/day would merge
+        # distinct shifts; one day's shifts are few, so read their exact times once and tally.
+        today = Slot.search_fetch(domain, ['start_datetime', 'end_datetime'], order='start_datetime asc, id asc')
         slots = {}
-        for start, end, count in groups:
-            label = '%s–%s' % (self._ppl_time(start), self._ppl_time(end))
-            slots[label] = slots.get(label, 0) + count
+        for slot in today:
+            label = '%s–%s' % (self._ppl_time(slot.start_datetime), self._ppl_time(slot.end_datetime))
+            slots[label] = slots.get(label, 0) + 1
         ranked = sorted(slots.items(), key=lambda item: (-item[1], item[0]))[:SHIFT_SLOTS]
-        rows = Slot.search(domain, order='start_datetime asc, id asc', limit=limit)
+        rows = today[:limit]
         return {'count': sum(slots.values()), 'slots': [{'time': t, 'count': n} for t, n in ranked],
                 'rows': [self._ppl_shift_row(slot) for slot in rows]}
 

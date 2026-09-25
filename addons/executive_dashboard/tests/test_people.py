@@ -48,6 +48,24 @@ class TestPeople(SalesCrmCase):
             self.assertIsNone(widgets['kpis']['shifts'])
         self.assertEqual(widgets['directory']['per'], 10)
 
+    def test_shifts_today(self):
+        """Planning (Enterprise): today's published shifts are counted and grouped by exact time slot."""
+        if 'planning.slot' not in self.env:
+            self.skipTest('Planning is not installed (Enterprise): verify on Odoo.sh')
+        Slot = self.env['planning.slot']
+        company = self.env['res.company'].create({'name': 'Example Shifts Company'})
+        noon = self.today_bounds()[0] + timedelta(hours=12)
+        values = {'start_datetime': noon, 'end_datetime': noon + timedelta(hours=2), 'company_id': company.id}
+        if 'state' in Slot._fields:
+            values['state'] = 'published'
+        Slot.create([values, values, dict(values, end_datetime=noon + timedelta(hours=3))])
+        dashboard = self.env['executive.dashboard']
+        scope = dict(dashboard._period_scope('people', 'month'), companies=company)
+        data = dashboard._ppl_shifts(scope, 2)
+        self.assertEqual(data['count'], 3)
+        self.assertEqual([s['count'] for s in data['slots']], [2, 1], 'identical shifts share one time slot')
+        self.assertEqual(len(data['rows']), 2)
+
     def test_headcount_and_departments_match_native(self):
         widgets = self.section(self.hr_user, 'people')['widgets']
         native = self.env['hr.employee'].search_count([('company_id', '=', self.company.id)])
