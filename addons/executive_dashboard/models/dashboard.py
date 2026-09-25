@@ -10,8 +10,12 @@ from odoo.exceptions import AccessError, ValidationError
 
 # Section key -> models it reads. A section is shown only when every model is
 # installed (runtime detection: the module depends on web + account only) and readable.
+# ``groups``: the user needs one of them as well (financial statements are accounting
+# data; an Invoicing-only database gives its administrators ``group_account_manager``
+# without the read-only accounting group).
 SECTIONS = {
-    'finance': {'models': ('account.move.line',), 'period': True},
+    'finance': {'models': ('account.move.line',), 'period': True,
+                'groups': ('account.group_account_readonly', 'account.group_account_manager')},
     'sales': {'models': ('sale.order',), 'period': True},
     'crm': {'models': ('crm.lead',), 'period': True},
     'procurement': {'models': ('purchase.order',), 'period': True},
@@ -81,6 +85,9 @@ class ExecutiveDashboard(models.AbstractModel):
         if any(name not in self.env for name in names):
             return 'hidden'
         if not all(self.env[name].has_access('read') for name in names):
+            return 'restricted'
+        groups = SECTIONS[section].get('groups')
+        if groups and not any(self.env.user.has_group(group) for group in groups):
             return 'restricted'
         return 'ok'
 

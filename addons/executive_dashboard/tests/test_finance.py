@@ -1,0 +1,180 @@
+from datetime import timedelta
+
+from odoo import fields
+from odoo.exceptions import AccessError, ValidationError
+from odoo.tests import new_test_user, tagged
+
+from odoo.addons.account.tests.common import AccountTestInvoicingCommon
+from odoo.addons.executive_dashboard.models import dashboard as dashboard_module
+
+
+@tagged('post_install', '-at_install')
+class TestFinance(AccountTestInvoicingCommon):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        company = cls.env.company
+        cls.user = new_test_user(
+            cls.env, login='ed_fin', company_id=company.id, company_ids=[company.id],
+            groups='executive_dashboard.group_user,account.group_account_readonly')
+        cls.billing = new_test_user(
+            cls.env, login='ed_billing', company_id=company.id, company_ids=[company.id],
+            groups='executive_dashboard.group_user,account.group_account_invoice')
+        cls.Dashboard = cls.env['executive.dashboard'].with_user(cls.user)
+        cls.today = fields.Date.context_today(cls.Dashboard)
+        data = cls.company_data
+        cls.revenue_account = data['default_account_revenue']
+        cls.cost_account = data['default_account_expense'].copy({'account_type': 'expense_direct_cost'})
+        cls.partner = cls.env['res.partner'].create({'name': 'Finance Example Customer'})
+        cls.vendor = cls.env['res.partner'].create({'name': 'Finance Example Vendor'})
+
+    def setUp(self):
+        super().setUp()
+        dashboard_module.cache_clear()
+
+    def _move(self, move_type, partner, account, amount, due_in_days, date=None):
+        date = date or self.today
+        move = self.env['account.move'].create({
+            'move_type': move_type, 'partner_id': partner.id,
+            'invoice_date': date, 'date': date,
+            'invoice_date_due': self.today + timedelta(days=due_in_days),
+            'invoice_line_ids': [fields.Command.create({
+                'name': 'Example line', 'account_id': account.id, 'quantity': 1,
+                'price_unit': amount, 'tax_ids': [fields.Command.clear()],
+            })],
+        })
+        move.invoice_payment_term_id = False
+        move.line_ids.filtered(lambda l: l.display_type == 'payment_term').date_maturity = \
+            self.today + timedelta(days=due_in_days)
+        move.action_post()
+        return move
+
+    def finance(self, period='month'):
+        dashboard_module.cache_clear()
+        result = self.Dashboard.get_section('finance', period)
+        self.assertEqual(result['status'], 'ok')
+        return result['widgets']
+
+    @staticmethod
+    def bucket(widget, view, key):
+        return next(b['value'] for b in widget[view] if b['key'] == key)
+
+    # -- widgets -------------------------------------------------------------
+
+    def test_widget_keys(self):
+        widgets = self.finance()
+        self.assertEqual(set(widgets), {'currency', 'kpis', 'trend', 'bank_cash', 'receivables', 'payables'})
+        self.assertEqual(len(widgets['trend']['months']), 12)
+        self.assertEqual(widgets['trend']['months'][-1]['month'], fields.Date.to_string(self.today.replace(day=1)))
+        self.assertEqual([b['key'] for b in widgets['receivables']['expected']],
+                         ['overdue', 'next7', 'd8_30', 'd31_60', 'later'])
+        # Community: no Accounting reports engine, so the figures come from journal items.
+        if not self.env.ref('account_reports.profit_and_loss', raise_if_not_found=False):
+            self.assertEqual(widgets['kpis']['source'], 'journal')
+            self.assertEqual([b['key'] for b in widgets['receivables']['aged']],
+                             ['not_due', 'd30', 'd60', 'd90', 'older'])
+
+    def test_profit_figures_follow_posted_entries(self):
+        before = self.finance()['kpis']
+        self._move('out_invoice', self.partner, self.revenue_account, 1000.0, 10)
+        self._move('in_invoice', self.vendor, self.cost_account, 400.0, 10)
+        draft = self._move('out_invoice', self.partner, self.revenue_account, 50.0, 10)
+        draft.button_draft()
+        after = self.finance()['kpis']
+        currency = self.env.company.currency_id
+        self.assertTrue(currency.is_zero(after['revenue'] - before['revenue'] - 1000.0))
+        self.assertTrue(currency.is_zero(after['gross_profit'] - before['gross_profit'] - 600.0))
+        self.assertTrue(currency.is_zero(after['net_profit'] - before['net_profit'] - 600.0))
+        self.assertEqual(after['invoices'], before['invoices'] + 1)
+        # The chart's current month is the same source as the This month figures.
+        month = self.finance()['trend']['months'][-1]
+        self.assertTrue(currency.is_zero(month['revenue'] - after['revenue']))
+        self.assertTrue(currency.is_zero(month['net_profit'] - after['net_profit']))
+
+    def test_open_items_match_native_partner_balances(self):
+        self._move('out_invoice', self.partner, self.revenue_account, 300.0, -40)
+        self._move('in_invoice', self.vendor, self.cost_account, 200.0, 5)
+        widgets = self.finance()
+        currency = self.env.company.currency_id
+        # res.partner credit/debit are Odoo's own open receivable/payable per partner.
+        partners = self.env['res.partner'].with_company(self.env.company).search([])
+        self.assertTrue(currency.is_zero(widgets['receivables']['total'] - sum(partners.mapped('credit'))))
+        self.assertTrue(currency.is_zero(widgets['payables']['total'] - sum(partners.mapped('debit'))))
+        partner = self.partner.with_company(self.env.company)
+        self.assertEqual(partner.credit, 300.0)
+        self.assertEqual(self.vendor.with_company(self.env.company).debit, 200.0)
+        receivables, payables = widgets['receivables'], widgets['payables']
+        for widget in (receivables, payables):
+            for view in ('aged', 'expected'):
+                self.assertTrue(currency.is_zero(sum(b['value'] for b in widget[view]) - widget['total']), view)
+        self.assertGreaterEqual(self.bucket(receivables, 'aged', 'd60'), 300.0)
+        self.assertGreaterEqual(self.bucket(receivables, 'expected', 'overdue'), 300.0)
+        self.assertGreaterEqual(receivables['overdue'], 300.0)
+        self.assertGreaterEqual(self.bucket(payables, 'aged', 'not_due'), 200.0)
+        self.assertGreaterEqual(self.bucket(payables, 'expected', 'next7'), 200.0)
+
+    def test_bank_cash_matches_account_balances(self):
+        widgets = self.finance()
+        accounts = self.env['account.account'].search([
+            ('account_type', '=', 'asset_cash'), ('company_ids', 'in', self.env.company.id)])
+        currency = self.env.company.currency_id
+        self.assertTrue(currency.is_zero(widgets['bank_cash']['total'] - sum(accounts.mapped('current_balance'))))
+        self.assertTrue(currency.is_zero(
+            widgets['bank_cash']['total'] - sum(r['balance'] for r in widgets['bank_cash']['rows'])))
+
+    # -- access --------------------------------------------------------------
+
+    def test_invoicing_user_is_restricted(self):
+        result = self.env['executive.dashboard'].with_user(self.billing).get_section('finance', 'month')
+        self.assertEqual(result['status'], 'restricted')
+        with self.assertRaises(AccessError):
+            self.env['executive.dashboard'].with_user(self.billing).get_drawer('finance.bank_cash')
+
+    # -- drawers and actions -------------------------------------------------
+
+    def test_drawers(self):
+        invoice = self._move('out_invoice', self.partner, self.revenue_account, 300.0, -40)
+        revenue = self.Dashboard.get_drawer('finance.revenue', {'period': 'month'})
+        self.assertEqual(len(revenue['rows']), 12)
+        self.assertEqual(revenue['action']['key'], 'finance.pnl')
+
+        bank = self.Dashboard.get_drawer('finance.bank_cash', {})
+        self.assertIn('total', bank)
+        if bank['rows']:
+            target = bank['rows'][0]['open']
+            account = self.Dashboard.get_drawer(target['key'], target['args'])
+            self.assertEqual(account['action']['key'], 'finance.account')
+
+        args = {'kind': 'receivables', 'view': 'aged', 'bucket': 'd60'}
+        bucket = self.Dashboard.get_drawer('finance.open_items', args)
+        row = next(r for r in bucket['rows'] if r['label'] == self.partner.display_name)
+        detail = self.Dashboard.get_drawer('finance.open_items', row['open']['args'])
+        self.assertEqual([r['label'] for r in detail['rows']], [invoice.name])
+
+        action = self.Dashboard.open_action('finance.open_items', row['open']['args'])
+        self.assertEqual(action['res_model'], 'account.move.line')
+        lines = self.env['account.move.line'].search(action['domain'])
+        self.assertEqual(lines.move_id, invoice)
+        # Nothing in the 1-30 days bucket belongs to this invoice.
+        action = self.Dashboard.open_action('finance.open_items', dict(row['open']['args'], bucket='d30'))
+        self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
+
+        pnl = self.Dashboard.open_action('finance.pnl', {'period': 'month'})
+        self.assertIn(pnl['type'], ('ir.actions.act_window', 'ir.actions.client'))
+
+    def test_drawer_arguments_are_validated(self):
+        for args in ({'kind': 'assets'}, {'kind': 'receivables', 'view': 'soon'},
+                     {'kind': 'receivables', 'bucket': 'd365'}, {'kind': 'receivables', 'partner_id': '1'}):
+            with self.assertRaises(ValidationError):
+                self.Dashboard.get_drawer('finance.open_items', args)
+        income = self.revenue_account
+        for args in ({'account_id': income.id}, {'account_id': 'x'}, {}):
+            with self.assertRaises(ValidationError):
+                self.Dashboard.get_drawer('finance.account', args)
+
+    def test_query_limit(self):
+        self.finance()  # warm the ORM caches
+        # Counted for the test's environment user; the section runs as ``ed_fin``.
+        with self.assertQueryCount(**{self.env.user.login: 24}):
+            self.Dashboard.get_section('finance', 'month', refresh=True)

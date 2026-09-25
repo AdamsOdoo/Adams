@@ -115,7 +115,7 @@ class TestDashboard(TransactionCase):
     def test_section_query_limit(self):
         dashboard = self.as_user(self.finance_user)
         dashboard.get_section('finance', 'month')  # warm the ORM caches
-        with self.assertQueryCount(__system__=4, ed_finance=4):
+        with self.assertQueryCount(__system__=24, ed_finance=24):
             dashboard.get_section('finance', 'month', refresh=True)
 
     # -- drawers and search --------------------------------------------------
