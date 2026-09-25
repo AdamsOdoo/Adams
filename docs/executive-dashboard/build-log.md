@@ -7,6 +7,7 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 | 1 | 2026-09-25 | `c1b9a3a2` | `oh test executive_dashboard`: 12 run, 12 passed (Community, demo). `oh shot /odoo/executive` EN + AR desktop: 2/2 ok. Extra local browser check at 1440 / 1024 / 390 px: no horizontal overflow | **completed** locally; dark mode not verified (Enterprise) |
 | 2 | 2026-09-25 | `e8fa1abc` | `oh test executive_dashboard`: 23 run, 23 passed (Community, demo). `oh shot /odoo/executive` EN + AR: 2/2 ok. Local browser check of Finance at 1440 / 1024 / 390 px, EN + AR: no console errors, no horizontal overflow, drawers and Open in Odoo work. Independent `odoo-reviewer` pass + re-check | **completed** locally; Enterprise report path **not verified** (see below) |
 | 3 | 2026-09-25 | `c74f63f` | `oh test executive_dashboard`: 23 run, 23 passed, Sales/CRM classes skipped (only `web` + `account` installed). Kept DB + `sale_stock,crm`: 37 run, 37 passed (Sales 9, CRM 5). `oh shot /odoo/executive` EN + AR: 2/2 ok. Local browser check of Sales and CRM at 1440 / 1024 / 390 px, EN + AR: 12/12, no console errors, no horizontal overflow, order and opportunity drawers open, Open in Odoo opens the delivery order and the opportunity | **completed** locally; no Enterprise-only part in this phase |
+| 4 | 2026-09-25 | `912c1e8` | `oh test executive_dashboard`: 23 run, 23 passed, Sales/CRM/Procurement/Inventory classes skipped (only `web` + `account` installed). Kept DB + `sale_stock,crm,purchase_stock,stock_account`: 51 run, 51 passed (Procurement 6, Inventory 8). `oh shot /odoo/executive` EN + AR: 2/2 ok. Local browser check of Procurement and Inventory at 1440 / 1024 / 390 px, EN + AR: 12/12, no console errors, no horizontal overflow; stock report hide checkbox, paging, search, product drawer, tiles, order drawers and month column work. Payload on demo data: Procurement 27 ms, Inventory 94 ms, a stock page 62 ms | **completed** locally; no Enterprise-only part in this phase |
 
 ## Phase 1 notes
 
@@ -45,6 +46,22 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 - Record rules apply everywhere (a salesman sees only their own orders; test `test_salesman_sees_own_documents_only`).
 - Native screens are opened with their own actions (`account.action_move_out_invoice`, `sale.action_orders`, `sale.action_quotations`, `sale.action_orders_to_invoice`, `stock.action_picking_tree_all`, `account.action_account_payments`, `crm.crm_lead_action_pipeline`, `crm.crm_lead_all_leads`), resolved at click time; a plain list/form action is used if one is missing.
 - Test setup: `oh test` installs only the dependencies, so `TestSales`/`TestCrm` skip there. Run them in the kept DB after `odoo-bin -i sale_stock,crm` (see the handoff).
+
+## Phase 4 notes
+
+- Procurement is one `get_section` call (17 queries on demo data as admin, test limit 30); Inventory 60 as admin, 63 in the test (limit 65), of which about 35 are Odoo's own valuation (`stock.quant.value`) behind Inventory value and the Value column.
+- Purchases confirmed: `purchase.order` `state = 'purchase'` with `date_approve` in the period (user's timezone), `amount_untaxed` converted from the order currency at the period end (today at most). Top suppliers and Purchases by month group the same orders (by `partner_id`; by `date_approve:month`).
+- To approve: `state = 'to approve'`, as of today. The list is oldest first by `date_order` (Odoo's "Order Deadline"); Odoo stores no "waiting since" date, so the column is labelled Order deadline instead of the reference's Waiting since.
+- Open purchase value (needs `purchase_stock`, hidden otherwise): confirmed orders with Receipt Status Not/Partially Received; each line's untaxed subtotal times its share not yet received (`product_qty − qty_received`).
+- Transfers: `stock.picking` by `picking_type_id.code` (`outgoing` / `incoming`) in states `waiting`, `confirmed`, `assigned`. Late = scheduled before the start of today, like Inventory's own "Late" filter (the brief said "before now"; this keeps Late and Due today separate). Next 7 days = tomorrow to today + 7. Waiting = Inventory's "Waiting" filter (`confirmed`, `waiting`). Days are the user's. Late receipts in Procurement use the same definition.
+- Stock report: `stock.quant` on internal locations grouped by `product_id` and `location_id.warehouse_id` (stored), 10 lines a page; warehouse, category (`child_of`), name or internal reference (`ilike`) and "Hide zero and negative stock" (`having quantity:sum > 0`, on by default) are in the query. Pages are fetched through `get_drawer('inventory.stock', …)`, so the section's access checks apply. Open in Odoo opens Odoo's stock list (`action_view_quants`) with the same filters.
+- Inventory value / Value column: Odoo 19 `stock.quant.value` (`stock_account`), which Odoo restricts to Inventory Administrators; other users see neither (no error). Without `stock_account` both are hidden.
+- Reserved and Available come from `reserved_quantity`; Available = On hand − Reserved, red when zero or less.
+- Owl templates cannot call globals such as `String()`; compare select values as strings built with `'' + id`.
+
+## Owner decision (2026-09-25)
+
+- Invoiced sales keep the **accounting date** (as built in Phase 3). Phase 6 adds one line to Definitions: Odoo's Invoice Analysis uses the invoice date, so its figures can differ from the dashboard's at month ends.
 
 ## Verify on Odoo.sh (Enterprise)
 

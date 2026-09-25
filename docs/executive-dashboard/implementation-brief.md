@@ -14,6 +14,7 @@ handover; nothing else from earlier sessions is needed.
 - Sections in order: Welcome, Finance, Sales, CRM, Procurement, Inventory, People. Welcome shows **no figures**: "Greetings, <user>", date, company, search, section cards.
 - No comparisons anywhere. Periods: This month, Last month, This quarter, Year to date, Custom. Inventory and People show the current position (no period selector).
 - Use native values as they are, e.g. `sale.order.delivery_status` (Not Delivered / Started / Partially Delivered / Fully Delivered).
+- Invoiced sales use the accounting date (`date`). Definitions (Phase 6) says in one line that Odoo's Invoice Analysis uses the invoice date and can differ at month ends.
 - Bank & Cash = the accounts under the Balance Sheet line "Bank and Cash Accounts" with their balances and total. No bank/cash split, no reconciliation message.
 - Stock report: warehouse (all/one), category, search by name or internal reference, one checkbox "Hide zero and negative stock" (on by default).
 - People = attendance (check-in/out today), time off, headcount by department, directory, shifts (Planning).
