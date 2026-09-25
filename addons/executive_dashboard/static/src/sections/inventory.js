@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, onWillUnmount, onWillUpdateProps, useState } from "@odoo/owl";
+import { Component, onWillUnmount, onWillUpdateProps, toRaw, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { sectionRegistry } from "../section";
@@ -27,16 +27,16 @@ export class StockReport extends Component {
         const { filters } = this.props.stock;
         // Filters and page kept when the user left for a native screen and came back.
         const kept = this.env.edRecall?.("stock");
-        this.state = useState(kept ? { ...kept, loading: false } : {
+        this.state = useState(kept ? { ...kept, data: this.props.stock, loading: false } : {
             data: this.props.stock, loading: false, ...filters,
             // Select values are strings.
             warehouse_id: filters.warehouse_id ? `${filters.warehouse_id}` : "",
             category_id: filters.category_id ? `${filters.category_id}` : "" });
-        this.env.edRemember?.("stock", () => ({ ...this.state }));
-        if (kept && !kept.data) {
-            // Back from the browser's Back button: filters only, so load the first page with them.
-            this.state.data = this.props.stock;
-            this.load(0);
+        this.env.edRemember?.("stock", () => JSON.parse(JSON.stringify(toRaw(this.state))));
+        onWillUnmount(() => this.env.edForget?.("stock"));
+        if (kept) {
+            // Kept filters: load their page now (the kept rows may be older than the section).
+            this.load(kept.data?.page || 0);
         }
         this.labels = {
             ref: _t("Reference"), product: _t("Product"), warehouse: _t("Warehouse"), onHand: _t("On hand"),
@@ -124,6 +124,7 @@ export class StockReport extends Component {
 
     /** Odoo's stock list with the same warehouse, category and search filters. */
     async openInOdoo() {
+        this.env.edLeaving?.();
         await this.action.doAction(await this.orm.call(MODEL, "open_action", ["inventory.stock", this.args]));
     }
 
@@ -198,6 +199,7 @@ export class InventorySection extends Component {
 
     /** Odoo's stock list (valued locations of the current companies). */
     async openStock() {
+        this.env.edLeaving?.();
         await this.action.doAction(await this.orm.call(MODEL, "open_action", ["inventory.stock", {}]));
     }
 }

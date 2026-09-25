@@ -143,6 +143,7 @@ export class SidePanel extends Component {
         if (target) {
             const action = await this.orm.call(MODEL, "open_action", [target.key, target.args || {}]);
             // The panel stays open: the breadcrumb brings the user back to it.
+            this.env.edLeaving?.();
             await this.action.doAction(action);
         }
     }

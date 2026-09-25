@@ -1,5 +1,5 @@
 /** @odoo-module **/
-import { Component, onWillUnmount, onWillUpdateProps, useState } from "@odoo/owl";
+import { Component, onWillUnmount, onWillUpdateProps, toRaw, useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 import { sectionRegistry } from "../section";
@@ -51,15 +51,15 @@ export class EmployeeDirectory extends Component {
         const { filters } = this.props.directory;
         // Filters and page kept when the user left for a native screen and came back.
         const kept = this.env.edRecall?.("directory");
-        this.state = useState(kept ? { ...kept, loading: false } : {
+        this.state = useState(kept ? { ...kept, data: this.props.directory, loading: false } : {
             data: this.props.directory, loading: false, query: filters.query,
             // Select values are strings.
             department_id: filters.department_id ? `${filters.department_id}` : "" });
-        this.env.edRemember?.("directory", () => ({ ...this.state }));
-        if (kept && !kept.data) {
-            // Back from the browser's Back button: filters only, so load the first page with them.
-            this.state.data = this.props.directory;
-            this.load(0);
+        this.env.edRemember?.("directory", () => JSON.parse(JSON.stringify(toRaw(this.state))));
+        onWillUnmount(() => this.env.edForget?.("directory"));
+        if (kept) {
+            // Kept filters: load their page now (the kept rows may be older than the section).
+            this.load(kept.data?.page || 0);
         }
         this.labels = { employee: _t("Employee"), department: _t("Department"), checkIn: _t("Check in"),
                         status: _t("Status") };
@@ -113,6 +113,7 @@ export class EmployeeDirectory extends Component {
     }
 
     async openInOdoo() {
+        this.env.edLeaving?.();
         await this.action.doAction(await this.orm.call(MODEL, "open_action", ["people.directory", this.args]));
     }
 

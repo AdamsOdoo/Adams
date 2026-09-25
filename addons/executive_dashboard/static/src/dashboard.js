@@ -14,7 +14,8 @@ import { SidePanel } from "./side_panel";
 const { DateTime } = luxon;
 const MODEL = "executive.dashboard";
 // Where the user was, kept in this browser tab for the browser's Back button (the
-// breadcrumb state covers Odoo's own breadcrumbs). No figures are stored.
+// breadcrumb state covers Odoo's own breadcrumbs). Written only when the user opens a
+// native screen from the dashboard, read once, never with figures.
 const RETURN_KEY = "executive_dashboard.return";
 const RETURN_MINUTES = 10;
 
@@ -53,7 +54,10 @@ export class ExecutiveDashboard extends Component {
         this.topbar = useRef("topbar");
         this.info = sectionInfo();
         this.periods = periodOptions();
-        const saved = this.props.state?.executiveDashboard || takeReturn();
+        // Always consume the Back-button entry, so it is used at most once.
+        const fromBack = takeReturn();
+        const saved = this.props.state?.executiveDashboard || fromBack;
+        this.leaving = false;
         this.pendingScroll = saved ? saved.scroll || 0 : null;
         this.cache = new Map(saved?.cache || []);
         // Table filters and pages kept by the sections (stock report, directory).
@@ -62,6 +66,15 @@ export class ExecutiveDashboard extends Component {
         useSubEnv({
             edRecall: (key) => this.memory[key],
             edRemember: (key, snapshot) => { this.keepers[key] = snapshot; },
+            // A section leaving the screen stores its filters now, so they are current.
+            edForget: (key) => {
+                if (this.keepers[key]) {
+                    this.memory[key] = this.keepers[key]();
+                    delete this.keepers[key];
+                }
+            },
+            // Called right before opening a native screen from the dashboard.
+            edLeaving: () => { this.leaving = true; },
         });
         this.inflight = new Map();
         this.seq = 0;
@@ -188,7 +201,9 @@ export class ExecutiveDashboard extends Component {
             scroll: this.root.el?.querySelector(".ed-main")?.scrollTop || 0,
             memory: this.memory,
         };
-        if (page !== "welcome") {
+        const leaving = this.leaving;
+        this.leaving = false;
+        if (leaving && page !== "welcome") {
             try {
                 // Filters only: table pages carry figures, so they are left out.
                 const memory = Object.fromEntries(Object.entries(this.memory).map(
@@ -196,6 +211,12 @@ export class ExecutiveDashboard extends Component {
                 sessionStorage.setItem(RETURN_KEY, JSON.stringify({ ...kept, memory, at: Date.now() }));
             } catch {
                 // Storage unavailable: the breadcrumb still brings the user back.
+            }
+        } else {
+            try {
+                sessionStorage.removeItem(RETURN_KEY);
+            } catch {
+                // Nothing kept.
             }
         }
         return { ...kept, cache: [...this.cache.entries()] };
@@ -298,6 +319,10 @@ export class ExecutiveDashboard extends Component {
             this.state.customFrom = this.state.shownFrom;
             this.state.customTo = this.state.shownTo;
         }
+        if (key !== "custom") {
+            // Until the new figures arrive, show no dates rather than the previous period's.
+            this.state.shownFrom = this.state.shownTo = null;
+        }
         this.state.period = key;
         if (!this.isWelcome && this.showPeriod) {
             this.load(this.state.page);
@@ -340,6 +365,7 @@ export class ExecutiveDashboard extends Component {
         if (this.state.panel?.kind === "search") {
             this.state.panel = null;
         }
+        this.leaving = true;
         this.action.doAction({
             type: "ir.actions.act_window",
             res_model: model,

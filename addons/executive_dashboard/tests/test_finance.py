@@ -143,6 +143,11 @@ class TestFinance(AccountTestInvoicingCommon):
         account = data['default_journal_bank'].default_account_id
         with self.assertRaises(UserError):
             self.Dashboard.get_drawer('finance.account', {'account_id': account.id})
+        # The other company's receivable account is refused too (ValidationError is a UserError).
+        receivable = data['default_account_receivable']
+        for method in ('get_drawer', 'open_action'):
+            with self.assertRaises(UserError):
+                getattr(self.Dashboard, method)('finance.account', {'account_id': receivable.id})
 
     # -- drawers and actions -------------------------------------------------
 
@@ -165,13 +170,16 @@ class TestFinance(AccountTestInvoicingCommon):
         detail = self.Dashboard.get_drawer('finance.open_items', row['open']['args'])
         self.assertEqual([r['label'] for r in detail['rows']], [invoice.name])
 
+        # A partner opens the Partner Ledger (Enterprise) or its open journal items.
         action = self.Dashboard.open_action('finance.open_items', row['open']['args'])
-        self.assertEqual(action['res_model'], 'account.move.line')
-        lines = self.env['account.move.line'].search(action['domain'])
-        self.assertEqual(lines.move_id, invoice)
-        # Nothing in the 1-30 days bucket belongs to this invoice.
-        action = self.Dashboard.open_action('finance.open_items', dict(row['open']['args'], bucket='d30'))
-        self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
+        if not self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False):
+            self.assertEqual(action['res_model'], 'account.move.line')
+            lines = self.env['account.move.line'].search(action['domain'])
+            self.assertEqual(lines.move_id, invoice)
+        # Without the Aged report a bucket opens its journal items: nothing in 1-30 days is this invoice's.
+        if not self.env.ref('account_reports.aged_receivable_report', raise_if_not_found=False):
+            action = self.Dashboard.open_action('finance.open_items', {'kind': 'receivables', 'view': 'aged', 'bucket': 'd30'})
+            self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
 
         pnl = self.Dashboard.open_action('finance.pnl', {'period': 'month'})
         self.assertIn(pnl['type'], ('ir.actions.act_window', 'ir.actions.client'))
@@ -189,15 +197,20 @@ class TestFinance(AccountTestInvoicingCommon):
         action = self.Dashboard.open_action('finance.account', {'account_id': account.id})
         trial = self.env.ref('account_reports.trial_balance_report', raise_if_not_found=False)
         if trial:
+            # The Trial Balance itself (not the fallback), searched on the account code.
             self.assertEqual(action['type'], 'ir.actions.client')
+            self.assertEqual(action['context']['report_id'], trial.id)
+            self.assertEqual(action['params']['options']['filter_search_bar'], account.code)
             self.assertEqual(detail['dest'], 'Trial Balance')
         else:
             self.assertEqual(action['res_model'], 'account.move.line')
             self.assertEqual(set(self.env['account.move.line'].search(action['domain']).account_id), {account})
         partner_args = {'kind': 'receivables', 'view': 'aged', 'partner_id': self.partner.id}
         action = self.Dashboard.open_action('finance.open_items', partner_args)
-        if self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False):
-            self.assertEqual(action['type'], 'ir.actions.client')
+        ledger = self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False)
+        if ledger:
+            self.assertEqual(action['context']['report_id'], ledger.id)
+            self.assertEqual(action['params']['options']['partner_ids'], [self.partner.id])
         else:
             self.assertEqual(self.env['account.move.line'].search(action['domain']).move_id, invoice)
 

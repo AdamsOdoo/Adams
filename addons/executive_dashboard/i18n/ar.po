@@ -1417,6 +1417,18 @@ msgid "Payables"
 msgstr "الذمم الدائنة"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Payables · Aged"
+msgstr "الذمم الدائنة · حسب العمر"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Payables · Expected"
+msgstr "الذمم الدائنة · المتوقع"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Payments"
@@ -1663,6 +1675,18 @@ msgstr "الاستلامات · الأيام السبعة القادمة"
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Receivables"
 msgstr "الذمم المدينة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Receivables · Aged"
+msgstr "الذمم المدينة · حسب العمر"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/finance.js:0
+msgid "Receivables · Expected"
+msgstr "الذمم المدينة · المتوقع"
 
 #. module: executive_dashboard
 #. odoo-javascript

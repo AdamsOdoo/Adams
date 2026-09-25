@@ -221,7 +221,7 @@ class ExecutiveDashboard(models.AbstractModel):
         line = report and report.line_ids.filtered(lambda l: l.code == code)[:1]
         return line and line.expression_ids.filtered(lambda e: e.label == 'balance')[:1]
 
-    def _fin_options(self, report, date_from, date_to, **extra):
+    def _fin_options(self, report, date_from, date_to, single_group=True, **extra):
         """Native options for these dates and the dashboard's companies (raises UnsupportedScope otherwise)."""
         previous = {
             'selected_variant_id': report.id,
@@ -239,7 +239,7 @@ class ExecutiveDashboard(models.AbstractModel):
                 or options.get('date', {}).get('mode') != ('range' if date_from else 'single')
                 or (date_from and options['date'].get('date_from') != fields.Date.to_string(date_from))
                 or {company['id'] for company in options.get('companies', [])} != set(self.env.companies.ids)
-                or len(options.get('column_groups', {})) != 1
+                or (single_group and len(options.get('column_groups', {})) != 1)
                 or any(options.get(k) != v for k, v in extra.items())):
             raise UnsupportedScope('the report changed the requested dates, companies or columns')
         return options
@@ -519,7 +519,7 @@ class ExecutiveDashboard(models.AbstractModel):
                      for line in lines],
             'total': {'label': _('Balance'), 'value': self._fin_format(balance or 0.0)},
             'action': {'key': 'finance.account', 'args': {'account_id': account.id}},
-            'dest': self._fin_account_dest(),
+            'dest': self._fin_account_target(account)[1],
         }
 
     def _fin_open_items_domain(self, args):
@@ -605,11 +605,6 @@ class ExecutiveDashboard(models.AbstractModel):
             return _('Aged Receivable') if kind == 'receivables' else _('Aged Payable')
         return _('Journal Items')
 
-    def _fin_account_dest(self):
-        _ = self.env._
-        if self._fin_report(TB_REPORT):
-            return _('Trial Balance')
-        return _('General Ledger') if self._fin_report(GL_REPORT) else _('Journal Items')
 
     def _fin_year_start(self, today):
         return self.env.company.compute_fiscalyear_dates(today)['date_from']
@@ -642,27 +637,36 @@ class ExecutiveDashboard(models.AbstractModel):
             ('date', '<=', fields.Date.to_string(scope['today'])), ('account_id.account_type', '=', 'asset_cash'),
         ]))
 
-    def _action_finance_account(self, args):
-        """Trial Balance filtered on the account (fiscal year to date); else its General Ledger;
-        journal items without the Enterprise reports."""
-        account = self._fin_account(args)
+    def _fin_account_target(self, account):
+        """``(action, destination name)`` of an account: the Trial Balance searched on the
+        account code (fiscal year to date), else the General Ledger with the account
+        unfolded, else its journal items (no Enterprise reports).
+
+        The Trial Balance's search matches line names, so a code that begins another
+        account's code also lists that account.
+        """
+        _ = self.env._
         today = self._fin_scope({})['today']
         start, code = self._fin_year_start(today), self._fin_code(account)
         trial = self._fin_report(TB_REPORT)
         if trial and code:
             try:
-                return self._fin_report_action(trial, self._fin_options(trial, start, today, filter_search_bar=code))
+                options = self._fin_options(trial, start, today, single_group=False, filter_search_bar=code)
+                return self._fin_report_action(trial, options), _('Trial Balance')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
         ledger = self._fin_report(GL_REPORT)
-        if ledger and hasattr(ledger, 'caret_option_open_general_ledger'):
+        if ledger:
             try:
-                options = self._fin_options(ledger, start, today)
-                return ledger.caret_option_open_general_ledger(
-                    options, {'line_id': ledger._get_generic_line_id('account.account', account.id)})
+                options = self._fin_options(ledger, start, today, single_group=False)
+                options['unfolded_lines'] = [ledger._get_generic_line_id('account.account', account.id)]
+                return self._fin_report_action(ledger, options), _('General Ledger')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
-        return self._fin_items_action(account.display_name, self._fin_account_domain(account))
+        return self._fin_items_action(account.display_name, self._fin_account_domain(account)), _('Journal Items')
+
+    def _action_finance_account(self, args):
+        return self._fin_account_target(self._fin_account(args))[0]
 
     def _action_finance_open_items(self, args):
         kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)

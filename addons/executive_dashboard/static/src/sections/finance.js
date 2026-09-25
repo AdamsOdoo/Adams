@@ -92,15 +92,15 @@ export class FinanceSection extends Component {
         const panels = [];
         for (const kind of ["receivables", "payables"]) {
             const widget = this.w[kind];
-            const name = kind === "receivables" ? _t("Receivables") : _t("Payables");
+            const recv = kind === "receivables";
             const aged = widget.aged;
-            panels.push(this.bucketPanel(kind, "aged", `${name} · ${_t("Aged")}`,
+            panels.push(this.bucketPanel(kind, "aged", recv ? _t("Receivables · Aged") : _t("Payables · Aged"),
                 _t("By days overdue · as of today"), widget.total, widget.overdue,
                 aged.map((b, i) => ({
                     ...b, color: `var(${AGE_RAMP[aged.length > 1 ? Math.round((i * 4) / (aged.length - 1)) : 0]})`,
                 }))));
-            panels.push(this.bucketPanel(kind, "expected", `${name} · ${_t("Expected")}`,
-                kind === "receivables" ? _t("Customer payments by due date") : _t("Supplier payments by due date"),
+            panels.push(this.bucketPanel(kind, "expected", recv ? _t("Receivables · Expected") : _t("Payables · Expected"),
+                recv ? _t("Customer payments by due date") : _t("Supplier payments by due date"),
                 widget.expected.reduce((sum, b) => sum + b.value, 0), widget.overdue,
                 widget.expected.map((b) => ({ ...b, color: b.key === "overdue" ? "var(--crit)" : "var(--sec)" }))));
         }

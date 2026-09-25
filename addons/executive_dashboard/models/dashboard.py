@@ -1,5 +1,6 @@
 """Server side of the Executive Dashboard: one call per section, drawers on demand, search."""
 import re
+from ast import literal_eval
 import threading
 import time
 from collections import OrderedDict
@@ -113,7 +114,14 @@ class ExecutiveDashboard(models.AbstractModel):
         """
         env = self._user_env()
         if action.get('type') == 'ir.actions.client':
-            report_id = (action.get('context') or {}).get('report_id')
+            context = action.get('context') or {}
+            if isinstance(context, str):
+                # Actions read from ir.actions.client keep their context as text.
+                try:
+                    context = literal_eval(context)
+                except (ValueError, SyntaxError):
+                    context = {}
+            report_id = context.get('report_id') if isinstance(context, dict) else None
             model, res_id, kind = 'account.report', report_id, 'report'
         else:
             model, res_id, kind = action.get('res_model'), action.get('res_id'), \
