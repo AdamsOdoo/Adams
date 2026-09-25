@@ -11,8 +11,10 @@ Every total is one grouped query (``_read_group``) or one report evaluation per 
 """
 import logging
 import math
+from collections import defaultdict
 from datetime import timedelta
 
+import psycopg2
 from dateutil.relativedelta import relativedelta
 
 from odoo import fields, models
@@ -50,7 +52,7 @@ AGED_REPORTS = {
 }
 # Errors a report evaluation can raise when it cannot represent the scope; the figure
 # then comes from journal items instead.
-ENGINE_ERRORS = (UserError, KeyError, TypeError, ValueError, AttributeError, StopIteration)
+ENGINE_ERRORS = (UserError, KeyError, TypeError, ValueError, AttributeError, StopIteration, psycopg2.Error)
 
 
 class UnsupportedScope(Exception):
@@ -79,7 +81,8 @@ class ExecutiveDashboard(models.AbstractModel):
             'kpis': {
                 **{key: pnl[key] for key in ('revenue', 'gross_profit', 'net_profit')},
                 'invoices': invoices,
-                'bank_cash': bank['total'], 'bank_cash_accounts': len(bank['rows']),
+                'bank_cash': bank['total'],
+                'bank_cash_accounts': sum(1 for row in bank['rows'] if not currency.is_zero(row['balance'])),
                 'receivables': open_items['receivables']['total'],
                 'receivables_overdue': open_items['receivables']['overdue'],
                 'payables': open_items['payables']['total'],
@@ -120,6 +123,15 @@ class ExecutiveDashboard(models.AbstractModel):
                 ('d90', _('61–90 days'), day(-90), day(-61)),
                 ('older', _('Over 90 days'), None, day(-91)),
             ],
+            # Columns of the native Aged Receivable/Payable reports (30-day interval), same ranges.
+            'aged_native': [
+                ('period0', _('Not due'), today, None),
+                ('period1', _('1–30 days'), day(-30), day(-1)),
+                ('period2', _('31–60 days'), day(-60), day(-31)),
+                ('period3', _('61–90 days'), day(-90), day(-61)),
+                ('period4', _('91–120 days'), day(-120), day(-91)),
+                ('period5', _('Over 120 days'), None, day(-121)),
+            ],
             'expected': [
                 ('overdue', _('Overdue'), None, day(-1)),
                 ('next7', _('Next 7 days'), today, day(7)),
@@ -153,7 +165,8 @@ class ExecutiveDashboard(models.AbstractModel):
         if kind not in OPEN_TYPES or view not in VIEWS:
             raise ValidationError(self.env._('Unknown detail.'))
         today = fields.Date.context_today(self)
-        buckets = {b[0]: b for b in self._fin_buckets(today)[view]}
+        ranges = self._fin_buckets(today)
+        buckets = {b[0]: b for b in ranges[view] + (ranges['aged_native'] if view == 'aged' else [])}
         if bucket is not None and bucket not in buckets:
             raise ValidationError(self.env._('Unknown detail.'))
         if partner_id is not None and (type(partner_id) is not int or partner_id <= 0):
@@ -171,8 +184,25 @@ class ExecutiveDashboard(models.AbstractModel):
 
     # ------------------------------------------------------------------ native report engine
 
+    def _fin_engine(self):
+        """True when the Enterprise report engine (``account_reports``) is installed."""
+        return hasattr(self.env['account.report'], 'get_report_information')
+
+    def _fin_native(self, compute, what):
+        """Run a native report evaluation in a savepoint; None (journal items instead) on failure."""
+        if not self._fin_engine():
+            return None
+        try:
+            with self.env.cr.savepoint():
+                return compute()
+        except (UnsupportedScope, AccessError, *ENGINE_ERRORS) as error:
+            _logger.warning('Executive Dashboard: %s engine not used (%s)', what, type(error).__name__)
+            return None
+
     def _fin_report(self, xmlid):
         """The Enterprise report record ``xmlid`` when its engine is installed, else None."""
+        if not self._fin_engine():
+            return None
         record = self.env.ref(xmlid, raise_if_not_found=False)
         if record is None or record._name != 'account.report' or not record.active:
             return None
@@ -205,6 +235,7 @@ class ExecutiveDashboard(models.AbstractModel):
         if (options.get('report_id') != report.id
                 or options.get('all_entries')
                 or options.get('date', {}).get('date_to') != fields.Date.to_string(date_to)
+                or options.get('date', {}).get('mode') != ('range' if date_from else 'single')
                 or (date_from and options['date'].get('date_from') != fields.Date.to_string(date_from))
                 or {company['id'] for company in options.get('companies', [])} != set(self.env.companies.ids)
                 or len(options.get('column_groups', {})) != 1
@@ -254,12 +285,9 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _fin_pnl(self, scope):
         """Revenue, gross profit and net profit for the period, with their ``source``."""
-        try:
-            native = self._fin_pnl_report(scope)
-            if native:
-                return dict(native, source='report')
-        except (UnsupportedScope, AccessError, *ENGINE_ERRORS) as error:
-            _logger.warning('Executive Dashboard: Profit and Loss engine not used (%s)', type(error).__name__)
+        native = self._fin_native(lambda: self._fin_pnl_report(scope), 'Profit and Loss')
+        if native:
+            return dict(native, source='report')
         by_type = self._fin_pl_journal(scope, scope['date_from'], scope['date_to']).get(None, {})
         return dict(self._fin_pl_figures(by_type), source='journal')
 
@@ -297,12 +325,8 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _fin_bank_cash(self, scope):
         """Accounts under "Bank and Cash Accounts" with their balance as of today, and the total."""
-        balances, source = None, 'journal'
-        try:
-            balances = self._fin_bank_cash_report(scope)
-            source = 'report' if balances is not None else 'journal'
-        except (UnsupportedScope, AccessError, *ENGINE_ERRORS) as error:
-            _logger.warning('Executive Dashboard: Balance Sheet engine not used (%s)', type(error).__name__)
+        balances = self._fin_native(lambda: self._fin_bank_cash_report(scope), 'Balance Sheet')
+        source = 'report' if balances is not None else 'journal'
         if balances is None:
             balances = {}
             rows = self.env['account.move.line']._read_group(
@@ -373,12 +397,9 @@ class ExecutiveDashboard(models.AbstractModel):
         }
         result.update(total=sum(totals['expected'].values()), overdue=totals['expected']['overdue'],
                       source='journal', report=False)
-        try:
-            aged = self._fin_aged_report(scope, kind, result['total'])
-            if aged:
-                result.update(aged=aged['buckets'], total=aged['total'], source='report', report=True)
-        except (UnsupportedScope, AccessError, *ENGINE_ERRORS) as error:
-            _logger.warning('Executive Dashboard: aged report engine not used (%s)', type(error).__name__)
+        aged = self._fin_native(lambda: self._fin_aged_report(scope, kind, result['total']), 'aged report')
+        if aged:
+            result.update(aged=aged['buckets'], total=aged['total'], source='report', report=True)
         return result
 
     def _fin_aged_report(self, scope, kind, journal_total):
@@ -393,9 +414,16 @@ class ExecutiveDashboard(models.AbstractModel):
         totals = self._fin_totals(report, options)
         by_label = {expr.label: expr for expr in expression.report_line_id.expression_ids}
         total = self._fin_number(totals[expression.id]['value'])
-        # The aged payable report may show amounts as credits; present them the way the
-        # dashboard does (amounts owed are positive), checked against the journal items.
-        sign = -1 if journal_total and total and (total > 0) != (journal_total > 0) else 1
+        # Both reports cover the same open items as of today as the journal items. Amounts owed
+        # are shown positive: accept the native total only when it equals the journal total
+        # up to its sign convention; otherwise the figures come from journal items.
+        currency = scope['company'].currency_id
+        tolerance = max(1.0, abs(journal_total) * 0.001)
+        if abs(abs(total) - abs(journal_total)) > tolerance:
+            raise UnsupportedScope()
+        sign = -1 if total and journal_total and (total > 0) != (journal_total > 0) else 1
+        if currency.is_zero(journal_total) and not currency.is_zero(total):
+            raise UnsupportedScope()
         buckets = []
         for column in options['columns']:
             label = column.get('expression_label') or ''
@@ -444,11 +472,20 @@ class ExecutiveDashboard(models.AbstractModel):
         account_id = args.get('account_id')
         if type(account_id) is not int:
             raise ValidationError(self.env._('Unknown detail.'))
-        account = self.env['account.account'].browse(account_id).exists()
-        if not account or account.account_type != 'asset_cash' or not (account.company_ids & self.env.companies):
+        # Only the accounts the Bank & Cash widget lists (an override line may include other types).
+        if account_id not in {row['id'] for row in self._fin_bank_cash(self._fin_scope({}))['rows']}:
             raise ValidationError(self.env._('Unknown detail.'))
+        account = self.env['account.account'].browse(account_id)
         account.check_access('read')
         return account
+
+    def _fin_sum(self, scope, domain, measure):
+        """Sum of ``measure`` over ``domain`` in the dashboard company's currency."""
+        rows = self.env['account.move.line']._read_group(domain, ['company_id'], [f'{measure}:sum'])
+        return sum(self._fin_convert(scope, amount, company, scope['today']) for company, amount in rows)
+
+    def _fin_line_amount(self, scope, line, amount):
+        return self._fin_convert(scope, amount, line.company_id, scope['today'])
 
     def _fin_account_domain(self, account):
         scope = self._fin_scope({})
@@ -457,16 +494,17 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _drawer_finance_account(self, args):
         account = self._fin_account(args)
+        scope = self._fin_scope({})
         domain = self._fin_account_domain(account)
-        Line = self.env['account.move.line']
-        [(balance,)] = Line._read_group(domain, [], ['balance:sum'])
-        lines = Line.search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
+        balance = self._fin_sum(scope, domain, 'balance')
+        lines = self.env['account.move.line'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
         _ = self.env._
         return {
             'title': account.name, 'sub': '%s · %s' % (self._fin_code(account), _('Latest journal items')),
             'rows': [{'label': line.move_id.name, 'sub': ' · '.join(filter(None, [
                           fields.Date.to_string(line.date), line.partner_id.display_name, line.name])),
-                      'value': self._fin_format(line.balance)} for line in lines],
+                      'value': self._fin_format(self._fin_line_amount(scope, line, line.balance))}
+                     for line in lines],
             'total': {'label': _('Balance'), 'value': self._fin_format(balance or 0.0)},
             'action': {'key': 'finance.account', 'args': {'account_id': account.id}},
             'dest': _('Journal Items'),
@@ -484,23 +522,23 @@ class ExecutiveDashboard(models.AbstractModel):
     def _drawer_finance_open_items(self, args):
         kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)
         _ = self.env._
+        scope = self._fin_scope({})
         sign = -1 if kind == 'payables' else 1
         Line = self.env['account.move.line']
         title = _('Receivables') if kind == 'receivables' else _('Payables')
         if bucket:
             title = '%s · %s' % (title, bucket[1])
-        [(total,)] = Line._read_group(domain, [], ['amount_residual:sum'])
+        total = self._fin_sum(scope, domain, 'amount_residual')
         if partner_id:
             partner = self.env['res.partner'].browse(partner_id)
             lines = Line.search(domain, order='date_maturity, id', limit=DRAWER_ROWS)
             rows = [{'label': line.move_id.name,
                      'sub': _('Due %s', fields.Date.to_string(line.date_maturity or line.date)),
-                     'value': self._fin_format(sign * line.amount_residual)} for line in lines]
+                     'value': self._fin_format(sign * self._fin_line_amount(scope, line, line.amount_residual))}
+                    for line in lines]
             sub = partner.display_name
         else:
-            order = 'amount_residual:sum %s' % ('desc' if sign > 0 else 'asc')
-            groups = Line._read_group(domain, ['partner_id'], ['amount_residual:sum', '__count'],
-                                      order=order, limit=DRAWER_ROWS)
+            groups = self._fin_partner_groups(scope, domain, sign)
             rows = [{'label': partner.display_name if partner else _('No partner'),
                      'sub': _('%s open items', count),
                      'value': self._fin_format(sign * residual),
@@ -513,6 +551,23 @@ class ExecutiveDashboard(models.AbstractModel):
                 'total': {'label': _('Total'), 'value': self._fin_format(sign * (total or 0.0))},
                 'action': {'key': 'finance.open_items', 'args': args},
                 'dest': self._fin_open_items_dest(kind, bucket, partner_id)}
+
+    def _fin_partner_groups(self, scope, domain, sign):
+        """Largest open amounts by partner: ``[(partner, residual, count)]``, residual converted."""
+        Line = self.env['account.move.line']
+        if len(scope['companies'].currency_id) == 1:
+            # One currency: rank and cut in SQL.
+            order = 'amount_residual:sum %s' % ('desc' if sign > 0 else 'asc')
+            return [(partner, self._fin_convert(scope, residual, scope['companies'][:1], scope['today']), count)
+                    for partner, residual, count in Line._read_group(
+                        domain, ['partner_id'], ['amount_residual:sum', '__count'], order=order, limit=DRAWER_ROWS)]
+        totals, counts = defaultdict(float), defaultdict(int)
+        for partner, company, residual, count in Line._read_group(
+                domain, ['partner_id', 'company_id'], ['amount_residual:sum', '__count']):
+            totals[partner] += self._fin_convert(scope, residual, company, scope['today'])
+            counts[partner] += count
+        ranked = sorted(totals, key=lambda partner: -sign * totals[partner])[:DRAWER_ROWS]
+        return [(partner, totals[partner], counts[partner]) for partner in ranked]
 
     def _fin_open_items_dest(self, kind, bucket, partner_id):
         _ = self.env._

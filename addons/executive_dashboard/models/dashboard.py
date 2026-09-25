@@ -150,7 +150,7 @@ class ExecutiveDashboard(models.AbstractModel):
         key = (
             self.env.cr.dbname, self.env.uid, tuple(self.env.user.all_group_ids.ids),
             tuple(scope['companies'].ids), scope['company'].id, self.env.lang,
-            section, scope['date_from'], scope['date_to'],
+            section, scope['date_from'], scope['date_to'], scope['today'],
         )
         if not refresh:
             cached = _cache_get(key)

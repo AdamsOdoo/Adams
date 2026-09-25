@@ -1,6 +1,11 @@
 from odoo import fields, models
 
 
+# Profit and loss figures need a period report; bank and cash an "as of" report.
+PERIOD_LINES = [('report_id.filter_date_range', '=', True)]
+BALANCE_LINES = [('report_id.filter_date_range', '=', False)]
+
+
 class ResCompany(models.Model):
     _inherit = 'res.company'
 
@@ -13,13 +18,13 @@ class ResCompany(models.Model):
     # Report lines used by Finance when the Enterprise reports are installed. Empty means
     # the standard line; set one when a localization renames or replaces it.
     executive_dashboard_line_revenue_id = fields.Many2one(
-        'account.report.line', string='Dashboard: Revenue line', ondelete='set null')
+        'account.report.line', domain=PERIOD_LINES, string='Dashboard: Revenue line', ondelete='set null')
     executive_dashboard_line_gross_id = fields.Many2one(
-        'account.report.line', string='Dashboard: Gross profit line', ondelete='set null')
+        'account.report.line', domain=PERIOD_LINES, string='Dashboard: Gross profit line', ondelete='set null')
     executive_dashboard_line_net_id = fields.Many2one(
-        'account.report.line', string='Dashboard: Net profit line', ondelete='set null')
+        'account.report.line', domain=PERIOD_LINES, string='Dashboard: Net profit line', ondelete='set null')
     executive_dashboard_line_bank_id = fields.Many2one(
-        'account.report.line', string='Dashboard: Bank and cash line', ondelete='set null')
+        'account.report.line', domain=BALANCE_LINES, string='Dashboard: Bank and cash line', ondelete='set null')
 
 
 class ResConfigSettings(models.TransientModel):

@@ -920,3 +920,15 @@ msgstr "ليست لديك صلاحية الوصول إلى بيانات هذا �
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "as of today"
 msgstr "حتى اليوم"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "91–120 days"
+msgstr "91–120 يوماً"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "Over 120 days"
+msgstr "أكثر من 120 يوماً"

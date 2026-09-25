@@ -33,9 +33,9 @@ class TestFinance(AccountTestInvoicingCommon):
         super().setUp()
         dashboard_module.cache_clear()
 
-    def _move(self, move_type, partner, account, amount, due_in_days, date=None):
+    def _move(self, move_type, partner, account, amount, due_in_days, date=None, company=None):
         date = date or self.today
-        move = self.env['account.move'].create({
+        move = self.env['account.move'].with_company(company or self.env.company).create({
             'move_type': move_type, 'partner_id': partner.id,
             'invoice_date': date, 'date': date,
             'invoice_date_due': self.today + timedelta(days=due_in_days),
@@ -173,8 +173,61 @@ class TestFinance(AccountTestInvoicingCommon):
             with self.assertRaises(ValidationError):
                 self.Dashboard.get_drawer('finance.account', args)
 
+    def test_bucket_boundaries_and_cancelled_entries(self):
+        before = self.finance()['receivables']
+        for days in (0, -1, 7, 8, 30, 31, 61):
+            self._move('out_invoice', self.partner, self.revenue_account, 10.0 + days, days)
+        self._move('out_invoice', self.partner, self.revenue_account, 1000.0, 3).button_cancel()
+        after = self.finance()['receivables']
+        delta = lambda view, key: self.bucket(after, view, key) - self.bucket(before, view, key)  # noqa: E731
+        self.assertAlmostEqual(delta('expected', 'overdue'), 9.0)            # due yesterday
+        self.assertAlmostEqual(delta('expected', 'next7'), 10.0 + 17.0)      # today, +7
+        self.assertAlmostEqual(delta('expected', 'd8_30'), 18.0 + 40.0)      # +8, +30
+        self.assertAlmostEqual(delta('expected', 'd31_60'), 41.0)            # +31
+        self.assertAlmostEqual(delta('expected', 'later'), 71.0)             # +61
+        self.assertAlmostEqual(delta('aged', 'd30'), 9.0)
+        self.assertAlmostEqual(delta('aged', 'not_due'), 10.0 + 17 + 18 + 40 + 41 + 71)
+        self.assertAlmostEqual(after['total'] - before['total'], 206.0)      # the cancelled invoice is not counted
+
+    def test_native_aged_columns_open_their_range(self):
+        # The Enterprise Aged reports return period0..period5; each opens the same due-date range.
+        invoice = self._move('out_invoice', self.partner, self.revenue_account, 70.0, -100)
+        args = {'kind': 'receivables', 'view': 'aged', 'bucket': 'period4', 'partner_id': self.partner.id}
+        drawer = self.Dashboard.get_drawer('finance.open_items', args)
+        self.assertEqual([r['label'] for r in drawer['rows']], [invoice.name])
+        action = self.Dashboard.open_action('finance.open_items', dict(args, bucket='period3'))
+        self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
+        with self.assertRaises(ValidationError):
+            self.Dashboard.get_drawer('finance.open_items', dict(args, view='expected'))
+
+    def test_other_currency_company_is_converted(self):
+        other = self.setup_other_currency('EUR', rates=[('1900-01-01', 2.0)])
+        data = self.setup_other_company(name='Finance Example EUR', currency_id=other.id)
+        company_b = data['company']
+        user = new_test_user(
+            self.env, login='ed_fin_two', company_id=self.env.company.id,
+            company_ids=[self.env.company.id, company_b.id],
+            groups='executive_dashboard.group_user,account.group_account_readonly')
+        dashboard = self.env['executive.dashboard'].with_user(user).with_context(
+            allowed_company_ids=[self.env.company.id, company_b.id])
+        before = dashboard.get_section('finance', 'month')['widgets']
+        self._move('out_invoice', self.partner, data['default_account_revenue'], 100.0, -5, company=company_b)
+        dashboard_module.cache_clear()
+        after = dashboard.get_section('finance', 'month')['widgets']
+        currency = self.env.company.currency_id
+        # 100 EUR at 2 EUR per company currency unit.
+        self.assertTrue(currency.is_zero(after['kpis']['revenue'] - before['kpis']['revenue'] - 50.0))
+        self.assertTrue(currency.is_zero(after['receivables']['total'] - before['receivables']['total'] - 50.0))
+        drawer = dashboard.get_drawer('finance.open_items', {'kind': 'receivables', 'view': 'expected'})
+        self.assertEqual(drawer['total']['value'], dashboard._fin_format(after['receivables']['total']))
+        row = next(r for r in drawer['rows'] if r['label'] == self.partner.display_name)
+        detail = dashboard.get_drawer('finance.open_items', row['open']['args'])
+        self.assertIn(dashboard._fin_format(50.0), [r['value'] for r in detail['rows']])
+
     def test_query_limit(self):
+        if self.env['executive.dashboard']._fin_engine():
+            self.skipTest('Accounting reports installed: the native engines run their own queries.')
         self.finance()  # warm the ORM caches
         # Counted for the test's environment user; the section runs as ``ed_fin``.
-        with self.assertQueryCount(**{self.env.user.login: 24}):
+        with self.assertQueryCount(**{self.env.user.login: 12}):
             self.Dashboard.get_section('finance', 'month', refresh=True)
