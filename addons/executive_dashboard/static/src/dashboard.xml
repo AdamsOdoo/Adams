@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <t t-name="executive_dashboard.Icon">
+        <t t-out="svg"/>
+    </t>
+
+    <t t-name="executive_dashboard.NavButtons">
+        <t t-foreach="navItems" t-as="item" t-key="item.key">
+            <button type="button" t-att-class="cls" t-att-data-sec="item.key" t-att-title="item.name"
+                    t-att-aria-current="state.page === item.key ? 'page' : false"
+                    t-on-click="() => this.openPage(item.key)"
+                    t-on-mouseenter="() => this.prefetch(item.key)"
+                    t-on-focus="() => this.prefetch(item.key)">
+                <span class="ed-ic"><Icon name="item.key"/></span>
+                <span class="ed-lbl" t-esc="item.name"/>
+            </button>
+        </t>
+    </t>
+
+    <t t-name="executive_dashboard.Dashboard">
+        <div class="o_action o_executive_dashboard ed-app" t-ref="root" t-att-data-sec="state.page">
+            <aside class="ed-rail" aria-label="Navigation">
+                <div class="ed-brand">
+                    <div class="ed-brand-mark" t-esc="state.boot.company_initials"/>
+                    <div class="ed-brand-txt">
+                        <strong><bdi t-esc="state.boot.company_name"/></strong>
+                        <small>Executive Dashboard</small>
+                    </div>
+                </div>
+                <p class="ed-rail-label">Sections</p>
+                <nav class="d-flex flex-column gap-1">
+                    <t t-call="executive_dashboard.NavButtons"><t t-set="cls" t-value="'ed-nav-btn'"/></t>
+                </nav>
+                <span class="ed-sep"/>
+                <p class="ed-rail-label">Quick access</p>
+                <button type="button" class="ed-nav-btn ed-quick" title="Search" t-on-click="() => this.openPanel({ kind: 'search' })">
+                    <span class="ed-ic"><Icon name="'search'"/></span>
+                    <span class="ed-lbl">Search</span>
+                    <kbd>/</kbd>
+                </button>
+                <button t-if="state.boot.can_configure" type="button" class="ed-nav-btn ed-quick" title="Settings" t-on-click="openSettings">
+                    <span class="ed-ic"><Icon name="'settings'"/></span>
+                    <span class="ed-lbl">Settings</span>
+                </button>
+            </aside>
+
+            <div class="ed-main">
+                <header class="ed-topbar" t-ref="topbar">
+                    <div class="ed-title">
+                        <span class="ed-ic"><Icon name="state.page"/></span>
+                        <div>
+                            <h1 t-esc="title"/>
+                            <small><bdi t-esc="subtitle"/></small>
+                        </div>
+                    </div>
+                    <div t-if="showPeriod" class="ed-seg" role="group" aria-label="Period">
+                        <t t-foreach="periods" t-as="p" t-key="p.key">
+                            <button type="button" t-att-aria-pressed="state.period === p.key ? 'true' : 'false'"
+                                    t-on-click="() => this.setPeriod(p.key)" t-esc="p.label"/>
+                        </t>
+                    </div>
+                    <span t-if="showPeriod and state.period === 'custom'" class="ed-custom">
+                        <input type="date" class="ed-field" aria-label="From" t-att-value="state.customFrom"
+                               t-att-max="state.customTo" t-on-change="(ev) => this.onCustomDate('customFrom', ev)"/>
+                        <span>–</span>
+                        <input type="date" class="ed-field" aria-label="To" t-att-value="state.customTo"
+                               t-att-min="state.customFrom" t-on-change="(ev) => this.onCustomDate('customTo', ev)"/>
+                    </span>
+                    <button type="button" class="ed-icon-btn ed-tb-compact" title="Search" aria-label="Search"
+                            t-on-click="() => this.openPanel({ kind: 'search' })">
+                        <Icon name="'search'"/>
+                    </button>
+                    <t t-if="!isWelcome">
+                        <button type="button" class="ed-icon-btn" title="Refresh" aria-label="Refresh" t-on-click="refresh">
+                            <Icon name="'refresh'"/>
+                        </button>
+                        <button type="button" class="ed-icon-btn" title="Hide figures and return to Welcome"
+                                aria-label="Hide figures and return to Welcome" t-on-click="hideFigures">
+                            <Icon name="'hide'"/>
+                        </button>
+                    </t>
+                </header>
+                <nav class="ed-mnav" aria-label="Sections">
+                    <t t-call="executive_dashboard.NavButtons"><t t-set="cls" t-value="''"/></t>
+                </nav>
+                <main class="ed-content">
+                    <Welcome t-if="isWelcome" boot="state.boot" sections="sections"
+                             openPage.bind="openPage" prefetch.bind="prefetch"
+                             openSearch="() => this.openPanel({ kind: 'search' })"/>
+                    <SectionView t-else="" t-key="state.page" section="current" data="state.data"
+                                 loading="state.loading" error="state.error" openPanel.bind="openPanel"/>
+                </main>
+            </div>
+
+            <SidePanel panel="state.panel" close.bind="closePanel" open.bind="openPanel" openRecord.bind="openRecord"/>
+        </div>
+    </t>
+</templates>
