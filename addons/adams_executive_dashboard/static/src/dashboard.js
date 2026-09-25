@@ -348,8 +348,7 @@ export class ExecutiveDashboard extends Component {
                 const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
                 if (this.alive && generation === this.generation) {
                     this.state.sections[key] = { ...data, status: 'ready' };
-                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status === 'ready')) { if (!this.state.recent) void this.loadRecent(previousRecent || 'orders'); if (!this.state.ranking) void this.loadRanking(previousRanking || 'invoiced_sales'); void this.loadCustomers(); }
-                    if (key === 'sales' && data.items.some(item => item.key === 'invoiced_sales' && item.status)) { void this.loadProducts(); void this.loadOrderRanking(); }
+                    if (key === 'sales') this.loadAvailableSales(data, previousRecent || 'orders', previousRanking || 'invoiced_sales');
                     if (key === 'finance') this.loadFinanceLists(data);
                 }
             } catch {
@@ -524,7 +523,8 @@ export class ExecutiveDashboard extends Component {
             const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, {...this.state.applied}]);
             if (this.alive && generation === this.generation && this.sectionRetries[key] === marker) {
                 this.state.sections[key] = {...data, status: 'ready'};
-                if (key === 'sales') void this.refreshRankings();
+                if (key === 'sales') this.loadAvailableSales(data,
+                    this.state.recent?.kind || 'orders', this.state.ranking?.key || 'invoiced_sales');
                 if (key === 'finance') this.loadFinanceLists(data);
             }
         } catch {
@@ -536,6 +536,26 @@ export class ExecutiveDashboard extends Component {
         // Cash accounts and the chart exist only when their metrics are ready (the finance addon provides them).
         if (data.items.some(item => item.key === 'cash' && item.status === 'ready')) void this.loadDirectory('cash');
         if (['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) void this.loadProfitabilityChart();
+    }
+
+    loadAvailableSales(data, recentKind, rankingKey) {
+        if (!data.items.some(item => item.status)) return;
+        const status = key => data.items.find(item => item.key === key)?.status || 'not_configured';
+        const unavailable = (key, extra = {}) => ({status: status(key), rows: [], ...extra});
+        if (status(rankingKey) === 'ready') void this.loadRanking(rankingKey);
+        else this.state.ranking = unavailable(rankingKey, {key: rankingKey});
+        if (status('invoiced_sales') === 'ready') {
+            void this.loadCustomers();
+            void this.loadProducts();
+        } else {
+            this.state.customers = unavailable('invoiced_sales');
+            this.state.products = unavailable('invoiced_sales');
+        }
+        if (status('confirmed_sales') === 'ready') void this.loadOrderRanking();
+        else this.state.orderRanking = unavailable('confirmed_sales');
+        const recentKey = recentKind === 'invoices' ? 'invoiced_sales' : recentKind === 'quotations' ? 'quotations' : 'confirmed_sales';
+        if (status(recentKey) === 'ready') void this.loadRecent(recentKind);
+        else this.state.recent = unavailable(recentKey, {kind: recentKind});
     }
 
     async refreshRankings() {
@@ -602,7 +622,11 @@ export class ExecutiveDashboard extends Component {
 
     loadSectionData(key) {
         // Workspace lists load on demand; a refresh clears them, so the visible section reloads here too.
-        if (key === 'sales' && !this.state.fulfillment) void this.loadDirectory('fulfillment');
+        if (key === 'sales' && !this.state.fulfillment) {
+            const metric = this.state.sections.sales?.items?.find(item => item.key === 'confirmed_sales');
+            if (metric?.status === 'ready') void this.loadDirectory('fulfillment');
+            else if (metric?.status) this.state.fulfillment = {status: metric.status, rows: []};
+        }
         if (key === 'inventory' && !this.state.inventory) void this.applyStockFilters();
         if (key === 'procurement' && !this.state.procurement) void this.loadDirectory('procurement');
         if (key === 'hr' && !this.state.hrData) void this.loadHR();

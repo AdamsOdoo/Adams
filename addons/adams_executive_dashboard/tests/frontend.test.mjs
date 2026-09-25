@@ -501,13 +501,27 @@ test('company section settings filter navigation and skip hidden source requests
     assert.equal(pending[0].args[0],'sales');
     pending[0].resolve({items:[{key:'invoiced_sales',status:'empty'}]});
     await refresh;
-    // A successful Sales response also requests its native product ranking.
-    pending[1].resolve({status:'empty',rows:[]});
+    // An empty native Sales measure must not trigger a product report request.
+    assert.equal(pending.length, 1);
+    assert.equal(controller.state.products.status, 'empty');
     controller.state.draft.company_id=2;
     await controller.refresh();
     assert.equal(controller.visibleSections.length,0);
     assert.equal(controller.state.activeSection,'');
     assert.equal(controller.state.products,null);
+});
+
+test('restricted Sales sources do not trigger unauthorized background reports', async () => {
+    const {controller, pending} = fixture();
+    controller.state.companies = [{id: 1, enabled_sections: ['sales']}];
+    const refresh = controller.refresh();
+    pending[0].resolve({items: ['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'quotations']
+        .map(key => ({key, status: 'restricted', value: null}))});
+    await refresh;
+    assert.deepEqual(pending.map(request => request.method), ['get_section']);
+    for (const key of ['ranking', 'customers', 'products', 'orderRanking', 'recent', 'fulfillment']) {
+        assert.equal(controller.state[key].status, 'restricted', `${key} keeps its source access state`);
+    }
 });
 
 test('explicit department navigation persists through scrolling and rejects disabled departments', () => {
@@ -725,7 +739,10 @@ test('same-company refresh retains Sales selections and reloads the selected sou
     controller.state.productMeasure='quantity'; controller.state.productUnit='7';
     controller.state.rankLimit=10;
     await settleRequests(pending,controller.refresh(), request => request.method==='get_section'
-        ? {items:[{key:'invoiced_sales',status:'ready',value:55}]}
+        ? {items:[{key:'invoiced_sales',status:'ready',value:55},
+            {key:'invoiced_margin',status:'ready',value:22},
+            {key:'quotations',status:'ready',value:12},
+            {key:'confirmed_sales',status:'ready',value:40}]}
         : {status:'ready',rows:[],unit_id:7});
     assert.equal(pending.find(r=>r.method==='get_recent_sales').args[0],'quotations');
     assert.ok(pending.some(r=>r.method==='get_breakdown' && r.args[0]==='invoiced_margin'));
@@ -1393,7 +1410,8 @@ test('refresh and company changes reload the visible workspace lists instead of 
             filters: {warehouse_id: 9, category_id: false, hide_zero: true, search: '', at_date: '', sort: 'name'}};
         controller.state.draft.company_id = company;
         await settleRequests(pending, controller.refresh(), request => request.method === 'get_section'
-            ? {items: []} : {status: 'ready', rows: [], mode: request.args[2]});
+            ? {items: section === 'sales' ? [{key: 'confirmed_sales', status: 'ready'}] : []}
+            : {status: 'ready', rows: [], mode: request.args[2]});
         const calls = pending.filter(request => request.method === method);
         assert.equal(calls.length, 1, `${section} for company ${company} reloads ${method} once`);
         assert.equal(calls[0].args[1], 0);
