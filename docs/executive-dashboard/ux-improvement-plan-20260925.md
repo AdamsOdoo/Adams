@@ -1,97 +1,121 @@
-# Executive Dashboard — UX improvement plan (2026-09-25)
+# Executive Dashboard — redesign plan (2026-09-25, revision 2)
 
-Status: **noted, not implemented.** Owner feedback after the completion build
-(modules 19.0.1.8.0). Nothing here changes the approved HTML until each item is
-recorded as a deviation (D19 onward) and approved.
+Status: **agreed direction, not implemented.** Revision 2 incorporates the
+owner's review of the first reference design. Each change against the approved
+HTML is recorded as a deviation (D19 onward) before implementation.
 
-Visual reference for this plan: `reference/executive-360-concept.html`
-(published copy: https://claude.ai/artifact/3JGeUFdrqBkgAgrDgkRbEY)
-(example figures only).
+Reference design: `reference/executive-360-concept.html`
+(published copy: https://claude.ai/artifact/3JGeUFdrqBkgAgrDgkRbEY). Example
+figures only.
 
-## Owner feedback
+## 1. Product rules (owner decisions)
 
-1. Quick access navigation is poor; it should open a side panel, not jump down the page.
-2. "Performance context" adds nothing.
-3. The progress bars carry no meaning; use real charts or keep it clean.
-4. Bank & cash shows "Breakdown unavailable" although the Balance Sheet has the detail.
-5. Delivery status should open delivery orders; every figure should open the records behind it.
-6. It must look, feel and work like an executive 360° view of the company.
+| # | Rule |
+|---|---|
+| R1 | The product is **Executive Dashboard**, reusable for any customer. No customer name in module names, titles, code, data or UI. |
+| R2 | Navigation order: **Welcome, Finance, Sales, CRM, Procurement, Inventory, People**. |
+| R3 | **Welcome** shows no figures (privacy when the screen is visible to others): greeting, date, company and the sections the user can open. |
+| R4 | **No comparisons anywhere** (no deltas, no "vs prior period", no sparklines). |
+| R5 | Periods: **This month, Last month, This quarter, Year to date, Custom** (from/to dates). Balances (bank, receivables, payables, stock) are always as of today. |
+| R6 | Layout direction follows the **user's language** in Odoo (Arabic → right to left) using Odoo's standard localization. No manual switch. |
+| R7 | Detail opens in a **side panel**; every figure opens the records behind it; "Open in Odoo" goes to the native screen with the same filters. |
+| R8 | **Search** covers the whole database the user may read (not the dashboard's filters or displayed rows). |
+| R9 | Loading must be fast: the page frame appears immediately, each widget loads independently, drawers load on demand. |
 
-## Current behaviour (from the code)
+## 2. Sections
 
-- Quick access: "Needs attention" and "Data & definitions" are in-page anchors
-  (`#adams-attention`, `#adams-trust`); "Search documents" opens a centred modal.
-  The dashboard uses seven modal dialogs (source, analysis, search, print,
-  employee, cash, saved views) that block the page.
-- Delivery status (`open_fulfillment`, `models/dashboard.py`) opens a
-  `sale.report` pivot, not `stock.picking`. The order list opens the sales order form.
-- Bars: top-5 ranking rows (`adams_rank_track`), aging rows (`adams_aging_track`)
-  and the analysis trend table (`adams_bar_track`) redraw the printed number.
-- Bank & cash split (`_cash_journal_breakdown`, `adams_dashboard_finance/models/dashboard.py`)
-  is shown only if a General Ledger detail mapping exists, **every** `asset_cash`
-  account is the default account of exactly one bank or cash journal, and the
-  total reconciles. Staging has unlinked cash accounts (see
-  `future-work-20260923.md` item 3), so the status is `ambiguous` and both lines
-  read "Breakdown unavailable".
+### Welcome
+Greeting with the user's name, today's date, company logo and name; one card
+per section the user has access to (hidden when the app is not installed or the
+user lacks rights). Search is available; no figures.
 
-## Plan
+### Finance
+- Figures: Revenue, Gross profit (with margin %), Net profit, **Bank & Cash**, Receivables, Payables.
+- Revenue & net profit by month (12 months; the current month drawn dashed as month-to-date).
+- **Bank & Cash**: the accounts under the Balance Sheet's "Bank and Cash Accounts" line, each with its balance, and the line total. Nothing else: no bank/cash split, no reconciliation message, no extra calculation. Clicking an account opens its General Ledger.
+- **Receivables**: two views, *Aged* (not due, 1–30, 31–60, 61–90, over 90 days) and *Expected* (open customer invoices by due date: next 7 days, 8–30, 31–60, 61–90, later). Source: Aged Receivable report / open posted invoices' residual amounts.
+- **Payables**: the same two views for vendor bills.
 
-### 1. One side panel for all detail
-- One reusable panel on the right (left in Arabic). The dashboard stays visible
-  and scrollable behind it. It replaces the source, analysis, cash, search,
-  employee and needs-attention modals.
-- Quick access opens the panel: **Needs attention** (ranked items, each linking
-  to its records), **Search** (grouped results: orders, invoices, deliveries,
-  partners), **Definitions**.
-- Print and saved views stay as small dialogs (they are actions, not places).
+### Sales
+- Figures: Invoiced sales, Confirmed orders, Open quotations, Orders to invoice.
+- Invoiced sales by month.
+- **Salespeople by invoiced sales**, **Top products by quantity sold** (per unit of measure), **Top customers by payments received** in the period.
+- Recent orders with **delivery status** (rule below). The status opens that order's delivery orders.
 
-### 2. Every figure opens the records behind it
-A click opens the records someone would act on, in the same period and company
-scope; the analysis view is a secondary link.
+**Delivery status rule.** Odoo's native `delivery_status` is `full` when every
+picking is done *or cancelled* (`sale_stock/models/sale_order.py`,
+`_compute_delivery_status`). The dashboard shows **Delivered** only when every
+outgoing delivery order of the order is **done** and none was cancelled with
+quantity left; otherwise **Partially delivered**, **Not delivered** or **Late**
+(a delivery order past its scheduled date). Returns are excluded.
 
-| Element | Today | Target |
+### CRM (new)
+- Figures: Open pipeline (expected revenue), Weighted pipeline (by probability), New leads, Won (count and value) in the period.
+- Pipeline by stage (value and count per stage; a stage opens its opportunities).
+- Opportunities closing soonest, by expected revenue.
+- Pipeline by salesperson.
+
+### Procurement
+- Figures: Purchases confirmed, Purchase orders to approve, Late receipts, Open purchase value.
+- Waiting for approval (oldest first), Late receipts, Top suppliers by purchase value.
+
+### Inventory
+- Figures: Inventory value, Late deliveries, Deliveries due today, Receipts due today.
+- Delivery status tiles: Late, Due today, Next 7 days, Waiting for stock (each opens the delivery orders).
+- **Stock report**: filters for **warehouse** (all or one), **product category**, and **search by name or internal reference**; columns: reference, product, category, warehouse, on hand, reserved, available, unit, value; server-side paging; a row opens the product's stock by location.
+- Removed: "Below reorder point".
+
+### People
+- Figures: Headcount, **On shift now**, On leave today.
+- **On shift now**: employees whose Planning shift covers the current time (Enterprise Planning); if Planning is not installed, employees checked in (Attendances).
+- **Headcount by department**: a department opens its employees.
+- **Employees directory**: search by name, filter by department; a row opens the employee.
+- Removed: Open positions, Contracts ending.
+
+### Quick access
+Search (whole database), Needs attention (ranked items across sections),
+Definitions. Each opens the side panel.
+
+## 3. Architecture and refactor (for R1 and R9)
+
+### Module family (plug and play)
+| Module | Depends | Provides |
 |---|---|---|
-| Delivery status, product row | `sale.report` pivot | Outgoing `stock.picking` not done/cancelled, filtered to the product |
-| Delivery status, order row | Sales order form | That order's delivery orders (`action_view_delivery`) |
-| Receivables / payables overdue | Aging report | Keep, plus a list of the overdue invoices/bills |
-| Late purchase orders | Purchase order list | Late incoming receipts |
-| Bank & cash | Account directory modal | Per-account balances in the panel, each opening that account's General Ledger |
+| `executive_dashboard` | `web` | Shell, Welcome, side panel, search, settings, access groups, widget registry |
+| `executive_dashboard_account` | core, `account` (auto-install) | Finance widgets from native reports; Enterprise `account_reports` used when present |
+| `executive_dashboard_sale` | core, `sale_management`, `sale_stock` (auto-install) | Sales widgets, delivery status rule |
+| `executive_dashboard_crm` | core, `crm` (auto-install) | CRM widgets |
+| `executive_dashboard_purchase` | core, `purchase` (auto-install) | Procurement widgets |
+| `executive_dashboard_stock` | core, `stock` (auto-install) | Inventory widgets and stock report |
+| `executive_dashboard_hr` | core, `hr` (auto-install); Planning/Attendance optional | People widgets |
 
-Before coding: walk the control-sweep inventory and write the target of every
-clickable element.
+A customer installs `executive_dashboard`; the bridge for each installed app
+installs itself. Sections without their app never appear.
 
-### 3. Remove what doesn't help decisions
-- Remove "Performance context". Reporting status becomes a header badge; the
-  revenue target shows only when a budget exists.
-- Remove the ranking and aging bars. Aging becomes one stacked bar
-  (current → 90+). The analysis trend becomes a line chart.
-- Keep charts only where they answer a question: revenue & profit by month,
-  cash trend, aging mix.
+**Renaming.** Odoo cannot rename an installed module. Recommended: publish the
+new modules, add a one-time migration for this database (settings, saved
+views, report mappings), then uninstall the old `adams_*` dashboard modules.
+**Owner decision needed** before implementation (alternative: keep the
+technical names and change only the displayed names).
 
-### 4. Bank & cash breakdown from the Balance Sheet
-- Take the account lines of the Balance Sheet's own "Bank and Cash Accounts"
-  line (expanded by account, same options and cutoff). They sum to the headline
-  by construction.
-- Show every account with its balance. Group as Bank / Cash when a journal
-  identifies it, otherwise "Other"; never hide the list because one account is unlinked.
-- "Unavailable" only for missing access or a missing report mapping.
+### Backend
+- One call per section, `get_section(section, period)`, returns every widget's payload; each widget is a small provider registered by its bridge module.
+- Aggregates use `_read_group` / native report engines; no per-record Python loops for totals; lists are limited and paged on the server.
+- Each provider checks access and returns `restricted` / `not_installed` states instead of failing the section.
+- Drawer content is fetched only when a drawer opens.
+- Global search: `name_search`-style lookups on a configurable list of models, 5 results per model, record rules applied, 250 ms debounce.
+- Performance budget (checked by `test_performance` query counts and timings on a staging-size dataset): section payload under 300 ms; drawer under 200 ms; search under 300 ms.
 
-### 5. Executive 360 layout
-- New **Overview** page first: company pulse KPIs with comparison and trend,
-  needs attention, cash, receivables, operations, people. Department pages follow.
-- One filter bar: period, comparison (prior period / last year), company, saved views.
-- Every KPI shows its change against the comparison period and opens its records.
+### Frontend
+- One Owl component per widget with its own skeleton, error and empty state; the frame and navigation render before any data.
+- Section payloads are cached per period in the browser for the session and refreshed in the background (stale while revalidate); changing period does not rebuild the page.
+- CSS uses logical properties only; direction comes from Odoo (`localization.direction`); all strings go through `_t` with Arabic translations.
+- Dark mode follows Odoo's user setting (Enterprise).
 
-## Dark mode
-The dashboard has no theme switch of its own by design (`dashboard.scss`
-header): it follows Odoo's theme. Odoo's dark mode is an **Enterprise**
-feature (`web_enterprise`), switched per user from the avatar menu at the
-top right. Community (local tests) has no dark mode, so it can only be
-checked on the Odoo.sh build. Option: add a dashboard toggle that calls the
-same user preference; recommended only if the owner wants it on the dashboard itself.
-
-## Order and cost
-1. Bank & cash (§4) and drill-down targets (§2): backend-first, low risk.
-2. Removals (§3).
-3. Side panel (§1) and Overview (§5): the largest change; the drawer/dialog
-   sweep (112) and browser checks (66) must be rewritten.
+## 4. Order of work
+1. Owner decision on module renaming; record deviations D19+.
+2. Core refactor: registry, `get_section`, side panel, Welcome, period selector, removal of comparisons.
+3. Finance (Bank & Cash from the Balance Sheet, expected receivables/payables).
+4. Sales (delivery status rule, three rankings) and Inventory (stock report).
+5. CRM, Procurement, People (on shift now, directory).
+6. Global search, performance budget tests, Arabic/RTL, dark mode on Odoo.sh.
