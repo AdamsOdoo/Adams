@@ -21,6 +21,14 @@ handover; nothing else from earlier sessions is needed.
 - Direction follows the user's language through Odoo (`localization.direction`); no manual switch. Dark mode follows Odoo's user setting.
 - The old modules `adams_executive_dashboard` and `adams_dashboard_finance` stay untouched until the final phase (data move + uninstall on a staging copy).
 
+### Owner decisions (2026-09-25, after Phase 5)
+
+- **Access**: one level, **Administrator**, or no access (replaces User/Manager). An Administrator sees every section and figure whatever their rights in other apps (the dashboard reads its data with elevated rights), only for the companies they may use. Dashboard settings stay with Odoo system administrators. Side panels show full details; the button to the native screen appears only when the user can open it (a list: only when the user sees every record the dashboard shows). Global search covers every search model; a result opens only when the user may open it.
+- **Finance report lines**: no settings. Always Odoo's standard report lines, falling back to journal items automatically.
+- **Sales, recent orders**: a row opens a side panel with the order's details (customer, order date, salesperson, untaxed and total amounts, Delivery Status and Invoice Status as stored, lines with quantity ordered, delivered and invoiced). "Deliveries" lists the order's delivery orders (each opens in Inventory); the record button opens the sales order.
+- **Sales, recent quotations**: a separate full-width box under Recent orders (no tabs): latest quotations (draft or sent) with reference, customer, date, validity date, amount and status; a row opens the same panel; the record button opens the quotation.
+- **Button wording**: "Open record" (one record), "Open list" (filtered list), "Open report" (report); Arabic فتح السجل / فتح القائمة / فتح التقرير. The destination line under the button stays.
+
 ## Data sources (verify each field with `.odoo-harness/oh src` before use)
 
 | Widget | Source |
@@ -43,7 +51,7 @@ handover; nothing else from earlier sessions is needed.
 | Attendance today | `hr.attendance` with `check_in` today in the user's timezone: first check-in, last check-out, `worked_hours` |
 | Time off | `hr.leave` validated, today and next 7 days |
 | Shifts today | `planning.slot` published, overlapping today (Enterprise; hide if missing) |
-| Search | configured list of models, name search, 5 results per model, `check_access` + record rules |
+| Search | configured list of models, name search, 5 results per model, the user's current companies (elevated read); a result opens only when the user may read it |
 
 Reusable from the old modules (read, adapt, do not copy wholesale):
 `adams_dashboard_finance/models/dashboard.py` and `account_report.py` (calling the
@@ -56,11 +64,11 @@ Do **not** reuse: the bank/cash split, comparisons, the modal dialogs, `dashboar
 ```
 addons/executive_dashboard/
   __manifest__.py            name "Executive Dashboard", depends web + account, version 19.0.1.0.0
-  security/                  groups: Executive Dashboard / User, / Manager; ir.model.access.csv
+  security/                  one group: Executive Dashboard / Administrator
   models/
     dashboard.py             get_section(section, period), get_drawer(key, args), search(query), open_action(key, args)
     sections/finance.py sales.py crm.py procurement.py inventory.py people.py   one provider per widget
-    settings.py              enabled sections; report line overrides for renamed localizations
+    settings.py              enabled sections
   static/src/                Owl: shell (nav/topbar/period), SidePanel, Kpi, Panel, LineChart, ColumnChart, AgeBar, tables; one file per section
   views/                     client action + menu, settings form
   i18n/ar.po
@@ -81,7 +89,7 @@ prefetch a section on menu hover without rendering it; charts are inline SVG.
   - `oh test executive_dashboard` for each phase; while iterating run one test with `--tags`.
   - `oh shot` only once per phase, for that phase's section, English and Arabic, desktop; phone width in the last phase.
 - **Do not** build coverage ledgers, control sweeps, paired-capture sets, reconciliation matrices or evidence bundles. Keep a short results line per phase in `docs/executive-dashboard/build-log.md` (date, commit, tests run, result).
-- Tests to write (small, fast): install/uninstall; each section returns its widget keys; 2–3 figures checked against native values on demo data; a user without rights gets `restricted`; a query-count limit per section.
+- Tests to write (small, fast): install/uninstall; each section returns its widget keys; 2–3 figures checked against native values on demo data; an Administrator without app rights sees the same figures but no button to screens they cannot open; records of other companies are refused; a query-count limit per section.
 - Local Odoo is **Community** (no Enterprise source here). Sales, Inventory, CRM, Purchase, Attendances and Time Off run locally; test there. `account_reports` and `planning` are Enterprise: code them with runtime detection plus the Community fallback, and list them under "verify on Odoo.sh" in the build log. `oh test` exit code 3 (blocked) for Enterprise-only parts is expected, not a failure to chase.
 - Independent review: run the `odoo-reviewer` agent once after Finance (money) and once at the end.
 - This repository is public: example data only, no customer data, credentials or Enterprise source.
