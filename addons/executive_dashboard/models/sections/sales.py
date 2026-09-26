@@ -87,7 +87,7 @@ class ExecutiveDashboard(models.AbstractModel):
             company = scope['companies'][:1]
             return [(group, self._fin_convert(scope, amount, company, day), count)
                     for group, amount, count in Model._read_group(
-                        domain, [key], [f'{measure}:sum', '__count'], order=f'{measure}:sum desc', limit=limit)]
+                        domain, [key], [f'{measure}:sum', '__count'], order=f'{measure}:sum desc, {key}', limit=limit)]
         totals, counts = defaultdict(float), defaultdict(int)
         for group, company, amount, count in Model._read_group(
                 domain, [key, 'company_id'], [f'{measure}:sum', '__count']):
@@ -95,7 +95,7 @@ class ExecutiveDashboard(models.AbstractModel):
             totals[group] += self._fin_convert(scope, amount, company or scope['company'], day)
             counts[group] += count
         return [(group, totals[group], counts[group])
-                for group in sorted(totals, key=lambda g: -totals[g])[:limit]]
+                for group in sorted(totals, key=lambda g: (-totals[g], g.id or 0))[:limit]]
 
     def _window(self, xmlid, name, model, domain, context=None, res_id=None):
         """The native window action ``xmlid`` (views and search panel) on ``domain``, or a plain one."""

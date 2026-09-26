@@ -218,6 +218,8 @@ class TestSales(SalesCrmCase):
         self.assertFalse(drawer['more'])
         people = Dashboard.get_drawer('sales.salespeople', args)
         self.assertEqual(people['rows'][0]['open']['key'], 'sales.salesperson')
+        self.assertEqual([r['label'] for r in people['rows'][:len(widgets['salespeople'])]],
+                         [p['name'] for p in widgets['salespeople']])
         customers = Dashboard.get_drawer('sales.customers', args)
         self.assertEqual(customers['action']['key'], 'sales.customers')
         self.assertEqual(Dashboard.open_action('sales.customers', args)['res_model'], 'account.move')

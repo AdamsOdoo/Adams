@@ -283,7 +283,7 @@ class TestFinance(AccountTestInvoicingCommon):
         result = billing.get_section('finance', 'month')
         self.assertEqual(result['status'], 'ok')
         # Same figures. Only the account buttons may differ: they depend on whether the user may
-        # open the account's native screen (the Trial Balance needs accounting report rights).
+        # open the account's native screen (the General Ledger needs accounting report rights).
         self.assertEqual(self.figures(result['widgets']), self.figures(self.finance()))
         self.assertIn('total', billing.get_drawer('finance.bank_cash'))
 

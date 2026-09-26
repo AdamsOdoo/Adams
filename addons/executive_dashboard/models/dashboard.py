@@ -299,7 +299,7 @@ class ExecutiveDashboard(models.AbstractModel):
         if isinstance(result, dict):
             if result.get('action'):
                 result['action'] = dashboard._target(result['action'])
-            # Rows opening the same report (e.g. every account opening the Trial Balance) share
+            # Rows opening the same report (e.g. every account opening the General Ledger) share
             # one access check on the report; each row's own arguments are still validated.
             reports = {}
             rows = [row for group in result.get('groups') or () for row in group.get('rows') or ()]

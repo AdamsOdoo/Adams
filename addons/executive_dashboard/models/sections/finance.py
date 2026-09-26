@@ -742,15 +742,13 @@ class ExecutiveDashboard(models.AbstractModel):
         ]))
 
     def _fin_account_target(self, account, scope):
-        """``(action, destination name)`` of an account: the General Ledger searched on the
-        account code with the account unfolded (its entries listed), else its journal items
-        (no Enterprise reports).
+        """``(action, destination name)`` of an account: the General Ledger with the account
+        unfolded (its entries listed), else its journal items (no Enterprise reports).
 
         A balance account (bank, cash, receivable, payable) runs from the start of the fiscal
         year to the balance date, with its opening balance, so the ledger ends on the
-        dashboard's balance; a profit and loss account covers the period, like its figure.
-        The ledger's search matches line names, so a code that begins another account's code
-        also lists that account (folded).
+        dashboard's balance; a profit and loss account lists the period's entries, like its
+        figure (the ledger may add an opening balance from the fiscal year start).
         """
         _ = self.env._
         profit_loss = account.account_type in PL_TYPES
@@ -759,13 +757,10 @@ class ExecutiveDashboard(models.AbstractModel):
         else:
             start, end = self._fin_year_start(scope['as_of']), scope['as_of']
         ledger = self._fin_report(GL_REPORT)
-        code = self._fin_code(account)
         if ledger:
             try:
                 options = self._fin_options(ledger, start, end, single_group=False)
                 options['unfolded_lines'] = [ledger._get_generic_line_id('account.account', account.id)]
-                if code:
-                    options['filter_search_bar'] = code
                 return self._fin_report_action(ledger, options), _('General Ledger')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
