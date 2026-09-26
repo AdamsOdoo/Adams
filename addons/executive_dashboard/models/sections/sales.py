@@ -21,7 +21,6 @@ from odoo.tools.misc import format_date, formatLang
 TREND_MONTHS = 12
 TOP_ROWS = 5
 RECENT_ROWS = 10
-DRAWER_ROWS = 25
 LINE_ROWS = 50
 INVOICE_TYPES = ('out_invoice', 'out_refund')
 
@@ -88,7 +87,7 @@ class ExecutiveDashboard(models.AbstractModel):
             company = scope['companies'][:1]
             return [(group, self._fin_convert(scope, amount, company, day), count)
                     for group, amount, count in Model._read_group(
-                        domain, [key], [f'{measure}:sum', '__count'], order=f'{measure}:sum desc', limit=limit)]
+                        domain, [key], [f'{measure}:sum', '__count'], order=f'{measure}:sum desc, {key}', limit=limit)]
         totals, counts = defaultdict(float), defaultdict(int)
         for group, company, amount, count in Model._read_group(
                 domain, [key, 'company_id'], [f'{measure}:sum', '__count']):
@@ -96,7 +95,7 @@ class ExecutiveDashboard(models.AbstractModel):
             totals[group] += self._fin_convert(scope, amount, company or scope['company'], day)
             counts[group] += count
         return [(group, totals[group], counts[group])
-                for group in sorted(totals, key=lambda g: -totals[g])[:limit]]
+                for group in sorted(totals, key=lambda g: (-totals[g], g.id or 0))[:limit]]
 
     def _window(self, xmlid, name, model, domain, context=None, res_id=None):
         """The native window action ``xmlid`` (views and search panel) on ``domain``, or a plain one."""
@@ -104,7 +103,7 @@ class ExecutiveDashboard(models.AbstractModel):
             if self.env.ref(xmlid, raise_if_not_found=False) else {
                 'type': 'ir.actions.act_window', 'res_model': model,
                 'views': [[False, 'list'], [False, 'form']]}
-        action.update(name=name, domain=list(domain), context=context or {}, target='current')
+        action.update(name=name, display_name=name, domain=list(domain), context=context or {}, target='current')
         if res_id:
             action.update(res_id=res_id, views=[[False, 'form']], view_mode='form')
         return action
@@ -210,7 +209,7 @@ class ExecutiveDashboard(models.AbstractModel):
         """``[(partner, collected, entries)]``, largest first."""
         rows = [(partner, sum(moves.values()), len(moves))
                 for partner, moves in self._sal_collections(scope, partner_id).items()]
-        return sorted(rows, key=lambda row: -row[1])
+        return sorted(rows, key=lambda row: (-row[1], row[0].id))
 
     # ------------------------------------------------------------------ figures
 
@@ -254,14 +253,16 @@ class ExecutiveDashboard(models.AbstractModel):
         return {'months': [{'month': fields.Date.to_string(m), 'amount': by_month[m]} for m in months],
                 'partial': end < last_day}
 
-    def _sal_salespeople(self, scope):
+    def _sal_salespeople(self, scope, limit=TOP_ROWS):
+        """Salespeople by invoiced sales, the ``limit`` first (every one when None)."""
         rows = self._ranked(scope, 'account.move', self._sal_invoice_domain(scope), 'invoice_user_id',
-                            'amount_untaxed_signed', TOP_ROWS, scope['date_to'])
+                            'amount_untaxed_signed', limit, scope['date_to'])
         return [{'id': user.id or False, 'name': user.name or self.env._('No salesperson'),
                  'amount': amount, 'count': count} for user, amount, count in rows]
 
-    def _sal_products(self, scope):
-        """Net quantity invoiced per product and unit (credit notes deducted); units never summed."""
+    def _sal_products(self, scope, limit=TOP_ROWS):
+        """Net quantity invoiced per product and unit (credit notes deducted), the ``limit`` largest
+        (every one when None); units are never summed."""
         rows = self.env['account.move.line']._read_group(
             [('move_id', 'any', self._sal_invoice_domain(scope)), ('display_type', '=', 'product'),
              ('product_id', '!=', False)],
@@ -269,15 +270,16 @@ class ExecutiveDashboard(models.AbstractModel):
         totals = defaultdict(float)
         for product, uom, move_type, quantity in rows:
             totals[product, uom] += -quantity if move_type == 'out_refund' else quantity
-        ranked = sorted((key for key in totals if totals[key] > 0), key=lambda k: -totals[k])[:TOP_ROWS]
+        ranked = sorted((key for key in totals if totals[key] > 0), key=lambda k: (-totals[k], k[0].id, k[1].id))[:limit]
         return [{'product_id': product.id, 'uom_id': uom.id, 'name': product.display_name,
                  'code': product.default_code or '', 'uom': uom.name or '', 'quantity': totals[product, uom]}
                 for product, uom in ranked]
 
-    def _sal_customers(self, scope):
+    def _sal_customers(self, scope, limit=TOP_ROWS):
+        """Customers by money received, the ``limit`` first (every one when None)."""
         rows = self._sal_collected(scope)
         return [{'id': partner.id, 'name': partner.display_name, 'amount': amount, 'count': count}
-                for partner, amount, count in rows if amount > 0][:TOP_ROWS]
+                for partner, amount, count in rows if amount > 0][:limit]
 
     def _sal_order_row(self, order, delivery):
         return {
@@ -313,6 +315,14 @@ class ExecutiveDashboard(models.AbstractModel):
 
     # ------------------------------------------------------------------ drawers
 
+    def _sal_search_page(self, model, domain, order):
+        """``(records, more)``: one page of ``domain`` for a side-panel list and its "Show more"."""
+        Model = self.env[model]
+        records = Model.search(domain, order=order, limit=self._drawer_limit())
+        more = self._drawer_more(len(records), Model.search_count(domain)) \
+            if len(records) == self._drawer_limit() else False
+        return records, more
+
     def _sal_invoice_rows(self, moves):
         return [{'label': move.name, 'sub': ' · '.join(filter(None, [
                     format_date(self.env, move.date), move.partner_id.display_name])),
@@ -322,10 +332,10 @@ class ExecutiveDashboard(models.AbstractModel):
         scope = self._sal_scope(args)
         domain = self._sal_invoice_domain(scope)
         _ = self.env._
-        moves = self.env['account.move'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
+        moves, more = self._sal_search_page('account.move', domain, 'date desc, id desc')
         invoiced = self._sal_invoiced(scope)
         return {'title': _('Invoiced sales'), 'sub': _('Posted customer invoices and credit notes · untaxed'),
-                'rows': self._sal_invoice_rows(moves),
+                'rows': self._sal_invoice_rows(moves), 'more': more,
                 'total': {'label': _('Total'), 'value': '%s %s' % (
                     self._sal_format(invoiced['amount']), scope['company'].currency_id.name)},
                 'action': {'key': 'sales.invoices', 'args': args}, 'dest': _('Customer Invoices')}
@@ -344,11 +354,11 @@ class ExecutiveDashboard(models.AbstractModel):
         scope, user_id, domain = self._sal_salesperson_domain(args)
         _ = self.env._
         name = self.env['res.users'].browse(user_id).name if user_id else _('No salesperson')
-        moves = self.env['account.move'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
+        moves, more = self._sal_search_page('account.move', domain, 'date desc, id desc')
         total = self._ranked(scope, 'account.move', domain, 'invoice_user_id', 'amount_untaxed_signed', 1,
                              scope['date_to'])
         return {'title': name, 'sub': _('Salespeople by invoiced sales'),
-                'rows': self._sal_invoice_rows(moves),
+                'rows': self._sal_invoice_rows(moves), 'more': more,
                 'total': {'label': _('Total'), 'value': self._sal_format(total[0][1] if total else 0.0)},
                 'action': {'key': 'sales.salesperson', 'args': args}, 'dest': _('Customer Invoices')}
 
@@ -368,13 +378,13 @@ class ExecutiveDashboard(models.AbstractModel):
         _ = self.env._
         product = self.env['product.product'].browse(product_id)
         uom = self.env['uom.uom'].browse(uom_id)
-        lines = self.env['account.move.line'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
+        lines, more = self._sal_search_page('account.move.line', domain, 'date desc, id desc')
         rows = [{'label': line.move_id.name,
                  'sub': ' · '.join(filter(None, [format_date(self.env, line.date), line.partner_id.display_name])),
                  'value': '%s %s' % (formatLang(self.env, -line.quantity if line.move_id.move_type == 'out_refund'
                                                 else line.quantity, digits=2), uom.name)}
                 for line in lines]
-        return {'title': product.display_name, 'sub': _('Invoiced quantity · %s', uom.name), 'rows': rows,
+        return {'title': product.display_name, 'sub': _('Invoiced quantity · %s', uom.name), 'rows': rows, 'more': more,
                 'action': {'key': 'sales.product', 'args': args}, 'dest': _('Customer Invoices')}
 
     def _action_sales_product(self, args):
@@ -390,13 +400,13 @@ class ExecutiveDashboard(models.AbstractModel):
         scope, partner_id = self._sal_customer_args(args)
         _ = self.env._
         moves = self._sal_collections(scope, partner_id).get(self.env['res.partner'].browse(partner_id), {})
-        ranked = sorted(moves, key=lambda m: (m.date, m.id), reverse=True)[:DRAWER_ROWS]
+        ranked, more = self._drawer_page(sorted(moves, key=lambda m: (m.date, m.id), reverse=True))
         return {'title': self.env['res.partner'].browse(partner_id).display_name,
                 'sub': _('Money received in the period: payments, bank statement lines and journal entries'),
                 'rows': [{'label': move.name,
                           'sub': ' · '.join(filter(None, [format_date(self.env, move.date), move.journal_id.name])),
                           'value': self._sal_format(moves[move])} for move in ranked],
-                'total': {'label': _('Total'), 'value': self._sal_format(sum(moves.values()))},
+                'more': more, 'total': {'label': _('Total'), 'value': self._sal_format(sum(moves.values()))},
                 'action': {'key': 'sales.customer', 'args': args}, 'dest': _('Journal Entries')}
 
     def _action_sales_customer(self, args):
@@ -405,6 +415,55 @@ class ExecutiveDashboard(models.AbstractModel):
         domain = Domain('id', 'in', [move.id for move in moves])
         return self._window('account.action_move_journal_line', self.env._('Customer collections'),
                             'account.move', domain)
+
+    # "View all" of the ranked lists: every salesperson, product or customer of the period.
+
+    def _drawer_sales_salespeople(self, args):
+        scope, _ = self._sal_scope(args), self.env._
+        title, period = _('Salespeople by invoiced sales'), self._fin_period_args(args)
+        people = self._sal_salespeople(scope, None)
+        shown, more = self._drawer_page(people)
+        return {'title': title, 'sub': _('Posted customer invoices and credit notes · untaxed'), 'more': more,
+                'rows': [{'label': p['name'], 'sub': _('%s invoices', p['count']), 'value': self._sal_format(p['amount']),
+                          'open': {'key': 'sales.salesperson', 'args': dict(period, user_id=p['id']), 'crumb': title}}
+                         for p in shown],
+                'total': {'label': _('Total'), 'value': '%s %s' % (
+                    self._sal_format(sum(p['amount'] for p in people)), scope['company'].currency_id.name)},
+                'action': {'key': 'sales.invoices', 'args': period}, 'dest': _('Customer Invoices')}
+
+    def _drawer_sales_products(self, args):
+        scope, _ = self._sal_scope(args), self.env._
+        title, period = _('Top products by quantity'), self._fin_period_args(args)
+        shown, more = self._drawer_page(self._sal_products(scope, None))
+        return {'title': title, 'sub': _('Invoiced quantity, credit notes deducted'), 'more': more,
+                'rows': [{'label': p['name'], 'sub': p['code'],
+                          'value': '%s %s' % (formatLang(self.env, p['quantity'], digits=0), p['uom']),
+                          'open': {'key': 'sales.product', 'crumb': title,
+                                   'args': dict(period, product_id=p['product_id'], uom_id=p['uom_id'])}}
+                         for p in shown],
+                'action': {'key': 'sales.invoices', 'args': period}, 'dest': _('Customer Invoices')}
+
+    def _drawer_sales_customers(self, args):
+        scope, _ = self._sal_scope(args), self.env._
+        title, period = _('Top customers by collections'), self._fin_period_args(args)
+        customers = self._sal_customers(scope, None)
+        shown, more = self._drawer_page(customers)
+        return {'title': title,
+                'sub': _('Money received in the period: payments, bank statement lines and journal entries'),
+                'more': more,
+                'rows': [{'label': c['name'], 'sub': _('%s receipts', c['count']), 'value': self._sal_format(c['amount']),
+                          'open': {'key': 'sales.customer', 'args': dict(period, partner_id=c['id']), 'crumb': title}}
+                         for c in shown],
+                'total': {'label': _('Total'), 'value': '%s %s' % (
+                    self._sal_format(sum(c['amount'] for c in customers)), scope['company'].currency_id.name)},
+                'action': {'key': 'sales.customers', 'args': period}, 'dest': _('Journal Entries')}
+
+    def _action_sales_customers(self, args):
+        scope = self._sal_scope(args)
+        moves = [move.id for partner, entries in self._sal_collections(scope).items()
+                 if sum(entries.values()) > 0 for move in entries]
+        return self._window('account.action_move_journal_line', self.env._('Customer collections'),
+                            'account.move', Domain('id', 'in', moves))
 
     def _sal_list_domain(self, args):
         """Order lists behind the three order figures: ``(title, domain, xmlid, destination)``."""
@@ -426,8 +485,8 @@ class ExecutiveDashboard(models.AbstractModel):
         _ = self.env._
         SaleOrder = self.env['sale.order']
         delivery = 'delivery_status' in SaleOrder._fields
-        orders = SaleOrder.search(domain, order='date_order desc, id desc', limit=DRAWER_ROWS)
-        count = SaleOrder.search_count(domain)
+        orders, more = self._sal_search_page('sale.order', domain, 'date_order desc, id desc')
+        count = more['count'] if more else len(orders)
         rows = []
         for order in orders:
             row = self._sal_order_row(order, delivery)
@@ -435,7 +494,7 @@ class ExecutiveDashboard(models.AbstractModel):
                          'sub': ' · '.join(filter(None, [order.partner_id.display_name, row['delivery_label']])),
                          'value': '%s %s' % (self._sal_format(order.amount_untaxed), order.currency_id.name),
                          'open': {'key': 'sales.order', 'args': {'order_id': order.id}, 'crumb': title}})
-        return {'title': title, 'sub': _('%s orders', count), 'rows': rows,
+        return {'title': title, 'sub': _('%s orders', count), 'rows': rows, 'more': more,
                 'action': {'key': 'sales.orders', 'args': args}, 'dest': dest}
 
     def _action_sales_orders(self, args):

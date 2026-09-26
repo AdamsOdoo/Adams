@@ -24,7 +24,8 @@
                 </header>
                 <p t-if="!w.approve.rows.length" class="ed-note">No purchase orders are waiting for approval.</p>
                 <div t-else="" class="ed-tbl-wrap">
-                    <table>
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:22%"/><col/><col style="width:22%"/><col style="width:22%"/></colgroup>
                         <thead><tr>
                             <th>Reference</th><th>Supplier</th><th class="n">Value</th><th>Order deadline</th>
                         </tr></thead>
@@ -69,6 +70,9 @@
                         <h2>Top suppliers by purchase value</h2>
                         <p><bdi dir="ltr" t-esc="period"/></p>
                     </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('suppliers', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
                 </header>
                 <p t-if="!w.suppliers.length" class="ed-note">No purchases confirmed in this period.</p>
                 <div class="ed-rows">

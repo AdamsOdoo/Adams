@@ -34,6 +34,9 @@
                         <h2>Salespeople by invoiced sales</h2>
                         <p><bdi dir="ltr" t-esc="period"/></p>
                     </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('salespeople', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
                 </header>
                 <p t-if="!w.salespeople.length" class="ed-note">No invoices in this period.</p>
                 <div class="ed-rows">
@@ -54,6 +57,9 @@
                         <h2>Top products by quantity</h2>
                         <p><bdi dir="ltr" t-esc="period"/></p>
                     </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('products', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
                 </header>
                 <p t-if="!w.products.length" class="ed-note">No invoiced products in this period.</p>
                 <div class="ed-rows">
@@ -73,6 +79,9 @@
                         <h2>Top customers by collections</h2>
                         <p>Money received · payments, bank statement lines and journal entries · <bdi dir="ltr" t-esc="period"/></p>
                     </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('customers', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
                 </header>
                 <p t-if="!w.customers.length" class="ed-note">No money received from customers in this period.</p>
                 <div class="ed-rows">
@@ -99,7 +108,9 @@
                 </header>
                 <p t-if="!w.orders.rows.length" class="ed-note">No confirmed orders in this period.</p>
                 <div t-else="" class="ed-tbl-wrap">
-                    <table>
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:16%"/><col/><col style="width:12%"/><col style="width:16%"/>
+                            <col t-if="w.orders.delivery" style="width:18%"/></colgroup>
                         <thead><tr>
                             <th>Reference</th><th>Customer</th><th>Date</th><th class="n">Value</th>
                             <th t-if="w.orders.delivery">Delivery Status</th>
@@ -134,7 +145,9 @@
                 </header>
                 <p t-if="!w.quotations.rows.length" class="ed-note">No open quotations.</p>
                 <div t-else="" class="ed-tbl-wrap">
-                    <table>
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:16%"/><col/><col style="width:12%"/><col style="width:12%"/>
+                            <col style="width:16%"/><col style="width:16%"/></colgroup>
                         <thead><tr>
                             <th>Reference</th><th>Customer</th><th>Date</th><th>Expiration</th><th class="n">Value</th><th>Status</th>
                         </tr></thead>

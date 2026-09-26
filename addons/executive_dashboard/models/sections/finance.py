@@ -29,8 +29,17 @@ DIRECT_COST = ('expense_direct_cost',)
 PL_TYPES = ('income', 'income_other', 'expense_direct_cost', 'expense', 'expense_other', 'expense_depreciation')
 OPEN_TYPES = {'receivables': 'asset_receivable', 'payables': 'liability_payable'}
 VIEWS = ('aged', 'expected')
+# Parts of the open items behind the box's chips: invoices (bills) past due, and unapplied
+# credits (receivables) or advances and unmatched payments (payables).
+SIDES = ('overdue', 'credits')
+# P&L figures and the account types each one adds up, in the order of the Profit and Loss.
+PNL_PARTS = {
+    'revenue': INCOME,
+    'gross_profit': INCOME + DIRECT_COST,
+    'net_profit': ('income', 'income_other', 'expense_direct_cost', 'expense', 'expense_depreciation',
+                   'expense_other'),
+}
 TREND_MONTHS = 12
-DRAWER_ROWS = 25
 
 # Standard Enterprise report records, resolved at runtime (never referenced in data files).
 PNL_EXPRESSIONS = {
@@ -41,7 +50,6 @@ PNL_EXPRESSIONS = {
 PNL_REPORT = 'account_reports.profit_and_loss'
 BS_REPORT = 'account_reports.balance_sheet'
 BANK_LINE = 'account_reports.account_financial_report_bank_view0'
-TB_REPORT = 'account_reports.trial_balance_report'
 GL_REPORT = 'account_reports.general_ledger_report'
 PARTNER_LEDGER = 'account_reports.partner_ledger_report'
 AGED_REPORTS = {
@@ -154,8 +162,8 @@ class ExecutiveDashboard(models.AbstractModel):
     def _fin_args(self, args):
         """Validated drawer/action arguments for the open-items drawer."""
         kind, view, bucket = args.get('kind'), args.get('view', 'aged'), args.get('bucket')
-        partner_id = args.get('partner_id')
-        if kind not in OPEN_TYPES or view not in VIEWS:
+        partner_id, side = args.get('partner_id'), args.get('side')
+        if kind not in OPEN_TYPES or view not in VIEWS or (side is not None and side not in SIDES):
             raise ValidationError(self.env._('Unknown detail.'))
         # Bucket ranges count from the balance date of the drawer's period.
         ranges = self._fin_buckets(self._fin_scope(args)['as_of'])
@@ -164,7 +172,7 @@ class ExecutiveDashboard(models.AbstractModel):
             raise ValidationError(self.env._('Unknown detail.'))
         if partner_id is not None and (type(partner_id) is not int or partner_id <= 0):
             raise ValidationError(self.env._('Unknown detail.'))
-        return kind, view, buckets.get(bucket), partner_id
+        return kind, view, buckets.get(bucket), partner_id, side
 
     def _fin_scope(self, args):
         return self._period_scope('finance', args.get('period') or 'month', args.get('date_from'), args.get('date_to'))
@@ -172,7 +180,7 @@ class ExecutiveDashboard(models.AbstractModel):
     def _fin_items_action(self, name, domain):
         """Native Journal Items list restricted to ``domain``."""
         action = self.env['ir.actions.act_window']._for_xml_id('account.action_account_moves_all')
-        action.update(name=name, domain=list(domain), context={}, target='current')
+        action.update(name=name, display_name=name, domain=list(domain), context={}, target='current')
         return action
 
     # ------------------------------------------------------------------ native report engine
@@ -522,6 +530,49 @@ class ExecutiveDashboard(models.AbstractModel):
                 'action': {'key': 'finance.pnl', 'args': args},
                 'dest': _('Profit and Loss') if engine else _('Journal Items')}
 
+    def _drawer_finance_profit(self, args):
+        """Revenue, gross profit or net profit (``figure``) of the period, by account: one group
+        per account type (Income, Cost of Revenue, Expenses...) with its subtotal. Amounts add to
+        the figure: income is positive, costs and expenses negative."""
+        figure = args.get('figure')
+        if figure not in PNL_PARTS:
+            raise ValidationError(self.env._('Unknown detail.'))
+        scope, _ = self._fin_scope(args), self.env._
+        currency = scope['company'].currency_id
+        types = PNL_PARTS[figure]
+        by_account = defaultdict(float)
+        for company, account, balance in self.env['account.move.line']._read_group(self._fin_domain(scope, [
+                ('date', '>=', fields.Date.to_string(scope['date_from'])),
+                ('date', '<=', fields.Date.to_string(scope['date_to'])),
+                ('account_id.account_type', 'in', types)]), ['company_id', 'account_id'], ['balance:sum']):
+            by_account[account] -= self._fin_convert(scope, balance, company, scope['date_to'])
+        labels = dict(self.env['account.account']._fields['account_type']._description_selection(self.env))
+        period = self._fin_period_args(args)
+        groups = []
+        for account_type in types:
+            accounts = sorted((a for a in by_account if a.account_type == account_type
+                               and not currency.is_zero(by_account[a])), key=lambda a: (-abs(by_account[a]), a.id))
+            if accounts:
+                subtotal = sum(by_account[a] for a in accounts)
+                groups.append({'title': '%s · %s' % (labels.get(account_type, account_type), self._fin_format(subtotal)),
+                               'rows': [{'label': a.name, 'sub': self._fin_code(a), 'value': self._fin_format(by_account[a]),
+                                         'action': {'key': 'finance.account', 'args': dict(period, account_id=a.id)}}
+                                        for a in accounts]})
+        total = sum(by_account.values())
+        title = {'revenue': _('Revenue'), 'gross_profit': _('Gross profit'), 'net_profit': _('Net profit')}[figure]
+        pnl = self._fin_pnl(scope)
+        note = _('The Profit and Loss report gives %(amount)s %(currency)s for this figure.',
+                 amount=self._fin_format(pnl[figure]), currency=currency.name) \
+            if pnl['source'] == 'report' and abs(pnl[figure] - total) >= 1 else False
+        return {'title': title, 'note': note,
+                'sub': _('Posted entries by account · %(date_from)s – %(date_to)s',
+                         date_from=format_date(self.env, scope['date_from'], date_format='d MMM y'),
+                         date_to=format_date(self.env, scope['date_to'], date_format='d MMM y')),
+                'groups': groups,
+                'total': {'label': title, 'value': '%s %s' % (self._fin_format(total), currency.name)},
+                'action': {'key': 'finance.pnl', 'args': period},
+                'dest': _('Profit and Loss') if self._fin_report(PNL_REPORT) else _('Journal Items')}
+
     def _fin_as_of_label(self, scope):
         return self.env._('as of %s', format_date(self.env, scope['as_of'], date_format='d MMM y'))
 
@@ -533,7 +584,7 @@ class ExecutiveDashboard(models.AbstractModel):
         bank = self._fin_bank_cash(scope)
         _ = self.env._
         period = self._fin_period_args(args)
-        # An account opens the Trial Balance at once (no intermediate panel).
+        # An account opens its General Ledger at once (no intermediate panel).
         rows = [{'label': row['name'], 'sub': row['code'], 'value': self._fin_format(row['balance']),
                  **({'action': {'key': 'finance.account', 'args': dict(period, account_id=row['id'])}}
                     if row['can_open'] else {})}
@@ -548,12 +599,12 @@ class ExecutiveDashboard(models.AbstractModel):
                 'dest': _('Balance Sheet') if self._fin_report(BS_REPORT) else _('Journal Items')}
 
     def _fin_account(self, args):
-        """A bank, cash, receivable or payable account of the dashboard's companies."""
+        """A bank, cash, receivable, payable or profit and loss account of the dashboard's companies."""
         account_id = args.get('account_id')
         if type(account_id) is not int or account_id <= 0:
             raise ValidationError(self.env._('Unknown detail.'))
         account = self.env['account.account'].browse(account_id).exists()
-        if not account or account.account_type not in ('asset_cash', *OPEN_TYPES.values()) \
+        if not account or account.account_type not in ('asset_cash', *OPEN_TYPES.values(), *PL_TYPES) \
                 or not account.company_ids & self.env.companies:
             raise ValidationError(self.env._('Unknown detail.'))
         return account
@@ -573,17 +624,26 @@ class ExecutiveDashboard(models.AbstractModel):
             numbers[record] += counts[company, record, _due, _debit]
         return [(record, totals[record], numbers[record]) for record in totals]
 
+    def _fin_side_domain(self, kind, side, as_of):
+        """Journal items of a chip: invoices (bills) due before ``as_of``, or the credits."""
+        owed = Domain('balance', '>', 0) if kind == 'receivables' else Domain('balance', '<', 0)
+        if side == 'overdue':
+            return owed & self._fin_due_domain(None, as_of - timedelta(days=1))
+        return ~owed
+
     def _fin_open_items_domain(self, args):
-        kind, view, bucket, partner_id = self._fin_args(args)
+        kind, view, bucket, partner_id, side = self._fin_args(args)
         domain = Domain.TRUE
         if bucket:
             domain &= self._fin_due_domain(bucket[2], bucket[3])
         if partner_id:
             domain &= Domain('partner_id', '=', partner_id)
-        return kind, view, bucket, partner_id, domain
+        if side:
+            domain &= self._fin_side_domain(kind, side, self._fin_scope(args)['as_of'])
+        return kind, view, bucket, partner_id, side, domain
 
     def _drawer_finance_open_items(self, args):
-        kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)
+        kind, view, bucket, partner_id, side, domain = self._fin_open_items_domain(args)
         _ = self.env._
         scope = self._fin_scope(args)
         sign = -1 if kind == 'payables' else 1
@@ -591,6 +651,8 @@ class ExecutiveDashboard(models.AbstractModel):
         title = _('Receivables') if kind == 'receivables' else _('Payables')
         if bucket:
             title = '%s · %s' % (title, bucket[1])
+        if side:
+            title = '%s · %s' % (title, self._fin_side_label(kind, side))
         if partner_id:
             partner = self.env['res.partner'].browse(partner_id)
             sums, _counts = self._fin_open_sums(scope, kind, domain, ['move_id'])
@@ -598,8 +660,8 @@ class ExecutiveDashboard(models.AbstractModel):
             for (company, move, due, _debit), residual in sums.items():
                 by_move[move] += self._fin_convert_line(scope, company, residual)
                 due_of[move] = min(due, due_of.get(move, due))
-            moves = sorted((m for m in by_move if not currency.is_zero(by_move[m])),
-                           key=lambda m: (due_of[m], m.id))[:DRAWER_ROWS]
+            moves, more = self._drawer_page(sorted((m for m in by_move if not currency.is_zero(by_move[m])),
+                                                   key=lambda m: (due_of[m], m.id)))
             rows = [{'label': move.name, 'sub': _('Due %s', format_date(self.env, due_of[move], date_format='d MMM y')),
                      'value': self._fin_format(sign * by_move[move])} for move in moves]
             total = sum(by_move.values())
@@ -608,19 +670,20 @@ class ExecutiveDashboard(models.AbstractModel):
             groups = [(p, r, c) for p, r, c in self._fin_open_by(scope, kind, domain, 'partner_id')
                       if not currency.is_zero(r)]
             total = sum(r for _p, r, _c in groups)
-            groups = sorted(groups, key=lambda g: -sign * g[1])[:DRAWER_ROWS]
+            groups, more = self._drawer_page(sorted(groups, key=lambda g: (-sign * g[1], g[0].id)))
             rows = [{'label': partner.display_name if partner else _('No partner'),
                      'sub': _('%s open items', count),
                      'value': self._fin_format(sign * residual),
                      **({'open': {'key': 'finance.open_items', 'args': dict(args, partner_id=partner.id),
                                   'crumb': title}} if partner else {})}
                     for partner, residual, count in groups]
-            label = _('Open customer invoices') if kind == 'receivables' else _('Open vendor bills')
+            label = self._fin_side_label(kind, side) if side == 'credits' else \
+                _('Open customer invoices') if kind == 'receivables' else _('Open vendor bills')
             sub = '%s · %s' % (label, self._fin_as_of_label(scope))
         groups, rows_title = [], False
-        if not bucket and not partner_id:
+        if not bucket and not partner_id and not side:
             period = self._fin_period_args(args)
-            # An account opens the Trial Balance at once (no intermediate panel).
+            # An account opens its General Ledger at once (no intermediate panel).
             accounts = [
                 {'label': account.name, 'sub': self._fin_code(account), 'value': self._fin_format(sign * residual),
                  'action': {'key': 'finance.account', 'args': dict(period, account_id=account.id)}}
@@ -628,16 +691,22 @@ class ExecutiveDashboard(models.AbstractModel):
                                                         key=lambda g: -abs(g[1]))]
             if accounts:
                 groups, rows_title = [{'title': _('By account'), 'rows': accounts}], _('By partner')
-        return {'title': title, 'sub': sub, 'groups': groups, 'rows_title': rows_title, 'rows': rows,
+        return {'title': title, 'sub': sub, 'groups': groups, 'rows_title': rows_title, 'rows': rows, 'more': more,
                 'total': {'label': _('Total'), 'value': self._fin_format(sign * total)},
                 'action': {'key': 'finance.open_items', 'args': args},
-                'dest': self._fin_open_items_dest(kind, bucket, partner_id)}
+                'dest': self._fin_open_items_dest(kind, bucket, partner_id, side)}
 
-    def _fin_open_items_dest(self, kind, bucket, partner_id):
+    def _fin_side_label(self, kind, side):
+        _ = self.env._
+        if side == 'overdue':
+            return _('Overdue')
+        return _('Unapplied credits') if kind == 'receivables' else _('Advances & unmatched payments')
+
+    def _fin_open_items_dest(self, kind, bucket, partner_id, side=None):
         _ = self.env._
         if partner_id:
             return _('Partner Ledger') if self._fin_report(PARTNER_LEDGER) else _('Journal Items')
-        if self._fin_report(AGED_REPORTS[kind][0]):
+        if side != 'credits' and self._fin_report(AGED_REPORTS[kind][0]):
             return _('Aged Receivable') if kind == 'receivables' else _('Aged Payable')
         return _('Journal Items')
 
@@ -673,39 +742,40 @@ class ExecutiveDashboard(models.AbstractModel):
         ]))
 
     def _fin_account_target(self, account, scope):
-        """``(action, destination name)`` of an account: the Trial Balance searched on the
-        account code (fiscal year to the balance date), else the General Ledger with the
-        account unfolded, else its journal items (no Enterprise reports).
+        """``(action, destination name)`` of an account: the General Ledger with the account
+        unfolded (its entries listed), else its journal items (no Enterprise reports).
 
-        The Trial Balance's search matches line names, so a code that begins another
-        account's code also lists that account.
+        A balance account (bank, cash, receivable, payable) runs from the start of the fiscal
+        year to the balance date, with its opening balance, so the ledger ends on the
+        dashboard's balance; a profit and loss account lists the period's entries, like its
+        figure (the ledger may add an opening balance from the fiscal year start).
         """
         _ = self.env._
-        as_of = scope['as_of']
-        start, code = self._fin_year_start(as_of), self._fin_code(account)
-        trial = self._fin_report(TB_REPORT)
-        if trial and code:
-            try:
-                options = self._fin_options(trial, start, as_of, single_group=False, filter_search_bar=code)
-                return self._fin_report_action(trial, options), _('Trial Balance')
-            except (UnsupportedScope, *ENGINE_ERRORS):
-                pass
+        profit_loss = account.account_type in PL_TYPES
+        if profit_loss:
+            start, end = scope['date_from'], scope['date_to']
+        else:
+            start, end = self._fin_year_start(scope['as_of']), scope['as_of']
         ledger = self._fin_report(GL_REPORT)
         if ledger:
             try:
-                options = self._fin_options(ledger, start, as_of, single_group=False)
+                options = self._fin_options(ledger, start, end, single_group=False)
                 options['unfolded_lines'] = [ledger._get_generic_line_id('account.account', account.id)]
                 return self._fin_report_action(ledger, options), _('General Ledger')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
+        # Every entry up to the balance date (they add up to the balance), or the period's.
+        dates = [('date', '<=', fields.Date.to_string(end))]
+        if profit_loss:
+            dates.append(('date', '>=', fields.Date.to_string(start)))
         return self._fin_items_action(account.display_name, self._fin_domain(scope, [
-            ('account_id', '=', account.id), ('date', '<=', fields.Date.to_string(as_of))])), _('Journal Items')
+            ('account_id', '=', account.id), *dates])), _('Journal Items')
 
     def _action_finance_account(self, args):
         return self._fin_account_target(self._fin_account(args), self._fin_scope(args))[0]
 
     def _action_finance_open_items(self, args):
-        kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)
+        kind, view, bucket, partner_id, side, domain = self._fin_open_items_domain(args)
         scope = self._fin_scope(args)
         as_of = scope['as_of']
         ledger = self._fin_report(PARTNER_LEDGER) if partner_id else None
@@ -716,8 +786,9 @@ class ExecutiveDashboard(models.AbstractModel):
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
         report = self._fin_report(AGED_REPORTS[kind][0])
-        # A bucket opens the whole Aged report: its columns show the same ranges.
-        if report and not partner_id:
+        # A bucket or the Overdue chip opens the whole Aged report: its columns show the same
+        # ranges. The report does not separate credits, so they open their journal items.
+        if report and not partner_id and side != 'credits':
             try:
                 options = self._fin_options(report, None, as_of,
                                             aging_based_on='base_on_maturity_date', aging_interval=30)
@@ -727,7 +798,9 @@ class ExecutiveDashboard(models.AbstractModel):
         # Journal items can only list the items open today (not an earlier day's open amount):
         # the bucket's range is then counted from today and the list says so.
         today_args = {key: value for key, value in args.items() if key not in ('period', 'date_from', 'date_to')}
-        _kind, _view, _bucket, _partner, domain = self._fin_open_items_domain(today_args)
+        _kind, _view, _bucket, _partner, _side, domain = self._fin_open_items_domain(today_args)
         name = self.env._('Open receivables today') if kind == 'receivables' else self.env._('Open payables today')
+        if side:
+            name = '%s · %s' % (name, self._fin_side_label(kind, side))
         return self._fin_items_action(name, self._fin_open_base(self._fin_scope({}), kind)
                                       & Domain('reconciled', '=', False) & domain)

@@ -54,11 +54,11 @@ export class FinanceSection extends Component {
         };
         return [
             { key: "revenue", icon: "coin", label: _t("Revenue"), value: k.revenue,
-              cap: _t("%s invoices · posted", k.invoices), open: () => this.open("revenue", this.periodArgs) },
+              cap: _t("%s invoices · posted", k.invoices), open: () => this.openProfit("revenue") },
             { key: "gross", icon: "scale", label: _t("Gross profit"), value: k.gross_profit,
-              cap: margin(k.gross_profit), open: () => this.open("revenue", this.periodArgs) },
+              cap: margin(k.gross_profit), open: () => this.openProfit("gross_profit") },
             { key: "net", icon: "spark", label: _t("Net profit"), value: k.net_profit,
-              cap: margin(k.net_profit), open: () => this.open("revenue", this.periodArgs) },
+              cap: margin(k.net_profit), open: () => this.openProfit("net_profit") },
             { key: "bank", icon: "bank", label: _t("Bank & Cash"), value: k.bank_cash,
               cap: _t("%(count)s accounts · as of %(date)s", { count: k.bank_cash_accounts, date: this.asOf }),
               open: () => this.open("bank_cash", this.periodArgs) },
@@ -132,7 +132,6 @@ export class FinanceSection extends Component {
                     : (recv ? _t("Customer payments by due date · as of %s", this.asOf)
                         : _t("Supplier payments by due date · as of %s", this.asOf)),
                 owedOverdue: widget.owed_overdue,
-                overduePct: widget.owed > 0 ? percent(widget.owed_overdue, widget.owed) : null,
                 credits: widget.credits,
                 creditsLabel: recv ? _t("Unapplied credits") : _t("Advances & unmatched payments"),
                 netNote: total < 0
@@ -178,7 +177,17 @@ export class FinanceSection extends Component {
         this.open("open_items", { ...this.periodArgs, kind, view, ...(bucket ? { bucket } : {}) });
     }
 
-    /** An account opens its native screen (the Trial Balance) at once. */
+    /** A chip of a box: its invoices (bills) past due, or its credits, by partner. */
+    openSide(kind, side) {
+        this.open("open_items", { ...this.periodArgs, kind, side });
+    }
+
+    /** Revenue, gross profit or net profit of the period, by account. */
+    openProfit(figure) {
+        this.open("profit", { ...this.periodArgs, figure });
+    }
+
+    /** An account opens its native screen (the General Ledger) at once. */
     async openAccount(row) {
         const action = await this.orm.call("executive.dashboard", "open_action",
             ["finance.account", { ...this.periodArgs, account_id: row.id }]);

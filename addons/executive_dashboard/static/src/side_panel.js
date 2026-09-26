@@ -7,6 +7,9 @@ import { Icon } from "./icons";
 
 const MODEL = "executive.dashboard";
 const SEARCH_DELAY = 250;
+// Rows a side-panel list adds on "Show more", and the most it shows (the native list shows all).
+const PAGE = 25;
+const MAX_ROWS = 1000;
 
 /** Custom side-panel bodies, keyed like the drawer (`<section>.<name>`). */
 export const drawerRegistry = registry.category("executive_dashboard.drawers");
@@ -17,7 +20,8 @@ export const drawerRegistry = registry.category("executive_dashboard.drawers");
  * content comes from `get_drawer` when it opens. The generic body shows
  * `rows` (each may open a nested drawer, or a native screen through its own
  * `action`), an optional `total` and a button to the native screen when the
- * drawer names an `action`. The server keeps an `action` only when the user may
+ * drawer names an `action`. A long list arrives with `more` (`{ shown, count }`)
+ * and "Show more" asks for the next page. The server keeps an `action` only when the user may
  * open that screen; its `kind` names the button: Open record, Open list or
  * Open report.
  */
@@ -38,7 +42,7 @@ export class SidePanel extends Component {
         this.searchInput = useRef("searchInput");
         this.closeBtn = useRef("closeBtn");
         this.seq = 0;
-        this.state = useState({ data: null, loading: false, query: "", results: null, searching: false });
+        this.state = useState({ data: null, loading: false, more: false, query: "", results: null, searching: false });
         // A panel restored from the breadcrumb (coming back from a native screen) loads at once.
         onWillStart(() => this.props.panel && this.reset(this.props.panel));
         onWillUpdateProps((next) => {
@@ -70,7 +74,7 @@ export class SidePanel extends Component {
     reset(panel) {
         const seq = ++this.seq;
         clearTimeout(this.timer);
-        Object.assign(this.state, { data: null, loading: false, query: "", results: null, searching: false });
+        Object.assign(this.state, { data: null, loading: false, more: false, query: "", results: null, searching: false });
         if (panel?.kind === "drawer") {
             this.state.loading = true;
             this.orm.call(MODEL, "get_drawer", [panel.key, panel.args || {}]).then(
@@ -86,6 +90,34 @@ export class SidePanel extends Component {
                     throw error;
                 }
             );
+        }
+    }
+
+    get moreLabel() {
+        const { shown, count } = this.state.data.more;
+        return _t("Showing %(shown)s of %(count)s", { shown, count });
+    }
+
+    get canShowMore() {
+        const more = this.state.data?.more;
+        return Boolean(more) && more.shown < MAX_ROWS;
+    }
+
+    /** The same drawer with the next page of rows; the rows already shown stay in place. */
+    async showMore() {
+        const { panel } = this.props;
+        const seq = ++this.seq;
+        this.state.more = true;
+        const limit = Math.min(this.state.data.more.shown + PAGE, MAX_ROWS);
+        try {
+            const data = await this.orm.call(MODEL, "get_drawer", [panel.key, panel.args || {}, limit]);
+            if (seq === this.seq) {
+                this.state.data = data;
+            }
+        } finally {
+            if (seq === this.seq) {
+                this.state.more = false;
+            }
         }
     }
 
