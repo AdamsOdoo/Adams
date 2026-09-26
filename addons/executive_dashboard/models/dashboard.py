@@ -174,7 +174,8 @@ class ExecutiveDashboard(models.AbstractModel):
                 raise ValidationError(self.env._('Choose a period of up to three years, starting before it ends.'))
         else:
             raise ValidationError(self.env._('Unknown period.'))
-        return {'period': period, 'date_from': start, 'date_to': end, 'today': today,
+        # Balances (bank and cash, open items) are taken at the period's end, never after today.
+        return {'period': period, 'date_from': start, 'date_to': end, 'today': today, 'as_of': min(end, today),
                 'company': self.env.company, 'companies': self.env.companies}
 
     # ------------------------------------------------------------------ public API
@@ -265,9 +266,19 @@ class ExecutiveDashboard(models.AbstractModel):
         if isinstance(result, dict):
             if result.get('action'):
                 result['action'] = dashboard._target(result['action'])
-            for row in result.get('rows') or ():
+            # Rows opening the same report (e.g. every account opening the Trial Balance) share
+            # one check: the report and the user's rights on it are the same for each row.
+            reports = {}
+            rows = [row for group in result.get('groups') or () for row in group.get('rows') or ()]
+            for row in rows + list(result.get('rows') or ()):
                 if isinstance(row, dict) and row.get('action'):
+                    key = row['action'].get('key')
+                    if key in reports:
+                        row['action'] = dict(row['action'], kind='report')
+                        continue
                     row['action'] = dashboard._target(row['action'])
+                    if row['action'] and row['action']['kind'] == 'report':
+                        reports[key] = True
         return result
 
     @api.model

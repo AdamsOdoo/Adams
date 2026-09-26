@@ -124,3 +124,18 @@ One line per phase (date, commit, tests run, result), then that phase's notes.
 ## UAT candidate
 
 - Branch `uat/executive-dashboard` (`4be9282`), built on `origin/staging` (`a653e81`) like earlier stagings: `executive_dashboard` from `73cfd09` added, `adams_executive_dashboard` and `adams_dashboard_finance` removed, `adams_base` and `adams_shopify` unchanged. It is a fast-forward of `staging`; the owner moves `staging` to it (Odoo.sh or GitHub), after uninstalling the old dashboards on the staging database if they are installed. Then install Executive Dashboard from Apps and follow `uat-checklist.md`.
+
+## Owner feedback on staging (2026-09-26, 19.0.1.7.0)
+
+Eight points from the owner's staging review; each point, the decision and its test are tracked in `owner-feedback-20260926.md`.
+
+- Bank & Cash lists every active bank/cash account (zero balances and accounts without entries included); the card list scrolls after about six rows so it no longer stretches the chart beside it (all card lists do the same).
+- Year to date is the default period. Switching periods keeps the figures on screen (dimmed) until the new ones arrive; after a section loads, its other periods load in the background one after the other.
+- Receivables and Payables: one box each with an Aged / Expected switch. The Overdue chip counts past-due invoices (bills) only; unapplied credits / advances are a separate chip; shares are hidden when buckets mix signs; a negative net explains itself.
+- Balances follow the period end (`scope['as_of']` = period end, never after today): Bank & Cash, Receivables, Payables, their drawers and native screens (Balance Sheet, Aged report, Partner Ledger, Trial Balance). Journal-item figures at an earlier date add back the matches made after it (`account.partial.reconcile.max_date`), as the Aged reports do.
+- Journal items and the Aged reports' default Account filter agree: Non Trade receivable/payable accounts (e.g. a VAT receivable) are left out. The native Aged total is now always the figure shown; a remaining difference from the journal items is shown in the box.
+- Account rows open the Trial Balance directly; the "Latest journal items" panel is removed.
+- Sales: Top customers by collections (money received: payments, bank statement lines and journal entries on a bank/cash account), replacing payments only.
+- Dark mode: unchanged by design; the dashboard follows Odoo's own colour scheme (see the feedback note).
+- Local: `oh test executive_dashboard` 31 passed (5 skipped: apps absent); kept DB with sale_stock, crm, purchase_stock, stock_account, hr_attendance, hr_holidays: 72 passed. Browser (1440 px, EN + AR): Year to date selected on open, Last month shown in 45 ms with no placeholder, drawer values aligned, bank list capped at 300 px with scroll, chart gap 19 px, account row opens its native screen, no console errors.
+- Verify on Odoo.sh (Enterprise): Aged Receivable / Payable totals and the difference note, Aged report / Partner Ledger / Trial Balance / Balance Sheet opening at the period end, dark mode with the owner's preference.

@@ -87,7 +87,7 @@
                 <nav class="ed-mnav" aria-label="Sections">
                     <t t-call="executive_dashboard.NavButtons"><t t-set="cls" t-value="''"/></t>
                 </nav>
-                <main class="ed-content">
+                <main t-att-class="{ 'ed-content': true, 'ed-stale': state.loading and state.data }">
                     <Welcome t-if="isWelcome" boot="state.boot" sections="sections"
                              openPage.bind="openPage" prefetch.bind="prefetch"
                              openSearch="() => this.openPanel({ kind: 'search' })"/>

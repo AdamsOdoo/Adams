@@ -128,6 +128,75 @@ class TestFinance(AccountTestInvoicingCommon):
         self.assertTrue(currency.is_zero(
             widgets['bank_cash']['total'] - sum(r['balance'] for r in widgets['bank_cash']['rows'])))
 
+    def test_bank_cash_lists_every_account(self):
+        """Accounts with a zero balance, or without any entry, are listed too."""
+        unused = self.company_data['default_journal_bank'].default_account_id.copy({
+            'name': 'Finance Example Unused Bank', 'code': '101999'})
+        widgets = self.finance()
+        accounts = self.env['account.account'].search([
+            ('account_type', '=', 'asset_cash'), ('active', '=', True), ('company_ids', 'in', self.env.company.id)])
+        rows = {row['id']: row for row in widgets['bank_cash']['rows']}
+        self.assertLessEqual(set(accounts.ids), set(rows))
+        self.assertEqual(rows[unused.id]['balance'], 0.0)
+        self.assertEqual(widgets['kpis']['bank_cash_accounts'], len(rows))
+
+    def _pay(self, invoice, day):
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=invoice.ids).create({'payment_date': day})._create_payments()
+
+    def test_overdue_counts_invoices_and_credits_are_apart(self):
+        """Overdue is the past-due invoices only; an unapplied credit is shown apart, not netted."""
+        before = self.finance()['receivables']
+        self._move('out_invoice', self.partner, self.revenue_account, 300.0, -40)
+        self._move('out_refund', self.partner, self.revenue_account, 500.0, -40)
+        after = self.finance()['receivables']
+        currency = self.env.company.currency_id
+        self.assertTrue(currency.is_zero(after['owed_overdue'] - before['owed_overdue'] - 300.0))
+        self.assertTrue(currency.is_zero(after['credits'] - before['credits'] + 500.0))
+        self.assertTrue(currency.is_zero(after['total'] - before['total'] + 200.0))
+        # The net past-due bucket nets them; the chip figure does not.
+        self.assertTrue(currency.is_zero(after['overdue'] - before['overdue'] + 200.0))
+
+    def test_balances_follow_the_period_end(self):
+        """Receivables and bank balances are taken at the period's end: an invoice paid after
+        it is still open at that date, as in the Aged Receivable report at that date."""
+        cutoff = self.today - timedelta(days=10)
+        invoice = self._move('out_invoice', self.partner, self.revenue_account, 120.0, -30,
+                             date=self.today - timedelta(days=40))
+        self._pay(invoice, self.today)
+        self.assertIn(invoice.payment_state, ('paid', 'in_payment'))
+        period = {'period': 'custom', 'date_from': fields.Date.to_string(cutoff - timedelta(days=30)),
+                  'date_to': fields.Date.to_string(cutoff)}
+        dashboard_module.cache_clear()
+        earlier = self.Dashboard.get_section('finance', **period)['widgets']
+        now = self.finance()
+        self.assertEqual(earlier['kpis']['as_of'], fields.Date.to_string(cutoff))
+        self.assertEqual(earlier['receivables']['as_of'], fields.Date.to_string(cutoff))
+        partner_row = lambda drawer: next(  # noqa: E731
+            (r for r in drawer['rows'] if r['label'] == self.partner.display_name), None)
+        drawer = self.Dashboard.get_drawer('finance.open_items', dict(period, kind='receivables', view='aged'))
+        self.assertEqual(partner_row(drawer)['value'], self.Dashboard._fin_format(120.0))
+        detail = self.Dashboard.get_drawer('finance.open_items', partner_row(drawer)['open']['args'])
+        self.assertEqual([r['label'] for r in detail['rows']], [invoice.name])
+        self.assertIsNone(partner_row(self.Dashboard.get_drawer(
+            'finance.open_items', {'period': 'month', 'kind': 'receivables', 'view': 'aged'})))
+        if not earlier['receivables']['report']:
+            # 20 days past due at the cutoff: 1-30 days.
+            self.assertGreaterEqual(self.bucket(earlier['receivables'], 'aged', 'd30'), 120.0)
+        self.assertGreaterEqual(earlier['receivables']['owed_overdue'] - now['receivables']['owed_overdue'], 0.0)
+
+    def test_non_trade_receivables_are_left_out(self):
+        """Like the Aged Receivable report's default Account filter, Non Trade accounts are left out."""
+        before = self.finance()['receivables']['total']
+        non_trade = self.company_data['default_account_receivable'].copy({
+            'name': 'Finance Example VAT Receivable', 'code': '100199', 'non_trade': True})
+        move = self.env['account.move'].create({'date': self.today, 'line_ids': [
+            fields.Command.create({'account_id': non_trade.id, 'debit': 80.0, 'name': 'VAT'}),
+            fields.Command.create({'account_id': self.revenue_account.id, 'credit': 80.0, 'name': 'VAT'}),
+        ]})
+        move.action_post()
+        self.assertEqual(self.finance()['receivables']['total'], before)
+
     # -- access --------------------------------------------------------------
 
     def test_invoicing_user_sees_every_figure(self):
@@ -142,7 +211,7 @@ class TestFinance(AccountTestInvoicingCommon):
         data = self.setup_other_company(name='Finance Example Other')
         account = data['default_journal_bank'].default_account_id
         with self.assertRaises(UserError):
-            self.Dashboard.get_drawer('finance.account', {'account_id': account.id})
+            self.Dashboard.open_action('finance.account', {'account_id': account.id})
         # The other company's receivable account is refused too (ValidationError is a UserError).
         receivable = data['default_account_receivable']
         for method in ('get_drawer', 'open_action'):
@@ -157,12 +226,15 @@ class TestFinance(AccountTestInvoicingCommon):
         self.assertEqual(len(revenue['rows']), 12)
         self.assertEqual(revenue['action']['key'], 'finance.pnl')
 
-        bank = self.Dashboard.get_drawer('finance.bank_cash', {})
+        bank = self.Dashboard.get_drawer('finance.bank_cash', {'period': 'month'})
         self.assertIn('total', bank)
-        if bank['rows']:
-            target = bank['rows'][0]['open']
-            account = self.Dashboard.get_drawer(target['key'], target['args'])
-            self.assertEqual(account['action']['key'], 'finance.account')
+        # An account opens its native screen at once: no intermediate "latest journal items" panel.
+        self.assertTrue(bank['rows'])
+        for row in bank['rows']:
+            self.assertNotIn('open', row)
+            self.assertEqual(row['action']['key'], 'finance.account')
+        with self.assertRaises(ValidationError):
+            self.Dashboard.get_drawer('finance.account', bank['rows'][0]['action']['args'])
 
         args = {'kind': 'receivables', 'view': 'aged', 'bucket': 'd60'}
         bucket = self.Dashboard.get_drawer('finance.open_items', args)
@@ -191,9 +263,9 @@ class TestFinance(AccountTestInvoicingCommon):
         account = invoice.line_ids.filtered(lambda l: l.display_type == 'payment_term').account_id
         drawer = self.Dashboard.get_drawer('finance.open_items', {'kind': 'receivables', 'view': 'aged'})
         by_account = drawer['groups'][0]['rows']
-        row = next(r for r in by_account if r['open']['args']['account_id'] == account.id)
-        detail = self.Dashboard.get_drawer(row['open']['key'], row['open']['args'])
-        self.assertEqual(detail['action']['key'], 'finance.account')
+        row = next(r for r in by_account if r['action']['args']['account_id'] == account.id)
+        self.assertEqual(row['action']['key'], 'finance.account')
+        self.assertNotIn('open', row)
         action = self.Dashboard.open_action('finance.account', {'account_id': account.id})
         trial = self.env.ref('account_reports.trial_balance_report', raise_if_not_found=False)
         if trial:
@@ -201,7 +273,6 @@ class TestFinance(AccountTestInvoicingCommon):
             self.assertEqual(action['type'], 'ir.actions.client')
             self.assertEqual(action['context']['report_id'], trial.id)
             self.assertEqual(action['params']['options']['filter_search_bar'], account.code)
-            self.assertEqual(detail['dest'], 'Trial Balance')
         else:
             self.assertEqual(action['res_model'], 'account.move.line')
             self.assertEqual(set(self.env['account.move.line'].search(action['domain']).account_id), {account})
@@ -222,7 +293,9 @@ class TestFinance(AccountTestInvoicingCommon):
         income = self.revenue_account
         for args in ({'account_id': income.id}, {'account_id': 'x'}, {}):
             with self.assertRaises(ValidationError):
-                self.Dashboard.get_drawer('finance.account', args)
+                self.Dashboard.open_action('finance.account', args)
+        with self.assertRaises(ValidationError):
+            self.Dashboard.get_drawer('finance.open_items', {'kind': 'receivables', 'period': 'someday'})
 
     def test_bucket_boundaries_and_cancelled_entries(self):
         before = self.finance()['receivables']
@@ -285,5 +358,5 @@ class TestFinance(AccountTestInvoicingCommon):
             self.skipTest('Accounting reports installed: the native engines run their own queries.')
         self.finance()  # warm the ORM caches
         # Counted for the test's environment user; the section runs as ``ed_fin``.
-        with self.assertQueryCount(**{self.env.user.login: 12}):
+        with self.assertQueryCount(**{self.env.user.login: 13}):
             self.Dashboard.get_section('finance', 'month', refresh=True)

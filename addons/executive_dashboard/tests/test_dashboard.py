@@ -144,7 +144,7 @@ class TestDashboard(TransactionCase):
         if self.Dashboard._fin_engine():
             self.skipTest('Accounting reports installed: the native engines run their own queries.')
         dashboard.get_section('finance', 'month')  # warm the ORM caches
-        with self.assertQueryCount(__system__=12, ed_finance=12):
+        with self.assertQueryCount(__system__=13, ed_finance=13):
             dashboard.get_section('finance', 'month', refresh=True)
 
     # -- drawers and search --------------------------------------------------

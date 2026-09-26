@@ -91,6 +91,8 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .ed-topbar,.ed-mnav,.ed-content{flex:none}
 
 .ed-content{padding:22px 28px 48px;display:flex;flex-direction:column;gap:18px;width:100%;max-width:1680px;margin-inline:auto}
+// Previous figures stay on screen, dimmed, while the chosen period loads.
+.ed-stale{opacity:.55;transition:opacity .15s;pointer-events:none}
 .ed-example-note{font-size:12px;color:var(--faint);margin:0}
 
 /* ---------- welcome ---------- */
@@ -170,6 +172,15 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .ed-row .ed-r{font-weight:600;white-space:nowrap;text-align:end}
 .ed-row .ed-r small{display:block;font-weight:400;color:var(--muted);font-size:12px}
 .ed-row.click{cursor:pointer;border-radius:9px;padding-inline:8px;margin-inline:-8px}
+// A clickable row reaches 8px past both edges (its hover background) and keeps its text in line with plain rows.
+.ed-row.click.w-100{width:calc(100% + 16px)!important}
+// Lists in a card stop at about six rows and scroll inside the card, so a long list (many
+// bank accounts, salespeople) never stretches the chart beside it. The padding keeps room for
+// the rows' hover background, which the scroll area would otherwise clip.
+.ed-panel > .ed-rows{max-height:300px;overflow-y:auto;overscroll-behavior:contain;padding-inline:8px;margin-inline:-8px}
+.ed-panel-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ed-seg.ed-seg-sm button{padding:3px 10px;font-size:12px}
+.ed-note.ed-note-sm{margin-top:-8px}
 .ed-row.click:hover{background:var(--soft)}
 .ed-rank{width:24px;height:24px;border-radius:50%;background:var(--sec-soft);color:var(--sec);display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
 .ed-avatar{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none;color:#fff}

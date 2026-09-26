@@ -195,6 +195,35 @@ class TestSales(SalesCrmCase):
         self.assertTrue(Dashboard.get_drawer('sales.product', dict(args, product_id=self.product.id,
                                                                    uom_id=self.product.uom_id.id))['rows'])
 
+    def test_top_customers_by_collections(self):
+        """Money received from a customer counts whether it was recorded as a payment or as a
+        journal entry on a bank or cash account; a credit note moves no money and does not count."""
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        invoice = self._invoice('out_invoice', 700.0)
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=invoice.ids).create({'amount': 300.0})._create_payments()
+        bank = self.env['account.journal'].search([
+            ('type', '=', 'bank'), ('company_id', '=', self.company.id)], limit=1)
+        receivable = self.partner.with_company(self.company).property_account_receivable_id
+        entry = self.env['account.move'].create({'date': self.today, 'journal_id': bank.id, 'line_ids': [
+            fields.Command.create({'account_id': bank.default_account_id.id, 'debit': 250.0, 'name': 'Courier'}),
+            fields.Command.create({'account_id': receivable.id, 'credit': 250.0, 'name': 'Courier',
+                                   'partner_id': self.partner.id}),
+        ]})
+        entry.action_post()
+        self._invoice('out_refund', 100.0)
+        customers = self.section(self.manager, 'sales')['widgets']['customers']
+        row = next(c for c in customers if c['id'] == self.partner.id)
+        self.assertAlmostEqual(row['amount'], 550.0)
+        self.assertEqual(row['count'], 2)
+        args = {'period': 'month', 'partner_id': self.partner.id}
+        drawer = Dashboard.get_drawer('sales.customer', args)
+        self.assertIn(entry.name, [r['label'] for r in drawer['rows']])
+        self.assertEqual(len(drawer['rows']), 2)
+        action = Dashboard.open_action('sales.customer', args)
+        self.assertEqual(action['res_model'], 'account.move.line')
+        self.assertEqual(len(self.env['account.move.line'].search(action['domain'])), 2)
+
     def test_drawer_arguments_are_validated(self):
         Dashboard = self.env['executive.dashboard'].with_user(self.manager)
         for key, args in [('sales.order', {'order_id': 'x'}), ('sales.order', {'order_id': 0}),
