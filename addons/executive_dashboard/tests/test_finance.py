@@ -60,6 +60,12 @@ class TestFinance(AccountTestInvoicingCommon):
     # period1, ...) and from journal items otherwise (not_due, d30, ...); same date ranges.
     NATIVE_AGED = {'not_due': 'period0', 'd30': 'period1', 'd60': 'period2', 'd90': 'period3'}
 
+    @staticmethod
+    def figures(widgets):
+        """The widgets without the per-user button flags of the Bank & Cash rows."""
+        rows = [{k: v for k, v in row.items() if k != 'can_open'} for row in widgets['bank_cash']['rows']]
+        return {**widgets, 'bank_cash': {**widgets['bank_cash'], 'rows': rows}}
+
     @classmethod
     def bucket(cls, widget, view, key):
         keys = {key, cls.NATIVE_AGED.get(key)} if view == 'aged' else {key}
@@ -221,7 +227,9 @@ class TestFinance(AccountTestInvoicingCommon):
         billing = self.env['executive.dashboard'].with_user(self.billing)
         result = billing.get_section('finance', 'month')
         self.assertEqual(result['status'], 'ok')
-        self.assertEqual(result['widgets'], self.finance())
+        # Same figures. Only the account buttons may differ: they depend on whether the user may
+        # open the account's native screen (the Trial Balance needs accounting report rights).
+        self.assertEqual(self.figures(result['widgets']), self.figures(self.finance()))
         self.assertIn('total', billing.get_drawer('finance.bank_cash'))
 
     def test_other_company_account_is_refused(self):
