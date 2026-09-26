@@ -253,6 +253,19 @@ class ExecutiveDashboard(models.AbstractModel):
         can_open, kind = self._open_info(action)
         return dict(target, kind=kind) if can_open else None
 
+    def _row_valid(self, target):
+        """Whether a row's native screen accepts its arguments, checked without building it
+        (``_check_<section>_<name>``; rows without such a check are resolved one by one)."""
+        section, _sep, name = (target.get('key') or '').partition('.')
+        check = getattr(self, f'_check_{section}_{name}', None)
+        if check is None:
+            return self._target(target) is not None
+        try:
+            check(dict(target.get('args') or {}))
+        except (AccessError, ValidationError, UserError):
+            return False
+        return True
+
     @api.model
     def get_drawer(self, key, args=None):
         """Side-panel content for ``<section>.<name>``, fetched when the panel opens.
@@ -267,14 +280,15 @@ class ExecutiveDashboard(models.AbstractModel):
             if result.get('action'):
                 result['action'] = dashboard._target(result['action'])
             # Rows opening the same report (e.g. every account opening the Trial Balance) share
-            # one check: the report and the user's rights on it are the same for each row.
+            # one access check on the report; each row's own arguments are still validated.
             reports = {}
             rows = [row for group in result.get('groups') or () for row in group.get('rows') or ()]
             for row in rows + list(result.get('rows') or ()):
                 if isinstance(row, dict) and row.get('action'):
                     key = row['action'].get('key')
                     if key in reports:
-                        row['action'] = dict(row['action'], kind='report')
+                        row['action'] = dict(row['action'], kind='report') \
+                            if dashboard._row_valid(row['action']) else None
                         continue
                     row['action'] = dashboard._target(row['action'])
                     if row['action'] and row['action']['kind'] == 'report':

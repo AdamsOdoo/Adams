@@ -139,3 +139,12 @@ Eight points from the owner's staging review; each point, the decision and its t
 - Dark mode: unchanged by design; the dashboard follows Odoo's own colour scheme (see the feedback note).
 - Local: `oh test executive_dashboard` 31 passed (5 skipped: apps absent); kept DB with sale_stock, crm, purchase_stock, stock_account, hr_attendance, hr_holidays: 72 passed. Browser (1440 px, EN + AR): Year to date selected on open, Last month shown in 45 ms with no placeholder, drawer values aligned, bank list capped at 300 px with scroll, chart gap 19 px, account row opens its native screen, no console errors.
 - Verify on Odoo.sh (Enterprise): Aged Receivable / Payable totals and the difference note, Aged report / Partner Ledger / Trial Balance / Balance Sheet opening at the period end, dark mode with the owner's preference.
+- Independent review (`odoo-reviewer`, read-only) of `b52221a`: 9 findings, all fixed:
+  - Collections counted the receivable side, so a write-off, discount or withholding settled with a payment counted as money received; now the money side is measured (payment amount; bank/cash lines of other entries, shared between the entry's customers). Test with a write-off and a refund paid out.
+  - A post-dated payment matched today hid the invoice at today; matches dated after the balance date are now always added back (one cheap check first). Test added.
+  - The native Aged total was re-signed from the journal total; both Aged reports show amounts owed positive, so it is used as it is (verify payables on Odoo.sh).
+  - Rows sharing one report check are still validated one by one (`_check_finance_account`); Bank & Cash rows that cannot open are plain rows (`can_open`), also on the card.
+  - Expected first bucket renamed "Past due (net)"; unused net overdue KPIs dropped; open-item counts no longer include add-backs; the journal-items fallback of a bucket uses today's ranges and says "today"; the difference note is one translatable sentence; due dates formatted.
+- Query limit for the Finance section: 17 on Community (one check for later matches, one account-button check).
+- Background period loading computes up to four more periods per visited section (sequential, silent): an accepted cost of instant switching.
+- Local after the fixes: `oh test executive_dashboard` 32 passed (5 skipped); kept DB with all Community apps 73 passed.

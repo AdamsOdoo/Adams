@@ -83,9 +83,7 @@ class ExecutiveDashboard(models.AbstractModel):
                 'bank_cash': bank['total'],
                 'bank_cash_accounts': len(bank['rows']),
                 'receivables': open_items['receivables']['total'],
-                'receivables_overdue': open_items['receivables']['overdue'],
                 'payables': open_items['payables']['total'],
-                'payables_overdue': open_items['payables']['overdue'],
                 'as_of': fields.Date.to_string(scope['as_of']),
                 'source': pnl['source'],
             },
@@ -133,7 +131,8 @@ class ExecutiveDashboard(models.AbstractModel):
                 ('period5', _('Over 120 days'), None, day(-121)),
             ],
             'expected': [
-                ('overdue', _('Overdue'), None, day(-1)),
+                # Net of unapplied credits: the Overdue chip shows the past-due invoices alone.
+                ('overdue', _('Past due (net)'), None, day(-1)),
                 ('next7', _('Next 7 days'), today, day(7)),
                 ('d8_30', _('8–30 days'), day(8), day(30)),
                 ('d31_60', _('31–60 days'), day(31), day(60)),
@@ -349,8 +348,14 @@ class ExecutiveDashboard(models.AbstractModel):
         accounts = self.env['account.account'].browse(balances)
         # Account codes are company dependent: show each one in a company it belongs to.
         rows = sorted(({'id': account.id, 'code': self._fin_code(account), 'name': account.name,
-                        'balance': balances[account.id]} for account in accounts),
+                        'balance': balances[account.id], 'can_open': account.account_type == 'asset_cash'}
+                       for account in accounts),
                       key=lambda row: (-row['balance'], row['code']))
+        # One check of the account's native screen (the same report for every account).
+        first = next((row for row in rows if row['can_open']), None)
+        if first and not self._target({'key': 'finance.account', 'args': {'account_id': first['id']}}):
+            for row in rows:
+                row['can_open'] = False
         return {'rows': rows, 'total': sum(balances.values()), 'source': source,
                 'as_of': fields.Date.to_string(as_of)}
 
@@ -399,16 +404,21 @@ class ExecutiveDashboard(models.AbstractModel):
 
         ``groupby`` are journal item fields; ``due`` is the due date (the entry date when there is
         none) and ``debit`` says whether the items are debits (invoices for receivables) or credits.
-        At an earlier date, the matches made after it are added back to the items they settled, as
-        the native Aged reports do, so the figures are the open amounts as they were on that day.
+        Matches dated after the balance date (a later payment, or a post-dated cheque at today) are
+        added back to the items they settled, as the native Aged reports do, so the figures are the
+        open amounts as they were on that day. ``counts`` counts journal items open today only.
         Amounts are in each company's currency.
         """
         base = self._fin_open_base(scope, kind) & Domain(domain or [])
         Line, Partial = self.env['account.move.line'], self.env['account.partial.reconcile']
         # (model, domain, path to the journal item, measure, sign, debit side or None for split).
         sources = [(Line, base & Domain('reconciled', '=', False), '', 'amount_residual', 1, None)]
-        if scope['as_of'] < scope['today']:
-            later = Domain('max_date', '>', fields.Date.to_string(scope['as_of']))
+        later = Domain('max_date', '>', fields.Date.to_string(scope['as_of']))
+        if '_later_matches' not in scope:
+            # One cheap check per section: usually nothing is matched after the balance date.
+            scope['_later_matches'] = bool(Partial.search_count(
+                later & Domain('company_id', 'in', scope['companies'].ids), limit=1))
+        if scope['_later_matches']:
             sources += [(Partial, later & Domain('debit_move_id', 'any', base), 'debit_move_id.', 'amount', 1, True),
                         (Partial, later & Domain('credit_move_id', 'any', base), 'credit_move_id.', 'amount', -1, False)]
         sums, counts = defaultdict(float), defaultdict(int)
@@ -423,7 +433,8 @@ class ExecutiveDashboard(models.AbstractModel):
                             source_domain & side_domain & due_domain, specs, [f'{measure}:sum', '__count']):
                         key = (*groups, fields.Date.to_date(due), debit)
                         sums[key] += sign * amount
-                        counts[key] += count
+                        if Model is Line:
+                            counts[key] += count
         return sums, counts
 
     def _fin_open_items(self, scope, kind):
@@ -476,16 +487,11 @@ class ExecutiveDashboard(models.AbstractModel):
         totals = self._fin_totals(report, options)
         by_label = {expr.label: expr for expr in expression.report_line_id.expression_ids}
         total = self._fin_number(totals[expression.id]['value'])
-        # Amounts owed are shown positive. The sign convention of the native total is read from
-        # the open journal items: it needs a total that is clearly not zero on both sides.
+        # Both native Aged reports show amounts owed as positive (the payable engine reverses the
+        # ledger sign), as the dashboard does: the figure is used as it is, never re-signed.
+        sign = 1
         tolerance = max(1.0, abs(journal_total) * 0.001)
-        if abs(journal_total) < tolerance or abs(total) < tolerance:
-            if abs(abs(total) - abs(journal_total)) > tolerance:
-                raise UnsupportedScope('one total is zero, the sign convention cannot be checked')
-            sign = 1
-        else:
-            sign = -1 if (total > 0) != (journal_total > 0) else 1
-        if abs(sign * total - journal_total) > tolerance:
+        if abs(total - journal_total) > tolerance:
             # The report is still the figure shown; the difference is shown next to it.
             _logger.warning('Executive Dashboard: %s total %s differs from the open journal items %s',
                             report.display_name, total, journal_total)
@@ -529,7 +535,8 @@ class ExecutiveDashboard(models.AbstractModel):
         period = self._fin_period_args(args)
         # An account opens the Trial Balance at once (no intermediate panel).
         rows = [{'label': row['name'], 'sub': row['code'], 'value': self._fin_format(row['balance']),
-                 'action': {'key': 'finance.account', 'args': dict(period, account_id=row['id'])}}
+                 **({'action': {'key': 'finance.account', 'args': dict(period, account_id=row['id'])}}
+                    if row['can_open'] else {})}
                 for row in bank['rows']]
         source = _('Balance Sheet › Bank and Cash Accounts') if bank['source'] == 'report' \
             else _('Bank and cash accounts')
@@ -550,6 +557,9 @@ class ExecutiveDashboard(models.AbstractModel):
                 or not account.company_ids & self.env.companies:
             raise ValidationError(self.env._('Unknown detail.'))
         return account
+
+    def _check_finance_account(self, args):
+        return self._fin_account(args)
 
     def _fin_convert_line(self, scope, company, amount):
         return self._fin_convert(scope, amount, company, scope['as_of'])
@@ -590,7 +600,7 @@ class ExecutiveDashboard(models.AbstractModel):
                 due_of[move] = min(due, due_of.get(move, due))
             moves = sorted((m for m in by_move if not currency.is_zero(by_move[m])),
                            key=lambda m: (due_of[m], m.id))[:DRAWER_ROWS]
-            rows = [{'label': move.name, 'sub': _('Due %s', fields.Date.to_string(due_of[move])),
+            rows = [{'label': move.name, 'sub': _('Due %s', format_date(self.env, due_of[move], date_format='d MMM y')),
                      'value': self._fin_format(sign * by_move[move])} for move in moves]
             total = sum(by_move.values())
             sub = partner.display_name
@@ -599,7 +609,6 @@ class ExecutiveDashboard(models.AbstractModel):
                       if not currency.is_zero(r)]
             total = sum(r for _p, r, _c in groups)
             groups = sorted(groups, key=lambda g: -sign * g[1])[:DRAWER_ROWS]
-            period = self._fin_period_args(args)
             rows = [{'label': partner.display_name if partner else _('No partner'),
                      'sub': _('%s open items', count),
                      'value': self._fin_format(sign * residual),
@@ -715,7 +724,10 @@ class ExecutiveDashboard(models.AbstractModel):
                 return self._fin_report_action(report, options)
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
-        name = self.env._('Open receivables') if kind == 'receivables' else self.env._('Open payables')
-        # Journal items: the items open today (the list cannot show an earlier day's open amount).
+        # Journal items can only list the items open today (not an earlier day's open amount):
+        # the bucket's range is then counted from today and the list says so.
+        today_args = {key: value for key, value in args.items() if key not in ('period', 'date_from', 'date_to')}
+        _kind, _view, _bucket, _partner, domain = self._fin_open_items_domain(today_args)
+        name = self.env._('Open receivables today') if kind == 'receivables' else self.env._('Open payables today')
         return self._fin_items_action(name, self._fin_open_base(self._fin_scope({}), kind)
                                       & Domain('reconciled', '=', False) & domain)

@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-26 06:27+0000\n"
-"PO-Revision-Date: 2026-09-26 06:27+0000\n"
+"POT-Creation-Date: 2026-09-26 06:46+0000\n"
+"PO-Revision-Date: 2026-09-26 06:46+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -874,8 +874,13 @@ msgstr "المبيعات المفوترة والطلبات ومندوبو الم
 
 #. module: executive_dashboard
 #. odoo-python
-#: code:addons/executive_dashboard/models/sections/finance.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
+msgid "Journal Entries"
+msgstr "القيود اليومية"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "Journal Items"
 msgstr "عناصر اليومية"
 
@@ -1247,8 +1252,8 @@ msgstr "الفرص المفتوحة · حتى اليوم"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
-msgid "Open payables"
-msgstr "الذمم الدائنة المفتوحة"
+msgid "Open payables today"
+msgstr "الذمم الدائنة المفتوحة اليوم"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1278,8 +1283,8 @@ msgstr "عروض الأسعار المفتوحة"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
-msgid "Open receivables"
-msgstr "الذمم المدينة المفتوحة"
+msgid "Open receivables today"
+msgstr "الذمم المدينة المفتوحة اليوم"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1404,8 +1409,6 @@ msgstr "أكثر من 90 يوماً"
 
 #. module: executive_dashboard
 #. odoo-javascript
-#. odoo-python
-#: code:addons/executive_dashboard/models/sections/finance.py:0
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "Overdue"
 msgstr "متأخر"
@@ -1421,6 +1424,12 @@ msgstr "متأخر %s"
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "Partner Ledger"
 msgstr "دفتر الشركاء"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid "Past due (net)"
+msgstr "مستحق سابقاً (صافٍ)"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1937,17 +1946,22 @@ msgstr "دفعات الموردين حسب تاريخ الاستحقاق · في
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
-msgid "The open payable journal items differ from the Aged Payable report by"
+msgid ""
+"The open payable journal items differ from the Aged Payable report by "
+"%(amount)s %(currency)s."
 msgstr ""
-"تختلف عناصر اليومية الدائنة المفتوحة عن تقرير أعمار الذمم الدائنة بمقدار"
+"تختلف عناصر اليومية الدائنة المفتوحة عن تقرير أعمار الذمم الدائنة بمقدار "
+"%(amount)s %(currency)s."
 
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid ""
-"The open receivable journal items differ from the Aged Receivable report by"
+"The open receivable journal items differ from the Aged Receivable report by "
+"%(amount)s %(currency)s."
 msgstr ""
-"تختلف عناصر اليومية المدينة المفتوحة عن تقرير أعمار الذمم المدينة بمقدار"
+"تختلف عناصر اليومية المدينة المفتوحة عن تقرير أعمار الذمم المدينة بمقدار "
+"%(amount)s %(currency)s."
 
 #. module: executive_dashboard
 #. odoo-javascript

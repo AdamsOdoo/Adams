@@ -142,8 +142,10 @@ export class FinanceSection extends Component {
                 difference: view === "aged" && widget.report && Math.abs(widget.difference) >= 1
                     ? widget.difference : 0,
                 differenceNote: recv
-                    ? _t("The open receivable journal items differ from the Aged Receivable report by")
-                    : _t("The open payable journal items differ from the Aged Payable report by"),
+                    ? _t("The open receivable journal items differ from the Aged Receivable report by %(amount)s %(currency)s.",
+                        { amount: whole(widget.difference), currency: this.currency })
+                    : _t("The open payable journal items differ from the Aged Payable report by %(amount)s %(currency)s.",
+                        { amount: whole(widget.difference), currency: this.currency }),
                 buckets,
             });
         });

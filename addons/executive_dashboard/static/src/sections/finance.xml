@@ -41,12 +41,18 @@
                     </button>
                 </header>
                 <p t-if="!w.bank_cash.rows.length" class="ed-note">No bank or cash accounts.</p>
-                <div class="ed-rows ed-scroll">
-                    <button t-foreach="w.bank_cash.rows" t-as="row" t-key="row.id" type="button"
-                            class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openAccount(row)">
-                        <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
-                        <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
-                    </button>
+                <div class="ed-rows">
+                    <t t-foreach="w.bank_cash.rows" t-as="row" t-key="row.id">
+                        <button t-if="row.can_open" type="button"
+                                class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openAccount(row)">
+                            <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
+                            <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
+                        </button>
+                        <div t-else="" class="ed-row">
+                            <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
+                            <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
+                        </div>
+                    </t>
                 </div>
                 <div class="ed-total-row">
                     <span>Total</span><span class="ed-num"><t t-esc="whole(w.bank_cash.total)"/> <t t-esc="currency"/></span>
@@ -83,9 +89,7 @@
                         </span>
                     </div>
                     <p t-if="p.netNote" class="ed-note ed-note-sm" t-esc="p.netNote"/>
-                    <p t-if="p.difference" class="ed-note ed-note-sm">
-                        <t t-esc="p.differenceNote"/> <b class="ed-num"><t t-esc="whole(p.difference)"/> <t t-esc="currency"/></b>.
-                    </p>
+                    <p t-if="p.difference" class="ed-note ed-note-sm" t-esc="p.differenceNote"/>
                     <div class="ed-buckets" role="list">
                         <button t-foreach="p.rows" t-as="b" t-key="b.key" type="button" role="listitem" class="ed-bucket"
                                 t-att-title="b.label + ': ' + whole(b.value) + ' ' + currency"

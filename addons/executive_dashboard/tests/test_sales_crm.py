@@ -197,11 +197,21 @@ class TestSales(SalesCrmCase):
 
     def test_top_customers_by_collections(self):
         """Money received from a customer counts whether it was recorded as a payment or as a
-        journal entry on a bank or cash account; a credit note moves no money and does not count."""
+        journal entry on a bank or cash account. The money side is measured: a write-off settled
+        with a payment is not money received; a refund paid out reduces it; a credit note moves no
+        money and does not count."""
         Dashboard = self.env['executive.dashboard'].with_user(self.manager)
         invoice = self._invoice('out_invoice', 700.0)
         self.env['account.payment.register'].with_context(
             active_model='account.move', active_ids=invoice.ids).create({'amount': 300.0})._create_payments()
+        discounted = self._invoice('out_invoice', 1000.0)
+        expense = self.env['account.account'].search([
+            ('account_type', '=', 'expense'), ('company_ids', 'in', self.company.id)], limit=1)
+        self.env['account.payment.register'].with_context(
+            active_model='account.move', active_ids=discounted.ids).create({
+                'amount': 950.0, 'payment_difference_handling': 'reconcile',
+                'writeoff_account_id': expense.id, 'writeoff_label': 'Discount'})._create_payments()
+        self.assertEqual(discounted.payment_state in ('paid', 'in_payment'), True)
         bank = self.env['account.journal'].search([
             ('type', '=', 'bank'), ('company_id', '=', self.company.id)], limit=1)
         receivable = self.partner.with_company(self.company).property_account_receivable_id
@@ -211,18 +221,24 @@ class TestSales(SalesCrmCase):
                                    'partner_id': self.partner.id}),
         ]})
         entry.action_post()
+        refund = self.env['account.payment'].create({
+            'payment_type': 'outbound', 'partner_type': 'customer', 'partner_id': self.partner.id,
+            'amount': 100.0, 'journal_id': bank.id, 'date': self.today})
+        refund.action_post()
         self._invoice('out_refund', 100.0)
         customers = self.section(self.manager, 'sales')['widgets']['customers']
         row = next(c for c in customers if c['id'] == self.partner.id)
-        self.assertAlmostEqual(row['amount'], 550.0)
-        self.assertEqual(row['count'], 2)
+        self.assertAlmostEqual(row['amount'], 300.0 + 950.0 + 250.0 - 100.0)
+        self.assertEqual(row['count'], 4)
         args = {'period': 'month', 'partner_id': self.partner.id}
         drawer = Dashboard.get_drawer('sales.customer', args)
         self.assertIn(entry.name, [r['label'] for r in drawer['rows']])
-        self.assertEqual(len(drawer['rows']), 2)
+        self.assertEqual(len(drawer['rows']), 4)
+        self.assertEqual(drawer['total']['value'], Dashboard._sal_format(1400.0))
         action = Dashboard.open_action('sales.customer', args)
-        self.assertEqual(action['res_model'], 'account.move.line')
-        self.assertEqual(len(self.env['account.move.line'].search(action['domain'])), 2)
+        self.assertEqual(action['res_model'], 'account.move')
+        self.assertIn(entry, self.env['account.move'].search(action['domain']))
+        self.assertEqual(len(self.env['account.move'].search(action['domain'])), 4)
 
     def test_drawer_arguments_are_validated(self):
         Dashboard = self.env['executive.dashboard'].with_user(self.manager)

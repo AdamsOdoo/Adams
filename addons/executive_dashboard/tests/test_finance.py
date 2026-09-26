@@ -185,6 +185,23 @@ class TestFinance(AccountTestInvoicingCommon):
             self.assertGreaterEqual(self.bucket(earlier['receivables'], 'aged', 'd30'), 120.0)
         self.assertGreaterEqual(earlier['receivables']['owed_overdue'] - now['receivables']['owed_overdue'], 0.0)
 
+    def test_post_dated_payment_keeps_the_invoice_open_today(self):
+        """An invoice matched today with a payment dated next week is still open today, as in the
+        Aged Receivable report at today."""
+        before = self.finance()['receivables']
+        invoice = self._move('out_invoice', self.partner, self.revenue_account, 90.0, -30,
+                             date=self.today - timedelta(days=35))
+        self._pay(invoice, self.today + timedelta(days=7))
+        self.assertIn(invoice.payment_state, ('paid', 'in_payment'))
+        after = self.finance()['receivables']
+        currency = self.env.company.currency_id
+        self.assertTrue(currency.is_zero(after['total'] - before['total'] - 90.0))
+        self.assertTrue(currency.is_zero(after['owed_overdue'] - before['owed_overdue'] - 90.0))
+        drawer = self.Dashboard.get_drawer('finance.open_items', {'period': 'month', 'kind': 'receivables'})
+        row = next(r for r in drawer['rows'] if r['label'] == self.partner.display_name)
+        # Items open today are counted, the add-back of a later match is not an extra item.
+        self.assertEqual(row['sub'], '0 open items')
+
     def test_non_trade_receivables_are_left_out(self):
         """Like the Aged Receivable report's default Account filter, Non Trade accounts are left out."""
         before = self.finance()['receivables']['total']
@@ -358,5 +375,5 @@ class TestFinance(AccountTestInvoicingCommon):
             self.skipTest('Accounting reports installed: the native engines run their own queries.')
         self.finance()  # warm the ORM caches
         # Counted for the test's environment user; the section runs as ``ed_fin``.
-        with self.assertQueryCount(**{self.env.user.login: 13}):
+        with self.assertQueryCount(**{self.env.user.login: 17}):
             self.Dashboard.get_section('finance', 'month', refresh=True)
