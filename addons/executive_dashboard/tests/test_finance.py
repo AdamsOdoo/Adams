@@ -354,6 +354,7 @@ class TestFinance(AccountTestInvoicingCommon):
             self.assertEqual(action['context']['report_id'], ledger.id)
             self.assertEqual(action['params']['options']['unfolded_lines'],
                              [ledger._get_generic_line_id('account.account', account.id)])
+            self.assertEqual(action['params']['options']['filter_search_bar'], account.code)
         else:
             self.assertEqual(action['res_model'], 'account.move.line')
             lines = self.env['account.move.line'].search(action['domain'])

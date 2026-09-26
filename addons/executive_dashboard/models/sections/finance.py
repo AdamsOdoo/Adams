@@ -742,8 +742,10 @@ class ExecutiveDashboard(models.AbstractModel):
         ]))
 
     def _fin_account_target(self, account, scope):
-        """``(action, destination name)`` of an account: the General Ledger with the account
-        unfolded (its entries listed), else its journal items (no Enterprise reports).
+        """``(action, destination name)`` of an account: the General Ledger filtered on the
+        account (searched on its code, the account unfolded so its entries are listed), else
+        its journal items (no Enterprise reports). The ledger's search matches line names, so
+        an account whose code begins with this code is listed too (folded).
 
         A balance account (bank, cash, receivable, payable) runs from the start of the fiscal
         year to the balance date, with its opening balance, so the ledger ends on the
@@ -760,8 +762,15 @@ class ExecutiveDashboard(models.AbstractModel):
         if ledger:
             try:
                 options = self._fin_options(ledger, start, end, single_group=False)
+                # Only this account: the ledger's search on its code, the account unfolded.
                 options['unfolded_lines'] = [ledger._get_generic_line_id('account.account', account.id)]
-                return self._fin_report_action(ledger, options), _('General Ledger')
+                code = self._fin_code(account)
+                if code:
+                    options['filter_search_bar'] = code
+                action = self._fin_report_action(ledger, options)
+                if code:
+                    action['context']['default_filter_accounts'] = code
+                return action, _('General Ledger')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
         # Every entry up to the balance date (they add up to the balance), or the period's.
