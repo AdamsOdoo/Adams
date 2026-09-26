@@ -119,10 +119,11 @@ class ExecutiveDashboard(models.AbstractModel):
         return [(partner, totals[partner], counts[partner])
                 for partner in sorted(totals, key=lambda p: (-totals[p], p.id))[:limit]]
 
-    def _pro_suppliers(self, scope):
+    def _pro_suppliers(self, scope, limit=TOP_ROWS):
+        """Suppliers by purchases confirmed in the period, the ``limit`` first (every one when None)."""
         return [{'id': partner.id, 'name': partner.display_name, 'amount': amount, 'count': count}
                 for partner, amount, count in self._pro_ranked_suppliers(
-                    scope, self._pro_confirmed_domain(scope), TOP_ROWS)]
+                    scope, self._pro_confirmed_domain(scope), limit)]
 
     def _pro_trend(self, scope):
         """Purchases confirmed in each of the 12 months ending with the period's last month."""
@@ -174,12 +175,12 @@ class ExecutiveDashboard(models.AbstractModel):
         _ = self.env._
         PurchaseOrder = self.env['purchase.order']
         oldest = args.get('kind') == 'approve'
-        orders = PurchaseOrder.search(domain, order='date_order asc, id asc' if oldest else
-                                      'date_approve desc, id desc', limit=DRAWER_ROWS)
-        count = PurchaseOrder.search_count(domain)
+        orders, more = self._sal_search_page('purchase.order', domain, 'date_order asc, id asc' if oldest else
+                                             'date_approve desc, id desc')
+        count = more['count'] if more else len(orders)
         total = self._pro_orders_kpi(self._pro_scope(args) if args.get('kind') == 'purchases'
                                      else self._period_scope('procurement', 'month'), domain)
-        return {'title': title, 'sub': _('%s orders', count), 'rows': self._pro_order_rows(orders, title),
+        return {'title': title, 'sub': _('%s orders', count), 'rows': self._pro_order_rows(orders, title), 'more': more,
                 'total': {'label': _('Total · untaxed'), 'value': '%s %s' % (
                     self._pro_format(total['amount']), self.env.company.currency_id.name)},
                 'action': {'key': 'procurement.orders', 'args': args}, 'dest': dest}
@@ -187,6 +188,21 @@ class ExecutiveDashboard(models.AbstractModel):
     def _action_procurement_orders(self, args):
         title, domain, xmlid, _dest = self._pro_list(args)
         return self._window(xmlid, title, 'purchase.order', domain)
+
+    def _drawer_procurement_suppliers(self, args):
+        """'View all' of Top suppliers by purchase value: every supplier with purchases confirmed in the period."""
+        scope, _ = self._pro_scope(args), self.env._
+        title, period = _('Top suppliers by purchase value'), self._fin_period_args(args)
+        suppliers = self._pro_suppliers(scope, None)
+        shown, more = self._drawer_page(suppliers)
+        return {'title': title, 'sub': _('Purchases confirmed in the period'), 'more': more,
+                'rows': [{'label': s['name'], 'sub': _('%s orders', s['count']), 'value': self._pro_format(s['amount']),
+                          'open': {'key': 'procurement.supplier', 'args': dict(period, partner_id=s['id']),
+                                   'crumb': title}} for s in shown],
+                'total': {'label': _('Total · untaxed'), 'value': '%s %s' % (
+                    self._pro_format(sum(s['amount'] for s in suppliers)), scope['company'].currency_id.name)},
+                'action': {'key': 'procurement.orders', 'args': dict(period, kind='purchases')},
+                'dest': _('Purchase Orders')}
 
     def _pro_supplier_domain(self, args):
         scope = self._pro_scope(args)
@@ -197,10 +213,10 @@ class ExecutiveDashboard(models.AbstractModel):
         scope, domain = self._pro_supplier_domain(args)
         _ = self.env._
         partner = self.env['res.partner'].browse(args['partner_id'])
-        orders = self.env['purchase.order'].search(domain, order='date_approve desc, id desc', limit=DRAWER_ROWS)
+        orders, more = self._sal_search_page('purchase.order', domain, 'date_approve desc, id desc')
         total = self._pro_orders_kpi(scope, domain)
         return {'title': partner.display_name, 'sub': _('Purchases confirmed in the period'),
-                'rows': self._pro_order_rows(orders, partner.display_name),
+                'rows': self._pro_order_rows(orders, partner.display_name), 'more': more,
                 'total': {'label': _('Total · untaxed'), 'value': '%s %s' % (
                     self._pro_format(total['amount']), scope['company'].currency_id.name)},
                 'action': {'key': 'procurement.supplier', 'args': args}, 'dest': _('Purchase Orders')}

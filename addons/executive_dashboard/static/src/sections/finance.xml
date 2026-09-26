@@ -80,13 +80,15 @@
                     </header>
                     <div class="ed-bucket-head">
                         <div class="ed-big ed-num"><t t-esc="compact(p.total)"/> <small t-esc="currency"/></div>
-                        <span t-if="p.owedOverdue > 0" class="ed-chip crit">
-                            Overdue <b class="ed-num" t-esc="compact(p.owedOverdue)"/><t t-if="p.overduePct !== null"> · <t t-esc="p.overduePct"/>%</t>
-                        </span>
+                        <button t-if="p.owedOverdue > 0" type="button" class="ed-chip crit ed-chip-btn"
+                                t-on-click="() => this.openSide(p.kind, 'overdue')">
+                            Overdue <b class="ed-num" t-esc="compact(p.owedOverdue)"/>
+                        </button>
                         <span t-else="" class="ed-chip good">Nothing overdue</span>
-                        <span t-if="p.credits &lt; 0" class="ed-chip neutral">
+                        <button t-if="p.credits &lt; 0" type="button" class="ed-chip neutral ed-chip-btn"
+                                t-on-click="() => this.openSide(p.kind, 'credits')">
                             <t t-esc="p.creditsLabel"/> <b class="ed-num" t-esc="compact(p.credits)"/>
-                        </span>
+                        </button>
                     </div>
                     <p t-if="p.netNote" class="ed-note ed-note-sm" t-esc="p.netNote"/>
                     <p t-if="p.difference" class="ed-note ed-note-sm" t-esc="p.differenceNote"/>

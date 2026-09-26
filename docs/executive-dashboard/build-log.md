@@ -148,3 +148,17 @@ Eight points from the owner's staging review; each point, the decision and its t
 - Query limit for the Finance section: 17 on Community (one check for later matches, one account-button check).
 - Background period loading computes up to four more periods per visited section (sequential, silent): an accepted cost of instant switching.
 - Local after the fixes: `oh test executive_dashboard` 32 passed (5 skipped); kept DB with all Community apps 73 passed.
+
+## Owner feedback on staging, round 2 (2026-09-26, 19.0.1.8.0)
+
+Nine points; each point, the decision and its test are tracked in `owner-feedback-20260926.md` ("Round 2").
+
+- Receivables / Payables: the share next to Overdue is removed. The Overdue chip and the credits chip open their items by partner (`finance.open_items` with `side`); Overdue opens the Aged report, credits their journal items (the Aged report does not separate them).
+- "View all" on Salespeople, Top products, Top customers (`sales.salespeople`, `sales.products`, `sales.customers`) and Top suppliers (`procurement.suppliers`): every one of the period; cards stay top 5.
+- Side-panel lists page: 25 rows, then "Show more" (`get_drawer(key, args, limit)`, 25 to 1000; `more: {shown, count}`). The native "Open list" still shows everything. Quotations stay as of today (owner decision).
+- Tables with fixed column widths (Sales, Procurement, CRM) so the Date column no longer moves with the period; card lists and side panels never scroll sideways.
+- Accounts open the General Ledger with the account unfolded (balance accounts: fiscal year start to the balance date; P&L accounts: the period), else their journal items. The Trial Balance is no longer used.
+- Revenue, Gross profit and Net profit open their own panel (`finance.profit`): accounts grouped by type with subtotals, adding up to the figure, with a note when the native P&L figure differs. The chart keeps the monthly panel.
+- New app icon (gauge). Native lists opened from the dashboard keep the dashboard's title in the breadcrumb (`display_name`).
+- Local: `oh test executive_dashboard` 34 passed (5 skipped); kept DB with sale_stock, crm, purchase_stock, stock_account, hr_attendance, hr_holidays: 78 passed. Browser (1440 px, EN + AR): chips, three profit panels, View all, Show more (25 → 49 of 49), Date column at the same x for every period, no sideways scroll, account opens its screen, no console errors.
+- Verify on Odoo.sh (Enterprise): the General Ledger opens on the account (unfolded, searched on its code) at the period end.

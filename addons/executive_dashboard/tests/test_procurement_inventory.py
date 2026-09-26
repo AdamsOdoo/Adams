@@ -90,6 +90,25 @@ class TestProcurement(SalesCrmCase):
         with self.assertRaises(ValidationError):
             dashboard.get_drawer('procurement.orders', {'kind': 'other'})
 
+    def test_view_all_suppliers(self):
+        """"View all" of Top suppliers lists every supplier of the period, each opening its orders."""
+        suppliers = self.env['res.partner'].create([{'name': 'Example Supplier %s' % i} for i in range(6)])
+        for i, supplier in enumerate(suppliers):
+            self.env['purchase.order'].create({
+                'partner_id': supplier.id,
+                'order_line': [fields.Command.create({'product_id': self.product.id, 'product_qty': 1,
+                                                      'price_unit': 10.0 * (i + 1), 'tax_ids': [fields.Command.clear()]})],
+            }).button_confirm()
+        widgets = self.section(self.buyer, 'procurement')['widgets']
+        self.assertEqual(len(widgets['suppliers']), 5)
+        drawer = self.env['executive.dashboard'].with_user(self.buyer).get_drawer(
+            'procurement.suppliers', {'period': 'month'})
+        self.assertTrue(set(suppliers.mapped('display_name')) <= {r['label'] for r in drawer['rows']})
+        self.assertEqual([r['label'] for r in drawer['rows'][:5]], [s['name'] for s in widgets['suppliers']])
+        row = next(r for r in drawer['rows'] if r['label'] == suppliers[0].display_name)
+        self.assertEqual(row['open'], {'key': 'procurement.supplier', 'crumb': drawer['title'],
+                                       'args': {'period': 'month', 'partner_id': suppliers[0].id}})
+
     def test_user_without_purchase_rights_sees_everything(self):
         self._order()
         result = self.section(self.plain, 'procurement')

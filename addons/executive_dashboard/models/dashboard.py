@@ -37,6 +37,10 @@ SEARCH_LIMIT = 5
 
 KEY_RE = re.compile(r'^[a-z_]+\.[a-z_]+$')
 
+# Side-panel lists show DRAWER_PAGE rows; "Show more" asks for the next page, up to DRAWER_MAX.
+DRAWER_PAGE = 25
+DRAWER_MAX = 1000
+
 # Per-process section cache. The key holds everything the result depends on
 # (database, user and groups, companies, section, dates, language), so users never
 # share an entry.
@@ -266,15 +270,31 @@ class ExecutiveDashboard(models.AbstractModel):
             return False
         return True
 
+    def _drawer_limit(self):
+        """Number of rows a side-panel list shows (``get_drawer``'s ``limit``)."""
+        return self.env.context.get('ed_drawer_limit') or DRAWER_PAGE
+
+    def _drawer_page(self, items):
+        """``(shown, more)``: the first ``_drawer_limit()`` of ``items`` and, when there are
+        more, ``{'shown': n, 'count': total}`` for the panel's "Show more"."""
+        limit = self._drawer_limit()
+        return items[:limit], self._drawer_more(min(limit, len(items)), len(items))
+
+    def _drawer_more(self, shown, count):
+        return {'shown': shown, 'count': count} if count > shown else False
+
     @api.model
-    def get_drawer(self, key, args=None):
+    def get_drawer(self, key, args=None, limit=None):
         """Side-panel content for ``<section>.<name>``, fetched when the panel opens.
 
-        The drawer's ``action`` (and a row's) is kept only when the user may open that
-        screen; it then carries ``kind`` (record, list or report) for the button's wording.
+        ``limit`` is the number of rows of a long list ("Show more" asks for more). The
+        drawer's ``action`` (and a row's) is kept only when the user may open that screen;
+        it then carries ``kind`` (record, list or report) for the button's wording.
         """
         self._authorize()
-        dashboard = self._elevated()
+        if limit is not None and (type(limit) is not int or not DRAWER_PAGE <= limit <= DRAWER_MAX):
+            raise ValidationError(self.env._('Unknown detail.'))
+        dashboard = self._elevated().with_context(ed_drawer_limit=limit)
         result = dashboard._dispatch('drawer', key, args)
         if isinstance(result, dict):
             if result.get('action'):

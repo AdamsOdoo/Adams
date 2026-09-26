@@ -195,6 +195,55 @@ class TestSales(SalesCrmCase):
         self.assertTrue(Dashboard.get_drawer('sales.product', dict(args, product_id=self.product.id,
                                                                    uom_id=self.product.uom_id.id))['rows'])
 
+    def test_view_all_lists_every_row(self):
+        """"View all" of Salespeople, Top products and Top customers lists every one of the period
+        (the cards show five), each row opening its own detail."""
+        products = self.env['product.product'].create([{'name': 'Example Part %s' % i} for i in range(7)])
+        for i, product in enumerate(products):
+            self.env['account.move'].create({
+                'move_type': 'out_invoice', 'partner_id': self.partner.id, 'invoice_date': self.today,
+                'date': self.today, 'invoice_line_ids': [fields.Command.create({
+                    'product_id': product.id, 'quantity': i + 1, 'price_unit': 10.0,
+                    'tax_ids': [fields.Command.clear()]})],
+            }).action_post()
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        args = {'period': 'month'}
+        widgets = self.section(self.manager, 'sales')['widgets']
+        self.assertEqual(len(widgets['products']), 5)
+        drawer = Dashboard.get_drawer('sales.products', args)
+        names = [r['label'] for r in drawer['rows']]
+        self.assertTrue(set(products.mapped('display_name')) <= set(names))
+        self.assertEqual(names[:5], [p['name'] for p in widgets['products']])
+        self.assertEqual(drawer['rows'][0]['open']['key'], 'sales.product')
+        self.assertFalse(drawer['more'])
+        people = Dashboard.get_drawer('sales.salespeople', args)
+        self.assertEqual(people['rows'][0]['open']['key'], 'sales.salesperson')
+        customers = Dashboard.get_drawer('sales.customers', args)
+        self.assertEqual(customers['action']['key'], 'sales.customers')
+        self.assertEqual(Dashboard.open_action('sales.customers', args)['res_model'], 'account.move')
+
+    def test_show_more_pages_long_lists(self):
+        """A side-panel list shows 25 rows and says how many there are; "Show more" (a larger
+        ``limit``) adds the next ones. Limits outside 25 to 1000 are refused."""
+        orders = self.env['sale.order'].create([{
+            'partner_id': self.partner.id,
+            'order_line': [fields.Command.create({'product_id': self.product.id, 'product_uom_qty': 1,
+                                                  'price_unit': 10.0, 'tax_ids': [fields.Command.clear()]})],
+        } for _i in range(30)])
+        orders.action_confirm()
+        Dashboard = self.env['executive.dashboard'].with_user(self.manager)
+        args = {'period': 'month', 'kind': 'orders'}
+        count = self.env['sale.order'].search_count(Dashboard._sal_list_domain(args)[1])
+        first = Dashboard.get_drawer('sales.orders', args)
+        self.assertEqual(len(first['rows']), 25)
+        self.assertEqual(first['more'], {'shown': 25, 'count': count})
+        page = Dashboard.get_drawer('sales.orders', args, 50)
+        self.assertEqual(len(page['rows']), min(50, count))
+        self.assertEqual([r['label'] for r in page['rows'][:25]], [r['label'] for r in first['rows']])
+        for bad in (10, 1001, '50', 25.5):
+            with self.assertRaises(ValidationError):
+                Dashboard.get_drawer('sales.orders', args, bad)
+
     def test_top_customers_by_collections(self):
         """Money received from a customer counts whether it was recorded as a payment or as a
         journal entry on a bank or cash account. The money side is measured: a write-off settled

@@ -23,3 +23,19 @@ Module `executive_dashboard` 19.0.1.7.0, branch `feature/executive-dashboard-pha
 - Aged Receivable / Payable totals equal the staging reports at the same dates, with amounts owed positive (the dashboard takes the native figure as it is, including for payables); the difference note appears only when they really differ.
 - Aged report, Partner Ledger, Trial Balance and Balance Sheet open at the period end.
 - Dark mode with the owner's colour preference.
+
+## Round 2 (module 19.0.1.8.0)
+
+| # | Asked | Built | Covered by |
+|---|---|---|---|
+| 1 | Remove the percentage next to Overdue; where do the credits come from; make them clickable | The share is removed. The credits are open receivable (payable) items on the other side that are not matched to an invoice (bill): customer payments not reconciled, credit notes not applied, advances (for payables: supplier payments not matched, vendor refunds). Both chips open a side panel by partner, each partner its documents; Overdue opens the Aged report, credits open their journal items. | `TestFinance.test_overdue_and_credit_chips_open_their_items`; browser check |
+| 2 | "View all" on Top products, Top customers, Salespeople; scrollbar only when needed | "View all" on the three cards lists every one of the period, each row opening its detail. Lists never scroll sideways; the vertical bar appears only when the list is longer than the card. | `TestSales.test_view_all_lists_every_row`; browser check |
+| 3 | Recent orders "View all" shows only some orders; quotations follow the dates and behave like orders | Side-panel lists show 25 rows and "Showing 25 of N" with "Show more"; "Open list" opens them all in Odoo. Quotations stay as of today (your decision); their rows and "View all" already open the same panels as orders, now with "Show more". | `TestSales.test_show_more_pages_long_lists`; browser check 25 → 49 of 49 |
+| 4 | The Date column moves when the dates change | Tables (Sales, Procurement, CRM) have fixed column widths; on phones they stay cards. | Browser check: Date column at the same position for all five periods |
+| 5 | Top suppliers "View all" | Added, same as point 2. | `TestProcurement.test_view_all_suppliers` |
+| 6 | A better app logo | New icon: a gauge in Odoo's app colours. | Stored on the app menu (checked in the database) |
+| 7 | Clean changes | Tests with all Community apps (78 passed), Arabic for every new string, browser check EN + AR, independent review. | This table, build log |
+| 8 | Accounts open the General Ledger, not the Trial Balance | Every account click (Bank & Cash, receivable and payable accounts, and the accounts in the profit panels) opens the General Ledger with the account unfolded; balance accounts from the fiscal year start to the balance date, P&L accounts for the period. Without Enterprise: the account's journal items. | `test_accounts_open_the_general_ledger`, `test_profit_figures_open_their_own_accounts` |
+| 9 | Revenue, Gross profit and Net profit all open the same thing | Each opens its own panel: its accounts grouped by type (Income, Cost of Revenue, Expenses, …) with subtotals, adding up to the figure; "Open report" opens the Profit and Loss for the same dates. The chart still opens the monthly view. | `test_profit_figures_open_their_own_accounts`; browser check |
+
+Still to verify on Odoo.sh (Enterprise): the General Ledger opens on the right account, unfolded, at the period end.

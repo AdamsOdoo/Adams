@@ -78,6 +78,7 @@
                         <t t-component="customBody" data="state.data" open="props.open" panel="props.panel"/>
                     </t>
                     <t t-elif="state.data">
+                        <p t-if="state.data.note" class="ed-note" t-esc="state.data.note"/>
                         <t t-foreach="state.data.groups or []" t-as="group" t-key="group_index">
                             <h3 class="ed-group-title" t-esc="group.title"/>
                             <div class="ed-rows">
@@ -91,6 +92,10 @@
                             <t t-foreach="state.data.rows or []" t-as="row" t-key="row_index">
                                 <t t-call="executive_dashboard.PanelRow"/>
                             </t>
+                        </div>
+                        <div t-if="state.data.more" class="ed-more">
+                            <span class="ed-note" t-esc="moreLabel"/>
+                            <button t-if="canShowMore" type="button" class="ed-btn" t-att-disabled="state.more" t-on-click="showMore">Show more</button>
                         </div>
                         <div t-if="state.data.total" class="ed-total-row">
                             <span t-esc="state.data.total.label"/><span class="ed-num" t-esc="state.data.total.value"/>

@@ -134,6 +134,61 @@ class TestFinance(AccountTestInvoicingCommon):
         self.assertTrue(currency.is_zero(
             widgets['bank_cash']['total'] - sum(r['balance'] for r in widgets['bank_cash']['rows'])))
 
+    def test_overdue_and_credit_chips_open_their_items(self):
+        """The Overdue chip lists the invoices past due by customer, the credits chip the
+        unapplied credits; each total is the chip's figure. Credits open their journal items."""
+        late = self._move('out_invoice', self.partner, self.revenue_account, 300.0, -10)
+        self._move('out_invoice', self.partner, self.revenue_account, 200.0, 20)
+        credit = self._move('out_refund', self.partner, self.revenue_account, 50.0, 0)
+        widget = self.finance()['receivables']
+        base = {'period': 'month', 'kind': 'receivables', 'view': 'aged'}
+        overdue = self.Dashboard.get_drawer('finance.open_items', dict(base, side='overdue'))
+        credits = self.Dashboard.get_drawer('finance.open_items', dict(base, side='credits'))
+        fmt = self.Dashboard._fin_format
+        self.assertEqual(overdue['total']['value'], fmt(widget['owed_overdue']))
+        self.assertEqual(credits['total']['value'], fmt(widget['credits']))
+        row = next(r for r in overdue['rows'] if r['label'] == self.partner.display_name)
+        self.assertEqual(row['value'], fmt(300.0))
+        self.assertEqual(row['open']['args']['side'], 'overdue')
+        detail = self.Dashboard.get_drawer('finance.open_items', row['open']['args'])
+        self.assertEqual([r['label'] for r in detail['rows']], [late.name])
+        row = next(r for r in credits['rows'] if r['label'] == self.partner.display_name)
+        self.assertEqual(row['value'], fmt(-50.0))
+        action = self.Dashboard.open_action('finance.open_items', dict(base, side='credits'))
+        self.assertEqual(action['res_model'], 'account.move.line')
+        lines = self.env['account.move.line'].search(action['domain'])
+        self.assertIn(credit, lines.move_id)
+        self.assertNotIn(late, lines.move_id)
+        with self.assertRaises(ValidationError):
+            self.Dashboard.get_drawer('finance.open_items', dict(base, side='other'))
+
+    def test_profit_figures_open_their_own_accounts(self):
+        """Revenue, Gross profit and Net profit each open their accounts, grouped by type, adding
+        up to the figure; an account opens its General Ledger for the period."""
+        self._move('out_invoice', self.partner, self.revenue_account, 1000.0, 10)
+        self._move('in_invoice', self.vendor, self.cost_account, 400.0, 10)
+        expense = self.company_data['default_account_expense']
+        self._move('in_invoice', self.vendor, expense, 100.0, 10)
+        kpis = self.finance()['kpis']
+        fmt, currency = self.Dashboard._fin_format, self.env.company.currency_id.name
+        drawers = {figure: self.Dashboard.get_drawer('finance.profit', {'period': 'month', 'figure': figure})
+                   for figure in ('revenue', 'gross_profit', 'net_profit')}
+        for figure, drawer in drawers.items():
+            if not drawer['note']:
+                self.assertEqual(drawer['total']['value'], '%s %s' % (fmt(kpis[figure]), currency))
+        accounts = lambda d: {r['action']['args']['account_id'] for g in d['groups'] for r in g['rows']}  # noqa: E731
+        self.assertIn(self.revenue_account.id, accounts(drawers['revenue']))
+        self.assertNotIn(self.cost_account.id, accounts(drawers['revenue']))
+        self.assertIn(self.cost_account.id, accounts(drawers['gross_profit']))
+        self.assertNotIn(expense.id, accounts(drawers['gross_profit']))
+        self.assertIn(expense.id, accounts(drawers['net_profit']))
+        action = self.Dashboard.open_action('finance.account', {'period': 'month', 'account_id': expense.id})
+        if action['type'] == 'ir.actions.act_window':
+            dates = {term[1] for term in action['domain'] if term[0] == 'date'}
+            self.assertEqual(dates, {'>=', '<='})
+        with self.assertRaises(ValidationError):
+            self.Dashboard.get_drawer('finance.profit', {'period': 'month', 'figure': 'ebitda'})
+
     def test_bank_cash_lists_every_account(self):
         """Accounts with a zero balance, or without any entry, are listed too."""
         unused = self.company_data['default_journal_bank'].default_account_id.copy({
@@ -281,9 +336,10 @@ class TestFinance(AccountTestInvoicingCommon):
         pnl = self.Dashboard.open_action('finance.pnl', {'period': 'month'})
         self.assertIn(pnl['type'], ('ir.actions.act_window', 'ir.actions.client'))
 
-    def test_accounts_open_the_trial_balance(self):
-        """Receivables list their accounts; an account opens the Trial Balance filtered on it
-        (Enterprise), else its journal items. A partner opens the Partner Ledger."""
+    def test_accounts_open_the_general_ledger(self):
+        """Receivables list their accounts; an account opens the General Ledger with the account
+        unfolded (Enterprise), else every journal item of the account up to the balance date.
+        A partner opens the Partner Ledger."""
         invoice = self._move('out_invoice', self.partner, self.revenue_account, 250.0, 10)
         account = invoice.line_ids.filtered(lambda l: l.display_type == 'payment_term').account_id
         drawer = self.Dashboard.get_drawer('finance.open_items', {'kind': 'receivables', 'view': 'aged'})
@@ -292,15 +348,18 @@ class TestFinance(AccountTestInvoicingCommon):
         self.assertEqual(row['action']['key'], 'finance.account')
         self.assertNotIn('open', row)
         action = self.Dashboard.open_action('finance.account', {'account_id': account.id})
-        trial = self.env.ref('account_reports.trial_balance_report', raise_if_not_found=False)
-        if trial:
-            # The Trial Balance itself (not the fallback), searched on the account code.
+        ledger = self.env.ref('account_reports.general_ledger_report', raise_if_not_found=False)
+        if ledger:
             self.assertEqual(action['type'], 'ir.actions.client')
-            self.assertEqual(action['context']['report_id'], trial.id)
-            self.assertEqual(action['params']['options']['filter_search_bar'], account.code)
+            self.assertEqual(action['context']['report_id'], ledger.id)
+            self.assertEqual(action['params']['options']['unfolded_lines'],
+                             [ledger._get_generic_line_id('account.account', account.id)])
         else:
             self.assertEqual(action['res_model'], 'account.move.line')
-            self.assertEqual(set(self.env['account.move.line'].search(action['domain']).account_id), {account})
+            lines = self.env['account.move.line'].search(action['domain'])
+            self.assertEqual(set(lines.account_id), {account})
+            self.assertIn(invoice, lines.move_id)
+            self.assertFalse([term for term in action['domain'] if term[0] == 'date' and term[1] == '>='])
         partner_args = {'kind': 'receivables', 'view': 'aged', 'partner_id': self.partner.id}
         action = self.Dashboard.open_action('finance.open_items', partner_args)
         ledger = self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False)
@@ -315,8 +374,9 @@ class TestFinance(AccountTestInvoicingCommon):
                      {'kind': 'receivables', 'bucket': 'd365'}, {'kind': 'receivables', 'partner_id': '1'}):
             with self.assertRaises(ValidationError):
                 self.Dashboard.get_drawer('finance.open_items', args)
-        income = self.revenue_account
-        for args in ({'account_id': income.id}, {'account_id': 'x'}, {}):
+        # Bank, cash, receivable, payable and profit and loss accounts open; a tax account does not.
+        tax = self.company_data['default_account_tax_sale']
+        for args in ({'account_id': tax.id}, {'account_id': 'x'}, {}):
             with self.assertRaises(ValidationError):
                 self.Dashboard.open_action('finance.account', args)
         with self.assertRaises(ValidationError):
