@@ -50,7 +50,7 @@ class ExecutiveDashboard(models.AbstractModel):
             'trend': self._sal_trend(scope) if invoices else None,
             'salespeople': self._sal_salespeople(scope) if invoices else None,
             'products': self._sal_products(scope) if self._sal_can_read('account.move.line') else None,
-            'customers': self._sal_customers(scope) if self._sal_can_read('account.payment') else None,
+            'customers': self._sal_customers(scope) if self._sal_can_read('account.move.line') else None,
             'orders': self._sal_recent(scope),
             'quotations': self._sal_recent_quotations(scope),
         }
@@ -148,13 +148,69 @@ class ExecutiveDashboard(models.AbstractModel):
     def _sal_to_invoice_domain(self, scope):
         return Domain([('invoice_status', '=', 'to invoice'), ('company_id', 'in', scope['companies'].ids)])
 
-    def _sal_payment_domain(self, scope):
+    def _sal_collection_domain(self, scope):
+        """Receivable (trade) journal items of customers in the period's posted entries."""
         return Domain([
-            ('payment_type', '=', 'inbound'), ('partner_type', '=', 'customer'),
-            ('state', 'in', ('in_process', 'paid')), ('company_id', 'in', scope['companies'].ids),
+            ('parent_state', '=', 'posted'), ('company_id', 'in', scope['companies'].ids),
             ('date', '>=', fields.Date.to_string(scope['date_from'])),
             ('date', '<=', fields.Date.to_string(scope['date_to'])),
+            ('account_id.account_type', '=', 'asset_receivable'), ('account_id.non_trade', '=', False),
+            ('partner_id', '!=', False),
         ])
+
+    def _sal_collections(self, scope, partner_id=None):
+        """``{partner: {entry: amount}}``: money received from each customer in the period, in the
+        dashboard company's currency (refunds paid out are negative).
+
+        The money side is measured, never the receivable side, so a write-off, an early-payment
+        discount or withheld tax settled with a payment does not count as money received:
+        - customer payments: the payment's own amount (``amount_company_currency_signed``);
+        - other entries with a bank or cash line and a customer's receivable line (bank statement
+          lines matched to invoices, manual journal entries): the bank and cash lines' balance,
+          shared between the entry's customers in proportion to their receivable movement.
+        Credit notes and write-offs alone move no money and do not count.
+        """
+        partners = [('partner_id', '=', partner_id)] if partner_id else []
+        result = defaultdict(lambda: defaultdict(float))
+        Payment, Line = self.env['account.payment'], self.env['account.move.line']
+        for partner, move, company, amount in Payment._read_group([
+                ('partner_type', '=', 'customer'), ('partner_id', '!=', False), ('move_id', '!=', False),
+                ('state', 'in', ('in_process', 'paid')), ('company_id', 'in', scope['companies'].ids),
+                ('date', '>=', fields.Date.to_string(scope['date_from'])),
+                ('date', '<=', fields.Date.to_string(scope['date_to'])), *partners],
+                ['partner_id', 'move_id', 'company_id'], ['amount_company_currency_signed:sum']):
+            result[partner][move] += self._fin_convert(scope, amount, company, scope['date_to'])
+        receivable = self._sal_collection_domain(scope) & Domain('move_id.origin_payment_id', '=', False) \
+            & Domain('move_id.line_ids', 'any', [('account_id.account_type', '=', 'asset_cash')])
+        if partner_id:
+            # Every customer of the entries this customer is in, to share the money correctly.
+            receivable = self._sal_collection_domain(scope) & Domain('move_id', 'any', Domain.AND([
+                Domain('origin_payment_id', '=', False),
+                Domain('line_ids', 'any', [('account_id.account_type', '=', 'asset_cash')]),
+                Domain('line_ids', 'any', self._sal_collection_domain(scope) & Domain('partner_id', '=', partner_id)),
+            ]))
+        shares = defaultdict(dict)
+        for move, partner, balance in Line._read_group(receivable, ['move_id', 'partner_id'], ['balance:sum']):
+            shares[move][partner] = -balance
+        if shares:
+            moves = self.env['account.move'].union(*shares)
+            for move, company, money in Line._read_group(
+                    [('move_id', 'in', moves.ids), ('account_id.account_type', '=', 'asset_cash')],
+                    ['move_id', 'company_id'], ['balance:sum']):
+                total = sum(shares[move].values())
+                if not total:
+                    continue
+                money = self._fin_convert(scope, money, company, scope['date_to'])
+                for partner, part in shares[move].items():
+                    if not partner_id or partner.id == partner_id:
+                        result[partner][move] += money * part / total
+        return result
+
+    def _sal_collected(self, scope, partner_id=None):
+        """``[(partner, collected, entries)]``, largest first."""
+        rows = [(partner, sum(moves.values()), len(moves))
+                for partner, moves in self._sal_collections(scope, partner_id).items()]
+        return sorted(rows, key=lambda row: -row[1])
 
     # ------------------------------------------------------------------ figures
 
@@ -219,10 +275,9 @@ class ExecutiveDashboard(models.AbstractModel):
                 for product, uom in ranked]
 
     def _sal_customers(self, scope):
-        rows = self._ranked(scope, 'account.payment', self._sal_payment_domain(scope), 'partner_id',
-                            'amount_company_currency_signed', TOP_ROWS, scope['date_to'])
-        return [{'id': partner.id, 'name': partner.display_name or self.env._('No customer'),
-                 'amount': amount, 'count': count} for partner, amount, count in rows if partner]
+        rows = self._sal_collected(scope)
+        return [{'id': partner.id, 'name': partner.display_name, 'amount': amount, 'count': count}
+                for partner, amount, count in rows if amount > 0][:TOP_ROWS]
 
     def _sal_order_row(self, order, delivery):
         return {
@@ -328,28 +383,28 @@ class ExecutiveDashboard(models.AbstractModel):
             ('product_id', '=', product_id), ('product_uom_id', '=', uom_id)])
         return self._window('account.action_move_out_invoice', self.env._('Invoiced sales'), 'account.move', domain)
 
-    def _sal_customer_domain(self, args):
-        scope = self._sal_scope(args)
-        partner_id = self._positive_id(args, 'partner_id')
-        return scope, partner_id, self._sal_payment_domain(scope) & Domain('partner_id', '=', partner_id)
+    def _sal_customer_args(self, args):
+        return self._sal_scope(args), self._positive_id(args, 'partner_id')
 
     def _drawer_sales_customer(self, args):
-        scope, partner_id, domain = self._sal_customer_domain(args)
+        scope, partner_id = self._sal_customer_args(args)
         _ = self.env._
-        payments = self.env['account.payment'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
-        total = self._ranked(scope, 'account.payment', domain, 'partner_id', 'amount_company_currency_signed', 1,
-                             scope['date_to'])
+        moves = self._sal_collections(scope, partner_id).get(self.env['res.partner'].browse(partner_id), {})
+        ranked = sorted(moves, key=lambda m: (m.date, m.id), reverse=True)[:DRAWER_ROWS]
         return {'title': self.env['res.partner'].browse(partner_id).display_name,
-                'sub': _('Customer payments received in the period'),
-                'rows': [{'label': payment.name, 'sub': format_date(self.env, payment.date),
-                          'value': self._sal_format(payment.amount_company_currency_signed)} for payment in payments],
-                'total': {'label': _('Total'), 'value': self._sal_format(total[0][1] if total else 0.0)},
-                'action': {'key': 'sales.customer', 'args': args}, 'dest': _('Payments')}
+                'sub': _('Money received in the period: payments, bank statement lines and journal entries'),
+                'rows': [{'label': move.name,
+                          'sub': ' · '.join(filter(None, [format_date(self.env, move.date), move.journal_id.name])),
+                          'value': self._sal_format(moves[move])} for move in ranked],
+                'total': {'label': _('Total'), 'value': self._sal_format(sum(moves.values()))},
+                'action': {'key': 'sales.customer', 'args': args}, 'dest': _('Journal Entries')}
 
     def _action_sales_customer(self, args):
-        _scope, _partner, domain = self._sal_customer_domain(args)
-        return self._window('account.action_account_payments', self.env._('Customer payments'),
-                            'account.payment', domain)
+        scope, partner_id = self._sal_customer_args(args)
+        moves = self._sal_collections(scope, partner_id).get(self.env['res.partner'].browse(partner_id), {})
+        domain = Domain('id', 'in', [move.id for move in moves])
+        return self._window('account.action_move_journal_line', self.env._('Customer collections'),
+                            'account.move', domain)
 
     def _sal_list_domain(self, args):
         """Order lists behind the three order figures: ``(title, domain, xmlid, destination)``."""

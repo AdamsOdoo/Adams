@@ -36,17 +36,23 @@
                         <h2>Bank &amp; Cash</h2>
                         <p t-esc="bankSubtitle"/>
                     </div>
-                    <button type="button" class="ed-link" t-on-click="() => this.open('bank_cash', {})">
+                    <button type="button" class="ed-link" t-on-click="() => this.open('bank_cash', this.periodArgs)">
                         Balance Sheet <Icon name="'arrow'" flip="true"/>
                     </button>
                 </header>
-                <p t-if="!w.bank_cash.rows.length" class="ed-note">No bank or cash entries yet.</p>
+                <p t-if="!w.bank_cash.rows.length" class="ed-note">No bank or cash accounts.</p>
                 <div class="ed-rows">
-                    <button t-foreach="w.bank_cash.rows" t-as="row" t-key="row.id" type="button"
-                            class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openAccount(row)">
-                        <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
-                        <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
-                    </button>
+                    <t t-foreach="w.bank_cash.rows" t-as="row" t-key="row.id">
+                        <button t-if="row.can_open" type="button"
+                                class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openAccount(row)">
+                            <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
+                            <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
+                        </button>
+                        <div t-else="" class="ed-row">
+                            <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
+                            <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
+                        </div>
+                    </t>
                 </div>
                 <div class="ed-total-row">
                     <span>Total</span><span class="ed-num"><t t-esc="whole(w.bank_cash.total)"/> <t t-esc="currency"/></span>
@@ -60,17 +66,30 @@
                             <h2 t-esc="p.title"/>
                             <p t-esc="p.sub"/>
                         </div>
-                        <button type="button" class="ed-link" t-on-click="() => this.openItems(p.kind, p.view)">
-                            Details <Icon name="'arrow'" flip="true"/>
-                        </button>
+                        <div class="ed-panel-tools">
+                            <div class="ed-seg ed-seg-sm" role="group" t-att-aria-label="p.title">
+                                <button type="button" t-att-aria-pressed="p.view === 'aged' ? 'true' : 'false'"
+                                        t-on-click="() => this.setView(p.kind, 'aged')">Aged</button>
+                                <button type="button" t-att-aria-pressed="p.view === 'expected' ? 'true' : 'false'"
+                                        t-on-click="() => this.setView(p.kind, 'expected')">Expected</button>
+                            </div>
+                            <button type="button" class="ed-link" t-on-click="() => this.openItems(p.kind, p.view)">
+                                Details <Icon name="'arrow'" flip="true"/>
+                            </button>
+                        </div>
                     </header>
                     <div class="ed-bucket-head">
                         <div class="ed-big ed-num"><t t-esc="compact(p.total)"/> <small t-esc="currency"/></div>
-                        <span t-if="p.overdue > 0" class="ed-chip crit">
-                            Overdue <b class="ed-num" t-esc="compact(p.overdue)"/><t t-if="p.overduePct !== null"> · <t t-esc="p.overduePct"/>%</t>
+                        <span t-if="p.owedOverdue > 0" class="ed-chip crit">
+                            Overdue <b class="ed-num" t-esc="compact(p.owedOverdue)"/><t t-if="p.overduePct !== null"> · <t t-esc="p.overduePct"/>%</t>
                         </span>
                         <span t-else="" class="ed-chip good">Nothing overdue</span>
+                        <span t-if="p.credits &lt; 0" class="ed-chip neutral">
+                            <t t-esc="p.creditsLabel"/> <b class="ed-num" t-esc="compact(p.credits)"/>
+                        </span>
                     </div>
+                    <p t-if="p.netNote" class="ed-note ed-note-sm" t-esc="p.netNote"/>
+                    <p t-if="p.difference" class="ed-note ed-note-sm" t-esc="p.differenceNote"/>
                     <div class="ed-buckets" role="list">
                         <button t-foreach="p.rows" t-as="b" t-key="b.key" type="button" role="listitem" class="ed-bucket"
                                 t-att-title="b.label + ': ' + whole(b.value) + ' ' + currency"

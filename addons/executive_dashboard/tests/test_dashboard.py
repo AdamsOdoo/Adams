@@ -59,7 +59,12 @@ class TestDashboard(TransactionCase):
         plain = self.as_user(self.plain_user)
         result = plain.get_section('finance', 'month')
         self.assertEqual(result['status'], 'ok')
-        self.assertEqual(result['widgets'], self.as_user(self.finance_user).get_section('finance', 'month')['widgets'])
+        finance = self.as_user(self.finance_user).get_section('finance', 'month')['widgets']
+        # Same figures; only the account buttons differ (the user may not open accounting reports).
+        figures = lambda widgets: {**widgets, 'bank_cash': {**widgets['bank_cash'], 'rows': [  # noqa: E731
+            {k: v for k, v in row.items() if k != 'can_open'} for row in widgets['bank_cash']['rows']]}}
+        self.assertEqual(figures(result['widgets']), figures(finance))
+        self.assertFalse(any(row['can_open'] for row in result['widgets']['bank_cash']['rows']))
         self.assertIn('finance', [s['key'] for s in plain.get_bootstrap()['sections']])
         # Full details in the side panel, but no button to a screen the user may not open.
         drawer = plain.get_drawer('finance.revenue', {'period': 'month'})
@@ -144,7 +149,8 @@ class TestDashboard(TransactionCase):
         if self.Dashboard._fin_engine():
             self.skipTest('Accounting reports installed: the native engines run their own queries.')
         dashboard.get_section('finance', 'month')  # warm the ORM caches
-        with self.assertQueryCount(__system__=12, ed_finance=12):
+        # 17: one check for matches after the balance date, one check of the account button.
+        with self.assertQueryCount(__system__=17, ed_finance=17):
             dashboard.get_section('finance', 'month', refresh=True)
 
     # -- drawers and search --------------------------------------------------

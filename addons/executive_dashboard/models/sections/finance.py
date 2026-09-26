@@ -81,11 +81,10 @@ class ExecutiveDashboard(models.AbstractModel):
                 **{key: pnl[key] for key in ('revenue', 'gross_profit', 'net_profit')},
                 'invoices': invoices,
                 'bank_cash': bank['total'],
-                'bank_cash_accounts': sum(1 for row in bank['rows'] if not currency.is_zero(row['balance'])),
+                'bank_cash_accounts': len(bank['rows']),
                 'receivables': open_items['receivables']['total'],
-                'receivables_overdue': open_items['receivables']['overdue'],
                 'payables': open_items['payables']['total'],
-                'payables_overdue': open_items['payables']['overdue'],
+                'as_of': fields.Date.to_string(scope['as_of']),
                 'source': pnl['source'],
             },
             'trend': self._fin_trend(scope),
@@ -132,7 +131,8 @@ class ExecutiveDashboard(models.AbstractModel):
                 ('period5', _('Over 120 days'), None, day(-121)),
             ],
             'expected': [
-                ('overdue', _('Overdue'), None, day(-1)),
+                # Net of unapplied credits: the Overdue chip shows the past-due invoices alone.
+                ('overdue', _('Past due (net)'), None, day(-1)),
                 ('next7', _('Next 7 days'), today, day(7)),
                 ('d8_30', _('8–30 days'), day(8), day(30)),
                 ('d31_60', _('31–60 days'), day(31), day(60)),
@@ -151,20 +151,14 @@ class ExecutiveDashboard(models.AbstractModel):
             return Domain.AND([[term] for term in terms])
         return within('date_maturity') | (Domain('date_maturity', '=', False) & within('date'))
 
-    def _fin_open_domain(self, scope, kind):
-        return self._fin_domain(scope, [
-            ('account_id.account_type', '=', OPEN_TYPES[kind]), ('reconciled', '=', False),
-            ('date', '<=', fields.Date.to_string(scope['today'])),
-        ])
-
     def _fin_args(self, args):
         """Validated drawer/action arguments for the open-items drawer."""
         kind, view, bucket = args.get('kind'), args.get('view', 'aged'), args.get('bucket')
         partner_id = args.get('partner_id')
         if kind not in OPEN_TYPES or view not in VIEWS:
             raise ValidationError(self.env._('Unknown detail.'))
-        today = fields.Date.context_today(self)
-        ranges = self._fin_buckets(today)
+        # Bucket ranges count from the balance date of the drawer's period.
+        ranges = self._fin_buckets(self._fin_scope(args)['as_of'])
         buckets = {b[0]: b for b in ranges[view] + (ranges['aged_native'] if view == 'aged' else [])}
         if bucket is not None and bucket not in buckets:
             raise ValidationError(self.env._('Unknown detail.'))
@@ -324,25 +318,46 @@ class ExecutiveDashboard(models.AbstractModel):
 
     # ------------------------------------------------------------------ bank and cash
 
+    def _fin_cash_accounts(self, scope):
+        """Every active bank and cash account of the dashboard's companies, with or without entries."""
+        return self.env['account.account'].search([
+            ('account_type', '=', 'asset_cash'), ('active', '=', True),
+            ('company_ids', 'in', scope['companies'].ids),
+        ])
+
     def _fin_bank_cash(self, scope):
-        """Accounts under "Bank and Cash Accounts" with their balance as of today, and the total."""
+        """Every bank and cash account with its balance at the period's end (``as_of``), and the total.
+
+        Accounts without entries are listed with a zero balance; accounts under the Balance Sheet
+        line that are not of type Bank and Cash (rare) are listed too, so the rows add up to the total.
+        """
+        as_of = scope['as_of']
         balances = self._fin_native(lambda: self._fin_bank_cash_report(scope), 'Balance Sheet')
         source = 'report' if balances is not None else 'journal'
         if balances is None:
             balances = {}
             rows = self.env['account.move.line']._read_group(
-                self._fin_domain(scope, [('date', '<=', fields.Date.to_string(scope['today'])),
+                self._fin_domain(scope, [('date', '<=', fields.Date.to_string(as_of)),
                                          ('account_id.account_type', '=', 'asset_cash')]),
                 ['account_id', 'company_id'], ['balance:sum'])
             for account, company, balance in rows:
                 balances[account.id] = balances.get(account.id, 0.0) + self._fin_convert(
-                    scope, balance, company, scope['today'])
+                    scope, balance, company, as_of)
+        for account in self._fin_cash_accounts(scope):
+            balances.setdefault(account.id, 0.0)
         accounts = self.env['account.account'].browse(balances)
         # Account codes are company dependent: show each one in a company it belongs to.
         rows = sorted(({'id': account.id, 'code': self._fin_code(account), 'name': account.name,
-                        'balance': balances[account.id]} for account in accounts),
-                      key=lambda row: -row['balance'])
-        return {'rows': rows, 'total': sum(balances.values()), 'source': source}
+                        'balance': balances[account.id], 'can_open': account.account_type == 'asset_cash'}
+                       for account in accounts),
+                      key=lambda row: (-row['balance'], row['code']))
+        # One check of the account's native screen (the same report for every account).
+        first = next((row for row in rows if row['can_open']), None)
+        if first and not self._target({'key': 'finance.account', 'args': {'account_id': first['id']}}):
+            for row in rows:
+                row['can_open'] = False
+        return {'rows': rows, 'total': sum(balances.values()), 'source': source,
+                'as_of': fields.Date.to_string(as_of)}
 
     def _fin_code(self, account):
         company = self.env.company if self.env.company in account.company_ids else account.company_ids[:1]
@@ -360,7 +375,7 @@ class ExecutiveDashboard(models.AbstractModel):
         expression = line.expression_ids.filtered(lambda e: e.label == 'balance')[:1]
         if not expression or not hasattr(report, '_compute_expression_totals_for_each_column_group'):
             return None
-        options = self._fin_options(report, None, scope['today'])
+        options = self._fin_options(report, None, scope['as_of'])
         self.env.flush_all()
         report._init_currency_table(options)
         native = report._compute_expression_totals_for_each_column_group(
@@ -373,60 +388,113 @@ class ExecutiveDashboard(models.AbstractModel):
 
     # ------------------------------------------------------------------ receivables and payables
 
+    def _fin_open_base(self, scope, kind):
+        """Posted receivable (or payable) items dated on or before the balance date.
+
+        Trade accounts only, like the default Account filter of the Aged Receivable / Aged Payable
+        reports: accounts marked Non Trade (for example a VAT receivable) are left out.
+        """
+        return self._fin_domain(scope, [
+            ('account_id.account_type', '=', OPEN_TYPES[kind]), ('account_id.non_trade', '=', False),
+            ('date', '<=', fields.Date.to_string(scope['as_of'])),
+        ])
+
+    def _fin_open_sums(self, scope, kind, domain=None, groupby=()):
+        """Open amounts at the balance date: ``({(company, *groups, due, debit): residual}, {key: count})``.
+
+        ``groupby`` are journal item fields; ``due`` is the due date (the entry date when there is
+        none) and ``debit`` says whether the items are debits (invoices for receivables) or credits.
+        Matches dated after the balance date (a later payment, or a post-dated cheque at today) are
+        added back to the items they settled, as the native Aged reports do, so the figures are the
+        open amounts as they were on that day. ``counts`` counts journal items open today only.
+        Amounts are in each company's currency.
+        """
+        base = self._fin_open_base(scope, kind) & Domain(domain or [])
+        Line, Partial = self.env['account.move.line'], self.env['account.partial.reconcile']
+        # (model, domain, path to the journal item, measure, sign, debit side or None for split).
+        sources = [(Line, base & Domain('reconciled', '=', False), '', 'amount_residual', 1, None)]
+        later = Domain('max_date', '>', fields.Date.to_string(scope['as_of']))
+        if '_later_matches' not in scope:
+            # One cheap check per section: usually nothing is matched after the balance date.
+            scope['_later_matches'] = bool(Partial.search_count(
+                later & Domain('company_id', 'in', scope['companies'].ids), limit=1))
+        if scope['_later_matches']:
+            sources += [(Partial, later & Domain('debit_move_id', 'any', base), 'debit_move_id.', 'amount', 1, True),
+                        (Partial, later & Domain('credit_move_id', 'any', base), 'credit_move_id.', 'amount', -1, False)]
+        sums, counts = defaultdict(float), defaultdict(int)
+        for Model, source_domain, path, measure, sign, side in sources:
+            sides = [(True, Domain('balance', '>', 0)), (False, Domain('balance', '<=', 0))] \
+                if side is None else [(side, Domain.TRUE)]
+            for debit, side_domain in sides:
+                for due_field in ('date_maturity', 'date'):
+                    due_domain = Domain(f'{path}date_maturity', '!=' if due_field == 'date_maturity' else '=', False)
+                    specs = [f'{path}company_id', *(f'{path}{g}' for g in groupby), f'{path}{due_field}:day']
+                    for *groups, due, amount, count in Model._read_group(
+                            source_domain & side_domain & due_domain, specs, [f'{measure}:sum', '__count']):
+                        key = (*groups, fields.Date.to_date(due), debit)
+                        sums[key] += sign * amount
+                        if Model is Line:
+                            counts[key] += count
+        return sums, counts
+
     def _fin_open_items(self, scope, kind):
-        """Open amount of ``kind`` as of today: total, overdue, Aged and Expected buckets."""
-        today = scope['today']
+        """Open amount of ``kind`` at the balance date: total, overdue, Aged and Expected buckets.
+
+        Amounts owed are positive (customers owe us, we owe suppliers). ``owed_overdue`` is the part
+        of the invoices (bills) past due; ``credits`` the unapplied credits, payments and advances,
+        which the net figures subtract.
+        """
+        as_of = scope['as_of']
         sign = -1 if kind == 'payables' else 1
-        domain = self._fin_open_domain(scope, kind)
-        Line = self.env['account.move.line']
-        rows = Line._read_group(domain & Domain('date_maturity', '!=', False),
-                                ['company_id', 'date_maturity:day'], ['amount_residual:sum'])
-        rows += Line._read_group(domain & Domain('date_maturity', '=', False),
-                                 ['company_id', 'date:day'], ['amount_residual:sum'])
-        buckets = self._fin_buckets(today)
+        owed_side = kind == 'receivables'
+        sums, _counts = self._fin_open_sums(scope, kind)
+        buckets = self._fin_buckets(as_of)
         totals = {view: dict.fromkeys((b[0] for b in buckets[view]), 0.0) for view in VIEWS}
-        for company, due, residual in rows:
-            amount = sign * self._fin_convert(scope, residual, company, today)
-            due = fields.Date.to_date(due)
+        owed = owed_overdue = credits = 0.0
+        for (company, due, debit), residual in sums.items():
+            amount = sign * self._fin_convert(scope, residual, company, as_of)
             for view in VIEWS:
                 key = next(b[0] for b in buckets[view] if (not b[2] or due >= b[2]) and (not b[3] or due <= b[3]))
                 totals[view][key] += amount
+            if debit == owed_side:
+                owed += amount
+                if due < as_of:
+                    owed_overdue += amount
+            else:
+                credits += amount
         result = {
             view: [{'key': key, 'label': label, 'value': totals[view][key]} for key, label, _f, _l in buckets[view]]
             for view in VIEWS
         }
         result.update(total=sum(totals['expected'].values()), overdue=totals['expected']['overdue'],
-                      source='journal', report=False)
+                      owed=owed, owed_overdue=owed_overdue, credits=credits, difference=0.0,
+                      as_of=fields.Date.to_string(as_of), source='journal', report=False)
         aged = self._fin_native(lambda: self._fin_aged_report(scope, kind, result['total']), 'aged report')
         if aged:
-            result.update(aged=aged['buckets'], total=aged['total'], source='report', report=True)
+            result.update(aged=aged['buckets'], total=aged['total'], difference=result['total'] - aged['total'],
+                          source='report', report=True)
         return result
 
     def _fin_aged_report(self, scope, kind, journal_total):
-        """Native Aged Receivable/Payable total and period columns as of today, or None."""
+        """Native Aged Receivable/Payable total and period columns at the balance date, or None."""
         report_xmlid, total_xmlid = AGED_REPORTS[kind]
         report = self._fin_report(report_xmlid)
         expression = self.env.ref(total_xmlid, raise_if_not_found=False)
         if report is None or expression is None:
             return None
-        options = self._fin_options(report, None, scope['today'],
+        options = self._fin_options(report, None, scope['as_of'],
                                     aging_based_on='base_on_maturity_date', aging_interval=30)
         totals = self._fin_totals(report, options)
         by_label = {expr.label: expr for expr in expression.report_line_id.expression_ids}
         total = self._fin_number(totals[expression.id]['value'])
-        # Both reports cover the same open items as of today as the journal items. Amounts owed
-        # are shown positive: accept the native total only when it equals the journal total
-        # up to its sign convention; otherwise the figures come from journal items.
+        # Both native Aged reports show amounts owed as positive (the payable engine reverses the
+        # ledger sign), as the dashboard does: the figure is used as it is, never re-signed.
+        sign = 1
         tolerance = max(1.0, abs(journal_total) * 0.001)
-        # A near-zero total cannot show the native sign convention: use journal items then.
-        if abs(journal_total) < tolerance:
-            raise UnsupportedScope('nothing open, the sign convention cannot be checked')
-        if abs(abs(total) - abs(journal_total)) > tolerance:
-            # Not expected: the same open items should give the same total. Worth a warning.
+        if abs(total - journal_total) > tolerance:
+            # The report is still the figure shown; the difference is shown next to it.
             _logger.warning('Executive Dashboard: %s total %s differs from the open journal items %s',
                             report.display_name, total, journal_total)
-            raise UnsupportedScope('the report total differs from the open journal items')
-        sign = -1 if (total > 0) != (journal_total > 0) else 1
         buckets = []
         for column in options['columns']:
             label = column.get('expression_label') or ''
@@ -454,77 +522,60 @@ class ExecutiveDashboard(models.AbstractModel):
                 'action': {'key': 'finance.pnl', 'args': args},
                 'dest': _('Profit and Loss') if engine else _('Journal Items')}
 
+    def _fin_as_of_label(self, scope):
+        return self.env._('as of %s', format_date(self.env, scope['as_of'], date_format='d MMM y'))
+
+    def _fin_period_args(self, args):
+        return {key: args[key] for key in ('period', 'date_from', 'date_to') if args.get(key)}
+
     def _drawer_finance_bank_cash(self, args):
         scope = self._fin_scope(args)
         bank = self._fin_bank_cash(scope)
         _ = self.env._
-        crumb = _('Bank & Cash')
+        period = self._fin_period_args(args)
+        # An account opens the Trial Balance at once (no intermediate panel).
         rows = [{'label': row['name'], 'sub': row['code'], 'value': self._fin_format(row['balance']),
-                 'open': {'key': 'finance.account', 'args': {'account_id': row['id']}, 'crumb': crumb}}
+                 **({'action': {'key': 'finance.account', 'args': dict(period, account_id=row['id'])}}
+                    if row['can_open'] else {})}
                 for row in bank['rows']]
-        return {'title': crumb,
-                'sub': _('Balance Sheet › Bank and Cash Accounts · as of today') if bank['source'] == 'report'
-                else _('Bank and cash accounts · as of today'),
+        source = _('Balance Sheet › Bank and Cash Accounts') if bank['source'] == 'report' \
+            else _('Bank and cash accounts')
+        return {'title': _('Bank & Cash'), 'sub': '%s · %s' % (source, self._fin_as_of_label(scope)),
                 'rows': rows,
                 'total': {'label': _('Total'), 'value': '%s %s' % (self._fin_format(bank['total']),
                                                                    scope['company'].currency_id.name)},
-                'action': {'key': 'finance.balance_sheet', 'args': {}},
+                'action': {'key': 'finance.balance_sheet', 'args': period},
                 'dest': _('Balance Sheet') if self._fin_report(BS_REPORT) else _('Journal Items')}
 
     def _fin_account(self, args):
+        """A bank, cash, receivable or payable account of the dashboard's companies."""
         account_id = args.get('account_id')
-        if type(account_id) is not int:
+        if type(account_id) is not int or account_id <= 0:
             raise ValidationError(self.env._('Unknown detail.'))
-        # Only the accounts the Bank & Cash widget lists, and the receivable/payable accounts.
-        if self._fin_open_account(account_id) is None and account_id not in {
-                row['id'] for row in self._fin_bank_cash(self._fin_scope({}))['rows']}:
+        account = self.env['account.account'].browse(account_id).exists()
+        if not account or account.account_type not in ('asset_cash', *OPEN_TYPES.values()) \
+                or not account.company_ids & self.env.companies:
             raise ValidationError(self.env._('Unknown detail.'))
-        account = self.env['account.account'].browse(account_id)
-        self._check_company(account)
         return account
 
-    def _fin_open_account(self, account_id):
-        """A receivable or payable account of the dashboard's companies, or None."""
-        account = self.env['account.account'].browse(account_id).exists()
-        if account and account.account_type in OPEN_TYPES.values() \
-                and account.company_ids & self._fin_scope({})['companies']:
-            return account
-        return None
+    def _check_finance_account(self, args):
+        return self._fin_account(args)
 
-    def _fin_sum(self, scope, domain, measure):
-        """Sum of ``measure`` over ``domain`` in the dashboard company's currency."""
-        rows = self.env['account.move.line']._read_group(domain, ['company_id'], [f'{measure}:sum'])
-        return sum(self._fin_convert(scope, amount, company, scope['today']) for company, amount in rows)
+    def _fin_convert_line(self, scope, company, amount):
+        return self._fin_convert(scope, amount, company, scope['as_of'])
 
-    def _fin_line_amount(self, scope, line, amount):
-        return self._fin_convert(scope, amount, line.company_id, scope['today'])
-
-    def _fin_account_domain(self, account):
-        scope = self._fin_scope({})
-        return self._fin_domain(scope, [('account_id', '=', account.id),
-                                        ('date', '<=', fields.Date.to_string(scope['today']))])
-
-    def _drawer_finance_account(self, args):
-        account = self._fin_account(args)
-        scope = self._fin_scope({})
-        domain = self._fin_account_domain(account)
-        balance = self._fin_sum(scope, domain, 'balance')
-        lines = self.env['account.move.line'].search(domain, order='date desc, id desc', limit=DRAWER_ROWS)
-        _ = self.env._
-        return {
-            'title': account.name, 'sub': '%s · %s' % (self._fin_code(account), _('Latest journal items')),
-            'rows': [{'label': line.move_id.name, 'sub': ' · '.join(filter(None, [
-                          fields.Date.to_string(line.date), line.partner_id.display_name, line.name])),
-                      'value': self._fin_format(self._fin_line_amount(scope, line, line.balance))}
-                     for line in lines],
-            'total': {'label': _('Balance'), 'value': self._fin_format(balance or 0.0)},
-            'action': {'key': 'finance.account', 'args': {'account_id': account.id}},
-            'dest': self._fin_account_target(account)[1],
-        }
+    def _fin_open_by(self, scope, kind, domain, field):
+        """``[(record, residual, count)]`` of the open amounts grouped by ``field`` (converted)."""
+        sums, counts = self._fin_open_sums(scope, kind, domain, [field])
+        totals, numbers = defaultdict(float), defaultdict(int)
+        for (company, record, _due, _debit), residual in sums.items():
+            totals[record] += self._fin_convert_line(scope, company, residual)
+            numbers[record] += counts[company, record, _due, _debit]
+        return [(record, totals[record], numbers[record]) for record in totals]
 
     def _fin_open_items_domain(self, args):
         kind, view, bucket, partner_id = self._fin_args(args)
-        domain = self._fin_open_domain(self._fin_scope({}), kind)
+        domain = Domain.TRUE
         if bucket:
             domain &= self._fin_due_domain(bucket[2], bucket[3])
         if partner_id:
@@ -534,68 +585,53 @@ class ExecutiveDashboard(models.AbstractModel):
     def _drawer_finance_open_items(self, args):
         kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)
         _ = self.env._
-        scope = self._fin_scope({})
+        scope = self._fin_scope(args)
         sign = -1 if kind == 'payables' else 1
-        Line = self.env['account.move.line']
+        currency = scope['company'].currency_id
         title = _('Receivables') if kind == 'receivables' else _('Payables')
         if bucket:
             title = '%s · %s' % (title, bucket[1])
-        total = self._fin_sum(scope, domain, 'amount_residual')
         if partner_id:
             partner = self.env['res.partner'].browse(partner_id)
-            lines = Line.search(domain, order='date_maturity, id', limit=DRAWER_ROWS)
-            rows = [{'label': line.move_id.name,
-                     'sub': _('Due %s', fields.Date.to_string(line.date_maturity or line.date)),
-                     'value': self._fin_format(sign * self._fin_line_amount(scope, line, line.amount_residual))}
-                    for line in lines]
+            sums, _counts = self._fin_open_sums(scope, kind, domain, ['move_id'])
+            by_move, due_of = defaultdict(float), {}
+            for (company, move, due, _debit), residual in sums.items():
+                by_move[move] += self._fin_convert_line(scope, company, residual)
+                due_of[move] = min(due, due_of.get(move, due))
+            moves = sorted((m for m in by_move if not currency.is_zero(by_move[m])),
+                           key=lambda m: (due_of[m], m.id))[:DRAWER_ROWS]
+            rows = [{'label': move.name, 'sub': _('Due %s', format_date(self.env, due_of[move], date_format='d MMM y')),
+                     'value': self._fin_format(sign * by_move[move])} for move in moves]
+            total = sum(by_move.values())
             sub = partner.display_name
         else:
-            groups = self._fin_partner_groups(scope, domain, sign)
+            groups = [(p, r, c) for p, r, c in self._fin_open_by(scope, kind, domain, 'partner_id')
+                      if not currency.is_zero(r)]
+            total = sum(r for _p, r, _c in groups)
+            groups = sorted(groups, key=lambda g: -sign * g[1])[:DRAWER_ROWS]
             rows = [{'label': partner.display_name if partner else _('No partner'),
                      'sub': _('%s open items', count),
                      'value': self._fin_format(sign * residual),
                      **({'open': {'key': 'finance.open_items', 'args': dict(args, partner_id=partner.id),
                                   'crumb': title}} if partner else {})}
                     for partner, residual, count in groups]
-            sub = _('Open customer invoices · as of today') if kind == 'receivables' \
-                else _('Open vendor bills · as of today')
+            label = _('Open customer invoices') if kind == 'receivables' else _('Open vendor bills')
+            sub = '%s · %s' % (label, self._fin_as_of_label(scope))
         groups, rows_title = [], False
         if not bucket and not partner_id:
+            period = self._fin_period_args(args)
+            # An account opens the Trial Balance at once (no intermediate panel).
             accounts = [
                 {'label': account.name, 'sub': self._fin_code(account), 'value': self._fin_format(sign * residual),
-                 'open': {'key': 'finance.account', 'args': {'account_id': account.id}, 'crumb': title}}
-                for account, residual in self._fin_account_groups(scope, domain)]
+                 'action': {'key': 'finance.account', 'args': dict(period, account_id=account.id)}}
+                for account, residual, _count in sorted(self._fin_open_by(scope, kind, domain, 'account_id'),
+                                                        key=lambda g: -abs(g[1]))]
             if accounts:
                 groups, rows_title = [{'title': _('By account'), 'rows': accounts}], _('By partner')
         return {'title': title, 'sub': sub, 'groups': groups, 'rows_title': rows_title, 'rows': rows,
-                'total': {'label': _('Total'), 'value': self._fin_format(sign * (total or 0.0))},
+                'total': {'label': _('Total'), 'value': self._fin_format(sign * total)},
                 'action': {'key': 'finance.open_items', 'args': args},
                 'dest': self._fin_open_items_dest(kind, bucket, partner_id)}
-
-    def _fin_account_groups(self, scope, domain):
-        """Open amount by account: ``[(account, residual)]``, residual converted, largest first."""
-        totals = defaultdict(float)
-        for account, company, residual in self.env['account.move.line']._read_group(
-                domain, ['account_id', 'company_id'], ['amount_residual:sum']):
-            totals[account] += self._fin_convert(scope, residual, company, scope['today'])
-        return sorted(totals.items(), key=lambda item: -abs(item[1]))
-
-    def _fin_partner_groups(self, scope, domain, sign):
-        """Largest open amounts by partner: ``[(partner, residual, count)]``, residual converted."""
-        Line = self.env['account.move.line']
-        if len(scope['companies'].currency_id) == 1:
-            # One currency: rank and cut in SQL.
-            order = 'amount_residual:sum %s' % ('desc' if sign > 0 else 'asc')
-            return [(partner, self._fin_convert(scope, residual, scope['companies'][:1], scope['today']), count)
-                    for partner, residual, count in Line._read_group(
-                        domain, ['partner_id'], ['amount_residual:sum', '__count'], order=order, limit=DRAWER_ROWS)]
-        totals, counts = defaultdict(float), defaultdict(int)
-        for partner, company, residual, count in Line._read_group(
-                domain, ['partner_id', 'company_id'], ['amount_residual:sum', '__count']):
-            totals[partner] += self._fin_convert(scope, residual, company, scope['today'])
-            counts[partner] += count
-        ranked = sorted(totals, key=lambda partner: -sign * totals[partner])[:DRAWER_ROWS]
-        return [(partner, totals[partner], counts[partner]) for partner in ranked]
 
     def _fin_open_items_dest(self, kind, bucket, partner_id):
         _ = self.env._
@@ -605,9 +641,8 @@ class ExecutiveDashboard(models.AbstractModel):
             return _('Aged Receivable') if kind == 'receivables' else _('Aged Payable')
         return _('Journal Items')
 
-
-    def _fin_year_start(self, today):
-        return self.env.company.compute_fiscalyear_dates(today)['date_from']
+    def _fin_year_start(self, day):
+        return self.env.company.compute_fiscalyear_dates(day)['date_from']
 
     # ------------------------------------------------------------------ native screens
 
@@ -626,55 +661,57 @@ class ExecutiveDashboard(models.AbstractModel):
         ]))
 
     def _action_finance_balance_sheet(self, args):
-        scope = self._fin_scope({})
+        scope = self._fin_scope(args)
         report = self._fin_report(BS_REPORT)
         if report:
             try:
-                return self._fin_report_action(report, self._fin_options(report, None, scope['today']))
+                return self._fin_report_action(report, self._fin_options(report, None, scope['as_of']))
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
         return self._fin_items_action(self.env._('Bank and cash items'), self._fin_domain(scope, [
-            ('date', '<=', fields.Date.to_string(scope['today'])), ('account_id.account_type', '=', 'asset_cash'),
+            ('date', '<=', fields.Date.to_string(scope['as_of'])), ('account_id.account_type', '=', 'asset_cash'),
         ]))
 
-    def _fin_account_target(self, account):
+    def _fin_account_target(self, account, scope):
         """``(action, destination name)`` of an account: the Trial Balance searched on the
-        account code (fiscal year to date), else the General Ledger with the account
-        unfolded, else its journal items (no Enterprise reports).
+        account code (fiscal year to the balance date), else the General Ledger with the
+        account unfolded, else its journal items (no Enterprise reports).
 
         The Trial Balance's search matches line names, so a code that begins another
         account's code also lists that account.
         """
         _ = self.env._
-        today = self._fin_scope({})['today']
-        start, code = self._fin_year_start(today), self._fin_code(account)
+        as_of = scope['as_of']
+        start, code = self._fin_year_start(as_of), self._fin_code(account)
         trial = self._fin_report(TB_REPORT)
         if trial and code:
             try:
-                options = self._fin_options(trial, start, today, single_group=False, filter_search_bar=code)
+                options = self._fin_options(trial, start, as_of, single_group=False, filter_search_bar=code)
                 return self._fin_report_action(trial, options), _('Trial Balance')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
         ledger = self._fin_report(GL_REPORT)
         if ledger:
             try:
-                options = self._fin_options(ledger, start, today, single_group=False)
+                options = self._fin_options(ledger, start, as_of, single_group=False)
                 options['unfolded_lines'] = [ledger._get_generic_line_id('account.account', account.id)]
                 return self._fin_report_action(ledger, options), _('General Ledger')
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
-        return self._fin_items_action(account.display_name, self._fin_account_domain(account)), _('Journal Items')
+        return self._fin_items_action(account.display_name, self._fin_domain(scope, [
+            ('account_id', '=', account.id), ('date', '<=', fields.Date.to_string(as_of))])), _('Journal Items')
 
     def _action_finance_account(self, args):
-        return self._fin_account_target(self._fin_account(args))[0]
+        return self._fin_account_target(self._fin_account(args), self._fin_scope(args))[0]
 
     def _action_finance_open_items(self, args):
         kind, view, bucket, partner_id, domain = self._fin_open_items_domain(args)
-        today = fields.Date.context_today(self)
+        scope = self._fin_scope(args)
+        as_of = scope['as_of']
         ledger = self._fin_report(PARTNER_LEDGER) if partner_id else None
         if ledger:
             try:
-                options = self._fin_options(ledger, self._fin_year_start(today), today, partner_ids=[partner_id])
+                options = self._fin_options(ledger, self._fin_year_start(as_of), as_of, partner_ids=[partner_id])
                 return self._fin_report_action(ledger, options)
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
@@ -682,10 +719,15 @@ class ExecutiveDashboard(models.AbstractModel):
         # A bucket opens the whole Aged report: its columns show the same ranges.
         if report and not partner_id:
             try:
-                options = self._fin_options(report, None, fields.Date.context_today(self),
+                options = self._fin_options(report, None, as_of,
                                             aging_based_on='base_on_maturity_date', aging_interval=30)
                 return self._fin_report_action(report, options)
             except (UnsupportedScope, *ENGINE_ERRORS):
                 pass
-        name = self.env._('Open receivables') if kind == 'receivables' else self.env._('Open payables')
-        return self._fin_items_action(name, domain)
+        # Journal items can only list the items open today (not an earlier day's open amount):
+        # the bucket's range is then counted from today and the list says so.
+        today_args = {key: value for key, value in args.items() if key not in ('period', 'date_from', 'date_to')}
+        _kind, _view, _bucket, _partner, domain = self._fin_open_items_domain(today_args)
+        name = self.env._('Open receivables today') if kind == 'receivables' else self.env._('Open payables today')
+        return self._fin_items_action(name, self._fin_open_base(self._fin_scope({}), kind)
+                                      & Domain('reconciled', '=', False) & domain)

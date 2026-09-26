@@ -11,7 +11,7 @@ import { compact, deliveryChip, periodLabel, whole } from "../widgets/format";
 
 /**
  * Sales: four figures, invoiced sales by month, salespeople, top products by
- * quantity, top customers by payments, recent orders with the order's own
+ * quantity, top customers by collections (money received), recent orders with the order's own
  * Delivery Status, and recent quotations. A widget whose app is missing arrives
  * as null and is left out.
  */

@@ -174,7 +174,8 @@ class ExecutiveDashboard(models.AbstractModel):
                 raise ValidationError(self.env._('Choose a period of up to three years, starting before it ends.'))
         else:
             raise ValidationError(self.env._('Unknown period.'))
-        return {'period': period, 'date_from': start, 'date_to': end, 'today': today,
+        # Balances (bank and cash, open items) are taken at the period's end, never after today.
+        return {'period': period, 'date_from': start, 'date_to': end, 'today': today, 'as_of': min(end, today),
                 'company': self.env.company, 'companies': self.env.companies}
 
     # ------------------------------------------------------------------ public API
@@ -252,6 +253,19 @@ class ExecutiveDashboard(models.AbstractModel):
         can_open, kind = self._open_info(action)
         return dict(target, kind=kind) if can_open else None
 
+    def _row_valid(self, target):
+        """Whether a row's native screen accepts its arguments, checked without building it
+        (``_check_<section>_<name>``; rows without such a check are resolved one by one)."""
+        section, _sep, name = (target.get('key') or '').partition('.')
+        check = getattr(self, f'_check_{section}_{name}', None)
+        if check is None:
+            return self._target(target) is not None
+        try:
+            check(dict(target.get('args') or {}))
+        except (AccessError, ValidationError, UserError):
+            return False
+        return True
+
     @api.model
     def get_drawer(self, key, args=None):
         """Side-panel content for ``<section>.<name>``, fetched when the panel opens.
@@ -265,9 +279,20 @@ class ExecutiveDashboard(models.AbstractModel):
         if isinstance(result, dict):
             if result.get('action'):
                 result['action'] = dashboard._target(result['action'])
-            for row in result.get('rows') or ():
+            # Rows opening the same report (e.g. every account opening the Trial Balance) share
+            # one access check on the report; each row's own arguments are still validated.
+            reports = {}
+            rows = [row for group in result.get('groups') or () for row in group.get('rows') or ()]
+            for row in rows + list(result.get('rows') or ()):
                 if isinstance(row, dict) and row.get('action'):
+                    key = row['action'].get('key')
+                    if key in reports:
+                        row['action'] = dict(row['action'], kind='report') \
+                            if dashboard._row_valid(row['action']) else None
+                        continue
                     row['action'] = dashboard._target(row['action'])
+                    if row['action'] and row['action']['kind'] == 'report':
+                        reports[key] = True
         return result
 
     @api.model

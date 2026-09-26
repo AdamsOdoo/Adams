@@ -70,17 +70,17 @@
             <section t-if="w.customers" class="ed-panel ed-span-6">
                 <header class="ed-panel-head">
                     <div>
-                        <h2>Top customers by payments received</h2>
-                        <p><bdi dir="ltr" t-esc="period"/></p>
+                        <h2>Top customers by collections</h2>
+                        <p>Money received · payments, bank statement lines and journal entries · <bdi dir="ltr" t-esc="period"/></p>
                     </div>
                 </header>
-                <p t-if="!w.customers.length" class="ed-note">No customer payments in this period.</p>
+                <p t-if="!w.customers.length" class="ed-note">No money received from customers in this period.</p>
                 <div class="ed-rows">
                     <button t-foreach="w.customers" t-as="c" t-key="c.id" type="button"
                             class="ed-row click w-100 border-0 bg-transparent text-start"
                             t-on-click="() => this.open('customer', { ...this.periodArgs, partner_id: c.id })">
                         <span class="ed-l"><span class="ed-rank" t-esc="c_index + 1"/>
-                            <span><t t-esc="c.name"/><small><t t-esc="c.count"/> payments</small></span></span>
+                            <span><t t-esc="c.name"/><small><t t-esc="c.count"/> receipts</small></span></span>
                         <span class="ed-r ed-num" t-esc="compact(c.amount)"/>
                     </button>
                 </div>

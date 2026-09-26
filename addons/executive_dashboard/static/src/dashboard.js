@@ -82,7 +82,8 @@ export class ExecutiveDashboard extends Component {
         this.state = useState({
             boot: null,
             page: "welcome",
-            period: "month",
+            // Year to date first: the other periods load in the background after it.
+            period: "ytd",
             customFrom: serializeDate(today.startOf("month")),
             customTo: serializeDate(today),
             data: null,
@@ -224,22 +225,22 @@ export class ExecutiveDashboard extends Component {
 
     // ------------------------------------------------------------ data
 
-    cacheKey(section) {
+    cacheKey(section, period = this.state.period) {
         const s = this.info[section];
         const spec = this.sections.find((x) => x.key === section);
         if (!s || !spec?.period) {
             return `${section}|now`;
         }
-        const { period, customFrom, customTo } = this.state;
+        const { customFrom, customTo } = this.state;
         return period === "custom" ? `${section}|custom|${customFrom}|${customTo}` : `${section}|${period}`;
     }
 
-    request(section, { refresh = false, silent = false } = {}) {
-        const key = this.cacheKey(section);
+    request(section, { refresh = false, silent = false, period = this.state.period } = {}) {
+        const key = this.cacheKey(section, period);
         if (!refresh && this.inflight.has(key)) {
             return this.inflight.get(key);
         }
-        const { period, customFrom, customTo } = this.state;
+        const { customFrom, customTo } = this.state;
         const custom = period === "custom";
         const orm = silent ? this.orm.silent : this.orm;
         const promise = orm
@@ -253,11 +254,16 @@ export class ExecutiveDashboard extends Component {
         return promise;
     }
 
-    async load(section, { refresh = false } = {}) {
+    /**
+     * Show `section` for the current period. A kept result shows at once (then refreshes
+     * quietly). With `keep`, the figures on screen stay (dimmed) until the new ones arrive,
+     * so switching the period never blanks the page.
+     */
+    async load(section, { refresh = false, keep = false } = {}) {
         const seq = ++this.seq;
         const cached = refresh ? null : this.cache.get(this.cacheKey(section));
         this.state.error = false;
-        this.state.data = cached || null;
+        this.state.data = cached || (keep ? this.state.data : null);
         this.state.loading = !cached;
         this.showDates(cached);
         try {
@@ -266,6 +272,7 @@ export class ExecutiveDashboard extends Component {
             if (seq === this.seq) {
                 this.state.data = result;
                 this.showDates(result);
+                this.warmPeriods(section);
             }
         } catch (error) {
             if (seq === this.seq && !cached) {
@@ -279,6 +286,23 @@ export class ExecutiveDashboard extends Component {
                 this.state.loading = false;
             }
         }
+    }
+
+    /**
+     * Load the section's other periods in the background, one after the other, once its
+     * figures are on screen, so choosing another period shows its figures at once.
+     */
+    warmPeriods(section) {
+        if (!this.sections.find((s) => s.key === section)?.period || this.warming?.has(section)) {
+            return;
+        }
+        this.warming ||= new Set();
+        this.warming.add(section);
+        const todo = this.periods.map((p) => p.key)
+            .filter((key) => key !== "custom" && !this.cache.has(this.cacheKey(section, key)));
+        todo.reduce((chain, period) => chain.then(() => (this.cache.has(this.cacheKey(section, period))
+            ? null : this.request(section, { silent: true, period }).catch(() => {}))), Promise.resolve())
+            .finally(() => this.warming.delete(section));
     }
 
     prefetch(section) {
@@ -325,7 +349,7 @@ export class ExecutiveDashboard extends Component {
         }
         this.state.period = key;
         if (!this.isWelcome && this.showPeriod) {
-            this.load(this.state.page);
+            this.load(this.state.page, { keep: true });
         }
     }
 
@@ -336,7 +360,7 @@ export class ExecutiveDashboard extends Component {
         }
         this.state[which] = value;
         if (this.state.customFrom <= this.state.customTo) {
-            this.load(this.state.page);
+            this.load(this.state.page, { keep: true });
         }
     }
 
