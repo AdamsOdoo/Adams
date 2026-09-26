@@ -1,3 +1,7 @@
+@AGENTS.md
+
+> The current development entrypoint and the rules for this public repository are at the top of AGENTS.md (imported above). The governance contract below is historical (Shopify research phase) and does not override them.
+
 # CLAUDE.md — Project Governance Contract
 
 > **Read this file at the start of every session before doing anything else.**

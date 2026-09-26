@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_bulk_export_wizard_view_form" model="ir.ui.view">
+        <field name="name">shopify.bulk.export.wizard.form</field>
+        <field name="model">shopify.bulk.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Bulk Export to Shopify">
+                <group>
+                    <field name="backend_id"/>
+                    <field name="entity"/>
+                    <field name="product_domain"
+                           invisible="entity != 'product'"/>
+                    <field name="customer_domain"
+                           invisible="entity != 'customer'"/>
+                    <field name="limit"/>
+                </group>
+                <footer>
+                    <button name="action_export" type="object"
+                            string="Export" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_bulk_export_wizard_action" model="ir.actions.act_window">
+        <field name="name">Bulk Export</field>
+        <field name="res_model">shopify.bulk.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

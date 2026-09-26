@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.executive.dashboard</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Executive Dashboard" name="executive_dashboard" groups="base.group_system">
+                    <block title="Sections" name="executive_dashboard_sections">
+                        <div class="text-muted mb-3">Choose the sections shown for this company. A section also needs its app installed and read access for the user.</div>
+                        <setting id="executive_dashboard_finance" string="Finance" company_dependent="1"><field name="executive_dashboard_finance"/></setting>
+                        <setting id="executive_dashboard_sales" string="Sales" company_dependent="1"><field name="executive_dashboard_sales"/></setting>
+                        <setting id="executive_dashboard_crm" string="CRM" company_dependent="1"><field name="executive_dashboard_crm"/></setting>
+                        <setting id="executive_dashboard_procurement" string="Procurement" company_dependent="1"><field name="executive_dashboard_procurement"/></setting>
+                        <setting id="executive_dashboard_inventory" string="Inventory" company_dependent="1"><field name="executive_dashboard_inventory"/></setting>
+                        <setting id="executive_dashboard_people" string="People" company_dependent="1"><field name="executive_dashboard_people"/></setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module': 'executive_dashboard'}</field>
+    </record>
+</odoo>

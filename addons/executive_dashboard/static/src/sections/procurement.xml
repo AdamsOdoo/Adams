@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.ProcurementSection">
+        <t t-set="kpiList" t-value="kpis"/>
+        <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
+            <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="kpi.value"/> <small t-if="kpi.money" t-esc="currency"/></span>
+                <span class="ed-kpi-cap"><bdi t-esc="kpi.cap"/></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <section t-att-class="'ed-panel ' + (w.late ? 'ed-span-7' : 'ed-span-12')">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Waiting for approval</h2>
+                        <p>Oldest first</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.openOrders('approve')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.approve.rows.length" class="ed-note">No purchase orders are waiting for approval.</p>
+                <div t-else="" class="ed-tbl-wrap">
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:22%"/><col/><col style="width:22%"/><col style="width:22%"/></colgroup>
+                        <thead><tr>
+                            <th>Reference</th><th>Supplier</th><th class="n">Value</th><th>Order deadline</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-foreach="w.approve.rows" t-as="o" t-key="o.id" class="click" tabindex="0"
+                                t-on-click="() => this.openOrder(o)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openOrder(o)">
+                                <td t-att-data-label="labels.ref" t-esc="o.name"/>
+                                <td t-att-data-label="labels.supplier" t-esc="o.supplier"/>
+                                <td t-att-data-label="labels.value" class="n ed-num"><t t-esc="whole(o.amount)"/>
+                                    <small t-if="o.currency !== currency" t-esc="o.currency"/></td>
+                                <td t-att-data-label="labels.date" t-esc="formatDate(o.date)"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section t-if="w.late" class="ed-panel ed-span-5">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Late receipts</h2>
+                        <p>Past their scheduled date</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('late', {})">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.late.rows.length" class="ed-note">No late receipts.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.late.rows" t-as="r" t-key="r.id" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openPicking(r)">
+                        <span class="ed-l"><span><t t-esc="r.name"/>
+                            <small><t t-esc="r.partner"/><t t-if="r.partner"> · </t><t t-esc="formatDate(r.date)"/></small></span></span>
+                        <span class="ed-chip crit"><t t-esc="r.days"/> days</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="ed-panel ed-span-6">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Top suppliers by purchase value</h2>
+                        <p><bdi dir="ltr" t-esc="period"/></p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('suppliers', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.suppliers.length" class="ed-note">No purchases confirmed in this period.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.suppliers" t-as="s" t-key="s.id" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                            t-on-click="() => this.open('supplier', { ...this.periodArgs, partner_id: s.id })">
+                        <span class="ed-l"><span class="ed-rank" t-esc="s_index + 1"/>
+                            <span><t t-esc="s.name"/><small><t t-esc="s.count"/> orders</small></span></span>
+                        <span class="ed-r ed-num" t-esc="compact(s.amount)"/>
+                    </button>
+                </div>
+            </section>
+
+            <section class="ed-panel ed-span-6">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Purchases by month</h2>
+                        <p>Confirmed purchase orders · <t t-esc="currency"/></p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.openOrders('purchases')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <ColumnChart items="trendColumns" height="200" onSelect="(i) => this.openMonth(i)"/>
+            </section>
+        </div>
+    </t>
+</templates>

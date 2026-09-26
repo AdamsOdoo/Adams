@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.Welcome">
+        <div class="ed-welcome">
+            <div class="ed-hello">
+                <p class="ed-date"><t t-esc="today"/> · <bdi t-esc="props.boot.company_name"/></p>
+                <h2 t-esc="greeting"/>
+                <p>Choose a section to open. Figures appear only inside a section.</p>
+            </div>
+            <button type="button" class="ed-search-launch" t-on-click="props.openSearch">
+                <Icon name="'search'"/>
+                <span>Search orders, invoices, contacts, products, employees…</span>
+                <kbd>/</kbd>
+            </button>
+            <div t-if="props.sections.length" class="ed-cards">
+                <t t-foreach="props.sections" t-as="s" t-key="s.key">
+                    <button type="button" class="ed-card" t-att-data-sec="s.key"
+                            t-on-click="() => props.openPage(s.key)"
+                            t-on-mouseenter="() => props.prefetch(s.key)"
+                            t-on-focus="() => props.prefetch(s.key)">
+                        <span class="ed-ic"><Icon name="s.key"/></span>
+                        <h3 t-esc="s.name"/>
+                        <p t-esc="s.description"/>
+                        <ul><li t-foreach="s.chips" t-as="chip" t-key="chip_index" t-esc="chip"/></ul>
+                    </button>
+                </t>
+            </div>
+            <p t-else="" class="ed-note">No section is available to you. Ask your administrator for access to the apps you need.</p>
+        </div>
+    </t>
+</templates>

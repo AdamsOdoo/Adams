@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_import_job_view_list" model="ir.ui.view">
+        <field name="name">shopify.import.job.list</field>
+        <field name="model">shopify.import.job</field>
+        <field name="arch" type="xml">
+            <list string="Import Jobs"
+                  decoration-danger="state == 'error'"
+                  decoration-success="state == 'done'"
+                  decoration-info="state in ('pending', 'running')"
+                  decoration-muted="state == 'cancelled'">
+                <field name="create_date" string="Created"/>
+                <field name="backend_id" string="Store"/>
+                <field name="entity"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-danger="state == 'error'"
+                       decoration-info="state in ('pending', 'running')"
+                       decoration-muted="state == 'cancelled'"/>
+                <field name="progress" widget="progressbar"/>
+                <field name="success_count"/>
+                <field name="error_count"/>
+                <field name="skipped_count"/>
+                <field name="started_at" optional="hide"/>
+                <field name="finished_at" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_import_job_view_form" model="ir.ui.view">
+        <field name="name">shopify.import.job.form</field>
+        <field name="model">shopify.import.job</field>
+        <field name="arch" type="xml">
+            <form string="Import Job">
+                <header>
+                    <button name="action_cancel" type="object"
+                            string="Cancel" class="btn-secondary"
+                            invisible="state not in ('pending', 'running')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,running,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="backend_id"/>
+                            <field name="entity"/>
+                            <field name="page_size"/>
+                        </group>
+                        <group>
+                            <field name="progress" widget="progressbar"/>
+                            <field name="processed_pages"/>
+                            <field name="total_pages"/>
+                            <field name="total_records"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group>
+                            <field name="success_count"/>
+                            <field name="error_count"/>
+                            <field name="skipped_count"/>
+                        </group>
+                        <group>
+                            <field name="started_at"/>
+                            <field name="finished_at"/>
+                        </group>
+                    </group>
+                    <group string="Error Details" invisible="not error_details">
+                        <field name="error_details" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_import_job_view_search" model="ir.ui.view">
+        <field name="name">shopify.import.job.search</field>
+        <field name="model">shopify.import.job</field>
+        <field name="arch" type="xml">
+            <search string="Import Jobs">
+                <field name="backend_id"/>
+                <field name="entity"/>
+                <filter name="pending" string="Pending"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="running" string="Running"
+                        domain="[('state', '=', 'running')]"/>
+                <filter name="done" string="Done"
+                        domain="[('state', '=', 'done')]"/>
+                <filter name="error" string="Errors"
+                        domain="[('state', '=', 'error')]"/>
+                <group>
+                    <filter name="group_entity" string="Entity"
+                            context="{'group_by': 'entity'}"/>
+                    <filter name="group_state" string="Status"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_backend" string="Store"
+                            context="{'group_by': 'backend_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="shopify_import_job_action" model="ir.actions.act_window">
+        <field name="name">Import Jobs</field>
+        <field name="res_model">shopify.import.job</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

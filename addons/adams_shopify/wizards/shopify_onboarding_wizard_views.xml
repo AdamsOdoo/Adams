@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Onboarding Wizard Form -->
+    <record id="shopify_onboarding_wizard_view_form" model="ir.ui.view">
+        <field name="name">shopify.onboarding.wizard.form</field>
+        <field name="model">shopify.onboarding.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Shopify Store Setup">
+                <field name="step" invisible="1"/>
+                <field name="backend_id" invisible="1"/>
+
+                <!-- Step 1: Connection -->
+                <div invisible="step != 'connection'">
+                    <h2>Step 1: Connect to Shopify</h2>
+                    <p class="text-muted">
+                        Enter your Shopify store credentials. You can find these
+                        in your Shopify admin under Apps &gt; Develop apps.
+                    </p>
+                    <group>
+                        <field name="name" placeholder="My Store"/>
+                        <field name="shop_url"
+                               placeholder="my-store.myshopify.com"/>
+                        <field name="access_token" password="True"/>
+                    </group>
+                    <group>
+                        <field name="connection_status" readonly="1"
+                               invisible="not connection_status"/>
+                    </group>
+                </div>
+
+                <!-- Step 2: Settings -->
+                <div invisible="step != 'settings'">
+                    <h2>Step 2: Odoo Settings</h2>
+                    <p class="text-muted">
+                        Configure which company and warehouse to use for
+                        synced data.
+                    </p>
+                    <group>
+                        <field name="company_id"
+                               groups="base.group_multi_company"/>
+                        <field name="warehouse_id"/>
+                        <field name="pricelist_id"/>
+                    </group>
+                </div>
+
+                <!-- Step 3: Webhooks -->
+                <div invisible="step != 'webhooks'">
+                    <h2>Step 3: Webhooks (Optional)</h2>
+                    <p class="text-muted">
+                        Webhooks allow Shopify to push real-time updates to
+                        Odoo. Enter a webhook secret to enable automatic
+                        registration. You can skip this and configure it later.
+                    </p>
+                    <group>
+                        <field name="webhook_secret" password="True"/>
+                    </group>
+                </div>
+
+                <!-- Step 4: Import -->
+                <div invisible="step != 'import'">
+                    <h2>Step 4: Initial Import</h2>
+                    <p class="text-muted">
+                        Your store has been created. Choose what to import
+                        now, or skip and import later.
+                    </p>
+                    <group>
+                        <field name="import_products"/>
+                        <field name="import_customers"/>
+                        <field name="import_orders"/>
+                        <field name="order_days"
+                               invisible="not import_orders"/>
+                    </group>
+                </div>
+
+                <footer>
+                    <!-- Step 1 buttons -->
+                    <button name="action_test_connection" type="object"
+                            string="Test Connection &amp; Next"
+                            class="oe_highlight"
+                            invisible="step != 'connection'"/>
+
+                    <!-- Step 2 buttons -->
+                    <button name="action_next_to_webhooks" type="object"
+                            string="Next" class="oe_highlight"
+                            invisible="step != 'settings'"/>
+
+                    <!-- Step 3 buttons -->
+                    <button name="action_next_to_import" type="object"
+                            string="Create Store &amp; Next"
+                            class="oe_highlight"
+                            invisible="step != 'webhooks'"/>
+
+                    <!-- Step 4 buttons -->
+                    <button name="action_finish" type="object"
+                            string="Import &amp; Finish"
+                            class="oe_highlight"
+                            invisible="step != 'import'"/>
+                    <button name="action_skip_import" type="object"
+                            string="Skip Import"
+                            invisible="step != 'import'"/>
+
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_onboarding_wizard_action" model="ir.actions.act_window">
+        <field name="name">Setup Wizard</field>
+        <field name="res_model">shopify.onboarding.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

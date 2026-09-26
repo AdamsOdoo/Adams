@@ -1,0 +1,1566 @@
+/** @odoo-module **/
+import { Component, onWillStart, onWillUnmount, useState, useRef, useEffect, useExternalListener } from '@odoo/owl';
+import { registry } from '@web/core/registry';
+import { useService, useBus } from '@web/core/utils/hooks';
+import { user, userBus } from '@web/core/user';
+import { useSetupAction } from '@web/search/action_hook';
+import { router } from '@web/core/browser/router';
+import { _t } from "@web/core/l10n/translation";
+
+export class ExecutiveDashboard extends Component {
+    static template = 'adams_executive_dashboard.Dashboard';
+    static props = ['*'];
+
+    setup() {
+        this.orm = useService('orm');
+        this.action = useService('action');
+        this.notification = useService('notification');
+        this.companyUser = user;
+        useBus(userBus, 'ACTIVE_COMPANIES_CHANGED', () => {
+            if (this.alive && this.state.applied) {
+                this.state.draft = {...this.state.applied, company_id: user.activeCompany.id};
+                void this.refresh();
+            }
+        });
+        this.hrDepartments = [];
+        this.generation = 0;
+        this.alive = true;
+        this.sections = [
+            { key: 'finance', name: _t('Accounting & Finance'), short: _t('Finance'), icon: 'bank', number: '01', description: _t('Your financial position, with a clear path to the numbers.') },
+            { key: 'sales', name: _t('Sales'), short: _t('Sales'), icon: 'sales', number: '02', description: _t('Orders, invoiced sales and delivery — clearly separated.') },
+            { key: 'crm', name: _t('CRM'), short: _t('CRM'), icon: 'target', number: '03', description: _t('Opportunities and pipeline for the selected period.') },
+            { key: 'inventory', name: _t('Inventory'), short: _t('Inventory'), icon: 'box', number: '04', description: _t('Find each product, its location and the quantity available.') },
+            { key: 'procurement', name: _t('Procurement'), short: _t('Procurement'), icon: 'truck', number: '05', description: _t('Purchasing activity and deliveries that need attention.') },
+            { key: 'hr', name: _t('Human Resources'), short: _t('HR'), icon: 'people', number: '06', description: _t('Attendance, time off, shifts and employee work profiles.') },
+        ];
+        this.sections.sort((a, b) => ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(a.key) - ['finance', 'sales', 'inventory', 'procurement', 'crm', 'hr'].indexOf(b.key));
+        this.labels = {
+            revenue: _t('Revenue'), profit: _t('Net profit'), cash: _t('Bank & cash'), cash_flow: _t('Net cash movement'),
+            receivables: _t('Receivables'), payables: _t('Payables'), receivables_overdue: _t('Overdue receivables'), payables_overdue: _t('Overdue payables'),
+            gross_profit: _t('Gross profit'), operating_expenses: _t('Operating expenses'),
+            gross_margin: _t('Gross margin'), net_margin: _t('Net margin'),
+            assets: _t('Assets'), liabilities: _t('Liabilities'), equity: _t('Equity'),
+            standard_forecast: _t('short-term cash forecast'),
+            invoiced_sales: _t('Invoiced sales'), invoiced_margin: _t('invoiced commercial margin'), confirmed_sales: _t('Confirmed orders'),
+            orders: _t('Distinct sales orders'), quotations: _t('Quotations'), purchases: _t('Confirmed purchases'),
+            inventory: _t('Inventory valuation'), crm: _t('Weighted open pipeline'), crm_expected: _t('Expected revenue'), hr: _t('Approved leave hours (signed)'),
+        };
+        this.groupHeadings = { revenue: _t('Profitability'), cash: _t('Liquidity'), receivables: _t('Working capital'), invoiced_sales: _t('Commercial performance') };
+        this.statusLabels = {
+            not_configured: _t('Not configured'), not_installed: _t('App not installed'),
+            restricted: _t('Access restricted'), empty: _t('No matching records'),
+            source_only: _t('Open the source report'), unsupported_scope: _t('Unsupported report scope'), error: _t('Report unavailable'),
+            undefined_ratio: _t('Undefined ratio: zero denominator'),
+        };
+        this.dimensionLabels = { customer: _t('Customer'), salesperson: _t('Salesperson'), product: _t('Product'),
+            vendor: _t('Vendor'), buyer: _t('Buyer'), stage: _t('Stage'), department: _t('Department') };
+        this.dimensions = { invoiced_margin: ['salesperson', 'customer', 'product'], invoiced_sales: ['customer', 'salesperson', 'product'], confirmed_sales: ['customer', 'salesperson', 'product'],
+            quotations: ['customer', 'salesperson', 'product'], orders: ['customer', 'salesperson'], purchases: ['vendor', 'buyer', 'product'], crm: ['stage', 'salesperson'], hr: ['department'] };
+        this.root = useRef('root');
+        this.sourceDialog = useRef('sourceDialog');
+        this.analysisDialog = useRef('analysisDialog');
+        this.searchDialog = useRef('searchDialog');
+        this.printDialog = useRef('printDialog');
+        this.searchInput = useRef('searchInput');
+        this.employeeDialog = useRef('employeeDialog');
+        this.cashDialog = useRef('cashDialog');
+        this.viewsDialog = useRef('viewsDialog');
+        useEffect(() => { const dialog = this.viewsDialog.el; if (!dialog) return; if (this.state.viewsOpen && !dialog.open) dialog.showModal(); if (!this.state.viewsOpen && dialog.open) dialog.close(); }, () => [this.state.viewsOpen]);
+        useEffect(() => { const dialog = this.cashDialog.el; if (!dialog) return; if (this.state.cashOpen && !dialog.open) dialog.showModal(); if (!this.state.cashOpen && dialog.open) dialog.close(); }, () => [this.state.cashOpen]);
+        useEffect(() => { const dialog = this.employeeDialog.el; if (!dialog) return; if (this.state.employeeProfile && !dialog.open) dialog.showModal(); if (!this.state.employeeProfile && dialog.open) dialog.close(); }, () => [this.state.employeeProfile]);
+        this.searchKinds = { all: _t('All documents'), invoices: _t('Customer invoices'), bills: _t('Vendor bills'), orders: _t('Sales orders'), quotations: _t('Quotations') };
+        this.workspaceMenu = useRef('workspaceMenu');
+        this.workspaceToggle = useRef('workspaceToggle');
+        this.moreToggle = useRef('moreToggle');
+        this.moreMenu = useRef('moreMenu');
+        // The utility menu closes on any pointer press outside it, like native Odoo dropdowns.
+        useExternalListener(window, 'pointerdown', event => {
+            if (this.state.moreOpen && !event.target?.closest?.('.adams_more_wrapper')) this.state.moreOpen = false;
+        }, { capture: true });
+        this.detailGeneration = 0;
+        this.state = useState({ workspaceDetails: {}, viewsOpen: false, viewName: '', activeViewName: '', cashOpen: false, periodPreset: 'month', cutoffOpen: false, searchOpen: false, moreOpen: false, logoFailed: false, stockMode: 'current', stockError: '', hrTab: 'overview', hrPeriodDraft: {}, hrPeriodApplied: null, hrPeriodError: '', hrFilters: {search: '', department_id: '', employee_id: '', status: '', assignment: '', view: 'week'}, hrData: null, employeeProfile: null, sectionOrder: [], layoutOpen: false, rankLimit: 5, productMeasure: 'value', productUnit: '', orderRanking: null, stockFilters: {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''}, printSummary: null, searchQuery: '', searchKind: 'all', search: null, companies: [], draft: {}, applied: null, sections: {}, error: '', opening: false,
+            collapsed: { crm: true, inventory: true, procurement: true, hr: true }, activeSection: 'finance', sidebarOpen: false, detail: null, directory: null, cashSearch: '', inventory: null, workforce: null, procurement: null, ranking: null, customers: null, products: null, canConfigure: false, source: null, financialTrends: {}, fulfillment: null, recent: null, exporting: false, restored: false, savedView: false, attentionExpanded: false, moreFlip: false });
+        useEffect(() => {
+            const dialog = this.printDialog.el;
+            if (!dialog) return;
+            if (this.state.printSummary && !dialog.open) dialog.showModal();
+            if (!this.state.printSummary && dialog.open) dialog.close();
+        }, () => [this.state.printSummary]);
+        useEffect(() => {
+            const dialog = this.searchDialog.el;
+            if (!dialog) return;
+            if (this.state.search && !dialog.open) dialog.showModal();
+            if (!this.state.search && dialog.open) dialog.close();
+        }, () => [this.state.search]);
+        useEffect(() => {
+            const dialog = this.sourceDialog.el;
+            if (!dialog) return;
+            if (this.state.source && !dialog.open) dialog.showModal();
+            if (!this.state.source && dialog.open) dialog.close();
+        }, () => [this.state.source]);
+        useEffect(() => {
+            if (this.state.sidebarOpen) this.workspaceMenu.el?.querySelector('button')?.focus();
+        }, () => [this.state.sidebarOpen]);
+        useEffect(() => {
+            const dialog = this.analysisDialog.el;
+            if (!dialog) return;
+            if (this.state.detail && !dialog.open) dialog.showModal();
+            if (!this.state.detail && dialog.open) dialog.close();
+        }, () => [this.state.detail]);
+        useEffect(() => {
+            const root = this.root.el;
+            if (!root) return;
+            let frame;
+            const schedule = () => {
+                if (frame) return;
+                frame = requestAnimationFrame(() => {
+                    frame = null;
+                    if (this.alive) this.syncActiveSection();
+                });
+            };
+            const manual = event => {
+                if (event.type !== 'keydown' || ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) {
+                    this.scrollTarget = null;
+                    schedule();
+                }
+            };
+            root.addEventListener('scroll', schedule, { passive: true });
+            for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown']) root.addEventListener(event, manual, { passive: true });
+            const observer = new ResizeObserver(schedule);
+            observer.observe(root);
+            for (const node of root.querySelectorAll('.adams_section, .adams_nav')) observer.observe(node);
+            schedule();
+            return () => {
+                if (frame) cancelAnimationFrame(frame);
+                root.removeEventListener('scroll', schedule);
+                for (const event of ['wheel', 'touchstart', 'pointerdown', 'keydown']) root.removeEventListener(event, manual);
+                observer.disconnect();
+            };
+        }, () => [this.visibleSections.map(section => section.key).join(',')]);
+        useEffect(() => {
+            this.root.el?.querySelector('.adams_nav button.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        }, () => [this.state.activeSection, this.visibleSections.map(section => section.key).join(',')]);
+        useEffect(() => {
+            const menu = this.moreMenu.el;
+            if (!menu) return;
+            const rect = menu.getBoundingClientRect();
+            if (rect.left < 8 || rect.right > window.innerWidth - 8) this.state.moreFlip = !this.state.moreFlip;
+            menu.querySelector('[role=menuitem]:not([disabled])')?.focus();
+        }, () => [this.state.moreOpen]);
+        useSetupAction({ getLocalState: () => ({ dashboard: this.navigationState() }) });
+        useEffect(() => {
+            if (this.state.restored && this.restoreScroll !== null && this.root.el) {
+                this.root.el.scrollTop = this.restoreScroll;
+                this.restoreScroll = null;
+            }
+        }, () => [this.state.restored]);
+        onWillStart(async () => {
+            try {
+                const data = await this.orm.call('adams.executive.dashboard', 'get_bootstrap', []);
+                if (!this.alive) { return; }
+                this.state.companies = data.companies;
+                this.state.canConfigure = data.can_configure;
+                this.userId = data.user_id;
+                this.defaultOptions = { ...data.options };
+                const savedNavigation = this.props.state?.dashboard;
+                const restore = savedNavigation?.userId === data.user_id && savedNavigation.applied?.company_id === data.options.company_id &&
+                    data.companies.some(company => company.id === savedNavigation.applied?.company_id)
+                    ? savedNavigation : null;
+                const fromUrl = restore ? null : this.urlSelection(data);
+                this.state.draft = restore ? { ...restore.applied } : { ...data.options, ...(fromUrl?.scope || {}) };
+                this.urlSection = fromUrl?.section || null;
+                this.urlHRTab = fromUrl?.hrTab || null;
+                this.preferenceKey = `adams-dashboard-v1-${data.user_id}`;
+                try { this.state.sectionOrder = JSON.parse(window.localStorage.getItem(this.preferenceKey + '-order') || '[]'); if (!Array.isArray(this.state.sectionOrder)) this.state.sectionOrder = []; } catch { this.state.sectionOrder = []; }
+                this.viewKey = `adams-dashboard-view-v1-${data.user_id}`;
+                this.state.savedView = Boolean(this.readSavedView());
+                try {
+                    const saved = JSON.parse(window.localStorage.getItem(this.preferenceKey) || '{}');
+                    for (const section of this.sections) {
+                        if (typeof saved[section.key] === 'boolean') { this.state.collapsed[section.key] = saved[section.key]; }
+                    }
+                } catch { /* Storage may be unavailable; dashboard remains usable. */ }
+                // Render the shell while each section completes independently.
+                void this.restoreNavigation(restore).then(() => this.applyUrlSection());
+            } catch {
+                this.state.error = _t('The dashboard could not be loaded. Check your access and try again.');
+            }
+        });
+        onWillUnmount(() => { this.alive = false; this.generation++; });
+    }
+
+    navigationState() {
+        const selection = (value, keys) => value ? Object.fromEntries(keys.map(key => [key, value[key]])) : null;
+        return { userId: this.userId, applied: this.state.applied ? { ...this.state.applied } : null,
+            viewName: this.state.activeViewName, hrPeriod: this.state.hrPeriodApplied ? {...this.state.hrPeriodApplied} : null, sectionOrder: [...this.state.sectionOrder], search: selection(this.state.search, ['query', 'kind', 'offset']), hr: this.state.hrData ? {tab: this.state.hrTab, filters: {...this.state.hrData.filters}, offset: this.state.hrData.offset || 0} : null, stockMode: this.state.stockMode,
+            collapsed: { ...this.state.collapsed }, activeSection: this.state.activeSection, scroll: this.root.el?.scrollTop || 0,
+            detail: selection(this.state.detail, ['key', 'dimension', 'offset']),
+            recent: selection(this.state.recent, ['kind', 'offset']),
+            ranking: selection(this.state.ranking, ['key']), rankLimit: this.state.rankLimit, productMeasure: this.state.productMeasure, productUnit: this.state.productUnit,
+            procurement: selection(this.state.procurement, ['offset', 'mode']), directory: selection(this.state.directory, ['offset', 'search']), inventory: selection(this.state.inventory, ['offset', 'mode', 'filters', 'expandedRow']), workforce: selection(this.state.workforce, ['offset']), fulfillment: selection(this.state.fulfillment, ['offset']) };
+    }
+
+    async restoreNavigation(saved) {
+        if (saved?.rankLimit === 5 || saved?.rankLimit === 10) this.state.rankLimit = saved.rankLimit;
+        if (['value', 'quantity'].includes(saved?.productMeasure)) this.state.productMeasure = saved.productMeasure;
+        const generation = this.generation + 1;
+        await this.refresh(Boolean(saved));
+        if (!this.alive || generation !== this.generation || !saved) { return; }
+        const jobs = [];
+        this.state.activeViewName = typeof saved.viewName === 'string' ? saved.viewName.slice(0,60) : '';
+        if (Array.isArray(saved.sectionOrder)) this.state.sectionOrder = saved.sectionOrder.filter(key => this.sectionEnabled(key));
+        if (saved.search) { this.state.searchQuery = saved.search.query; this.state.searchKind = saved.search.kind; jobs.push(this.searchRecords(null, saved.search.offset)); }
+        if (saved.hrPeriod && !this.validateScope({...this.state.applied, ...saved.hrPeriod})) { this.state.hrPeriodApplied = {date_from:saved.hrPeriod.date_from, date_to:saved.hrPeriod.date_to}; this.state.hrPeriodDraft = {...this.state.hrPeriodApplied}; }
+        if (saved.hr && this.sectionEnabled('hr')) { this.state.hrFilters = {...saved.hr.filters}; jobs.push(this.loadHR(saved.hr.tab, saved.hr.offset)); }
+        if (this.sectionEnabled('sales') && saved.productMeasure === 'quantity' && Number(saved.productUnit) > 0) {
+            this.state.productUnit = String(saved.productUnit);
+            jobs.push(this.loadProducts());
+        }
+        if (this.visibleSections.some(section => section.key === saved.activeSection)) this.state.activeSection = saved.activeSection;
+        if (saved.detail && this.sectionEnabled(['invoiced_sales', 'invoiced_margin', 'confirmed_sales', 'quotations', 'orders'].includes(saved.detail.key) ? 'sales' : ({purchases: 'procurement', crm: 'crm', hr: 'hr'}[saved.detail.key] || 'finance')) && this.dimensions[saved.detail.key]?.includes(saved.detail.dimension)) {
+            jobs.push(this.inspect(saved.detail.key, saved.detail.dimension, saved.detail.offset));
+        }
+        if (this.sectionEnabled('sales') && saved.recent && ['orders', 'quotations', 'invoices'].includes(saved.recent.kind)) {
+            jobs.push(this.loadRecent(saved.recent.kind, saved.recent.offset));
+        }
+        if (this.sectionEnabled('sales') && ['invoiced_sales', 'invoiced_margin'].includes(saved.ranking?.key)) {
+            jobs.push(this.loadRanking(saved.ranking.key));
+        }
+        if (this.sectionEnabled('finance') && saved.directory) { this.state.cashSearch = saved.directory.search || ''; jobs.push(this.loadDirectory('cash', saved.directory.offset, null, this.state.cashSearch)); }
+        if (this.sectionEnabled('sales') && saved.fulfillment) { jobs.push(this.loadDirectory('fulfillment', saved.fulfillment.offset)); }
+        if (this.sectionEnabled('procurement') && saved.procurement) { jobs.push(this.loadDirectory('procurement', saved.procurement.offset, saved.procurement.mode)); }
+        if (this.sectionEnabled('hr') && saved.workforce) { jobs.push(this.loadDirectory('workforce', saved.workforce.offset)); }
+        if (this.sectionEnabled('inventory') && saved.inventory) {
+            if (saved.inventory.filters) {
+                this.state.stockFilters = {...this.state.stockFilters, ...saved.inventory.filters};
+                // As Apply does: the saved filters replace the applied ones, so the table and the form agree.
+                const previous = this.state.inventory;
+                this.state.inventory = {warehouses: previous?.warehouses || [], categories: previous?.categories || []};
+            }
+            jobs.push(this.loadDirectory('inventory', saved.inventory.offset, saved.inventory.mode || 'current'));
+        }
+        for (const section of this.sections) {
+            if (typeof saved.collapsed?.[section.key] === 'boolean') { this.state.collapsed[section.key] = saved.collapsed[section.key]; }
+        }
+        // The refresh above ran for the initial department; lists of the restored one that were not saved
+        // (CRM and Procurement records, for example) load as they do on navigation.
+        this.loadSectionData(this.state.activeSection);
+        await Promise.all(jobs);
+        if (this.alive && generation === this.generation) {
+            if (saved.inventory?.expandedRow && this.state.inventory?.rows?.some(row => row.id === saved.inventory.expandedRow)) this.state.inventory.expandedRow = saved.inventory.expandedRow;
+            this.restoreScroll = Number.isFinite(saved.scroll) ? Math.max(0, saved.scroll) : 0;
+            this.state.restored = true;
+        }
+    }
+
+    async loadRecent(kind, offset = 0) {
+        const generation = this.generation;
+        const request = (this.recentRequest || 0) + 1;
+        this.recentRequest = request;
+        this.state.recent = { kind, offset, status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_recent_sales', [kind, { ...this.state.applied }, offset, 6]);
+            if (this.alive && generation === this.generation && request === this.recentRequest) {
+                this.state.recent = { ...data, kind, offset: data.offset ?? offset };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && request === this.recentRequest) {
+                this.state.recent = { kind, offset, status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async openRecent(recordId = null) {
+        if (this.state.opening || !this.state.recent) { return; }
+        const generation = this.generation;
+        const recent = this.state.recent;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_recent_sale', [recent.kind, { ...this.state.applied }, recordId]);
+            if (this.alive && generation === this.generation && recent === this.state.recent) { await this.action.doAction(action); }
+        } catch {
+            if (this.alive) { this.notification.add(_t('The sales record could not be opened. Check your access and filters.'), { type: 'warning' }); }
+        } finally { if (this.alive) { this.state.opening = false; } }
+    }
+
+    async refresh(resetAux = false) {
+        resetAux = resetAux === true;
+        const options = { ...this.state.draft, company_id: this.companyUser?.activeCompany?.id || Number(this.state.draft.company_id) };
+        const validation = this.validateScope(options);
+        if (validation) { this.state.error = validation; return; }
+        const generation = ++this.generation;
+        const sameCompany = this.state.applied?.company_id === options.company_id;
+        const previousRecent = sameCompany && !resetAux ? this.state.recent?.kind : 'orders';
+        const previousRanking = sameCompany && !resetAux ? this.state.ranking?.key : 'invoiced_sales';
+        const previousInventory = sameCompany ? this.state.inventory : null;
+        // A company switch keeps the HR tab (as the approved HTML does) but not its company-specific filters.
+        const previousHR = this.state.hrTab || 'overview';
+        const previousProcurementMode = sameCompany ? this.state.procurement?.mode : null;
+        this.closeEmployeeProfile();
+        this.invalidateHRSource();
+        if (!sameCompany) { this.closeSavedViews(); this.state.activeViewName = ''; this.state.savedView = Boolean(this.readSavedView()); }
+        if (!sameCompany || !this.state.hrPeriodApplied) {
+            this.state.hrPeriodApplied = {date_from:options.date_from, date_to:options.date_to};
+            this.state.hrPeriodDraft = {...this.state.hrPeriodApplied};
+            this.state.hrPeriodError = '';
+        }
+        this.state.cashOpen = false;
+        this.state.hrData = null;
+        this.hrDepartments = [];
+        this.state.workspaceDetails = {};
+        this.state.logoFailed = false;
+        this.analysisTrends = {};
+        if (!sameCompany) { this.state.hrFilters = {search: '', department_id: '', employee_id: '', status: previousHR === 'shifts' ? 'published' : '', assignment: '', view: 'week'}; this.state.productUnit = ''; }
+
+        if (this.state.applied?.company_id !== options.company_id) {
+            this.state.stockFilters = {...this.state.stockFilters, warehouse_id: '', category_id: ''};
+        }
+        this.state.applied = options;
+        this.state.periodPreset = this.presetFor(options);
+        this.syncUrl();
+        if (this.companyUser?.activeCompany) void this.refreshCompanyIdentity(generation);
+        this.closeSearch();
+        this.state.printSummary = null;
+        this.state.detail = null;
+        this.state.directory = null;
+        this.state.cashSearch = '';
+        this.state.inventory = null;
+        this.state.workforce = null;
+        this.state.procurement = null;
+        this.state.ranking = null;
+        this.state.customers = null;
+        this.state.products = null;
+        this.state.orderRanking = null;
+        this.scrollTarget = null;
+        this.closeSource();
+        this.state.financialTrends = {};
+        this.state.fulfillment = null;
+        this.state.recent = null;
+        this.detailGeneration++;
+        this.state.error = '';
+        // Immediately remove previous-company values, including during failures.
+        const enabled = this.visibleSections.map(section => section.key);
+        if (!enabled.includes(this.state.activeSection)) { this.state.activeSection = enabled[0] || ''; this.syncUrl(); }
+        const sources = ['finance', 'sales', 'operations'].filter(key => key === 'operations' ? enabled.some(entry => !['finance', 'sales'].includes(entry)) : enabled.includes(key));
+        this.state.sections = Object.fromEntries(sources.map(key => [key, { status: 'loading', items: [] }]));
+        await Promise.all(sources.map(async key => {
+            try {
+                const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, options]);
+                if (this.alive && generation === this.generation) {
+                    this.state.sections[key] = { ...data, status: 'ready' };
+                    if (key === 'sales') this.loadAvailableSales(data, previousRecent || 'orders', previousRanking || 'invoiced_sales');
+                    if (key === 'finance') this.loadFinanceLists(data);
+                }
+            } catch {
+                if (this.alive && generation === this.generation) {
+                    this.state.sections[key] = { status: 'error', items: [] };
+                }
+            }
+        }));
+        if (this.alive && generation === this.generation) {
+            if (previousInventory && this.sectionEnabled('inventory')) {
+                this.state.inventory = {filters: {...previousInventory.filters}, mode: previousInventory.mode};
+                void this.pageStock(0);
+            }
+            const active = this.state.activeSection;
+            if (active === 'procurement' && previousProcurementMode && this.sectionEnabled('procurement')) void this.loadDirectory('procurement', 0, previousProcurementMode);
+            if (active === 'hr') { if (this.sectionEnabled('hr')) void this.loadHR(previousHR); }
+            else if (active) this.loadSectionData(active);
+        }
+    }
+
+    sectionResult(section) {
+        const source = this.state.sections[['finance', 'sales'].includes(section.key) ? section.key : 'operations'];
+        if (!source || ['finance', 'sales'].includes(section.key)) { return source; }
+        const key = section.key === 'procurement' ? 'purchases' : section.key;
+        return { ...source, items: source.items.filter(item => item.key === key) };
+    }
+
+    metricGroups(section, result) {
+        // Native stock quantities and valuation live in the product workspace below.
+        // There is no separate accounting valuation mapping in the agreed scope.
+        if (section.key === 'inventory') { return []; }
+        const select = keys => keys.map(key => result.items.find(item => item.key === key)).filter(Boolean);
+        if (section.key === 'finance') {
+            return [
+                { key: 'profitability', name: _t('Profitability'), description: _t('Performance during the selected financial period.'), items: select(['revenue', 'gross_profit', 'profit', 'operating_expenses']) },
+                { key: 'working-capital', name: _t('Cash & working capital'), description: _t('Balances at the selected cutoff.'), items: select(['cash', 'receivables', 'payables']) },
+                { key: 'liquidity', name: _t('Money movement'), description: _t('Recorded cash movement and a separately labelled forecast.'), items: [this.cashMovement(result), ...select(['standard_forecast'])] },
+                { key: 'financial-position', name: _t('Balance sheet'), description: _t('Balance Sheet at the selected cutoff.'), items: select(['assets', 'liabilities', 'equity']) },
+            ];
+        }
+        if (section.key === 'sales') { return [{ key: 'commercial', name: _t('Sales performance'), description: '', items: select(['invoiced_sales', 'confirmed_sales', 'quotations']) }]; }
+        return [{ key: section.key, name: '', description: '', items: result.items }];
+    }
+
+    agingWidth(bucket, item) {
+        const magnitude = (item.aging_buckets || []).reduce((sum, row) => sum + Math.abs(row.value || 0), 0);
+        return (magnitude ? Math.abs(bucket.value) / magnitude * 100 : 0) + '%';
+    }
+
+    metricIcon(key) {
+        return { revenue: 'chart', gross_profit: 'trend', profit: 'coins', operating_expenses: 'wallet',
+            cash: 'bank', cash_flow: 'trend', standard_forecast: 'calendar', receivables: 'invoice', payables: 'invoice',
+            invoiced_sales: 'invoice', invoiced_margin: 'trend', confirmed_sales: 'sales', orders: 'box',
+            quotations: 'invoice', purchases: 'truck', inventory: 'box', crm: 'target', hr: 'people' }[key] || 'chart';
+    }
+
+    cashMovement(result) {
+        const flow = result.cash_flow;
+        return { key: 'cash_flow', status: flow?.status || 'not_installed',
+            value: flow?.bridge?.net_increase?.value ?? null, unit: 'currency', date_field: 'period',
+            source: flow?.source, measure: 'net_increase', drilldown: flow?.status === 'ready',
+            definition: _t('Net cash movement recorded during the selected period.'),
+            has_warnings: flow?.has_warnings };
+    }
+
+    financeMetric(key) {
+        return this.state.sections.finance?.items.find(item => item.key === key);
+    }
+
+    get referenceSurface() { return ['finance','inventory','sales','procurement','crm','hr'].includes(this.state.activeSection); }
+    rankingInitials(label) {
+        const words = (label || '').replace(/^\s*\[[^\]]*\]\s*/, '').split(/\s+/)
+            .map(word => word.replace(/[^\p{L}]+/gu, '')).filter(Boolean);
+        return words.slice(0, 2).map(word => [...word][0].toUpperCase()).join('');
+    }
+    get salesQuantityUnit() { return this.state.products?.units?.find(unit => unit.id === this.state.products.unit_id)?.name || ''; }
+    openSalesRanking(type, id = undefined) {
+        if (type === 'product') return this.openProductRanking(id);
+        const key = type === 'order' ? 'confirmed_sales' : type === 'invoice' ? (this.state.ranking?.key || 'invoiced_sales') : 'invoiced_sales';
+        const dimension = type === 'customer' ? 'customer' : 'salesperson';
+        return id === undefined ? this.inspect(key, dimension) : this.openReport(key, dimension, id);
+    }
+    retrySalesRanking(type) {
+        if (type === 'product') return this.loadProducts();
+        if (type === 'customer') return this.loadCustomers();
+        if (type === 'order') return this.loadOrderRanking();
+        return this.loadRanking(this.state.ranking?.key || 'invoiced_sales');
+    }
+    recentPageCaption(data) {
+        const total = data?.total_count || 0;
+        return _t('%s–%s of %s · Page %s of %s', total ? data.offset + 1 : 0,
+            Math.min((data?.offset || 0) + (data?.rows?.length || 0), total), total,
+            this.currentPage(data), Math.max(1, Math.ceil(total / (data?.page_size || 6))));
+    }
+    compactPages(data) {
+        const current = this.currentPage(data), total = Math.max(1, Math.ceil((data?.total_count || 0) / (data?.page_size || 6)));
+        const numbers = [...new Set([1,current-1,current,current+1,total])].filter(number => number > 0 && number <= total).sort((a,b) => a-b);
+        return numbers.flatMap((number,index) => index && number - numbers[index-1] > 1 ? [{key:'gap-'+number,number:null},{key:'page-'+number,number}] : [{key:'page-'+number,number}]);
+    }
+    commonRowValue(rows, field) { const values = [...new Set((rows || []).map(row => row[field]))]; return values.length === 1 ? values[0] : ''; }
+    recentDate(row) {
+        const value = row.date_label?.slice(0, 10);
+        const locale = this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale;
+        return /^\d{4}-\d{2}-\d{2}$/.test(value || '') ? new Intl.DateTimeFormat(locale, {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value + 'T12:00:00Z')) : row.date_label;
+    }
+    get dashboardCompanies() { return user.allowedCompanies || this.state.companies; }
+    async changeDashboardCompany(event) {
+        const companyId=Number(event.target.value);
+        if (!this.dashboardCompanies.some(company=>company.id===companyId) || companyId===user.activeCompany?.id || this.state.companySwitchPending) return;
+        this.state.companySwitchPending=true;
+        try {
+            // Native user API updates the Odoo shell and emits the existing
+            // ACTIVE_COMPANIES_CHANGED event; its handler refreshes source data.
+            await user.activateCompanies([companyId], {includeChildCompanies:false,reload:false});
+        } catch {
+            this.notification.add(_t('The company could not be switched. Try again.'), {type:'warning'});
+        } finally { if(this.alive) this.state.companySwitchPending=false; }
+    }
+
+    get filtersDirty() {
+        return this.state.applied && ['company_id', 'date_from', 'date_to', 'as_of'].some(key => String(this.state.draft[key]) !== String(this.state.applied[key]));
+    }
+
+    pageNumbers(data) {
+        const size = data?.page_size || 25;
+        const current = Math.floor((data?.offset || 0) / size) + 1;
+        const total = Number.isInteger(data?.total_count) ? Math.max(1, Math.ceil(data.total_count / size)) : current + (data?.has_more ? 1 : 0);
+        const start = Math.max(1, Math.min(current - 2, total - 4));
+        return [...new Set([1, ...Array.from({length: Math.min(5, total - start + 1)}, (_, i) => start + i), ...(data?.total_count !== undefined ? [total] : [])])];
+    }
+
+    stockPageNumbers() {
+        const page = this.currentPage(this.state.inventory), total = this.stockTotalPages;
+        const numbers = [...new Set([1, page - 1, page, page + 1, total])].filter(n => n > 0 && n <= total).sort((a,b) => a-b);
+        return numbers.flatMap((number,index) => index && number - numbers[index-1] > 1
+            ? [{key:'gap-'+number, number:null}, {key:'page-'+number, number}]
+            : [{key:'page-'+number, number}]);
+    }
+    get stockTotalPages() { return Math.max(1, Math.ceil((this.state.inventory?.total_count || 0) / (this.state.inventory?.page_size || 8))); }
+
+    // Owl template expressions resolve bare constructors and globals through ctx.
+    // Keep these computations on the component so a populated optional view
+    // never attempts to invoke ctx.String, ctx.Math or ctx.Object.
+    get searchKindKeys() { return Object.keys(this.searchKinds); }
+    currentPage(data) { return Math.floor((data?.offset || 0) / (data?.page_size || 25)) + 1; }
+    visibleRowEnd(data) { return Math.min(data.offset + data.rows.length, data.total); }
+    chartMinimumWidth(chart) { return Math.max(340, chart.rows.length * 104); }
+    chartHitHeight(series) { return Math.max(16, series.height + 8); }
+
+    setAllSections(collapsed) {
+        for (const section of this.visibleSections) this.state.collapsed[section.key] = collapsed;
+        try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional storage. */ }
+    }
+
+    moveSection(key, direction) {
+        const keys = this.visibleSections.map(section => section.key);
+        const index = keys.indexOf(key), target = index + direction;
+        if (target < 0 || target >= keys.length) return;
+        [keys[index], keys[target]] = [keys[target], keys[index]];
+        this.state.sectionOrder = [...keys, ...this.sections.map(s => s.key).filter(k => !keys.includes(k))];
+        try { window.localStorage.setItem(this.preferenceKey + '-order', JSON.stringify(this.state.sectionOrder)); } catch { /* Optional storage. */ }
+    }
+
+    async retrySection(section) {
+        const key = ['finance', 'sales'].includes(section) ? section : 'operations';
+        const generation = this.generation;
+        const marker = {};
+        this.sectionRetries ||= {};
+        this.sectionRetries[key] = marker;
+        this.state.sections[key] = {status: 'loading', items: []};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_section', [key, {...this.state.applied}]);
+            if (this.alive && generation === this.generation && this.sectionRetries[key] === marker) {
+                this.state.sections[key] = {...data, status: 'ready'};
+                if (key === 'sales') this.loadAvailableSales(data,
+                    this.state.recent?.kind || 'orders', this.state.ranking?.key || 'invoiced_sales');
+                if (key === 'finance') this.loadFinanceLists(data);
+            }
+        } catch {
+            if (this.alive && generation === this.generation && this.sectionRetries[key] === marker) this.state.sections[key] = {status: 'error', items: []};
+        }
+    }
+
+    loadFinanceLists(data) {
+        // Cash accounts and the chart exist only when their metrics are ready (the finance addon provides them).
+        if (data.items.some(item => item.key === 'cash' && item.status === 'ready')) void this.loadDirectory('cash');
+        if (['revenue', 'gross_profit', 'profit'].every(metric => data.items.some(item => item.key === metric && item.status === 'ready'))) void this.loadProfitabilityChart();
+    }
+
+    loadAvailableSales(data, recentKind, rankingKey) {
+        if (!data.items.some(item => item.status)) return;
+        const status = key => data.items.find(item => item.key === key)?.status || 'not_configured';
+        const unavailable = (key, extra = {}) => ({status: status(key), rows: [], ...extra});
+        if (status(rankingKey) === 'ready') void this.loadRanking(rankingKey);
+        else this.state.ranking = unavailable(rankingKey, {key: rankingKey});
+        if (status('invoiced_sales') === 'ready') {
+            void this.loadCustomers();
+            void this.loadProducts();
+        } else {
+            this.state.customers = unavailable('invoiced_sales');
+            this.state.products = unavailable('invoiced_sales');
+        }
+        if (status('confirmed_sales') === 'ready') void this.loadOrderRanking();
+        else this.state.orderRanking = unavailable('confirmed_sales');
+        const recentKey = recentKind === 'invoices' ? 'invoiced_sales' : recentKind === 'quotations' ? 'quotations' : 'confirmed_sales';
+        if (status(recentKey) === 'ready') void this.loadRecent(recentKind);
+        else this.state.recent = unavailable(recentKey, {kind: recentKind});
+    }
+
+    async refreshRankings() {
+        return Promise.all([this.loadRanking(this.state.ranking?.key || 'invoiced_sales'), this.loadCustomers(), this.loadProducts(), this.loadOrderRanking()]);
+    }
+
+    async loadOrderRanking() {
+        const generation = this.generation, marker = {};
+        this.orderRankingRequest = marker;
+        this.state.orderRanking = {status: 'loading', rows: []};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_breakdown', ['confirmed_sales', 'salesperson', {...this.state.applied}]);
+            if (this.alive && generation === this.generation && this.orderRankingRequest === marker) this.state.orderRanking = {...data, rows: data.rows.slice(0, this.state.rankLimit || 5)};
+        } catch {
+            if (this.alive && generation === this.generation && this.orderRankingRequest === marker) this.state.orderRanking = {status: 'error', rows: []};
+        }
+    }
+
+    async openStockRow(row) {
+        if (this.state.opening || !this.state.inventory) return;
+        const generation = this.generation;
+        const data = this.state.inventory;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_location', [{...this.state.applied}, row.product_id, row.location_id, data.mode, data.filters]);
+            if (this.alive && generation === this.generation && this.state.inventory === data) await this.action.doAction(action);
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('This stock report could not be opened. Check your access and try again.'), {type: 'warning'});
+        } finally { if (this.alive) this.state.opening = false; }
+    }
+
+    get visibleSections() {
+        const company = this.state.companies.find(entry => entry.id === this.state.applied?.company_id);
+        const enabled = company?.enabled_sections;
+        const sections = enabled ? this.sections.filter(section => enabled.includes(section.key)) : [...this.sections];
+        const order = this.state.sectionOrder || [];
+        return sections.sort((a, b) => (order.includes(a.key) ? order.indexOf(a.key) : 99) - (order.includes(b.key) ? order.indexOf(b.key) : 99));
+    }
+
+    sectionEnabled(key) { return this.visibleSections.some(section => section.key === key); }
+
+    openSettings() {
+        return this.action.doAction('adams_executive_dashboard.action_dashboard_settings', {
+            additionalContext: {allowed_company_ids: [this.state.applied.company_id], default_company_id: this.state.applied.company_id},
+        });
+    }
+
+    scrollOffset() {
+        return (this.root.el?.querySelector('.adams_nav')?.getBoundingClientRect().height || 0) + 16;
+    }
+
+    syncActiveSection() { /* Explicit department navigation owns the active state. */ }
+
+    navigateSection(key) {
+        if (!this.sectionEnabled(key)) return;
+        this.urlSection = this.urlHRTab = null;  // a user's choice wins over a URL selection still pending
+        this.state.activeSection = key;
+        this.syncUrl();
+        this.state.collapsed[key] = false;
+        this.state.sidebarOpen = false;
+        this.root.el?.scrollTo?.({top: 0});
+        this.loadSectionData(key);
+    }
+
+    loadSectionData(key) {
+        // Workspace lists load on demand; a refresh clears them, so the visible section reloads here too.
+        if (key === 'sales' && !this.state.fulfillment) {
+            const metric = this.state.sections.sales?.items?.find(item => item.key === 'confirmed_sales');
+            if (metric?.status === 'ready') void this.loadDirectory('fulfillment');
+            else if (metric?.status) this.state.fulfillment = {status: metric.status, rows: []};
+        }
+        if (key === 'inventory' && !this.state.inventory) void this.applyStockFilters();
+        if (key === 'procurement' && !this.state.procurement) void this.loadDirectory('procurement');
+        if (key === 'hr' && !this.state.hrData) void this.loadHR();
+        if (['crm','procurement'].includes(key) && !this.state.workspaceDetails[key]) void this.loadWorkspaceDetails(key);
+    }
+
+    urlSelection(data) {
+        // Only validated, known keys are read; anything else in the URL is ignored.
+        const query = router.current || {};
+        const scope = {};
+        for (const [key, name] of [['date_from', 'date_from'], ['date_to', 'date_to'], ['as_of', 'as_of']]) {
+            if (typeof query[name] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(query[name])) scope[key] = query[name];
+        }
+        const candidate = {...data.options, ...scope};
+        const valid = !this.validateScope(candidate);
+        return {scope: valid ? scope : {},
+            section: typeof query.section === 'string' ? query.section : null,
+            hrTab: ['overview', 'attendance', 'time_off', 'shifts', 'employees'].includes(query.hr_tab) ? query.hr_tab : null};
+    }
+
+    applyUrlSection() {
+        const section = this.urlSection, hrTab = this.urlHRTab;
+        this.urlSection = this.urlHRTab = null;
+        if (!this.alive) return;
+        if (section && section !== this.state.activeSection && this.sectionEnabled(section)) this.navigateSection(section);
+        if (hrTab && this.state.activeSection === 'hr' && hrTab !== this.state.hrTab) void this.loadHR(hrTab);
+        this.syncUrl();
+    }
+
+    syncUrl() {
+        if (!this.alive || !this.state.applied || this.env?.inDialog) return;
+        const scope = this.state.applied, defaults = this.defaultOptions || {};
+        const changed = ['date_from', 'date_to', 'as_of'].some(key => scope[key] !== defaults[key]);
+        // replaceState merges into the current route (keeping the action path) without a new history
+        // entry; pushState(..., {replace: true}) would drop the action (web/static/src/core/browser/router.js).
+        router.replaceState({
+            section: this.state.activeSection && this.state.activeSection !== 'finance' ? this.state.activeSection : undefined,
+            hr_tab: this.state.activeSection === 'hr' && this.state.hrTab !== 'overview' ? this.state.hrTab : undefined,
+            date_from: changed ? scope.date_from : undefined,
+            date_to: changed ? scope.date_to : undefined,
+            as_of: changed ? scope.as_of : undefined,
+        });
+    }
+
+    presetFor(scope) {
+        // The Period selector always describes the applied dates (saved views, URLs, returns).
+        const today = this.defaultOptions?.date_to;
+        if (!today || !scope) return this.state.periodPreset;
+        if (scope.date_to === today && scope.date_from === today.slice(0, 7) + '-01') return 'month';
+        if (scope.date_to === today && scope.date_from === today.slice(0, 4) + '-01-01') return 'ytd';
+        const end = new Date(today.slice(0, 7) + '-01T12:00:00Z');
+        end.setUTCDate(0);
+        const previousEnd = end.toISOString().slice(0, 10);
+        if (scope.date_to === previousEnd && scope.date_from === previousEnd.slice(0, 7) + '-01') return 'previous';
+        return 'custom';
+    }
+
+    get chartBlockedReason() {
+        // The chart needs all three approved series. Configuration, installation and access states
+        // are not something Retry can fix, so they are named; no data and load errors keep Retry.
+        if (this.state.sections.finance?.status !== 'ready') return '';
+        const statuses = ['revenue', 'gross_profit', 'profit'].map(key => this.financeMetric(key)?.status || 'not_installed');
+        const blocking = statuses.find(status => ['not_configured', 'not_installed', 'restricted', 'unsupported_scope'].includes(status));
+        return blocking ? this.statusLabels[blocking] : '';
+    }
+
+    get formatLocale() { return (user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-'); }
+
+    metricPeriodLabel(item) {
+        const scope = this.state.applied;
+        if (!scope) return '';
+        const language = (user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-');
+        const formatter = new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language, {
+            day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+        });
+        const date = value => new Date(value + 'T12:00:00Z');
+        if (item.date_field === 'as_of' || ['cash', 'receivables', 'payables', 'assets', 'liabilities', 'equity'].includes(item.key)) {
+            return formatter.format(date(scope.as_of));
+        }
+        return formatter.formatRange(date(scope.date_from), date(scope.date_to));
+    }
+
+    financePeriodLabel(item) {
+        const label = this.metricPeriodLabel(item);
+        const language = (user.context?.lang || document.documentElement.lang || 'en');
+        const balance = item.date_field === 'as_of' || ['cash','receivables','payables','assets','liabilities','equity'].includes(item.key);
+        return language.startsWith('en') && !balance ? label.replace(/\bSept\b/g, 'Sep') : label;
+    }
+
+    supplierWindowLabel(item) {
+        return {supplier_overdue: _t('Overdue'), supplier_today: _t('Today'),
+            supplier_due_7: _t('Next 7 days'), supplier_due_30: _t('Next 30 days')}[item.key] || item.label;
+    }
+
+    supplierWindow(key) {
+        return this.state.sections.finance?.supplier_windows?.find(item => item.key === key);
+    }
+
+    get supplierStatus() {
+        return this.statusLabels[this.financeMetric('payables')?.status] ||
+            this.statusLabels[this.state.sections.finance?.status] || this.statusLabels.not_configured;
+    }
+
+    navigateWorkspace(event, id) {
+        event.preventDefault();
+        this.state.sidebarOpen = false;
+        if (id === 'adams-attention') this.state.attentionExpanded = true;
+        requestAnimationFrame(() => { const node = this.root.el?.querySelector('#' + id); if (node?.tagName === 'DETAILS') node.open = true; node?.scrollIntoView({ block: 'start' }); node?.querySelector('button, summary')?.focus(); });
+    }
+
+    closeSearch() { this.state.search = null; }
+
+    async searchRecords(event = null, offset = 0) {
+        event?.preventDefault();
+        const query = (this.state.searchQuery || '').trim();
+        if (query.length < 2 || query.length > 100 || !this.state.applied) { this.notification.add(_t('Enter between 2 and 100 characters to search.'), {type: 'warning'}); return; }
+        const generation = this.generation;
+        this.state.search = { query, kind: this.state.searchKind || 'all', offset, status: 'loading', groups: [] };
+        const search = this.state.search;
+        try {
+            const result = await this.orm.call('adams.executive.dashboard', 'search_records', [query, { ...this.state.applied }, search.kind, offset]);
+            if (this.alive && generation === this.generation && this.state.search === search) Object.assign(search, result, { status: 'ready' });
+        } catch {
+            if (this.alive && generation === this.generation && this.state.search === search) search.status = 'error';
+        }
+    }
+
+    async openSearchRecord(kind, id) {
+        if (this.state.opening || !this.state.search) return;
+        const generation = this.generation;
+        const search = this.state.search;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_search_record', [search.query, { ...this.state.applied }, kind, id]);
+            if (this.alive && generation === this.generation && search === this.state.search) {
+                await this.action.doAction(action);
+            }
+        } catch {
+            if (this.alive) this.notification.add(_t('The record is unavailable in the selected scope.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.opening = false; }
+    }
+
+    closePrint() { this.state.printSummary = null; }
+    printNow() { window.print(); }
+
+    printValue(row) {
+        return row.value === null ? '—' : new Intl.NumberFormat(this.formatLocale, {
+            minimumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
+            maximumFractionDigits: row.digits ?? this.state.printSummary.currency_digits,
+        }).format(row.value);
+    }
+
+    async printDashboard() {
+        this.state.moreOpen = false;
+        if (!this.state.applied || this.state.exporting) return;
+        const generation = this.generation;
+        this.state.exporting = true;
+        this.state.printSummary = null;
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'export_summary', [{ ...this.state.applied }]);
+            if (!this.alive || generation !== this.generation) return;
+            this.state.printSummary = data;
+
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('Export unavailable. Check your export permissions or use the report for large exports.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.exporting = false; }
+    }
+
+    async exportSummary() {
+        this.state.moreOpen = false;
+        if (!this.state.applied || this.state.exporting) return;
+        const generation = this.generation;
+        this.state.exporting = true;
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'export_summary', [{ ...this.state.applied }]);
+            if (!this.alive || generation !== this.generation) return;
+            const url = URL.createObjectURL(new Blob([data.content], { type: 'text/csv;charset=utf-8' }));
+            const anchor = document.createElement('a');
+            anchor.href = url; anchor.download = data.filename; anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            if (this.alive && generation === this.generation) this.notification.add(_t('Export unavailable. Check your export permissions or use the report for large exports.'), { type: 'warning' });
+        } finally { if (this.alive) this.state.exporting = false; }
+    }
+
+    switchTabs(event) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const buttons = [...event.currentTarget.querySelectorAll('button')];
+        const current = buttons.indexOf(event.target);
+        if (current < 0) return;
+        event.preventDefault();
+        const rtl = getComputedStyle(event.currentTarget).direction === 'rtl';
+        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 :
+            (current + delta + buttons.length) % buttons.length;
+        buttons[next].focus();
+        buttons[next].click();
+    }
+
+    navigateGroup(key) {
+        this.root.el?.querySelector(`#adams-group-${key}`)?.scrollIntoView({ block: 'start',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+
+    get hasFinanceWarnings() {
+        const finance = this.state.sections.finance;
+        return Boolean(finance?.items?.some(item => item.has_warnings) ||
+            finance?.cash_flow?.has_warnings || finance?.supplier_windows?.some(item => item.has_warnings));
+    }
+
+    readSavedView() {
+        try {
+            const saved = JSON.parse(window.localStorage.getItem(this.viewKey) || 'null');
+            const dates = ['date_from', 'date_to', 'as_of'];
+            if (saved?.userId !== this.userId || (this.companyUser?.activeCompany && saved.applied?.company_id !== this.companyUser.activeCompany.id) || !this.state.companies.some(company => company.id === saved.applied?.company_id) ||
+                !dates.every(key => /^\d{4}-\d{2}-\d{2}$/.test(saved.applied?.[key] || '')) ||
+                saved.applied.date_from > saved.applied.date_to) return null;
+            return saved;
+        } catch { return null; }
+    }
+
+    openSavedViews() { this.state.moreOpen = false; this.state.viewName = this.state.activeViewName || this.readSavedView()?.viewName || _t('My executive view'); this.state.viewsOpen = true; }
+    closeSavedViews() { this.state.viewsOpen = false; }
+
+    saveView() {
+        if (!this.state.applied) return;
+        // Store selections only, never amounts, records, permissions or theme.
+        const applied = Object.fromEntries(['company_id', 'date_from', 'date_to', 'as_of']
+            .map(key => [key, this.state.applied[key]]));
+        try {
+            const viewName = String(this.state.viewName || _t('My executive view')).trim().slice(0,60) || _t('My executive view');
+            window.localStorage.setItem(this.viewKey, JSON.stringify({...this.navigationState(), viewName, applied, recent: this.state.recent ? {kind: this.state.recent.kind, offset: 0} : null, detail: null, scroll: 0}));
+            this.state.savedView = true;
+            this.state.activeViewName = viewName;
+            this.closeSavedViews();
+            this.notification.add(_t('View saved in this browser.'), { type: 'success' });
+        } catch {
+            this.notification.add(_t('Browser storage is unavailable. The view could not be saved.'), { type: 'warning' });
+        }
+    }
+
+    async restoreView() {
+        this.closeSavedViews();
+        this.state.moreOpen = false;
+        const saved = this.readSavedView();
+        if (!saved) {
+            this.state.savedView = false;
+            this.notification.add(_t('The saved view is unavailable for your current access.'), { type: 'warning' });
+            return;
+        }
+        this.state.draft = { ...saved.applied };
+        await this.restoreNavigation(saved);
+    }
+
+    async resetView() {
+        this.closeSavedViews();
+        this.state.activeViewName = '';
+        this.state.moreOpen = false;
+        if (!this.defaultOptions) return;
+        this.state.draft = { ...this.defaultOptions };
+        this.state.sectionOrder = [];
+        this.state.rankLimit = 5;
+        this.state.productMeasure = 'value';
+        this.state.stockFilters = {sort: 'name', warehouse_id: '', category_id: '', search: '', hide_zero: true, hide_negative: false, at_date: ''};
+        try { window.localStorage.setItem(this.preferenceKey + '-order', '[]'); } catch { /* Optional. */ }
+        this.state.collapsed = { crm: true, inventory: true, procurement: true, hr: true };
+        try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional. */ }
+        this.state.activeSection = 'finance';
+        this.state.sidebarOpen = false;
+        this.state.hrPeriodApplied = null;
+        await this.refresh();
+        this.root.el?.scrollTo({ top: 0 });
+    }
+
+    openCashDirectory() { this.state.cashOpen = true; if (!this.state.directory) void this.loadDirectory('cash'); }
+    closeCashDirectory() { this.state.cashOpen = false; }
+    toggleMore() { this.state.moreOpen = !this.state.moreOpen; if (!this.state.moreOpen) this.state.moreFlip = false; }
+    closeMore(returnFocus = false) {
+        if (!this.state.moreOpen) return;
+        this.state.moreOpen = false;
+        this.state.moreFlip = false;
+        if (returnFocus) this.moreToggle.el?.focus();
+    }
+    menuKeydown(event) {
+        const items = [...event.currentTarget.querySelectorAll('[role=menuitem]:not([disabled])')];
+        const index = items.indexOf(event.target);
+        const next = {ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1}[event.key];
+        if (next === undefined || !items.length) return;
+        event.preventDefault();
+        items[(next + items.length) % items.length].focus();
+    }
+
+    closeWorkspace() {
+        this.state.sidebarOpen = false;
+        this.workspaceToggle.el?.focus();
+    }
+
+    workspaceKeydown(event) {
+        if (event.key === 'Escape' && this.state.moreOpen) { event.preventDefault(); this.closeMore(true); }
+        if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) &&
+                !event.target.isContentEditable && !this.state.search && !this.state.printSummary && !this.state.source && !this.state.detail) {
+            event.preventDefault();
+            this.searchInput.el?.focus();
+        }
+        if (event.key === 'Escape' && this.state.sidebarOpen) {
+            event.preventDefault();
+            this.closeWorkspace();
+        }
+    }
+
+    openSource(item, result) {
+        const definitions = {
+            invoiced_sales: _t('Posted customer invoices less credit notes, excluding tax, by invoice date in the selected company.'),
+            confirmed_sales: _t('Confirmed sales orders, excluding tax, by order date in the selected company.'),
+            quotations: _t('Draft and sent quotations, excluding tax, by order date in the selected company.'),
+            purchases: _t('Confirmed purchase orders, excluding tax, by order date in the selected company.'),
+            crm: _t('Expected revenue weighted by probability for open opportunities created in the selected period.'),
+            crm_expected: _t('Expected revenue before probability weighting for the same open opportunities created in the selected period.'),
+        };
+        this.state.source = { item: {...item, definition:item.definition || definitions[item.key]}, result };
+    }
+
+    closeSource() { this.state.source = null; }
+
+    headline(item, section, fullValue = false) {
+        if (fullValue && typeof item.value === 'number') {
+            // Amounts show whole units as in the approved design (the exact value is in the card title,
+            // the source drawer and every table); ratios keep one decimal ("36.2% margin") unless the
+            // caller states the native precision.
+            const digits = item.unit === 'percentage' ? (item.digits ?? 1) : 0;
+            return new Intl.NumberFormat(this.formatLocale, {
+                minimumFractionDigits: 0, maximumFractionDigits: digits,
+            }).format(item.value);
+        }
+        if (typeof item.value !== 'number' || Math.abs(item.value) < 1000000) return this.formatted(item, section);
+        return new Intl.NumberFormat(this.formatLocale, {
+            notation: 'compact', maximumFractionDigits: 2,
+        }).format(item.value);
+    }
+
+    async loadCustomers() {
+        const generation = this.generation;
+        const marker = {};
+        this.customerRequest = marker;
+        this.state.customers = { status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_breakdown', ['invoiced_sales', 'customer', { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && marker === this.customerRequest) {
+                this.state.customers = { ...data, rows: data.rows.slice(0, this.state.rankLimit || 5) };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && marker === this.customerRequest) {
+                this.state.customers = { status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async loadProducts() {
+        const generation = this.generation;
+        const marker = {};
+        this.productRequest = marker;
+        this.state.products = { status: 'loading', rows: [] };
+        try {
+            const data = this.state.productMeasure === 'quantity'
+                ? await this.orm.call('adams.executive.dashboard', 'get_product_quantity_ranking', [{...this.state.applied}, Number(this.state.productUnit) || false])
+                : await this.orm.call('adams.executive.dashboard', 'get_breakdown', ['invoiced_sales', 'product', { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && marker === this.productRequest) {
+                if (data.unit_id) this.state.productUnit = String(data.unit_id);
+                this.state.products = { ...data, rows: data.rows.slice(0, this.state.rankLimit || 5) };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && marker === this.productRequest) {
+                this.state.products = { status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async loadProfitabilityChart() {
+        const generation = this.generation, marker = {};
+        this.profitabilityRequest = marker;
+        const keys = ['revenue', 'gross_profit', 'profit'];
+        for (const key of keys) this.state.financialTrends[key] = {status: 'loading', rows: []};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_financial_trends', [keys, {...this.state.applied}]);
+            if (this.alive && generation === this.generation && marker === this.profitabilityRequest) for (const key of keys) this.state.financialTrends[key] = data.series[key];
+        } catch { if (this.alive && generation === this.generation && marker === this.profitabilityRequest) for (const key of keys) this.state.financialTrends[key] = {status: 'error', rows: []}; }
+    }
+
+    get partialChartMonth() {
+        const end = this.state.applied?.date_to;
+        if (!end) return null;
+        const date = new Date(end + 'T00:00:00Z');
+        const next = new Date(date); next.setUTCDate(date.getUTCDate() + 1);
+        if (next.getUTCMonth() !== date.getUTCMonth()) return null;
+        return {key: end.slice(0, 7), label: new Intl.DateTimeFormat(this.formatLocale,
+            {month: 'long', timeZone: 'UTC'}).format(date)};
+    }
+
+    profitabilityChart() {
+        const keys = ['revenue', 'gross_profit', 'profit'];
+        const data = keys.map(key => this.state.financialTrends[key]);
+        if (data.some(value => value?.status === 'loading')) { return { status: 'loading', rows: [] }; }
+        if (!data.some(Boolean)) { return { status: 'idle', rows: [] }; }
+        if (data.some(value => value?.status !== 'ready')) { return { status: 'unavailable', rows: [] }; }
+        const labels = [...new Set(data.flatMap(value => value.rows.map(row => row.label)))];
+        const values = data.flatMap(value => value.rows.map(row => row.value)).filter(Number.isFinite);
+        const peak = Math.max(1, ...values.map(Math.abs));
+        const step = 10 ** Math.floor(Math.log10(peak)) / 2;
+        const maximum = Math.ceil(Math.max(0, ...values) * 1.1 / step) * step || 1;
+        const minimum = Math.floor(Math.min(0, ...values) * 1.1 / step) * step;
+        const scale = value => 19 + (maximum - value) / (maximum - minimum) * 174;
+        const zero = scale(0);
+        const width = Math.max(680, labels.length * 104);
+        const number = value => new Intl.NumberFormat(this.formatLocale, {
+            notation: 'compact', maximumFractionDigits: 1 }).format(value);
+        return { status: 'ready', zero, width, ticks: Array.from({ length: 4 }, (_, index) => {
+            const value = minimum + (maximum - minimum) * index / 3;
+            return { label: number(value), y: scale(value) };
+        }), rows: labels.sort().map((label, monthIndex) => ({ label,
+            displayLabel: new Intl.DateTimeFormat(this.formatLocale, {month: 'short', timeZone: 'UTC'}).format(new Date(label + '-01T00:00:00Z')) + (this.partialChartMonth?.key === label ? '*' : ''),
+            x: 67 + (width - 82) / labels.length * (monthIndex + 0.5),
+            series: keys.map((key, index) => {
+                const row = data[index].rows.find(value => value.label === label);
+                const value = Number.isFinite(row?.value) ? row.value : null;
+                return { ...row, key, value,
+                    x: 67 + (width - 82) / labels.length * (monthIndex + 0.5) + (index - 1) * 29 - 12,
+                    y: value === null ? zero : Math.min(scale(value), zero),
+                    height: value === null ? 0 : Math.max(1, Math.abs(scale(value) - zero)) };
+            }) })) };
+    }
+
+    chartKeydown(event, key, month) {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            void this.openFinancialPeriod(key, month);
+        }
+    }
+
+    guidance(text) {
+        return typeof text === 'string' ? text.replace(/\bnative\s+/gi, '') : text;
+    }
+
+    formatted(item, section) {
+        if (item.value === null) { return this.statusLabels[item.status] || '—'; }
+        return new Intl.NumberFormat(this.formatLocale, {
+            maximumFractionDigits: item.key === 'orders' ? 0 : section.digits,
+            minimumFractionDigits: item.key === 'orders' ? 0 : section.digits,
+        }).format(item.value);
+    }
+
+    toggleSection(key) {
+        this.state.collapsed[key] = !this.state.collapsed[key];
+        try { window.localStorage.setItem(this.preferenceKey, JSON.stringify(this.state.collapsed)); } catch { /* Optional. */ }
+    }
+
+    async inspect(key, dimension = null, offset = 0) {
+        const generation = this.generation;
+        const request = ++this.detailGeneration;
+        dimension ||= this.dimensions[key][0];
+        this.closeSource();
+        const trendKey = JSON.stringify([this.state.applied, key]);
+        const cachedTrend = this.analysisTrends?.[trendKey];
+        this.state.detail = { key, dimension, offset, status: 'loading', rows: [], trend: cachedTrend?.rows || [] };
+        try {
+            const [groups, trend] = await Promise.all([
+                this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, dimension, { ...this.state.applied }, offset]),
+                cachedTrend || this.orm.call('adams.executive.dashboard', 'get_trend', [key, { ...this.state.applied }]),
+            ]);
+            if (this.alive && generation === this.generation && request === this.detailGeneration) {
+                if (trend.status === 'ready' || !trend.status) { this.analysisTrends ||= {}; this.analysisTrends[trendKey] = trend; }
+                this.state.detail = { ...groups, key, dimension, offset, trend: trend.rows || [], status: groups.status };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && request === this.detailGeneration) {
+                this.state.detail = { key, dimension, offset, status: 'error', rows: [], trend: [] };
+            }
+        }
+    }
+
+    closeDetail() { this.detailGeneration++; this.state.detail = null; }
+
+    barWidth(value, rows) {
+        const maximum = Math.max(...rows.map(row => Math.abs(row.value)), 1);
+        return `${Math.abs(value) / maximum * 100}%`;
+    }
+
+    async loadRanking(key) {
+        const generation = this.generation;
+        const request = (this.rankingRequest || 0) + 1;
+        this.rankingRequest = request;
+        this.state.ranking = { key, status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_breakdown', [key, 'salesperson', { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && request === this.rankingRequest) {
+                this.state.ranking = { ...data, key, rows: data.rows.slice(0, this.state.rankLimit || 5) };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && request === this.rankingRequest) {
+                this.state.ranking = { key, status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async loadFinancialTrend(key) {
+        const generation = this.generation;
+        const marker = {};
+        this.financialTrendRequests ||= {};
+        this.financialTrendRequests[key] = marker;
+        this.state.financialTrends[key] = { status: 'loading', rows: [] };
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_financial_trend', [key, { ...this.state.applied }]);
+            if (this.alive && generation === this.generation && this.financialTrendRequests[key] === marker) {
+                this.state.financialTrends[key] = data;
+            }
+        } catch {
+            if (this.alive && generation === this.generation && this.financialTrendRequests[key] === marker) {
+                this.state.financialTrends[key] = { status: 'error', rows: [] };
+            }
+        }
+    }
+
+    async openFinancialPeriod(key, period) {
+        if (this.state.opening) { return; }
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_financial_period', [key, { ...this.state.applied }, period]);
+            if (this.alive && generation === this.generation) { await this.action.doAction(action); }
+        } catch {
+            if (this.alive) { this.notification.add(_t('The report could not be opened. Check your access.'), { type: 'warning' }); }
+        } finally { if (this.alive) { this.state.opening = false; } }
+    }
+
+    async loadDirectory(kind, offset = 0, mode = null, search = null) {
+        const generation = this.generation;
+        const stateKey = kind === 'cash' ? 'directory' : kind;
+        const method = { cash: 'get_cash_directory', inventory: 'get_inventory', fulfillment: 'get_fulfillment', workforce: 'get_workforce', procurement: 'get_procurement' }[kind];
+        const request = (this[`${stateKey}Request`] || 0) + 1;
+        this[`${stateKey}Request`] = request;
+        mode = mode || this.state[stateKey]?.mode || (kind === 'procurement' ? 'late' : 'current');
+        search = kind === 'cash' ? (search ?? this.state.directory?.search ?? '') : null;
+        const previous = this.state[stateKey];
+        const stockFilters = kind === 'inventory' && previous?.filters ? {...previous.filters} : kind === 'inventory' ? {...this.state.stockFilters, warehouse_id: Number(this.state.stockFilters.warehouse_id) || false, category_id: Number(this.state.stockFilters.category_id) || false} : null;
+        if (kind === 'inventory' && !previous?.filters && mode === 'historical' && !stockFilters.at_date) stockFilters.at_date = this.state.applied.as_of;
+        if (kind === 'inventory' && mode === 'current') stockFilters.at_date = '';
+        this.state[stateKey] = { status: 'loading', rows: [], offset, mode, search, filters: stockFilters, warehouses: previous?.warehouses || [], categories: previous?.categories || [] };
+        try {
+            const args = [{ ...this.state.applied }, offset];
+            if (kind === 'cash') { args.push(search); }
+            if (['inventory', 'procurement'].includes(kind)) { args.push(mode); }
+            if (kind === 'inventory') args.push(stockFilters, 8);
+            const data = await this.orm.call('adams.executive.dashboard', method, args);
+            if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
+                this.state[stateKey] = { ...data, offset: Number.isInteger(data.offset) ? data.offset : offset };
+            }
+        } catch {
+            if (this.alive && generation === this.generation && this[`${stateKey}Request`] === request) {
+                this.state[stateKey] = { status: 'error', rows: [], offset, mode, search, filters: stockFilters, warehouses: previous?.warehouses || [], categories: previous?.categories || [] };
+            }
+        }
+    }
+
+    async exportDetail() {
+        if (!this.state.detail || this.state.exporting) { return; }
+        const generation = this.generation;
+        const detail = this.state.detail;
+        this.state.exporting = true;
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'export_breakdown', [detail.key, detail.dimension, { ...this.state.applied }]);
+            if (!this.alive || generation !== this.generation || this.state.detail !== detail) { return; }
+            const url = URL.createObjectURL(new Blob([data.content], { type: 'text/csv;charset=utf-8' }));
+            const anchor = document.createElement('a');
+            anchor.href = url; anchor.download = data.filename; anchor.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            if (this.alive) { this.notification.add(_t('Export unavailable. Check your export permissions or use the report for large exports.'), { type: 'warning' }); }
+        } finally { if (this.alive) { this.state.exporting = false; } }
+    }
+
+    async loadWorkspaceDetails(section, offset = 0) {
+        if (!['crm','procurement'].includes(section) || !this.sectionEnabled(section)) return;
+        const generation=this.generation, marker={};
+        this.workspaceRequests ||= {}; this.workspaceRequests[section]=marker;
+        this.state.workspaceDetails[section]={status:'loading',rows:[],offset};
+        try {
+            const data=await this.orm.call('adams.executive.dashboard','get_workspace_details',[{...this.state.applied},section,offset,4]);
+            if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]=data;
+        } catch {if(this.alive && generation===this.generation && this.workspaceRequests[section]===marker) this.state.workspaceDetails[section]={status:'error',rows:[],offset};}
+    }
+    async openWorkspaceRecord(section, id = null) {
+        if(this.state.opening)return;
+        const generation=this.generation; this.state.opening=true;
+        try {
+            const action=await this.orm.call('adams.executive.dashboard','open_workspace_record',[{...this.state.applied},section,id]);
+            if(this.alive && generation===this.generation)await this.action.doAction(action);
+        } catch {if(this.alive && generation===this.generation)this.notification.add(_t('The record is unavailable in the selected scope.'),{type:'warning'});}
+        finally {if(this.alive)this.state.opening=false;}
+    }
+
+    workspaceMetric(section, details) {
+        if (section === 'crm') return {...details.unweighted, key:'crm_expected', unit:'currency', source:_t('Pipeline Analysis'), date_field:'create_date', drilldown:details.unweighted?.status === 'ready'};
+        return this.sectionResult({key:'procurement'})?.items?.find(item => item.key === 'purchases');
+    }
+    get purchaseNote() { return _t('Untaxed purchase orders'); }
+    get pipelineNote() { return _t('Open opportunities · weighted by probability'); }
+    get pipelineUnweightedNote() { return _t('Open opportunities · unweighted'); }
+
+    async openProcurementWorklist(kind) {
+        if (this.state.opening || !['approvals','late'].includes(kind)) return;
+        const generation=this.generation;
+        this.state.opening=true;
+        try {
+            const action=await this.orm.call('adams.executive.dashboard','open_procurement',[{...this.state.applied},kind]);
+            if(this.alive && generation===this.generation) await this.action.doAction(action);
+        } catch { if(this.alive && generation===this.generation) this.notification.add(_t('The report could not be opened. Check your access.'),{type:'warning'}); }
+        finally { if(this.alive) this.state.opening=false; }
+    }
+
+    async refreshCompanyIdentity(generation) {
+        try {
+            const data = await this.orm.call('adams.executive.dashboard', 'get_bootstrap', []);
+            if (this.alive && generation === this.generation && data.options.company_id === this.state.applied.company_id) { this.state.companies = data.companies; this.state.logoFailed = false; }
+        } catch { /* Source widgets retain their own permission/error status. */ }
+    }
+    loadHRDepartment(id) { this.state.hrFilters = id ? {department_id:id} : {department_unassigned:true}; return this.loadHR('employees',0,this.state.hrFilters); }
+    get hrDepartmentSelection() { return this.state.hrFilters.department_unassigned ? 'unassigned' : String(this.state.hrFilters.department_id || ''); }
+    changeHRDepartment(event) {
+        const value = event.target.value;
+        delete this.state.hrFilters.department_unassigned;
+        delete this.state.hrFilters.department_id;
+        if (value === 'unassigned') this.state.hrFilters.department_unassigned = true;
+        else if (value) this.state.hrFilters.department_id = Number(value);
+    }
+    setHRView(view) { this.state.hrFilters.view = view; return this.applyHRFilters(); }
+    clearHRFilters() { this.state.hrFilters = {view:'week'}; return this.applyHRFilters(); }
+    openEmployeeRecord() { const id=this.state.employeeProfile?.employee?.id; if (id) return this.openHRSource(id,false,'employees',{status:'all'}); }
+    loadHROverviewMetric(metric) { this.state.hrFilters = {...metric.filters}; return this.loadHR(metric.tab, 0, metric.filters); }
+    hrMetricLabel(key) { return {employees:_t('Active employees'), checked_in:_t('Checked in now'), time_off:_t('On approved time off'), unassigned_shifts:_t('Unassigned shifts')}[key] || key; }
+    hrStatusLabel(status, source) {
+        // A missing source names its standard app (HR addendum); other states keep the shared labels.
+        if (status !== 'not_installed') return this.statusLabels[status];
+        return {employees: _t('Employees is not installed'), attendance: _t('Attendances is not installed'),
+                time_off: _t('Time Off is not installed'), shifts: _t('Planning is not installed')}[source] || this.statusLabels.not_installed;
+    }
+    hrMetricSource(key) { return {employees: 'employees', checked_in: 'attendance', time_off: 'time_off', unassigned_shifts: 'shifts'}[key]; }
+    employeeInitials(name) { return this.rankingInitials(name); }
+    get hrSnapshotLabel() {
+        const hr=this.state.hrData;
+        if (!hr?.generated_at) return this.hrDate(hr?.today);
+        const value=new Date(hr.generated_at.replace(' ','T')+'Z');
+        const locale=this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale;
+        const date=new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric',timeZone:hr.timezone || 'UTC'}).format(value).replace(/\bSept\b/g,'Sep');
+        return date+' · '+new Intl.DateTimeFormat(locale,{hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZone:hr.timezone || 'UTC'}).format(value);
+    }
+    get hrUnassignedLabel() { return _t('Unassigned'); }
+    hrDate(value, short = false) {
+        if (!value) return '—';
+        const date = value.slice(0,10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return value;
+        return new Intl.DateTimeFormat(this.formatLocale.startsWith('en') ? 'en-GB' : this.formatLocale,
+            {day:'numeric',month:'short',...(short ? {} : {year:'numeric'}),timeZone:'UTC'}).format(new Date(date+'T12:00:00Z'));
+    }
+    hrTime(value) { return value ? value.slice(11,16) : '—'; }
+    hrSourceLabel(tab) { return {employees:_t('Open Employees'),attendance:_t('Open Attendances'),time_off:_t('Open Time Off'),shifts:_t('Open Planning')}[tab]; }
+    hrBadgeClass(row) {
+        const state=row.state || row.status;
+        return {green:row.active === true || ['validate','published','open'].includes(state), amber:['confirm','validate1'].includes(state),red:['refuse','cancel'].includes(state)};
+    }
+    get hrStatusSelection() { const filters=this.state.hrFilters; return filters.assignment === 'unassigned' ? (filters.status === 'published' ? 'published_unassigned' : 'unassigned') : filters.status || ''; }
+    changeHRStatus(event) { this.state.hrFilters.status=event.target.value; delete this.state.hrFilters.assignment; }
+    get hrStatusOptions() {
+        const options = {employees:[['active',_t('Active')],['archived',_t('Archived')],['all',_t('All')]], attendance:[['all',_t('All')],['open',_t('Checked in')],['closed',_t('Checked out')]], time_off:[['all',_t('All')],['confirm',_t('To approve')],['validate1',_t('Second approval')],['validate',_t('Approved')],['refuse',_t('Refused')],['cancel',_t('Cancelled')]], shifts:[['published',_t('Published')],['draft',_t('Draft')],['unassigned',_t('Unassigned')],['published_unassigned',_t('Published unassigned')]]};
+        return (options[this.state.hrTab] || []).filter(([value])=>value !== 'all').map(([value,label])=>({value,label}));
+    }
+    get hrWeekDays() {
+        const start = this.state.hrData?.date_from || this.state.applied?.date_from;
+        if (!start) return [];
+        const end=this.state.hrData?.date_to || this.state.applied?.date_to || start;
+        const length=Math.min(7,Math.max(1,Math.floor((Date.parse(end)-Date.parse(start))/86400000)+1));
+        const weekday = new Intl.DateTimeFormat((user.context?.lang || document.documentElement.lang || 'en').replaceAll('_', '-'), {weekday: 'short', timeZone: 'UTC'});
+        return Array.from({length}, (_,index)=>{const value=new Date(start+'T12:00:00Z'); value.setUTCDate(value.getUTCDate()+index); const date=value.toISOString().slice(0,10); return {date,label:weekday.format(value), rows:(this.state.hrData?.rows || []).filter(row => row.start_datetime_label?.slice(0,10)<=date && (row.end_datetime_label?.slice(0,10)>date || (row.end_datetime_label?.slice(0,10)===date && row.end_datetime_label?.slice(11,16)!=='00:00'))).map(row=>({...row,continuation:row.start_datetime_label.slice(0,10)<date}))};});
+    }
+    openEmployeeRecords(tab) { const id=this.state.employeeProfile?.employee?.id; if (!id) return; this.closeEmployeeProfile(); this.state.hrFilters={employee_id:id}; return this.loadHR(tab,0,this.state.hrFilters); }
+
+    validateScope(options) {
+        const dates = ['date_from', 'date_to', 'as_of'].map(key => options[key]);
+        if (dates.some(value => !/^\d{4}-\d{2}-\d{2}$/.test(value || '') || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString().slice(0, 10) !== value)) return _t('Enter valid dates.');
+        if (dates[0] > dates[1] || (Date.parse(dates[1]) - Date.parse(dates[0])) / 86400000 > 1095) return _t('Select a period of up to three years with the start before the end.');
+        return '';
+    }
+
+    get activeDepartment() { return this.sections.find(section => section.key === this.state.activeSection) || this.sections[0]; }
+    get companyIdentity() {
+        const company = this.state.companies.find(entry => entry.id === this.state.applied?.company_id) || {};
+        return {id: company.id, name: company.name || '', logoUrl: company.logo_url || '', initials: company.initials || (company.name || '').split(/\s+/).slice(0, 2).map(word => word[0]).join('')};
+    }
+    logoError() { this.state.logoFailed = true; }
+    focusSearch() { this.state.sidebarOpen = false; this.state.moreOpen = false; this.state.searchOpen = true; requestAnimationFrame(() => this.searchInput.el?.focus()); }
+    changePeriod(event) {
+        const value = event.target.value;
+        this.state.periodPreset = value;
+        if (value === 'custom') return;
+        const today = this.defaultOptions?.date_to || new Date().toISOString().slice(0, 10);
+        const current = new Date(today + 'T12:00:00Z');
+        let start = today.slice(0, 7) + '-01', end = today;
+        if (value === 'ytd') start = today.slice(0, 4) + '-01-01';
+        if (value === 'previous') { current.setUTCDate(0); end = current.toISOString().slice(0, 10); start = end.slice(0, 7) + '-01'; }
+        this.state.draft = {...this.state.draft, date_from: start, date_to: end};
+        return this.refresh();
+    }
+    formatStockQuantity(value, row) { return this.quantity(value, row?.digits ?? 2); }
+    get stockQuantityColumns() { return [
+        {key:'reserved_quantity',label:_t('Reserved')},{key:'free_qty',label:_t('Available')},
+        {key:'incoming_qty',label:_t('Incoming')},{key:'outgoing_qty',label:_t('Outgoing')},
+        {key:'virtual_available',label:_t('Forecasted')}]; }
+    get stockDetailColumns() { const columns=this.stockQuantityColumns; return this.state.inventory?.mode === 'historical' ? columns.slice(0,2) : [...columns.slice(2),...columns.slice(0,2)]; }
+    stockRowLabel(row, detail=false) { return detail ? _t('Show details for %s', row.name || row.display_name) : _t('View stock for %s', row.name || row.display_name); }
+    toggleStockRow(row) { this.state.inventory.expandedRow = this.state.inventory.expandedRow === row.id ? null : row.id; }
+    openStockQuantity(row, key) {
+        if (key === 'reserved_quantity') return this.openStockReservations(row);
+        if (key === 'free_qty') return this.openStockRow(row);
+        return this.openStockSource('forecast',row);
+    }
+    get stockDateValue() { return this.state.stockFilters.at_date || this.defaultOptions?.date_to || ''; }
+    changeStockDate(event) { this.state.stockFilters.at_date = event.target.value === this.defaultOptions?.date_to ? '' : event.target.value; }
+    get stockDateLabel() {
+        const value=this.state.inventory?.as_of || this.defaultOptions?.date_to;
+        if (!value) return '';
+        const language=(user.context?.lang || document.documentElement.lang || 'en').replaceAll('_','-');
+        return new Intl.DateTimeFormat(language.startsWith('en') ? 'en-GB' : language,
+            {day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
+    }
+    get stockFiltersDirty() { const applied = this.state.inventory?.filters; return Boolean(applied && Object.keys(this.state.stockFilters).some(key=>String(this.state.stockFilters[key] || '') !== String(applied[key] || ''))); }
+    clearStockFilters() { this.state.stockFilters={sort:'name',warehouse_id:'',category_id:'',search:'',hide_zero:true,hide_negative:false,at_date:''}; this.state.stockMode='current'; return this.applyStockFilters(); }
+    changeStockMode(mode) {
+        this.state.stockMode = mode;
+        if (mode === 'current') this.state.stockFilters.at_date = '';
+        if (mode === 'cutoff') this.state.stockFilters.at_date = this.state.applied.as_of === this.defaultOptions?.date_to ? '' : this.state.applied.as_of;
+        if (mode !== 'custom') return this.applyStockFilters();
+    }
+    applyStockFilters() {
+        const atDate = this.state.stockFilters.at_date;
+        const today = this.defaultOptions?.date_to || new Date().toISOString().slice(0, 10);
+        if (atDate && (!/^\d{4}-\d{2}-\d{2}$/.test(atDate) || !Number.isFinite(Date.parse(atDate)) || new Date(atDate).toISOString().slice(0,10) !== atDate || atDate > today)) {
+            this.state.stockError = _t('Choose a valid stock date no later than today.'); return;
+        }
+        this.state.stockError = '';
+        const previous = this.state.inventory;
+        this.state.inventory = {warehouses: previous?.warehouses || [], categories: previous?.categories || []};
+        return this.loadDirectory('inventory', 0, atDate ? 'historical' : 'current');
+    }
+    pageStock(offset) { return this.loadDirectory('inventory', offset); }
+    changeStockSort(event) {
+        const sort = event.target.value;
+        if (!['name', 'qty'].includes(sort) || !this.state.inventory) return;
+        this.state.stockFilters.sort = sort;
+        this.state.inventory = {...this.state.inventory, filters: {...this.state.inventory.filters, sort}};
+        return this.pageStock(0);
+    }
+    stockValuationLabel(row = null) {
+        return row?.warehouse_id || this.state.inventory?.filters?.warehouse_id ? _t('Warehouse valuation →') : _t('Company valuation →');
+    }
+    async openStockValuation(row = null) {
+        const data = this.state.inventory;
+        if (!data || this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const filters = {...data.filters};
+            if (row?.warehouse_id) filters.warehouse_id = row.warehouse_id;
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_valuation', [{...this.state.applied}, data.mode, filters, row?.product_id || null]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The valuation report could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openStockReservations(row) {
+        const data = this.state.inventory;
+        if (!data || data.mode !== 'current' || this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_reservations', [{...this.state.applied}, row.product_id, row.location_id, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openStockSource(kind, row = null) {
+        if (row?.product_id) return this.openReport('inventory_product', kind, row.product_id);
+        if (!['history', 'replenishment', 'forecast'].includes(kind) || this.state.opening || !this.state.inventory) return;
+        const generation = this.generation, data = this.state.inventory;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_inventory_source', [{...this.state.applied}, kind, {...data.filters}]);
+            if (this.alive && generation === this.generation && data === this.state.inventory) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The stock source could not be opened. Check your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    async openProductRanking(productId = null) {
+        if (this.state.productMeasure !== 'quantity') return this.openReport('invoiced_sales', productId ? 'product' : null, productId);
+        if (this.state.opening) return;
+        const generation = this.generation;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard', 'open_product_quantity_report', [{...this.state.applied}, productId, Number(this.state.productUnit) || null]);
+            if (this.alive && generation === this.generation) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation) this.notification.add(_t('The quantity report could not be opened. Check the selected unit and your access.'), {type:'warning'}); }
+        finally { if (this.alive) this.state.opening = false; }
+    }
+    quantity(value, digits = 2) { return Number.isFinite(value) ? new Intl.NumberFormat(this.formatLocale, {maximumFractionDigits: digits}).format(value) : '—'; }
+    get hrOptions() { return {...this.state.applied, ...this.state.hrPeriodApplied}; }
+    get hrLoading() { return this.state.hrData?.status === 'loading'; }
+    get hrPeriodDirty() { return ['date_from','date_to'].some(key => this.state.hrPeriodDraft[key] !== this.state.hrPeriodApplied?.[key]); }
+    onHRDateChange(event) { const key = event.target.name; if (['date_from','date_to'].includes(key)) this.state.hrPeriodDraft[key] = event.target.value; }
+    async applyHRPeriod(event) {
+        event?.preventDefault?.();
+        const period = {...this.state.hrPeriodDraft};
+        const error = this.validateScope({...this.state.applied, ...period});
+        this.state.hrPeriodError = error;
+        if (error) return;
+        this.state.hrPeriodApplied = period;
+        this.closeEmployeeProfile();
+        return this.loadHR(this.state.hrTab, 0, {...this.state.hrFilters});
+    }
+    invalidateHRSource() { if (this.hrSourceRequest) { this.hrSourceRequest = null; this.state.opening = false; } }
+    async loadHR(tab = this.state.hrTab, offset = 0, filters = null) {
+        if (!['overview','attendance','time_off','shifts','employees'].includes(tab) || !this.sectionEnabled('hr')) return;
+        const generation = this.generation, marker = {};
+        this.hrRequest = marker;
+        this.invalidateHRSource();
+        this.closeEmployeeProfile();
+        const changedTab = tab !== this.state.hrTab;
+        if (changedTab && !filters) this.state.hrFilters = {search: '', view: 'week', ...(tab === 'shifts' ? {status:'published'} : {})};
+        const appliedFilters = this.normalizedHRFilters(filters || (changedTab ? this.state.hrFilters : this.state.hrData?.filters) || this.state.hrFilters);
+        if (tab === 'overview') for (const key of Object.keys(appliedFilters)) delete appliedFilters[key];
+        if (tab === 'shifts' && appliedFilters.view === 'week') offset = 0;
+        this.state.hrTab = tab;
+        this.syncUrl();
+        this.state.hrData = {status:'loading', rows:[], filters: appliedFilters, offset};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[this.hrOptions,tab,appliedFilters,offset,6]);
+            if (this.alive && generation === this.generation && this.hrRequest === marker) { this.state.hrData = {...data, filters: appliedFilters, total_count: data.total, next_offset: (data.offset || 0) + (data.rows?.length || 0)}; if (data.departments) this.hrDepartments = data.departments; }
+        } catch { if (this.alive && generation === this.generation && this.hrRequest === marker) this.state.hrData = {status:'error',rows:[],filters:appliedFilters,offset}; }
+    }
+    async loadMoreHRShifts() {
+        const previous = this.state.hrData;
+        if (this.state.hrTab !== 'shifts' || previous?.filters?.view !== 'week' ||
+            previous.status !== 'ready' || !previous.has_more || previous.loading_more) return;
+        const generation = this.generation, marker = {}, options = {...this.hrOptions};
+        const filters = {...previous.filters}, offset = previous.next_offset ?? ((previous.offset || 0) + previous.rows.length);
+        this.hrRequest = marker;
+        this.state.hrData = {...previous, loading_more:true, load_more_error:false};
+        const current = () => this.alive && generation === this.generation && this.hrRequest === marker &&
+            this.state.hrTab === 'shifts' && JSON.stringify(this.hrOptions) === JSON.stringify(options);
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_hr_workspace',[options,'shifts',filters,offset]);
+            if (!current()) return;
+            if (!['ready','empty'].includes(data.status)) {
+                if (data.status === 'restricted') {
+                    this.invalidateHRSource();
+                    this.closeEmployeeProfile();
+                    this.hrDepartments = [];
+                }
+                this.state.hrData = {...data, rows:[], filters, total_count:data.total};
+                return;
+            }
+            const rows = [...new Map([...previous.rows, ...data.rows].map(row => [row.id,row])).values()];
+            // Offset paging can overlap or skip slots when Planning changes.
+            // Start a new calendar result instead of labelling a mixed snapshot complete.
+            if (data.total !== previous.total || data.offset !== offset ||
+                rows.length !== previous.rows.length + data.rows.length || rows.length > data.total ||
+                (!data.has_more && rows.length !== data.total)) {
+                return this.loadHR('shifts', 0, filters);
+            }
+            this.state.hrData = {...data, status:rows.length ? 'ready' : 'empty', rows, filters, offset:0,
+                next_offset:(data.offset || 0) + data.rows.length, total_count:data.total, loading_more:false, load_more_error:false};
+        } catch (error) {
+            if (!current()) return;
+            if (error?.data?.name === 'odoo.exceptions.AccessError') {
+                this.invalidateHRSource();
+                this.closeEmployeeProfile();
+                this.hrDepartments = [];
+                this.state.hrData = {status:'restricted', rows:[], filters, offset:0};
+            } else {
+                this.state.hrData = {...previous, loading_more:false, load_more_error:true};
+            }
+        }
+    }
+    normalizedHRFilters(filters) { const result = Object.fromEntries(Object.entries(filters || {}).filter(([, value]) => value !== '' && value !== undefined && value !== null)); if (['unassigned','published_unassigned'].includes(result.status)) { result.assignment='unassigned'; result.status=result.status==='published_unassigned' ? 'published' : 'all'; } if ('include_archived' in result) { result.status = result.include_archived ? 'all' : 'active'; delete result.include_archived; } for (const key of ['department_id','employee_id','leave_type_id']) if (key in result) result[key] = Number(result[key]); return result; }
+    applyHRFilters() { return this.loadHR(this.state.hrTab,0,{...this.state.hrFilters}); }
+    async openEmployeeProfile(id) {
+        this.invalidateHRSource();
+        const generation = this.generation, marker = {};
+        this.employeeRequest = marker;
+        this.state.employeeProfile = {status:'loading',id};
+        try {
+            const data = await this.orm.call('adams.executive.dashboard','get_employee_profile',[this.hrOptions,id]);
+            if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = data;
+        } catch { if (this.alive && generation === this.generation && this.employeeRequest === marker) this.state.employeeProfile = {status:'error',id}; }
+    }
+    closeEmployeeProfile() { this.invalidateHRSource(); this.employeeRequest = null; this.state.employeeProfile = null; }
+    async openHRSource(recordId = null, report = false, tab = this.state.hrTab, filters = null) {
+        const generation = this.generation, marker = {};
+        if (this.state.opening) return;
+        this.hrSourceRequest = marker;
+        this.state.opening = true;
+        try {
+            const action = await this.orm.call('adams.executive.dashboard','open_hr_source',[this.hrOptions,tab,this.normalizedHRFilters(filters || this.state.hrData?.filters || this.state.hrFilters),recordId,report]);
+            if (this.alive && generation === this.generation && this.hrSourceRequest === marker) await this.action.doAction(action);
+        } catch { if (this.alive && generation === this.generation && this.hrSourceRequest === marker) this.notification.add(_t('The HR record or report could not be opened. Check your access.'),{type:'warning'}); }
+        finally { if (this.alive && this.hrSourceRequest === marker) { this.state.opening = false; this.hrSourceRequest = null; } }
+    }
+
+    async openReport(key, dimension = null, groupId = null) {
+        if (this.state.opening) { return; }
+        if (key === 'crm_expected') { this.closeSource(); return this.openWorkspaceRecord('crm'); }
+        const generation = this.generation;
+        this.closeSource();
+        this.state.opening = true;
+        try {
+            const isDirectory = ['inventory', 'fulfillment', 'workforce', 'inventory_product', 'procurement'].includes(key);
+            const args = isDirectory ? [{ ...this.state.applied }] : [key, { ...this.state.applied }, dimension, groupId];
+            if (key === 'inventory') { args.push(this.state.inventory?.mode || 'current'); }
+            if (key === 'procurement') { args.push(this.state.procurement?.mode || 'late', groupId); }
+            if (key === 'workforce') { args.push(groupId); }
+            if (key === 'fulfillment' && groupId) { args.push(groupId, dimension); }
+            if (key === 'inventory_product') { args.push(groupId, dimension); }
+            const action = await this.orm.call('adams.executive.dashboard', isDirectory ? `open_${key}` : 'open_report', args);
+            if (this.alive && generation === this.generation) { await this.action.doAction(action); }
+        } catch {
+            if (this.alive) { this.notification.add(_t('The report could not be opened. Check your access.'), { type: 'warning' }); }
+        } finally {
+            if (this.alive) { this.state.opening = false; }
+        }
+    }
+}
+
+registry.category('actions').add('adams_executive_dashboard.dashboard', ExecutiveDashboard);

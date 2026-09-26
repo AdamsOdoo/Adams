@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.SalesSection">
+        <t t-set="kpiList" t-value="kpis"/>
+        <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
+            <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="compact(kpi.value)"/> <small t-esc="currency"/></span>
+                <span class="ed-kpi-cap" t-esc="kpi.cap"/>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <section t-if="w.trend" class="ed-panel ed-span-8">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Invoiced sales by month</h2>
+                        <p t-if="w.trend.partial">Posted entries · last 12 months · current month to date (dashed)</p>
+                        <p t-else="">Posted entries · last 12 months</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('invoices', this.periodArgs)">
+                        Invoiced sales <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <t t-set="trendData" t-value="trend"/>
+                <LineChart series="trendData.series" labels="trendData.labels" titles="trendData.titles"
+                           partial="trendData.partial" onClick="() => this.open('invoices', this.periodArgs)"/>
+            </section>
+
+            <section t-if="w.salespeople" class="ed-panel ed-span-4">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Salespeople by invoiced sales</h2>
+                        <p><bdi dir="ltr" t-esc="period"/></p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('salespeople', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.salespeople.length" class="ed-note">No invoices in this period.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.salespeople" t-as="p" t-key="p_index" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                            t-on-click="() => this.open('salesperson', { ...this.periodArgs, user_id: p.id })">
+                        <span class="ed-l"><span class="ed-rank" t-esc="p_index + 1"/>
+                            <span><t t-esc="p.name"/><small>
+                                <t t-esc="p.count"/> invoices</small></span></span>
+                        <span class="ed-r ed-num" t-esc="compact(p.amount)"/>
+                    </button>
+                </div>
+            </section>
+
+            <section t-if="w.products" class="ed-panel ed-span-6">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Top products by quantity</h2>
+                        <p><bdi dir="ltr" t-esc="period"/></p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('products', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.products.length" class="ed-note">No invoiced products in this period.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.products" t-as="p" t-key="p_index" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                            t-on-click="() => this.open('product', { ...this.periodArgs, product_id: p.product_id, uom_id: p.uom_id })">
+                        <span class="ed-l"><span class="ed-rank" t-esc="p_index + 1"/>
+                            <span><t t-esc="p.name"/><small t-if="p.code" t-esc="p.code"/></span></span>
+                        <span class="ed-r ed-num"><t t-esc="whole(p.quantity)"/> <small t-esc="p.uom"/></span>
+                    </button>
+                </div>
+            </section>
+
+            <section t-if="w.customers" class="ed-panel ed-span-6">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Top customers by collections</h2>
+                        <p>Money received · payments, bank statement lines and journal entries · <bdi dir="ltr" t-esc="period"/></p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('customers', this.periodArgs)">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.customers.length" class="ed-note">No money received from customers in this period.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.customers" t-as="c" t-key="c.id" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                            t-on-click="() => this.open('customer', { ...this.periodArgs, partner_id: c.id })">
+                        <span class="ed-l"><span class="ed-rank" t-esc="c_index + 1"/>
+                            <span><t t-esc="c.name"/><small><t t-esc="c.count"/> receipts</small></span></span>
+                        <span class="ed-r ed-num" t-esc="compact(c.amount)"/>
+                    </button>
+                </div>
+            </section>
+
+            <section class="ed-panel ed-span-12">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Recent orders</h2>
+                        <p t-if="w.orders.delivery">Delivery Status as recorded on each sales order</p>
+                        <p t-else="">Confirmed sales orders in the period</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.openOrders('orders')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.orders.rows.length" class="ed-note">No confirmed orders in this period.</p>
+                <div t-else="" class="ed-tbl-wrap">
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:16%"/><col/><col style="width:12%"/><col style="width:16%"/>
+                            <col t-if="w.orders.delivery" style="width:18%"/></colgroup>
+                        <thead><tr>
+                            <th>Reference</th><th>Customer</th><th>Date</th><th class="n">Value</th>
+                            <th t-if="w.orders.delivery">Delivery Status</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-foreach="w.orders.rows" t-as="o" t-key="o.id" class="click" tabindex="0"
+                                t-on-click="() => this.openOrder(o)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openOrder(o)">
+                                <td t-att-data-label="labels.ref" t-esc="o.name"/>
+                                <td t-att-data-label="labels.customer" t-esc="o.customer"/>
+                                <td t-att-data-label="labels.date" t-esc="formatDate(o.date)"/>
+                                <td t-att-data-label="labels.value" class="n ed-num"><t t-esc="whole(o.amount)"/>
+                                    <small t-if="o.currency !== currency" t-esc="o.currency"/></td>
+                                <td t-if="w.orders.delivery" t-att-data-label="labels.delivery">
+                                    <span t-if="o.delivery_status" t-att-class="'ed-chip ' + deliveryChip(o.delivery_status)" t-esc="o.delivery_label"/>
+                                    <t t-else="">—</t>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section t-if="w.quotations" class="ed-panel ed-span-12">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Recent quotations</h2>
+                        <p>Quotations and quotations sent · as of today</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.openOrders('quotations')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.quotations.rows.length" class="ed-note">No open quotations.</p>
+                <div t-else="" class="ed-tbl-wrap">
+                    <table class="ed-fixed">
+                        <colgroup><col style="width:16%"/><col/><col style="width:12%"/><col style="width:12%"/>
+                            <col style="width:16%"/><col style="width:16%"/></colgroup>
+                        <thead><tr>
+                            <th>Reference</th><th>Customer</th><th>Date</th><th>Expiration</th><th class="n">Value</th><th>Status</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-foreach="w.quotations.rows" t-as="q" t-key="q.id" class="click" tabindex="0"
+                                t-on-click="() => this.openQuotation(q)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openQuotation(q)">
+                                <td t-att-data-label="labels.ref" t-esc="q.name"/>
+                                <td t-att-data-label="labels.customer" t-esc="q.customer"/>
+                                <td t-att-data-label="labels.date" t-esc="formatDate(q.date)"/>
+                                <td t-att-data-label="labels.validity"><t t-if="q.validity_date" t-esc="formatDate(q.validity_date)"/><t t-else="">—</t></td>
+                                <td t-att-data-label="labels.value" class="n ed-num"><t t-esc="whole(q.amount)"/>
+                                    <small t-if="q.currency !== currency" t-esc="q.currency"/></td>
+                                <td t-att-data-label="labels.status">
+                                    <span t-att-class="'ed-chip ' + (q.state === 'sent' ? 'info' : 'neutral')" t-esc="q.state_label"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.SalesOrderDrawer">
+        <t t-if="props.data">
+            <t t-set="d" t-value="props.data"/>
+            <div class="ed-rows">
+                <div class="ed-row"><span class="ed-l">Customer</span><span class="ed-r" t-esc="d.customer"/></div>
+                <div class="ed-row"><span class="ed-l">Order date</span><span class="ed-r ed-num" t-esc="formatDate(d.date)"/></div>
+                <div t-if="d.validity_date and (d.state === 'draft' or d.state === 'sent')" class="ed-row">
+                    <span class="ed-l">Expiration</span><span class="ed-r ed-num" t-esc="formatDate(d.validity_date)"/></div>
+                <div class="ed-row"><span class="ed-l">Salesperson</span><span class="ed-r" t-esc="d.salesperson or '—'"/></div>
+                <div class="ed-row"><span class="ed-l">Status</span><span class="ed-r"><span class="ed-chip neutral" t-esc="d.state_label"/></span></div>
+                <div t-if="d.delivery_status" class="ed-row"><span class="ed-l">Delivery Status</span>
+                    <span class="ed-r"><span t-att-class="'ed-chip ' + deliveryChip(d.delivery_status)" t-esc="d.delivery_label"/></span></div>
+                <div t-if="d.invoice_status" class="ed-row"><span class="ed-l">Invoice Status</span>
+                    <span class="ed-r"><span t-att-class="'ed-chip ' + invoiceChip(d.invoice_status)" t-esc="d.invoice_label"/></span></div>
+                <div class="ed-row"><span class="ed-l">Untaxed amount</span>
+                    <span class="ed-r ed-num"><t t-esc="whole(d.untaxed)"/> <small t-esc="d.currency"/></span></div>
+                <div class="ed-row"><span class="ed-l">Total</span>
+                    <span class="ed-r ed-num"><t t-esc="whole(d.total)"/> <small t-esc="d.currency"/></span></div>
+            </div>
+
+            <button t-if="d.deliveries !== null" type="button" class="ed-btn mt-3" t-on-click="openDeliveries"
+                    t-att-disabled="!d.deliveries">
+                Deliveries <span class="ed-num" t-esc="d.deliveries"/> <Icon name="'arrow'" flip="true"/>
+            </button>
+
+            <div class="ed-group-label mt-3"><span>Order lines</span><span class="ed-num" t-esc="d.line_count"/></div>
+            <p t-if="!d.lines.length" class="ed-note">No order lines.</p>
+            <div t-else="" class="ed-tbl-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Product</th><th class="n">Ordered</th><th class="n">Delivered</th><th class="n">Invoiced</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr t-foreach="d.lines" t-as="line" t-key="line_index">
+                            <td t-att-data-label="labels.product"><t t-esc="line.name"/> <small t-if="line.unit" t-esc="line.unit"/></td>
+                            <td t-att-data-label="labels.ordered" class="n ed-num" t-esc="quantity(line.ordered)"/>
+                            <td t-att-data-label="labels.delivered" class="n ed-num" t-esc="quantity(line.delivered)"/>
+                            <td t-att-data-label="labels.invoiced" class="n ed-num" t-esc="quantity(line.invoiced)"/>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p t-if="d.line_count > d.lines.length" class="ed-note">Showing the first <t t-esc="d.lines.length"/> lines.</p>
+        </t>
+    </t>
+</templates>

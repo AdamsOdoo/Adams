@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Sync Now Wizard -->
+    <record id="shopify_sync_wizard_view_form" model="ir.ui.view">
+        <field name="name">shopify.sync.wizard.form</field>
+        <field name="model">shopify.sync.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Sync Now">
+                <group>
+                    <field name="backend_id"/>
+                    <field name="direction"/>
+                </group>
+                <group string="What to Sync">
+                    <field name="sync_products"/>
+                    <field name="sync_customers"/>
+                    <field name="sync_orders"/>
+                    <field name="sync_inventory"/>
+                </group>
+                <group string="Options">
+                    <field name="force_full_sync"/>
+                </group>
+                <footer>
+                    <button name="action_sync" type="object"
+                            string="Start Sync" class="oe_highlight"/>
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_sync_wizard_action" model="ir.actions.act_window">
+        <field name="name">Sync Now</field>
+        <field name="res_model">shopify.sync.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

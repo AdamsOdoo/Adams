@@ -1,0 +1,115 @@
+// Approved shared metric/ranking/table geometry, qualified first on Finance/Inventory.
+// Odoo chrome and appearance remain authoritative.
+.o_adams_dashboard #adams-sales,
+.o_adams_dashboard #adams-procurement,
+.o_adams_dashboard #adams-crm,
+.o_adams_dashboard #adams-hr {
+    --adams-sales-amber:#85510d; --adams-sales-red:#b23843;
+    @if $o-webclient-color-scheme == dark { --adams-sales-amber:#f6c672; --adams-sales-red:#ffa4ae; }
+    .adams_metric_group { margin-bottom:0; }
+    .adams_card { min-height:0; }
+    .adams_card_top { align-items:center; min-height:0; }
+    .adams_metric_info { display:inline-flex; align-items:center; justify-content:center; flex:none; margin-inline-start:auto; padding:1px 6px; width:27px; height:17px; border:0; background:none; color:var(--adams-sub); }
+    .adams_metric_info .adams_icon { width:15px; height:15px; }
+    .adams_metric_info:hover { color:var(--adams-purple); }
+    .adams_margin_note { display:block; min-height:0; }
+    .adams_margin_note strong { font-weight:400; }
+    .adams_card > .adams_metric_foot { margin-top:13px; padding-top:8px; gap:8px; }
+    .adams_metric_foot > .adams_source_button { padding:2px 0; font-size:12px; line-height:18px; display:inline-flex; align-items:center; }
+    .adams_grid_three > .adams_card:last-child { grid-column:auto; }
+    .adams_sales_reference { display:block; margin:0; }
+    .adams_group_heading { display:flex; align-items:center; justify-content:space-between; gap:14px; margin:25px 0 13px; }
+    .adams_group_heading h3 { font-size:17px; line-height:25.5px; font-weight:650; letter-spacing:-.25px; }
+    .adams_group_heading .btn-link, .adams_panel .btn-link { display:inline-flex; align-items:center; gap:5px; padding:2px 0; border:0; background:transparent; min-height:0; font-size:12px; font-weight:600; line-height:18px; white-space:nowrap; }
+    .adams_action_arrow { width:14px; height:14px; }
+    .adams_sales_show { display:flex; align-items:center; gap:8px; margin:0; color:var(--adams-sub); font-size:12px; font-weight:400; }
+    .adams_sales_show select { appearance:auto; background:var(--adams-paper); color:var(--adams-ink); border:1px solid var(--adams-line); border-radius:6px; padding:7px 9px; min-height:36px; font-size:13px; line-height:normal; }
+    .adams_sales_rank_toolbar, .adams_sales_toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:0 0 12px; }
+    .adams_sales_toolbar { padding:15px 20px; }
+    .adams_hint { margin:0; font-size:12px; line-height:18px; color:var(--adams-sub); }
+    .adams_rank_tabs { display:inline-flex; gap:3px; padding:3px; margin:0; width:auto; background:var(--adams-soft); border:1px solid var(--adams-line); border-radius:7px; flex-wrap:wrap; }
+    .adams_rank_tabs button { flex:0 0 auto; font-size:12px; line-height:18px; padding:5px 10px; min-height:0; border:0; border-radius:4px; color:var(--adams-sub); background:transparent; }
+    .adams_rank_tabs button.active { background:var(--adams-paper); color:var(--adams-purple); box-shadow:0 1px 3px #0001; font-weight:600; }
+    .adams_sales_equal { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:stretch; }
+    .adams_sales_equal > .adams_panel { order:0; grid-column:auto; margin:0; }
+    .adams_products_heading > h3 { margin-inline-end:0; }
+    .adams_workspace_reference > .adams_group_heading { margin-top:0; }
+    .adams_workspace_kpis { gap:13px; margin-bottom:18px; }
+    .adams_workspace_reference .adams_metric_foot > .adams_card_date { display:block; }
+    .adams_workspace_records { margin-top:0; }
+    .adams_workspace_records .adams_table_wrap { margin-top:16px; }
+    .adams_procurement_panels { margin-top:0; align-items:stretch; grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .adams_procurement_panels .adams_table_wrap { margin-top:15px; }
+    .adams_procurement_alert { gap:11px; padding:12px 15px; border-radius:8px; margin:0 0 18px; color:var(--adams-sales-amber); font-size:12px; border-color:color-mix(in srgb,var(--adams-sales-amber) 24%,transparent); }
+    .adams_procurement_alert .btn-link { padding:2px 0; border:0; background:none; display:inline-flex; align-items:center; gap:5px; min-height:0; line-height:18px; }
+    .adams_procurement_payments .adams_panel_body { padding:17px 20px; }
+    .adams_procurement_payments h3 { font-size:15px; font-weight:650; line-height:22.5px; margin:0; }
+    .adams_payment_scope { font-size:12px; color:var(--adams-sub); margin:6px 0 14px; }
+    .adams_payment_row { padding:12px 0; }
+    .adams_payment_row:last-child { border-bottom:0; }
+    .adams_payment_row .btn-link { font-size:14px; padding:0; line-height:21px; }
+    .adams_panel_head { display:flex; align-items:start; justify-content:space-between; padding:18px 20px 0; }
+    .adams_panel_head h3 { line-height:22.5px; }
+    .adams_panel_head p { margin:3px 0 0; font-size:12px; line-height:18px; }
+    .adams_rank_list { margin:0; padding:4px 20px 17px; }
+    .adams_rank_row { display:grid; grid-template-columns:18px 30px minmax(0,1fr) auto; align-items:center; gap:10px; padding:13px 0; min-height:0; border:0; border-bottom:1px solid var(--adams-line); width:100%; text-align:start; font-weight:400; }
+    .adams_rank_row:last-child { border:0; }
+    .adams_rank_row:hover { color:var(--adams-purple); }
+    .adams_rank_index { width:auto; font-size:12px; }
+    .adams_rank_avatar { width:29px; height:29px; font-size:10px; font-weight:650; }
+    .adams_rank_person { font-size:13px; line-height:19.5px; min-width:0; }
+    .adams_rank_track { height:3px; margin-top:6px; background:var(--adams-line); border-radius:2px; }
+    .adams_rank_track > span { border-radius:2px; background:var(--adams-purple); }
+    .adams_rank_track > .negative { background:var(--adams-sales-red); }
+    .adams_rank_value { font-size:13px; font-weight:600; text-align:end; white-space:nowrap; }
+    .adams_rank_value small { color:var(--adams-sub); font-size:12px; }
+    .adams_table_wrap { max-height:none; margin:0; padding:0; scrollbar-gutter:auto; overflow:auto; scrollbar-width:thin; }
+    .adams_table_wrap table { margin:0; width:100%; border-collapse:collapse; font-size:13px; }
+    .adams_table_wrap th { color:var(--adams-sub); font-size:11px; font-weight:600; background:var(--adams-soft); }
+    .adams_table_wrap th, .adams_table_wrap td { padding:12px 15px; line-height:19.5px; vertical-align:middle; border-bottom:1px solid var(--adams-line); }
+    .adams_table_wrap th { padding:10px 15px; line-height:16.5px; white-space:nowrap; }
+    .adams_recent_panel td .btn-link { display:inline; vertical-align:baseline; padding:0; font-size:13px; line-height:19.5px; }
+    .adams_workspace_records .adams_row_link { display:inline; vertical-align:baseline; padding:0; font-size:13px; line-height:19.5px; white-space:normal; text-align:start; }
+    .adams_table_wrap tbody tr:last-child td { border-bottom:0; }
+    .adams_table_wrap td small { display:block; color:var(--adams-sub); font-size:11px; line-height:16.5px; margin-top:2px; }
+    .adams_state_badge { display:inline-flex; align-items:center; padding:3px 7px; border-radius:5px; background:var(--adams-soft); color:var(--adams-sub); font-size:11px; line-height:16.5px; font-weight:550; white-space:nowrap; }
+    .adams_state_badge.green { background:var(--adams-green-soft); color:var(--adams-green); }
+    .adams_state_badge.amber { background:var(--adams-attention); color:var(--adams-sales-amber); }
+    .adams_state_badge.brand { background:var(--adams-purple-soft); color:var(--adams-purple); }
+    .adams_table_wrap td .adams_inline_unit { display:inline; margin:0; }
+    .adams_numeric { text-align:end; white-space:nowrap; }
+    .adams_sales_record { display:inline-grid; place-items:center; width:34px; height:34px; border:0; border-radius:6px; background:none; color:var(--adams-ink); }
+    .adams_sales_record:hover { background:var(--adams-soft); }
+    .adams_sales_table_footer { padding:11px 16px; border-top:1px solid var(--adams-line); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:12px; color:var(--adams-sub); }
+    .adams_page_controls { display:flex; align-items:center; gap:4px; margin:0; padding:0; border:0; }
+    .adams_page_controls .btn { min-width:30px; height:30px; min-height:0; padding:0 6px; border:1px solid var(--adams-line); border-radius:5px; font-size:12px; background:var(--adams-paper); color:var(--adams-ink); }
+    .adams_page_controls .btn.active { background:var(--adams-purple-soft); border-color:var(--adams-purple); color:var(--adams-purple); font-weight:700; }
+    @media(min-width:901px) { .adams_grid_three { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media(max-width:1100px) { .adams_card { padding:14px; } .adams_value { font-size:25px; } }
+    @media(max-width:900px) { .adams_grid_three, .adams_workspace_kpis_three { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .adams_value { font-size:24px; } .adams_card_top h3 { font-size:12px; } }
+    @media(max-width:650px) {
+        .adams_card { padding:13px 12px 10px; }
+        .adams_amount { display:block; }
+        .adams_amount .adams_currency { display:block; margin-bottom:4px; }
+        .adams_margin_note, .adams_metric_foot > .adams_source_button { font-size:11px; }
+        .adams_sales_equal { grid-template-columns:1fr; }
+        .adams_workspace_kpis, .adams_workspace_kpis_three { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+        .adams_procurement_panels { grid-template-columns:1fr; }
+        .adams_procurement_payments .adams_panel_body { padding:15px; }
+        .adams_group_heading { flex-wrap:wrap; align-items:flex-start; }
+        .adams_panel_head { padding:16px 15px 0; }
+        .adams_rank_list { padding:4px 15px 15px; }
+        .adams_sales_toolbar { padding:13px 15px; }
+        .adams_sales_table_footer { padding:11px 12px; font-size:11px; }
+        .adams_page_controls { gap:3px; }
+        .adams_page_controls .btn { min-width:28px; }
+    }
+}
+.o_rtl .o_adams_dashboard #adams-sales .adams_action_arrow,
+.o_adams_dashboard:dir(rtl) #adams-sales .adams_action_arrow,
+.o_rtl .o_adams_dashboard #adams-procurement .adams_action_arrow,
+.o_adams_dashboard:dir(rtl) #adams-procurement .adams_action_arrow,
+.o_rtl .o_adams_dashboard #adams-crm .adams_action_arrow,
+.o_adams_dashboard:dir(rtl) #adams-crm .adams_action_arrow,
+.o_rtl .o_adams_dashboard #adams-hr .adams_action_arrow,
+.o_adams_dashboard:dir(rtl) #adams-hr .adams_action_arrow { /* rtl:ignore */ transform:scaleX(-1); }

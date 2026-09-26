@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_tax_mapping_view_list" model="ir.ui.view">
+        <field name="name">shopify.tax.mapping.list</field>
+        <field name="model">shopify.tax.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Tax Mappings" editable="bottom">
+                <field name="backend_id"/>
+                <field name="shopify_tax_name"/>
+                <field name="shopify_tax_rate"/>
+                <field name="odoo_tax_id"/>
+                <field name="fiscal_position_id"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_tax_mapping_view_form" model="ir.ui.view">
+        <field name="name">shopify.tax.mapping.form</field>
+        <field name="model">shopify.tax.mapping</field>
+        <field name="arch" type="xml">
+            <form string="Tax Mapping">
+                <sheet>
+                    <group>
+                        <group string="Shopify Tax">
+                            <field name="backend_id"/>
+                            <field name="shopify_tax_name"/>
+                            <field name="shopify_tax_rate"/>
+                        </group>
+                        <group string="Odoo Tax">
+                            <field name="odoo_tax_id"/>
+                            <field name="fiscal_position_id"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_tax_mapping_action" model="ir.actions.act_window">
+        <field name="name">Tax Mappings</field>
+        <field name="res_model">shopify.tax.mapping</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

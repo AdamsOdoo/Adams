@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.Skeleton">
+        <section class="ed-kpis" style="--n:4">
+            <div t-foreach="[0, 1, 2, 3]" t-as="i" t-key="i" class="ed-kpi" aria-hidden="true">
+                <div class="ed-sk" style="grid-column:1/-1;height:14px;width:40%"/>
+                <div class="ed-sk" style="grid-column:1/-1;height:26px;width:70%"/>
+            </div>
+        </section>
+        <div class="ed-grid">
+            <section class="ed-panel ed-span-8" aria-hidden="true">
+                <div class="ed-sk" style="height:14px;width:30%"/>
+                <div class="ed-sk" style="height:220px"/>
+            </section>
+            <section class="ed-panel ed-span-4" aria-hidden="true">
+                <div class="ed-sk" style="height:14px;width:40%"/>
+                <div class="ed-sk" style="height:220px"/>
+            </section>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.SectionView">
+        <div class="d-contents" t-att-aria-busy="props.loading ? 'true' : 'false'">
+            <t t-if="props.error">
+                <section class="ed-panel">
+                    <p class="ed-note">This section could not be loaded. Use Refresh to try again.</p>
+                </section>
+            </t>
+            <t t-elif="status === 'restricted'">
+                <section class="ed-panel">
+                    <p class="ed-note">You do not have access to the data of this section.</p>
+                </section>
+            </t>
+            <t t-elif="status === 'hidden'">
+                <section class="ed-panel">
+                    <p class="ed-note">This section is not available for the current company.</p>
+                </section>
+            </t>
+            <t t-elif="!props.data">
+                <t t-call="executive_dashboard.Skeleton"/>
+            </t>
+            <t t-elif="component">
+                <t t-component="component" data="props.data" openPanel="props.openPanel"/>
+            </t>
+            <t t-else="">
+                <section class="ed-panel">
+                    <p class="ed-note">No figures are set up for this section yet.</p>
+                </section>
+            </t>
+        </div>
+    </t>
+</templates>

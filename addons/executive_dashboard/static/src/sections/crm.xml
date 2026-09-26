@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.CrmSection">
+        <section class="ed-kpis" style="--n:4">
+            <button t-foreach="kpis" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="kpi.value"/> <small t-if="kpi.money" t-esc="currency"/></span>
+                <span class="ed-kpi-cap"><bdi t-esc="kpi.cap"/></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <section class="ed-panel ed-span-7">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Pipeline by stage</h2>
+                        <p>Expected revenue in each stage</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('pipeline', {})">
+                        Pipeline <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.stages.length" class="ed-note">No open opportunities.</p>
+                <t t-else="">
+                    <ColumnChart items="stageColumns" height="170" onSelect="(i) => this.openStage(w.stages[i])"/>
+                    <div class="ed-rows">
+                        <button t-foreach="w.stages" t-as="s" t-key="s_index" type="button"
+                                class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openStage(s)">
+                            <span class="ed-l" t-esc="s.name"/>
+                            <span class="ed-r ed-num"><t t-esc="compact(s.amount)"/><small><t t-esc="s.count"/> opportunities</small></span>
+                        </button>
+                    </div>
+                </t>
+            </section>
+
+            <section class="ed-panel ed-span-5">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Pipeline by salesperson</h2>
+                        <p>Open opportunities</p>
+                    </div>
+                </header>
+                <p t-if="!w.salespeople.length" class="ed-note">No open opportunities.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.salespeople" t-as="p" t-key="p_index" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                            t-on-click="() => this.openList('salesperson', { user_id: p.id })">
+                        <t t-set="av" t-value="avatar(p.name)"/>
+                        <span class="ed-l"><span class="ed-avatar" t-att-style="'background:' + av.color" t-esc="av.initials"/>
+                            <span><t t-esc="p.name"/><small><t t-esc="p.count"/> opportunities</small></span></span>
+                        <span class="ed-r ed-num" t-esc="compact(p.amount)"/>
+                    </button>
+                </div>
+            </section>
+
+            <section class="ed-panel ed-span-12">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Closing soonest</h2>
+                        <p>By expected closing date</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.openList('closing')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.closing.length" class="ed-note">No open opportunities.</p>
+                <div t-else="" class="ed-tbl-wrap">
+                    <table class="ed-fixed">
+                        <colgroup><col/><col style="width:18%"/><col style="width:15%"/><col style="width:11%"/>
+                            <col style="width:12%"/><col style="width:16%"/></colgroup>
+                        <thead><tr>
+                            <th>Opportunity</th><th>Customer</th><th class="n">Expected revenue</th>
+                            <th class="n">Probability</th><th>Closing</th><th>Salesperson</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr t-foreach="w.closing" t-as="o" t-key="o.id" class="click" tabindex="0"
+                                t-on-click="() => this.openLead(o)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openLead(o)">
+                                <td t-att-data-label="labels.opportunity" t-esc="o.name"/>
+                                <td t-att-data-label="labels.customer" t-esc="o.customer or '—'"/>
+                                <td t-att-data-label="labels.revenue" class="n ed-num" t-esc="whole(o.amount)"/>
+                                <td t-att-data-label="labels.probability" class="n ed-num"><t t-esc="whole(o.probability)"/>%</td>
+                                <td t-att-data-label="labels.closing" t-esc="formatDate(o.closing)"/>
+                                <td t-att-data-label="labels.salesperson" t-esc="o.salesperson or '—'"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </t>
+</templates>

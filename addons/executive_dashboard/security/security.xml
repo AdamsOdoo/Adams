@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_groups_privilege_executive_dashboard" model="res.groups.privilege">
+        <field name="name">Executive Dashboard</field>
+        <field name="sequence">50</field>
+        <field name="category_id" ref="base.module_category_productivity"/>
+    </record>
+
+    <!-- One access level: Administrator, or no access. -->
+    <record id="group_admin" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="sequence">10</field>
+        <field name="privilege_id" ref="res_groups_privilege_executive_dashboard"/>
+        <field name="implied_ids" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="user_ids" eval="[Command.link(ref('base.user_root')), Command.link(ref('base.user_admin'))]"/>
+        <field name="comment">Opens the dashboard with every section and figure of the companies the user may use, whatever the user's rights in the other apps. Buttons to Odoo's own screens appear only when the user may open them.</field>
+    </record>
+</odoo>

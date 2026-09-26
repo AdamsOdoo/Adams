@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_metafield_view_list" model="ir.ui.view">
+        <field name="name">shopify.metafield.list</field>
+        <field name="model">shopify.metafield</field>
+        <field name="arch" type="xml">
+            <list string="Metafields">
+                <field name="backend_id"/>
+                <field name="owner_type"/>
+                <field name="namespace"/>
+                <field name="key"/>
+                <field name="value"/>
+                <field name="metafield_type"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_metafield_view_search" model="ir.ui.view">
+        <field name="name">shopify.metafield.search</field>
+        <field name="model">shopify.metafield</field>
+        <field name="arch" type="xml">
+            <search string="Metafields">
+                <field name="namespace"/>
+                <field name="key"/>
+                <field name="value"/>
+                <group>
+                    <filter name="group_type" string="Owner Type"
+                            context="{'group_by': 'owner_type'}"/>
+                    <filter name="group_namespace" string="Namespace"
+                            context="{'group_by': 'namespace'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="shopify_metafield_action" model="ir.actions.act_window">
+        <field name="name">Metafields</field>
+        <field name="res_model">shopify.metafield</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Metafield Mapping Views -->
+    <record id="shopify_metafield_mapping_view_list" model="ir.ui.view">
+        <field name="name">shopify.metafield.mapping.list</field>
+        <field name="model">shopify.metafield.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Metafield Mappings" editable="bottom">
+                <field name="backend_id"/>
+                <field name="owner_type"/>
+                <field name="shopify_namespace"/>
+                <field name="shopify_key"/>
+                <field name="shopify_type"/>
+                <field name="odoo_field"/>
+                <field name="direction"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="shopify_metafield_mapping_action" model="ir.actions.act_window">
+        <field name="name">Metafield Mappings</field>
+        <field name="res_model">shopify.metafield.mapping</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Payout List View -->
+    <record id="shopify_payout_view_list" model="ir.ui.view">
+        <field name="name">shopify.payout.list</field>
+        <field name="model">shopify.payout</field>
+        <field name="arch" type="xml">
+            <list string="Payouts"
+                  decoration-success="status == 'paid'"
+                  decoration-danger="status == 'failed'"
+                  decoration-info="status in ('scheduled', 'in_transit')"
+                  decoration-muted="status == 'cancelled'">
+                <field name="payout_date"/>
+                <field name="backend_id" string="Store"/>
+                <field name="shopify_payout_id" string="Payout ID"/>
+                <field name="status" widget="badge"
+                       decoration-success="status == 'paid'"
+                       decoration-danger="status == 'failed'"
+                       decoration-info="status in ('scheduled', 'in_transit')"
+                       decoration-muted="status == 'cancelled'"/>
+                <field name="gross_amount" string="Gross"/>
+                <field name="fees_amount" string="Fees"/>
+                <field name="refunds_amount" string="Refunds" optional="show"/>
+                <field name="amount" string="Net" sum="Total Net"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="transaction_count" string="Txns"/>
+                <field name="journal_entry_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Payout Form View -->
+    <record id="shopify_payout_view_form" model="ir.ui.view">
+        <field name="name">shopify.payout.form</field>
+        <field name="model">shopify.payout</field>
+        <field name="arch" type="xml">
+            <form string="Payout">
+                <header>
+                    <field name="status" widget="statusbar"
+                           statusbar_visible="scheduled,in_transit,paid"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            Payout #<field name="shopify_payout_id" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="backend_id"/>
+                            <field name="payout_date"/>
+                            <field name="currency_id"/>
+                            <field name="journal_entry_id"/>
+                        </group>
+                        <group>
+                            <field name="gross_amount"/>
+                            <field name="fees_amount"/>
+                            <field name="charges_amount"/>
+                            <field name="refunds_amount"/>
+                            <field name="adjustments_amount"/>
+                            <field name="amount" string="Net Amount"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Transactions" name="transactions">
+                            <field name="transaction_ids">
+                                <list>
+                                    <field name="processed_at"/>
+                                    <field name="transaction_type"/>
+                                    <field name="source_type"/>
+                                    <field name="source_order_id"/>
+                                    <field name="amount"/>
+                                    <field name="fee"/>
+                                    <field name="net"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Payout Search View -->
+    <record id="shopify_payout_view_search" model="ir.ui.view">
+        <field name="name">shopify.payout.search</field>
+        <field name="model">shopify.payout</field>
+        <field name="arch" type="xml">
+            <search string="Payouts">
+                <field name="shopify_payout_id"/>
+                <field name="backend_id"/>
+                <filter name="paid" string="Paid"
+                        domain="[('status', '=', 'paid')]"/>
+                <filter name="pending" string="Pending"
+                        domain="[('status', 'in', ('scheduled', 'in_transit'))]"/>
+                <filter name="failed" string="Failed"
+                        domain="[('status', '=', 'failed')]"/>
+                <separator/>
+                <filter name="this_month" string="This Month"
+                        domain="[('payout_date', '&gt;=', (context_today() - relativedelta(day=1)).strftime('%Y-%m-%d'))]"/>
+                <group>
+                    <filter name="group_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+                    <filter name="group_month" string="Month"
+                            context="{'group_by': 'payout_date:month'}"/>
+                    <filter name="group_backend" string="Store"
+                            context="{'group_by': 'backend_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Payout Action -->
+    <record id="shopify_payout_action" model="ir.actions.act_window">
+        <field name="name">Payouts</field>
+        <field name="res_model">shopify.payout</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Payout Transaction List View -->
+    <record id="shopify_payout_transaction_view_list" model="ir.ui.view">
+        <field name="name">shopify.payout.transaction.list</field>
+        <field name="model">shopify.payout.transaction</field>
+        <field name="arch" type="xml">
+            <list string="Payout Transactions">
+                <field name="processed_at"/>
+                <field name="payout_id"/>
+                <field name="transaction_type"/>
+                <field name="source_type"/>
+                <field name="source_order_id"/>
+                <field name="amount"/>
+                <field name="fee"/>
+                <field name="net" sum="Total Net"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Payout Transaction Search View -->
+    <record id="shopify_payout_transaction_view_search" model="ir.ui.view">
+        <field name="name">shopify.payout.transaction.search</field>
+        <field name="model">shopify.payout.transaction</field>
+        <field name="arch" type="xml">
+            <search string="Payout Transactions">
+                <field name="payout_id"/>
+                <field name="source_order_id"/>
+                <filter name="charges" string="Charges"
+                        domain="[('transaction_type', '=', 'charge')]"/>
+                <filter name="refunds" string="Refunds"
+                        domain="[('transaction_type', '=', 'refund')]"/>
+                <filter name="disputes" string="Disputes"
+                        domain="[('transaction_type', '=', 'dispute')]"/>
+                <group>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'transaction_type'}"/>
+                    <filter name="group_payout" string="Payout"
+                            context="{'group_by': 'payout_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Payout Transaction Action -->
+    <record id="shopify_payout_transaction_action" model="ir.actions.act_window">
+        <field name="name">Payout Transactions</field>
+        <field name="res_model">shopify.payout.transaction</field>
+        <field name="view_mode">list</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,24 @@
+{
+  "_comment": "odoo-harness settings. The branch names decide what the guard and `oh protect` cover: confirm them against the Odoo.sh project. odoo_commit / enterprise_commit are optional full commit SHAs; without them oh keeps the commit it resolved first until `oh env --update`.",
+  "odoo_ref": "19.0",
+  "odoo_commit": "8d05257d83f9128953f580a066db67c48fcdb96f",
+  "production_branch": "main",
+  "staging_branches": [
+    "staging",
+    "test"
+  ],
+  "protected_branches": [],
+  "languages": [
+    "en_US",
+    "ar_001"
+  ],
+  "addons_paths": [
+    "addons"
+  ],
+  "enterprise_path": null,
+  "enterprise_repo": null,
+  "enterprise_ref": null,
+  "enterprise_commit": null,
+  "base_branch": null,
+  "with_demo": true
+}

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="shopify_demo_data_wizard_view_form" model="ir.ui.view">
+        <field name="name">shopify.demo.data.wizard.form</field>
+        <field name="model">shopify.demo.data.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Generate Demo Data">
+                <group>
+                    <field name="backend_id"/>
+                </group>
+                <group string="Entities to Seed">
+                    <group>
+                        <field name="seed_products"/>
+                        <field name="product_count"
+                               invisible="not seed_products"/>
+                        <field name="seed_customers"/>
+                        <field name="customer_count"
+                               invisible="not seed_customers"/>
+                        <field name="seed_orders"/>
+                        <field name="order_count"
+                               invisible="not seed_orders"/>
+                    </group>
+                    <group>
+                        <field name="seed_abandoned_carts"/>
+                        <field name="abandoned_cart_count"
+                               invisible="not seed_abandoned_carts"/>
+                        <field name="seed_collections"/>
+                        <field name="seed_promoters"/>
+                    </group>
+                </group>
+                <div class="alert alert-warning" role="alert">
+                    <strong>Warning:</strong> This will create test records in your database.
+                    Use only in development or staging environments.
+                </div>
+                <footer>
+                    <button name="action_seed" string="Generate Demo Data"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="shopify_demo_data_wizard_action" model="ir.actions.act_window">
+        <field name="name">Generate Demo Data</field>
+        <field name="res_model">shopify.demo.data.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>
