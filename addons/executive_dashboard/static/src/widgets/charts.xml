@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.LineChart">
+        <div class="ed-chart-wrap ed-fill" t-ref="host">
+            <t t-set="g" t-value="geo"/>
+            <t t-set="tp" t-value="tip"/>
+            <svg t-att-viewBox="'0 0 ' + g.W + ' ' + g.H" t-att-height="g.H" role="img" aria-label="Monthly trend">
+                <g class="ed-axis">
+                    <t t-foreach="g.ticks" t-as="tick" t-key="tick_index">
+                        <line class="ed-grid-line" t-att-x1="g.gridX1" t-att-x2="g.gridX2" t-att-y1="tick.y" t-att-y2="tick.y"/>
+                        <text t-att-x="g.labelX" t-att-y="tick.y + 4" t-att-text-anchor="g.rtl ? 'start' : 'end'" t-esc="tick.label"/>
+                    </t>
+                    <t t-foreach="g.xlabels" t-as="xl" t-key="xl_index">
+                        <text t-if="xl.label" t-att-x="xl.x" t-att-y="g.H - 6" text-anchor="middle" t-esc="xl.label"/>
+                    </t>
+                </g>
+                <t t-foreach="g.lines" t-as="line" t-key="line_index">
+                    <path t-if="line.area" t-att-d="line.area" t-att-fill="line.color" opacity=".1"/>
+                    <path t-att-d="line.solid" fill="none" t-att-stroke="line.color" stroke-width="2" stroke-linejoin="round"/>
+                    <path t-if="line.dashed" t-att-d="line.dashed" fill="none" t-att-stroke="line.color" stroke-width="2" stroke-dasharray="4 4"/>
+                    <circle t-att-cx="line.end[0]" t-att-cy="line.end[1]" r="4" t-att-fill="line.color" stroke="var(--panel)" stroke-width="2"/>
+                </t>
+                <t t-if="tp">
+                    <line t-att-x1="tp.x" t-att-x2="tp.x" t-att-y1="g.pad.t" t-att-y2="g.H - g.pad.b" stroke="var(--line-strong)"/>
+                    <circle t-foreach="tp.dots" t-as="dot" t-key="dot_index" t-att-cx="tp.x" t-att-cy="dot.cy" r="4"
+                            t-att-fill="dot.color" stroke="var(--panel)" stroke-width="2"/>
+                </t>
+                <rect x="0" y="0" t-att-width="g.W" t-att-height="g.H" fill="transparent"
+                      t-att-style="props.onClick ? 'cursor:pointer' : ''"
+                      t-on-pointermove="onPointerMove" t-on-pointerleave="onPointerLeave"
+                      t-on-click="() => props.onClick and props.onClick()"/>
+            </svg>
+            <div t-if="tp" class="ed-tip" t-att-style="'top:6px;left:' + tp.left + 'px'">
+                <b t-esc="tp.title"/>
+                <div t-foreach="tp.rows" t-as="row" t-key="row_index">
+                    <span><i t-att-style="'background:' + row.color"/><t t-esc="row.name"/></span>
+                    <span class="ed-num" t-esc="row.value"/>
+                </div>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.ColumnChart">
+        <div class="ed-chart-wrap" t-ref="host">
+            <t t-set="g" t-value="geo"/>
+            <svg t-att-viewBox="'0 0 ' + g.W + ' ' + g.H" t-att-height="g.H" role="img">
+                <line class="ed-grid-line" t-att-x1="g.pad.l" t-att-x2="g.W - g.pad.r" t-att-y1="g.base" t-att-y2="g.base"/>
+                <g t-foreach="g.cols" t-as="col" t-key="col.i" class="ed-col-hit" tabindex="0" role="button"
+                   t-att-aria-label="col.label + ': ' + col.value"
+                   t-on-click="() => this.select(col.i)" t-on-keydown="(ev) => this.onKey(ev, col.i)">
+                    <rect t-att-x="col.hitX" t-att-y="g.pad.t" t-att-width="col.bw" t-att-height="g.H - g.pad.t - g.pad.b" fill="transparent"/>
+                    <path t-if="col.path" t-att-d="col.path" t-att-fill="col.color or 'var(--sec)'"/>
+                    <text class="ed-vlabel ed-num" t-att-x="col.cx" t-att-y="col.labelY" text-anchor="middle" t-esc="col.value"/>
+                    <text class="ed-xlabel" t-att-x="col.cx" t-att-y="g.H - 8" text-anchor="middle" t-esc="col.label"/>
+                </g>
+            </svg>
+        </div>
+    </t>
+</templates>

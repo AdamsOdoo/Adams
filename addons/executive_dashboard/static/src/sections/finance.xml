@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.FinanceSection">
+        <section class="ed-kpis" style="--n:6">
+            <button t-foreach="kpis" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="compact(kpi.value)"/> <small t-esc="currency"/></span>
+                <span class="ed-kpi-cap"><t t-if="kpi.cap" t-esc="kpi.cap"/><t t-else="">&#160;</t></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <section class="ed-panel ed-span-8">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Revenue &amp; net profit</h2>
+                        <p t-if="w.trend.partial">Posted entries · last 12 months · current month to date (dashed)</p>
+                        <p t-else="">Posted entries · last 12 months</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('revenue', this.periodArgs)">
+                        Profit and Loss <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <t t-set="trendData" t-value="trend"/>
+                <div class="ed-legend">
+                    <span t-foreach="trendData.series" t-as="s" t-key="s_index"><i t-att-style="'background:' + s.color"/><t t-esc="s.name"/></span>
+                </div>
+                <LineChart series="trendData.series" labels="trendData.labels" titles="trendData.titles"
+                           partial="trendData.partial" onClick="() => this.open('revenue', this.periodArgs)"/>
+            </section>
+
+            <section class="ed-panel ed-span-4">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Bank &amp; Cash</h2>
+                        <p t-esc="bankSubtitle"/>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('bank_cash', {})">
+                        Balance Sheet <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.bank_cash.rows.length" class="ed-note">No bank or cash entries yet.</p>
+                <div class="ed-rows">
+                    <button t-foreach="w.bank_cash.rows" t-as="row" t-key="row.id" type="button"
+                            class="ed-row click w-100 border-0 bg-transparent text-start" t-on-click="() => this.openAccount(row)">
+                        <span class="ed-l"><span><t t-esc="row.name"/><small class="ed-num" t-esc="row.code"/></span></span>
+                        <span class="ed-r ed-num" t-esc="whole(row.balance)"/>
+                    </button>
+                </div>
+                <div class="ed-total-row">
+                    <span>Total</span><span class="ed-num"><t t-esc="whole(w.bank_cash.total)"/> <t t-esc="currency"/></span>
+                </div>
+            </section>
+
+            <t t-foreach="openItemsPanels()" t-as="p" t-key="p.id">
+                <section class="ed-panel ed-span-6">
+                    <header class="ed-panel-head">
+                        <div>
+                            <h2 t-esc="p.title"/>
+                            <p t-esc="p.sub"/>
+                        </div>
+                        <button type="button" class="ed-link" t-on-click="() => this.openItems(p.kind, p.view)">
+                            Details <Icon name="'arrow'" flip="true"/>
+                        </button>
+                    </header>
+                    <div class="ed-bucket-head">
+                        <div class="ed-big ed-num"><t t-esc="compact(p.total)"/> <small t-esc="currency"/></div>
+                        <span t-if="p.overdue > 0" class="ed-chip crit">
+                            Overdue <b class="ed-num" t-esc="compact(p.overdue)"/><t t-if="p.overduePct !== null"> · <t t-esc="p.overduePct"/>%</t>
+                        </span>
+                        <span t-else="" class="ed-chip good">Nothing overdue</span>
+                    </div>
+                    <div class="ed-buckets" role="list">
+                        <button t-foreach="p.rows" t-as="b" t-key="b.key" type="button" role="listitem" class="ed-bucket"
+                                t-att-title="b.label + ': ' + whole(b.value) + ' ' + currency"
+                                t-on-click="() => this.openItems(p.kind, p.view, b.key)">
+                            <span class="ed-bucket-label" t-esc="b.label"/>
+                            <span class="ed-bucket-track"><i t-att-style="'width:' + b.width + '%;background:' + b.color"/></span>
+                            <b class="ed-num" t-esc="compact(b.value)"/>
+                            <small class="ed-num"><t t-if="b.share !== null"><t t-esc="b.share"/>%</t></small>
+                        </button>
+                    </div>
+                </section>
+            </t>
+        </div>
+    </t>
+</templates>

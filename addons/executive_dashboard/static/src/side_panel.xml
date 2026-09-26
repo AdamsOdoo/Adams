@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.PanelRow">
+        <button t-if="row.open or row.action" type="button" class="ed-row click w-100 border-0 bg-transparent text-start"
+                t-att-title="row.action ? openLabel(row.action.kind) : null" t-on-click="() => this.openRow(row)">
+            <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
+            <span class="ed-r ed-num"><t t-esc="row.value"/><Icon t-if="row.action" name="'arrow'" flip="true"/></span>
+        </button>
+        <div t-else="" class="ed-row">
+            <span class="ed-l"><span><t t-esc="row.label"/><small t-if="row.sub" t-esc="row.sub"/></span></span>
+            <span class="ed-r ed-num" t-esc="row.value"/>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.SidePanel">
+        <div t-att-class="{ 'ed-scrim': true, on: isOpen }" t-on-click="props.close"/>
+        <aside t-ref="drawer" t-att-class="{ 'ed-drawer': true, on: isOpen }" role="dialog" aria-modal="true"
+               aria-labelledby="ed-drawer-title" t-att-aria-hidden="isOpen ? 'false' : 'true'"
+               t-att-data-sec="props.panel?.sec or null" t-on-keydown="onKeydown">
+            <t t-if="props.panel">
+                <div class="ed-drawer-head">
+                    <div>
+                        <p class="ed-crumb">
+                            <button t-if="props.panel.back" type="button" t-on-click="() => props.open(props.panel.back)">
+                                <Icon name="'back'" flip="true"/> Back
+                            </button>
+                            <span t-if="props.panel.kind === 'search'">Quick access</span>
+                            <span t-else="" t-esc="props.panel.crumb or ''"/>
+                        </p>
+                        <h2 id="ed-drawer-title">
+                            <t t-if="props.panel.kind === 'search'">Search</t>
+                            <t t-else="" t-esc="state.data?.title or props.panel.title or ''"/>
+                        </h2>
+                        <p t-if="props.panel.kind === 'search'">Searches the whole database for the companies you use, not only what the dashboard shows.</p>
+                        <p t-elif="state.data?.sub" t-esc="state.data.sub"/>
+                    </div>
+                    <button type="button" class="ed-icon-btn" t-ref="closeBtn" title="Close" aria-label="Close" t-on-click="props.close">
+                        <Icon name="'close'"/>
+                    </button>
+                </div>
+
+                <div class="ed-drawer-body">
+                    <t t-if="props.panel.kind === 'search'">
+                        <input t-ref="searchInput" class="ed-search-input" type="search" autocomplete="off"
+                               placeholder="Search orders, invoices, contacts, products, employees…"
+                               t-att-value="state.query" t-on-input="onSearchInput"/>
+                        <p t-if="state.query.trim().length &lt; 2" class="ed-note">Type at least 2 characters.</p>
+                        <p t-elif="state.results and !state.results.length" class="ed-note">No matches.</p>
+                        <t t-foreach="state.results or []" t-as="group" t-key="group.model">
+                            <div class="ed-group-label"><span t-esc="group.label"/><span class="ed-num" t-esc="group.records.length"/></div>
+                            <div class="ed-rows">
+                                <t t-foreach="group.records" t-as="rec" t-key="rec.id">
+                                    <button t-if="rec.can_open" type="button" title="Open record"
+                                            class="ed-row click w-100 border-0 bg-transparent text-start"
+                                            t-on-click="() => props.openRecord(group.model, rec.id)">
+                                        <span class="ed-l"><span>
+                                            <t t-foreach="highlight(rec.name)" t-as="part" t-key="part_index">
+                                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                                            </t>
+                                        </span></span>
+                                    </button>
+                                    <div t-else="" class="ed-row">
+                                        <span class="ed-l"><span>
+                                            <t t-foreach="highlight(rec.name)" t-as="part" t-key="part_index">
+                                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                                            </t>
+                                        </span></span>
+                                    </div>
+                                </t>
+                            </div>
+                        </t>
+                    </t>
+                    <t t-elif="state.loading">
+                        <div class="ed-sk" style="height:28px;width:50%"/>
+                        <div class="ed-sk" style="height:160px"/>
+                    </t>
+                    <t t-elif="customBody">
+                        <t t-component="customBody" data="state.data" open="props.open" panel="props.panel"/>
+                    </t>
+                    <t t-elif="state.data">
+                        <t t-foreach="state.data.groups or []" t-as="group" t-key="group_index">
+                            <h3 class="ed-group-title" t-esc="group.title"/>
+                            <div class="ed-rows">
+                                <t t-foreach="group.rows" t-as="row" t-key="row_index">
+                                    <t t-call="executive_dashboard.PanelRow"/>
+                                </t>
+                            </div>
+                        </t>
+                        <h3 t-if="state.data.rows_title and state.data.rows?.length" class="ed-group-title" t-esc="state.data.rows_title"/>
+                        <div class="ed-rows">
+                            <t t-foreach="state.data.rows or []" t-as="row" t-key="row_index">
+                                <t t-call="executive_dashboard.PanelRow"/>
+                            </t>
+                        </div>
+                        <div t-if="state.data.total" class="ed-total-row">
+                            <span t-esc="state.data.total.label"/><span class="ed-num" t-esc="state.data.total.value"/>
+                        </div>
+                    </t>
+                </div>
+
+                <div t-if="state.data?.action" class="ed-drawer-foot">
+                    <button type="button" class="ed-btn primary" t-on-click="openNative">
+                        <t t-esc="openLabel(state.data.action.kind)"/> <Icon name="'arrow'" flip="true"/>
+                    </button>
+                    <span t-if="state.data.dest" class="ed-dest">Opens: <t t-esc="state.data.dest"/></span>
+                </div>
+            </t>
+        </aside>
+    </t>
+</templates>

@@ -1,0 +1,56 @@
+{
+  "harness": {
+    "version": "1.2.1",
+    "commit": "176f07317e5a6cd8cd9b769d7ebd3d99eca34bd1",
+    "dirty": false
+  },
+  "files": {
+    ".agents/skills/odoo-dev/SKILL.md": "9412111809ba44f4093aceac02ea19c88b2a99c22d0f1178e6c3ea3c0bb423c6",
+    ".agents/skills/odoo-dev/assets/feature.md": "65fefb98176d144d6eb7fc352a62fd0ac75a447b4a73d1fd3d0815c867da6b17",
+    ".agents/skills/odoo-dev/references/data-migrations.md": "eae95052ef432b0e7770d306f39b91513fad5418f45d48f7b80e4b26b7f5d4e3",
+    ".agents/skills/odoo-dev/references/design.md": "3bc0ceeafbf5665f0a6f0fb2f0d2c84a402f830db797cbdeb3c5645798631612",
+    ".agents/skills/odoo-dev/references/i18n-rtl.md": "b44e9b4b5c2c6d84e42e3cf941b7c63437e29e52297260de249bd97691ae4d75",
+    ".agents/skills/odoo-dev/references/odoo-sh.md": "8fc9694e72d611a306484ff41a9388a0525c967f31df09ccde06d16363dc5581",
+    ".agents/skills/odoo-dev/references/odoo19.md": "9bc2ce0e5cdbd5f946ba6f8594c9175dc5bb7818af5e1dac2eb4e7d3262c3073",
+    ".agents/skills/odoo-dev/references/reports.md": "ed94ef75cadc62448a068db33e6d1989693e06baabbdedf905d8423a1137de9e",
+    ".agents/skills/odoo-dev/references/security.md": "5d0a79597839937c478c55fb5a85262be9cc233f5c0d074728049f5eebc2d471",
+    ".agents/skills/odoo-dev/references/testing.md": "8d81f35bcd730bd4e564649143a3f920b8e532ed9838d081521959ac4bbca41a",
+    ".agents/skills/odoo-dev/references/views-ui.md": "2f154b63167183f7e03e79d7129ec5daba44a2d0fcdeec81f651c7c05e64f54a",
+    ".agents/skills/odoo-review/SKILL.md": "d1d33e8e1b45c6ab4c22c87e84666155e777deb905e8e406fd3169283d0e7f9e",
+    ".claude/agents/odoo-reviewer.md": "e30b8a9feeb0f16439ec583f433350bac75ee580de4493259638889edf6c8603",
+    ".claude/skills/odoo-dev/SKILL.md": "9412111809ba44f4093aceac02ea19c88b2a99c22d0f1178e6c3ea3c0bb423c6",
+    ".claude/skills/odoo-dev/assets/feature.md": "65fefb98176d144d6eb7fc352a62fd0ac75a447b4a73d1fd3d0815c867da6b17",
+    ".claude/skills/odoo-dev/references/data-migrations.md": "eae95052ef432b0e7770d306f39b91513fad5418f45d48f7b80e4b26b7f5d4e3",
+    ".claude/skills/odoo-dev/references/design.md": "3bc0ceeafbf5665f0a6f0fb2f0d2c84a402f830db797cbdeb3c5645798631612",
+    ".claude/skills/odoo-dev/references/i18n-rtl.md": "b44e9b4b5c2c6d84e42e3cf941b7c63437e29e52297260de249bd97691ae4d75",
+    ".claude/skills/odoo-dev/references/odoo-sh.md": "8fc9694e72d611a306484ff41a9388a0525c967f31df09ccde06d16363dc5581",
+    ".claude/skills/odoo-dev/references/odoo19.md": "9bc2ce0e5cdbd5f946ba6f8594c9175dc5bb7818af5e1dac2eb4e7d3262c3073",
+    ".claude/skills/odoo-dev/references/reports.md": "ed94ef75cadc62448a068db33e6d1989693e06baabbdedf905d8423a1137de9e",
+    ".claude/skills/odoo-dev/references/security.md": "5d0a79597839937c478c55fb5a85262be9cc233f5c0d074728049f5eebc2d471",
+    ".claude/skills/odoo-dev/references/testing.md": "8d81f35bcd730bd4e564649143a3f920b8e532ed9838d081521959ac4bbca41a",
+    ".claude/skills/odoo-dev/references/views-ui.md": "2f154b63167183f7e03e79d7129ec5daba44a2d0fcdeec81f651c7c05e64f54a",
+    ".claude/skills/odoo-review/SKILL.md": "d1d33e8e1b45c6ab4c22c87e84666155e777deb905e8e406fd3169283d0e7f9e",
+    ".odoo-harness/guard.py": "7c9451c1fe8287cbc82db46bfd762a9d352fb5fc906832491c7389302d47f426",
+    ".odoo-harness/oh": "dbb03dba7acec86f2adf7ba9b3388700779f07f7af015f66d4e072469eb65bf9"
+  },
+  "block": "a7074797697a906a04db9300fd7fa81958cffd75b042d65f8b932760c1c53964",
+  "hooks": [
+    {
+      "event": "PreToolUse",
+      "matcher": "Bash|mcp__.*github.*",
+      "hook": {
+        "type": "command",
+        "command": "python3 \"$CLAUDE_PROJECT_DIR/.odoo-harness/guard.py\""
+      }
+    },
+    {
+      "event": "SessionStart",
+      "matcher": "startup|resume",
+      "hook": {
+        "type": "command",
+        "command": "python3 \"$CLAUDE_PROJECT_DIR/.odoo-harness/oh\" env --background --if-remote",
+        "async": true
+      }
+    }
+  ]
+}

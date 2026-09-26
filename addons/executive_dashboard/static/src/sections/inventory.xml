@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.InventorySection">
+        <t t-set="kpiList" t-value="kpis"/>
+        <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
+            <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="kpi.value"/> <small t-if="kpi.money" t-esc="currency"/></span>
+                <span class="ed-kpi-cap"><bdi t-esc="kpi.cap"/></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <t t-foreach="['outgoing', 'incoming']" t-as="code" t-key="code">
+                <section class="ed-panel ed-span-6">
+                    <header class="ed-panel-head">
+                        <div>
+                            <h2 t-if="code === 'outgoing'">Deliveries</h2>
+                            <h2 t-else="">Receipts</h2>
+                            <p t-if="code === 'outgoing'">Outgoing, not done</p>
+                            <p t-else="">Incoming, not done</p>
+                        </div>
+                        <button type="button" class="ed-link" t-on-click="() => this.openPickings(code, 'late')">
+                            View all <Icon name="'arrow'" flip="true"/>
+                        </button>
+                    </header>
+                    <div class="ed-tiles">
+                        <button t-foreach="tiles(code)" t-as="tile" t-key="tile.bucket" type="button"
+                                t-att-class="'ed-tile ' + tile.cls" t-on-click="() => this.openPickings(code, tile.bucket)">
+                            <b class="ed-num" t-esc="whole(tile.count)"/>
+                            <span t-esc="tile.label"/>
+                        </button>
+                    </div>
+                </section>
+            </t>
+
+            <section class="ed-panel ed-span-12">
+                <StockReport stock="w.stock" currency="currency" openPanel="props.openPanel"/>
+            </section>
+        </div>
+    </t>
+
+    <t t-name="executive_dashboard.StockReport">
+        <t t-set="data" t-value="state.data"/>
+        <header class="ed-panel-head">
+            <div>
+                <h2>Stock report</h2>
+                <p>Quantities by warehouse · now</p>
+            </div>
+            <button t-if="props.stock.can_open" type="button" class="ed-link" t-on-click="openInOdoo">
+                Open list <Icon name="'arrow'" flip="true"/>
+            </button>
+        </header>
+        <div class="ed-filters">
+            <select class="ed-field" aria-label="Warehouse" t-on-change="(ev) => this.onSelect('warehouse_id', ev)">
+                <option value="">All warehouses</option>
+                <option t-foreach="props.stock.options.warehouses" t-as="wh" t-key="wh.id" t-att-value="wh.id"
+                        t-att-selected="('' + wh.id) === state.warehouse_id" t-esc="wh.name"/>
+            </select>
+            <select class="ed-field" aria-label="Category" t-on-change="(ev) => this.onSelect('category_id', ev)">
+                <option value="">All categories</option>
+                <option t-foreach="props.stock.options.categories" t-as="cat" t-key="cat.id" t-att-value="cat.id"
+                        t-att-selected="('' + cat.id) === state.category_id" t-esc="cat.name"/>
+            </select>
+            <input class="ed-field ed-grow" type="search" autocomplete="off"
+                   placeholder="Search product name or internal reference"
+                   t-att-value="state.query" t-on-input="onQuery"/>
+            <label class="ed-custom">
+                <input type="checkbox" t-att-checked="state.hide" t-on-change="onHide"/> Hide zero and negative stock
+            </label>
+        </div>
+        <p t-if="!data.rows.length" class="ed-note">No matches.</p>
+        <div t-else="" class="ed-tbl-wrap" t-att-aria-busy="state.loading ? 'true' : 'false'"
+             t-att-style="state.loading ? 'opacity:.6' : ''">
+            <table>
+                <thead><tr>
+                    <th>Reference</th><th>Product</th><th>Warehouse</th><th class="n">On hand</th>
+                    <th class="n">Reserved</th><th class="n">Available</th><th>Unit</th>
+                    <th t-if="data.valued" class="n">Value</th>
+                </tr></thead>
+                <tbody>
+                    <tr t-foreach="data.rows" t-as="r" t-key="r.product_id + '-' + r.warehouse_id" class="click" tabindex="0"
+                        t-on-click="() => this.openProduct(r)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openProduct(r)">
+                        <td t-att-data-label="labels.ref">
+                            <t t-foreach="highlight(r.code)" t-as="part" t-key="part_index">
+                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                            </t>
+                            <t t-if="!r.code">—</t>
+                        </td>
+                        <td t-att-data-label="labels.product">
+                            <t t-foreach="highlight(r.name)" t-as="part" t-key="part_index">
+                                <mark t-if="part.mark" t-esc="part.text"/><t t-else="" t-esc="part.text"/>
+                            </t>
+                            <small t-esc="r.category"/>
+                        </td>
+                        <td t-att-data-label="labels.warehouse" t-esc="r.warehouse"/>
+                        <td t-att-data-label="labels.onHand" t-att-class="'n ed-num' + (r.on_hand &lt;= 0 ? ' neg' : '')" t-esc="whole(r.on_hand)"/>
+                        <td t-att-data-label="labels.reserved" class="n ed-num" t-esc="whole(r.reserved)"/>
+                        <td t-att-data-label="labels.available" t-att-class="'n ed-num' + (r.available &lt;= 0 ? ' neg' : '')" t-esc="whole(r.available)"/>
+                        <td t-att-data-label="labels.unit" t-esc="r.unit"/>
+                        <td t-if="data.valued" t-att-data-label="labels.value" class="n ed-num" t-esc="whole(r.value)"/>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="ed-pager">
+            <t t-set="rng" t-value="range"/>
+            <span class="ed-num"><t t-esc="rng.from"/>–<t t-esc="rng.to"/> / <t t-esc="rng.count"/></span>
+            <div>
+                <button type="button" class="ed-btn" t-att-disabled="state.loading or data.page === 0"
+                        t-on-click="() => this.load(data.page - 1)">Previous</button>
+                <button type="button" class="ed-btn" t-att-disabled="state.loading or data.page >= lastPage"
+                        t-on-click="() => this.load(data.page + 1)">Next</button>
+            </div>
+        </div>
+    </t>
+</templates>
