@@ -246,8 +246,13 @@ class TestFinance(AccountTestInvoicingCommon):
         args = {'kind': 'receivables', 'view': 'aged', 'bucket': 'period4', 'partner_id': self.partner.id}
         drawer = self.Dashboard.get_drawer('finance.open_items', args)
         self.assertEqual([r['label'] for r in drawer['rows']], [invoice.name])
-        action = self.Dashboard.open_action('finance.open_items', dict(args, bucket='period3'))
-        self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
+        # 61-90 days does not hold this 100-day-old invoice (the panel, on Community and Enterprise).
+        drawer = self.Dashboard.get_drawer('finance.open_items', dict(args, bucket='period3'))
+        self.assertNotIn(invoice.name, [r['label'] for r in drawer['rows']])
+        # Without the Partner Ledger the button opens the same range as journal items.
+        if not self.env.ref('account_reports.partner_ledger_report', raise_if_not_found=False):
+            action = self.Dashboard.open_action('finance.open_items', dict(args, bucket='period3'))
+            self.assertFalse(self.env['account.move.line'].search(action['domain']) & invoice.line_ids)
         with self.assertRaises(ValidationError):
             self.Dashboard.get_drawer('finance.open_items', dict(args, view='expected'))
 
