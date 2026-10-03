@@ -9,7 +9,7 @@
   --line:#e6e3ea; --line-strong:#d3cfd9;
   --brand:#714b67; --brand-ink:#ffffff; --brand-hover:#5c3b53;
   --good:#1d7a4f; --good-soft:#e6f4ec; --warn:#9a5b00; --warn-soft:#fdf0d9; --crit:#b3303a; --crit-soft:#fbe8ea; --info:#2563c9; --info-soft:#e8f0fc;
-  --c-fin:#0b7a6d; --c-sal:#2563c9; --c-crm:#6d45c4; --c-pro:#a35705; --c-inv:#3b7a1a; --c-ppl:#b53461; --c-wel:#714b67; --c-key:#4a5a86;
+  --c-fin:#0b7a6d; --c-sal:#2563c9; --c-crm:#6d45c4; --c-pro:#a35705; --c-inv:#3b7a1a; --c-ppl:#b53461; --c-wel:#714b67; --c-key:#4a5a86; --p1:#2a78d6; --p2:#eb6834; --p3:#1baf7a; --p4:#eda100; --p5:#e87ba4; --p0:#b9b4c0;
   --s1:#2a78d6; --s2:#eb6834;
   --a1:#86b6ef; --a2:#5598e7; --a3:#2a78d6; --a4:#1c5cab; --a5:#104281;
   --shadow:0 18px 50px rgba(29,27,34,.16); --scrim:rgba(29,27,34,.3);
@@ -23,7 +23,7 @@
     --line:#302d37; --line-strong:#423e4a;
     --brand:#d5a9cb; --brand-ink:#1d1b22; --brand-hover:#e4c5dd;
     --good:#7fd1a6; --good-soft:#1f3a2e; --warn:#f3c26b; --warn-soft:#3a3122; --crit:#ff9ea8; --crit-soft:#402630; --info:#8fb8f4; --info-soft:#1f2c42;
-    --c-fin:#5fd0bf; --c-sal:#7fb0f2; --c-crm:#b9a2f3; --c-pro:#f2ab5c; --c-inv:#95d77c; --c-ppl:#f28bb0; --c-wel:#d5a9cb; --c-key:#aab8e4;
+    --c-fin:#5fd0bf; --c-sal:#7fb0f2; --c-crm:#b9a2f3; --c-pro:#f2ab5c; --c-inv:#95d77c; --c-ppl:#f28bb0; --c-wel:#d5a9cb; --c-key:#aab8e4; --p1:#3987e5; --p2:#d95926; --p3:#199e70; --p4:#c98500; --p5:#d55181; --p0:#5b5664;
     --s1:#3987e5; --s2:#d95926;
     --a1:#184f95; --a2:#256abf; --a3:#3987e5; --a4:#6da7ec; --a5:#9ec5f4;
     --shadow:0 18px 50px rgba(0,0,0,.5); --scrim:rgba(0,0,0,.55);
@@ -35,7 +35,7 @@
   --line:#302d37; --line-strong:#423e4a;
   --brand:#d5a9cb; --brand-ink:#1d1b22; --brand-hover:#e4c5dd;
   --good:#7fd1a6; --good-soft:#1f3a2e; --warn:#f3c26b; --warn-soft:#3a3122; --crit:#ff9ea8; --crit-soft:#402630; --info:#8fb8f4; --info-soft:#1f2c42;
-  --c-fin:#5fd0bf; --c-sal:#7fb0f2; --c-crm:#b9a2f3; --c-pro:#f2ab5c; --c-inv:#95d77c; --c-ppl:#f28bb0; --c-wel:#d5a9cb; --c-key:#aab8e4;
+  --c-fin:#5fd0bf; --c-sal:#7fb0f2; --c-crm:#b9a2f3; --c-pro:#f2ab5c; --c-inv:#95d77c; --c-ppl:#f28bb0; --c-wel:#d5a9cb; --c-key:#aab8e4; --p1:#3987e5; --p2:#d95926; --p3:#199e70; --p4:#c98500; --p5:#d55181; --p0:#5b5664;
   --s1:#3987e5; --s2:#d95926;
   --a1:#184f95; --a2:#256abf; --a3:#3987e5; --a4:#6da7ec; --a5:#9ec5f4;
   --shadow:0 18px 50px rgba(0,0,0,.5); --scrim:rgba(0,0,0,.55);
@@ -345,7 +345,24 @@ mark{background:color-mix(in srgb,var(--sec) 20%,transparent);color:inherit;bord
 .proposal{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px dashed var(--line-strong);border-radius:12px;background:var(--panel);color:var(--muted);font-size:13px;margin-bottom:12px}
 .proposal b{color:var(--ink)}
 .q{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 6px;background:var(--warn-soft);color:var(--warn);margin-inline-start:6px;vertical-align:middle}
-@media (max-width:899px){ .wc{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.wc .tile .sub{font-size:11px;color:var(--faint)}
+.wc .tile .cat{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+.wc-total{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--sec-soft)}
+.wc-total b{font-size:24px;font-weight:600;color:var(--sec)}
+.wc-total span{font-size:12px;color:var(--muted)}
+.wc-total strong{display:block;font-size:14px;color:var(--ink)}
+.chan-wrap{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:center}
+.donut{position:relative}
+.donut svg{display:block;width:100%;height:auto}
+.donut path{cursor:pointer;stroke:var(--panel);stroke-width:2}
+.donut path:hover{filter:brightness(1.08)}
+.donut .mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none}
+.donut .mid b{display:block;font-size:20px;font-weight:600}
+.donut .mid span{font-size:12px;color:var(--muted)}
+.donut .tip{position:absolute;pointer-events:none;white-space:nowrap;min-width:170px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:8px;vertical-align:middle}
+.chan-tbl td:first-child{white-space:nowrap}
+@media (max-width:899px){ .wc{grid-template-columns:repeat(2,minmax(0,1fr))} .chan-wrap{grid-template-columns:1fr} .donut{max-width:240px;margin:0 auto} }
 </style>
 
 <div class="app" id="app">
@@ -399,7 +416,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 const AR = {
  'Executive Dashboard':'لوحة المعلومات التنفيذية','Sections':'الأقسام','Quick access':'وصول سريع','Search':'بحث','Needs attention':'يتطلب الانتباه','Definitions':'التعريفات',
  'Preview as user language':'معاينة بلغة المستخدم',"In Odoo, language and direction come from the user's preferences.":'في أودو، تأتي اللغة واتجاه الصفحة من تفضيلات المستخدم.',
- 'Welcome':'الترحيب','Key metrics':'المؤشرات الرئيسية','Net sales':'صافي المبيعات','Net sales by channel':'صافي المبيعات حسب القناة','Gross profit %':'نسبة إجمالي الربح','Working capital':'رأس المال العامل','Available cash':'النقدية المتاحة','Inventory at cost':'المخزون بالتكلفة','Accounts receivable':'الذمم المدينة','Accounts payable':'الذمم الدائنة','OTIF':'التسليم في الموعد وبالكامل','ROAS':'العائد على الإنفاق الإعلاني','Ad spend':'الإنفاق الإعلاني','Net revenue':'صافي الإيرادات','Cost of goods sold':'تكلفة البضاعة المباعة','Gross profit':'إجمالي الربح','Orders due':'الطلبات المستحقة','On time and in full':'في الموعد وبالكامل','On time, not in full':'في الموعد، غير مكتمل','In full, late':'مكتمل، متأخر','Late and not in full':'متأخر وغير مكتمل','No channel':'بدون قناة','Excluding VAT':'بدون ضريبة القيمة المضافة','Finance':'المالية','Sales':'المبيعات','CRM':'إدارة العملاء','Procurement':'المشتريات','Inventory':'المخزون','People':'الموظفون',
+ 'Welcome':'الترحيب','Key metrics':'المؤشرات الرئيسية','Net sales':'صافي المبيعات','Net sales by channel':'صافي المبيعات حسب القناة','Gross profit %':'نسبة إجمالي الربح','Working capital':'رأس المال العامل','Available cash':'النقدية المتاحة','Inventory at cost':'المخزون بالتكلفة','Accounts receivable':'الذمم المدينة','Accounts payable':'الذمم الدائنة','OTIF':'التسليم في الموعد وبالكامل','ROAS':'العائد على الإنفاق الإعلاني','Ad spend':'الإنفاق الإعلاني','Net revenue':'صافي الإيرادات','Cost of goods sold':'تكلفة البضاعة المباعة','Gross profit':'إجمالي الربح','Orders due':'الطلبات المستحقة','On time and in full':'في الموعد وبالكامل','On time, not in full':'في الموعد، غير مكتمل','In full, late':'مكتمل، متأخر','Late and not in full':'متأخر وغير مكتمل','No channel':'بدون قناة','Other':'أخرى','Channel':'القناة','Invoiced':'المفوتر','Credit notes':'الإشعارات الدائنة','Share':'الحصة','Asset':'أصل','Liability':'التزام','Excluding VAT':'بدون ضريبة القيمة المضافة','Finance':'المالية','Sales':'المبيعات','CRM':'إدارة العملاء','Procurement':'المشتريات','Inventory':'المخزون','People':'الموظفون',
  'This month':'هذا الشهر','Last month':'الشهر الماضي','This quarter':'هذا الربع','Year to date':'منذ بداية السنة','Custom':'مخصص',
  'Greetings':'أهلاً بك','Choose a section to open. Figures appear only inside a section.':'اختر قسماً لفتحه. تظهر الأرقام داخل الأقسام فقط.',
  'Search orders, invoices, contacts, products, employees…':'ابحث في الطلبات والفواتير وجهات الاتصال والمنتجات والموظفين…',
@@ -535,7 +552,27 @@ const attention = [
 
 /* ---------- key metrics example data (proposal) ---------- */
 /* channel = sale.order "Source" (utm.source); [name, invoiced untaxed, credit notes untaxed, ad spend or null] */
-const channels = [['Showroom',5.48e6,0.36e6,null],['Website',4.10e6,0.26e6,0.92e6],['Social media',2.81e6,0.15e6,0.88e6],['Marketplace',2.12e6,0.19e6,0.55e6],['Wholesale',1.15e6,0.03e6,null],['No channel',0.55e6,0.02e6,null]];
+const channels = [['Showroom',5.48e6,0.36e6],['Website',4.10e6,0.26e6],['Social media',2.81e6,0.15e6],['Marketplace',2.12e6,0.19e6],['Wholesale',0.89e6,0.03e6],['Phone orders',0.19e6,0.01e6],['Events',0.08e6,0],['No channel',0.55e6,0.02e6]];
+/* advertising expense accounts chosen in Settings: [code, name, posted in period] */
+const adAccounts = [['610210','Online advertising',1.12e6],['610220','Social media advertising',0.88e6],['610230','Print and outdoor advertising',0.35e6]];
+const PIE_MAX = 5; /* top 5 channels get a colour; the rest fold into Other */
+const chanSorted = () => { const named=channels.filter(c=>c[0]!=='No channel').sort((a,b)=>netOf(b)-netOf(a)); return [...named, ...channels.filter(c=>c[0]==='No channel')]; };
+const chanColor = c => { const i=chanSorted().filter(x=>x[0]!=='No channel').indexOf(c); return i>=0 && i<PIE_MAX ? `var(--p${i+1})` : 'var(--p0)'; };
+function pieChart(host){
+  const f=F(), list=chanSorted(), top=list.filter(c=>c[0]!=='No channel').slice(0,PIE_MAX), rest=list.filter(c=>!top.includes(c));
+  const slices=[...top.map(c=>[t(c[0]),netOf(c)*f,chanColor(c),'kmChan:'+c[0]]), ...(rest.length?[[`${t('Other')} (${rest.length})`,rest.reduce((s,c)=>s+netOf(c),0)*f,'var(--p0)','kmNet']]:[])];
+  const tot=slices.reduce((s,x)=>s+x[1],0), R=100, r=64, C=110; let a0=-Math.PI/2;
+  const rtl=document.documentElement.dir==='rtl', pt=(a,rad)=>[C+(rtl?-1:1)*rad*Math.cos(a), C+rad*Math.sin(a)];
+  const paths=slices.map(x=>{ const a1=a0+x[1]/tot*2*Math.PI, big=a1-a0>Math.PI?1:0, sw=rtl?0:1, [x0,y0]=pt(a0,R),[x1,y1]=pt(a1,R),[x2,y2]=pt(a1,r),[x3,y3]=pt(a0,r);
+    const d=`M${x0} ${y0}A${R} ${R} 0 ${big} ${sw} ${x1} ${y1}L${x2} ${y2}A${r} ${r} 0 ${big} ${1-sw} ${x3} ${y3}Z`; a0=a1;
+    return `<path d="${d}" fill="${x[2]}" data-open="${esc(x[3])}" data-tip="${esc(x[0])}|${N(x[1])}|${pct(x[1]/tot*100)}"></path>`; }).join('');
+  host.innerHTML=`<svg viewBox="0 0 220 220" role="img" aria-label="${esc(t('Net sales by channel'))}">${paths}</svg><div class="mid"><div><b class="num">${M(tot)}</b><span>${esc(t('Net sales'))}</span></div></div><div class="tip" hidden></div>`;
+  const tip=$('.tip',host);
+  $$('path',host).forEach(el=>{ el.addEventListener('pointermove',e=>{ const [n,v,pc]=el.dataset.tip.split('|'), b=host.getBoundingClientRect();
+      tip.innerHTML=`<b>${n}</b><div><span>${esc(t('Net sales'))}</span><span class="num">${v}</span></div><div><span>${esc(t('Share'))}</span><span class="num">${pc}</span></div>`; tip.hidden=false;
+      tip.style.left=Math.min(b.width-150,Math.max(0,e.clientX-b.left+12))+'px'; tip.style.top=(e.clientY-b.top+12)+'px'; });
+    el.addEventListener('pointerleave',()=>{ tip.hidden=true; }); });
+}
 const netOf = c => c[1]-c[2];
 const netSales = () => channels.reduce((s,c)=>s+netOf(c),0);
 const COGS = 10.43e6;
@@ -646,47 +683,49 @@ const tiles = list => `<div class="tiles" style="--tn:${list.length>2?2:list.len
 
 /* ---------- pages ---------- */
 const pages = {
-  key:()=>{ const f=F(), ns=netSales()*f, cogs=COGS*f, gp=(ns-cogs)/ns*100, bc=bankCash.reduce((s,a)=>s+a[2],0), inv=stock.reduce((s,r)=>s+Math.max(0,r.oh)*r.cost,0), ar=22.8e6, ap=12.6e6;
-    const spend=channels.reduce((s,c)=>s+(c[3]||0),0)*f, roas=ns/spend, o=otif, op=o.ok/o.due*100, maxC=Math.max(...channels.map(netOf));
+  key:()=>{ const f=F(), ns=netSales()*f, cogs=COGS*f, gp=(ns-cogs)/ns*100, bc=bankCash.reduce((s,a)=>s+a[2],0), inv=stock.reduce((s,r)=>s+Math.max(0,r.oh)*r.cost,0), ar=22.8e6, ap=12.6e6, wc=bc+inv+ar-ap;
+    const spend=adAccounts.reduce((s,a)=>s+a[2],0)*f, roas=ns/spend, o=otif, op=o.ok/o.due*100, end=lang==='ar'?'في نهاية الفترة':'At the end of the period';
+    const wtile=(open,cls,sub,v,label,cat)=>`<button class="tile ${cls}" data-open="${open}"><span class="sub">${esc(sub)}</span><b class="num">${M(v)}</b><span>${esc(t(label))}</span><span class="cat">${esc(t(cat))}</span></button>`;
+    const list=chanSorted();
     return `
-    <div class="proposal">${svgI('spark')}<span><b>${lang==='ar'?'مقترح للموافقة':'Proposal for approval.'}</b> ${lang==='ar'?'قسم جديد فوق المالية. الأرقام أمثلة. العلامات الصفراء أسئلة مفتوحة.':'New section placed above Finance. Figures are examples. Yellow tags mark open questions.'}</span></div>
+    <div class="proposal">${svgI('spark')}<span><b>${lang==='ar'?'مقترح للموافقة · المراجعة 2':'Proposal for approval · revision 2.'}</b> ${lang==='ar'?'قسم جديد فوق المالية. الأرقام أمثلة.':'New section placed above Finance, updated with your answers. Figures are examples.'}</span></div>
     ${kpis([{ic:'coin',label:'Net sales',v:money(ns),cap:t('Excluding VAT'),open:'kmNet'},
             {ic:'percent',label:'Gross profit %',v:pct(gp),cap:`${t('Gross profit')} ${M(ns-cogs)}`,open:'kmGp'},
-            {ic:'bank',label:'Available cash',v:money(bc),cap:t('Working capital'),open:'bankcash'},
+            {ic:'scale',label:'Working capital',v:money(wc),cap:lang==='ar'?'في نهاية الفترة':'At period end',open:'kmWc'},
             {ic:'truck',label:'OTIF',v:pct(op),cap:`${o.ok} / ${o.due} ${t('orders')}`,open:'kmOtif'},
             {ic:'megaphone',label:'ROAS',v:times(roas),cap:`${t('Ad spend')} ${M(spend)}`,open:'kmRoas'}])}
     <div class="grid">
-      ${panel('span-7','Net sales by channel',{html:`${esc(t('Excluding VAT'))} · ${lang==='ar'?'بعد الخصومات والإلغاءات والمرتجعات والإشعارات الدائنة':'after discounts, cancellations, returns and credit notes'} · <bdi dir="ltr">${esc(periodLabel())}</bdi>`},
-        `<div>${channels.map(c=>`<button class="chan ${c[0]==='No channel'?'none':''}" data-open="kmChan:${esc(c[0])}"><span class="nm">${esc(t(c[0]))}<small>${pct(netOf(c)/netSales()*100)}</small></span><span class="num">${N(netOf(c)*f)}</span><span class="bar"><i style="width:${netOf(c)/maxC*100}%"></i></span></button>`).join('')}</div>
-         <div class="total-row"><span>${t('Total')}</span><span class="num">${N(ns)} ${t('EGP')}</span></div>`,link('kmNet','View all'))}
-      ${panel('span-5','Gross profit %',{html:`${lang==='ar'?'إجمالي الشركة · من الإجماليات المجمعة':'Whole company · from combined totals'} · <bdi dir="ltr">${esc(periodLabel())}</bdi>`},
-        `<div class="gauge"><span class="big num">${pct(gp)}</span><span class="note">${lang==='ar'?'لا يتم احتساب متوسط نسب المنتجات أو القنوات':'Not an average of product or channel margins'}</span></div>
-         <div class="meter"><i style="width:${gp}%"></i></div>
-         <dl class="formula"><dt>${t('Net revenue')} <small>(${t('Excluding VAT')})</small></dt><dd class="num">${N(ns)}</dd>
-           <dt>− ${t('Cost of goods sold')}<span class="q">Q2</span></dt><dd class="num">${N(cogs)}</dd>
+      ${panel('span-12','Net sales by channel',{html:`${esc(t('Excluding VAT'))} · ${lang==='ar'?'بعد الخصومات والإلغاءات والمرتجعات والإشعارات الدائنة · القناة = المصدر في أمر البيع':'after discounts, cancellations, returns and credit notes · channel = Source on the sales order'} · <bdi dir="ltr">${esc(periodLabel())}</bdi>`},
+        `<div class="chan-wrap"><div class="donut" data-pie="chan"></div>
+          <div class="chan-tbl">${table([{t:'Channel',f:v=>`<i class="dot" style="background:${chanColor(channels.find(c=>c[0]===v))}"></i>${esc(t(v))}`},{t:'Invoiced',n:1,f:v=>N(v*f)},{t:'Credit notes',n:1,f:v=>v?`<bdi dir="ltr">−${N(v*f)}</bdi>`:'0'},{t:'Net sales',n:1,f:(v,r)=>N(netOf(r)*f)},{t:'Share',n:1,f:(v,r)=>pct(netOf(r)/netSales()*100)}],list,r=>'kmChan:'+r[0],
+            `<tfoot><tr><td>${t('Total')} · ${list.length}</td><td class="n num">${N(channels.reduce((s,c)=>s+c[1],0)*f)}</td><td class="n num"><bdi dir="ltr">−${N(channels.reduce((s,c)=>s+c[2],0)*f)}</bdi></td><td class="n num">${N(ns)}</td><td class="n num">100%</td></tr></tfoot>`)}</div></div>
+         <p class="note" style="margin-top:10px">${lang==='ar'?'تظهر أكبر 5 قنوات في الرسم بألوان، وتُجمع البقية في "أخرى". يعرض الجدول كل القنوات، وعند زيادتها يظهر زر "عرض المزيد".':'The chart colours the 5 largest channels and folds the rest into Other; the table lists every channel (sorted by net sales, “No channel” last) and pages with “Show more” as sources are added.'}</p>`,link('kmNet','View all'))}
+      ${panel('span-4','Gross profit %',{html:`${lang==='ar'?'إجمالي الشركة · من الإجماليات المجمعة':'Whole company · from combined totals'}`},
+        `<div class="gauge"><span class="big num">${pct(gp)}</span></div>
+         <dl class="formula" style="margin-top:10px"><dt>${t('Net revenue')}</dt><dd class="num">${N(ns)}</dd>
+           <dt>− ${t('Cost of goods sold')}</dt><dd class="num">${N(cogs)}</dd>
            <dt class="eq">= ${t('Gross profit')}</dt><dd class="eq num">${N(ns-cogs)}</dd>
-           <dt>${t('Gross profit')} ÷ ${t('Net revenue')} × 100</dt><dd class="num">${pct(gp)}</dd></dl>`,link('kmGp','Profit and Loss'))}
-      ${panel('span-12','Working capital',{html:`${lang==='ar'?'أربعة أرقام منفصلة':'Four separate figures'} · ${esc(t('as of today'))}<span class="q">Q4</span>`},
-        `<div class="wc">
-          <button class="tile sec" data-open="bankcash"><span class="sign">${lang==='ar'?'أصل':'Asset'}</span><b class="num">${M(bc)}</b><span>${esc(t('Available cash'))}</span><small>${lang==='ar'?'حسابات البنوك والنقدية':'Bank and Cash Accounts'}</small></button>
-          <button class="tile sec" data-open="kmInv"><span class="sign">${lang==='ar'?'أصل':'Asset'}</span><b class="num">${M(inv)}</b><span>${esc(t('Inventory at cost'))}</span><small>${lang==='ar'?'تقييم المخزون':'Stock valuation'}</small></button>
-          <button class="tile sec" data-open="recvAged"><span class="sign">${lang==='ar'?'أصل':'Asset'}</span><b class="num">${M(ar)}</b><span>${esc(t('Accounts receivable'))}</span><small>${t('Overdue')} ${M(8.2e6)}</small></button>
-          <button class="tile warn" data-open="payAged"><span class="sign">${lang==='ar'?'التزام':'Liability'}</span><b class="num">${M(ap)}</b><span>${esc(t('Accounts payable'))}</span><small>${t('Overdue')} ${M(3.2e6)}</small></button>
-        </div>
-        <p class="note" style="margin-top:10px">${lang==='ar'?'اختياري: صافي رأس المال العامل':'Optional:'} ${lang==='ar'?'':'net working capital = cash + inventory + receivables − payables ='} <b class="num">${M(bc+inv+ar-ap)}</b><span class="q">Q5</span></p>`)}
-      ${panel('span-6','OTIF',{html:`${lang==='ar'?'الطلبات المستحقة في الفترة':'Orders due in the period'}<span class="q">Q3</span> · <bdi dir="ltr">${esc(periodLabel())}</bdi>`},
+           <dt>÷ ${t('Net revenue')} × 100</dt><dd class="num">${pct(gp)}</dd></dl>
+         <p class="note" style="margin-top:10px">${lang==='ar'?'لا يتم احتساب متوسط نسب المنتجات أو القنوات.':'Never an average of product or channel margins.'}</p>`,link('kmGp','Profit and Loss'))}
+      ${panel('span-4','OTIF',{html:lang==='ar'?'الطلبات المستحقة في الفترة · بدون هامش سماح':'Orders due in the period · no tolerance'},
         `<div class="gauge"><span class="big num">${pct(op)}</span><span class="note num">${o.ok} ${lang==='ar'?'من':'of'} ${o.due} ${t('orders')}</span></div>
-         <div class="meter"><i style="width:${op}%"></i></div>
          <div class="tiles" style="--tn:2;margin-top:10px">
            <button class="tile good" data-open="kmOtif"><b class="num">${o.ok}</b><span>${esc(t('On time and in full'))}</span></button>
            <button class="tile warn" data-open="kmOtif"><b class="num">${o.notFull}</b><span>${esc(t('On time, not in full'))}</span></button>
            <button class="tile warn" data-open="kmOtif"><b class="num">${o.late}</b><span>${esc(t('In full, late'))}</span></button>
-           <button class="tile crit" data-open="kmOtif"><b class="num">${o.both}</b><span>${esc(t('Late and not in full'))}</span></button></div>
-         <p class="note" style="margin-top:10px">OTIF % = ${lang==='ar'?'(الطلبات المكتملة في الموعد وبالكامل ÷ إجمالي الطلبات المستحقة) × 100':'(orders completed on time and in full ÷ total orders due) × 100'}</p>`,link('kmOtif','View all'))}
-      ${panel('span-6','ROAS',{html:`${lang==='ar'?'صافي المبيعات ÷ الإنفاق الإعلاني':'Net sales ÷ ad spend'}<span class="q">Q1</span> · <bdi dir="ltr">${esc(periodLabel())}</bdi>`},
-        `<div class="gauge"><span class="big num">${times(roas)}</span><span class="note">${lang==='ar'?'لكل 1 جنيه إنفاق إعلاني':'net sales per EGP 1 of ad spend'}</span></div>
-         <dl class="formula" style="margin:10px 0"><dt>${t('Net sales')}</dt><dd class="num">${N(ns)}</dd><dt>÷ ${t('Ad spend')}</dt><dd class="num">${N(spend)}</dd><dt class="eq">= ROAS</dt><dd class="eq num">${times(roas)}</dd></dl>
-         <div class="rows">${channels.filter(c=>c[3]).map(c=>`<div class="row click" data-open="kmRoas"><span class="l"><span>${esc(t(c[0]))}<small>${t('Ad spend')} ${M(c[3]*f)}</small></span></span><span class="r num">${times(netOf(c)/c[3])}</span></div>`).join('')}</div>`,link('kmRoas','View all'))}
+           <button class="tile crit" data-open="kmOtif"><b class="num">${o.both}</b><span>${esc(t('Late and not in full'))}</span></button></div>`,link('kmOtif','View all'))}
+      ${panel('span-4','ROAS',{html:lang==='ar'?'صافي المبيعات ÷ الإنفاق الإعلاني':'Net sales ÷ ad spend'},
+        `<div class="gauge"><span class="big num">${times(roas)}</span><span class="note">${lang==='ar'?'لكل 1 جنيه':'per EGP 1 spent'}</span></div>
+         <dl class="formula" style="margin-top:10px"><dt>${t('Net sales')}</dt><dd class="num">${N(ns)}</dd><dt>÷ ${t('Ad spend')}</dt><dd class="num">${N(spend)}</dd><dt class="eq">= ROAS</dt><dd class="eq num">${times(roas)}</dd></dl>
+         <p class="note" style="margin-top:10px">${lang==='ar'?'الإنفاق الإعلاني = القيود المرحّلة على حسابات الإعلان المختارة في الإعدادات.':'Ad spend = posted entries on the advertising expense accounts chosen in Settings.'}</p>`,link('kmRoas','View all'))}
+      ${panel('span-12','Working capital',{html:`${esc(end)} · <bdi dir="ltr">${esc(periodLabel().split(/–|-/).pop().trim())}</bdi>`},
+        `<div class="wc">
+          ${wtile('bankcash','sec',lang==='ar'?'حسابات البنوك والنقدية':'Bank and Cash Accounts',bc,'Available cash','Asset')}
+          ${wtile('kmInv','sec',lang==='ar'?'تقييم المخزون':'Stock valuation',inv,'Inventory at cost','Asset')}
+          ${wtile('recvAged','sec',lang==='ar'?'فواتير العملاء المفتوحة':'Open customer invoices',ar,'Accounts receivable','Asset')}
+          ${wtile('payAged','warn',lang==='ar'?'فواتير الموردين المفتوحة':'Open vendor bills',ap,'Accounts payable','Liability')}
+        </div>
+        <button class="wc-total" data-open="kmWc" style="width:100%;border:0;cursor:pointer;text-align:start"><span><strong>${esc(t('Working capital'))}</strong>${lang==='ar'?'النقدية + المخزون + الذمم المدينة − الذمم الدائنة':'Available cash + inventory + receivables − payables'}</span><b class="num">${N(wc)} <small>${t('EGP')}</small></b></button>`)}
     </div>`; },
   welcome:()=>`<div class="welcome">
       <div class="hello"><p class="date">${lang==='ar'?'الجمعة، 25 سبتمبر 2026':'Friday, 25 September 2026'} · <bdi>Example Trading Co.</bdi></p>
@@ -805,9 +844,10 @@ const D = {
   kmNet:()=>({crumb:'Key metrics',title:'Net sales by channel',sub:`${t('Excluding VAT')} · ${periodLabel()}`,body:table([{t:'Channel',f:v=>esc(t(v))},{t:'Invoiced',n:1,f:v=>N(v*F())},{t:'Credit notes',n:1,f:v=>'−'+N(v*F())},{t:'Net sales',n:1,f:(v,r)=>N(netOf(r)*F())}],channels,r=>'kmChan:'+r[0],`<tfoot><tr><td>${t('Total')}</td><td class="n num">${N(channels.reduce((s,c)=>s+c[1],0)*F())}</td><td class="n num">−${N(channels.reduce((s,c)=>s+c[2],0)*F())}</td><td class="n num">${N(netSales()*F())}</td></tr></tfoot>`)+note('Invoiced = posted customer invoices, untaxed, after line discounts. Credit notes = posted refunds (returns, price corrections). Cancelled orders and invoices are never counted. Channel = Source on the sales order the invoice line comes from.'),foot:odoo('Accounting › Invoice Analysis · grouped by Source')}),
   kmChan:n=>{ const c=channels.find(x=>x[0]===n)||channels[0]; return {crumb:'Key metrics',back:'kmNet',title:t(c[0]),sub:`${t('Net sales')} · ${periodLabel()}`,body:`<div class="big num">${N(netOf(c)*F())}${cur()}</div>`+simpleRows([['Invoiced (untaxed)',N(c[1]*F())],['Credit notes (untaxed)','−'+N(c[2]*F())],['Invoices',N(Math.round(c[1]/1.4e5*F()))],['Credit notes',N(Math.round(c[2]/4e4*F()))]])+(c[0]==='No channel'?note('Invoice lines with no sales order, or a sales order with no Source.'):''),foot:odoo(`Accounting › Invoice Analysis · Source ${c[0]}`)}; },
   kmGp:()=>({crumb:'Key metrics',title:'Gross profit %',sub:periodLabel(),body:`<dl class="formula"><dt>${t('Net revenue')}</dt><dd class="num">${N(netSales()*F())}</dd><dt>− ${t('Cost of goods sold')}</dt><dd class="num">${N(COGS*F())}</dd><dt class="eq">= ${t('Gross profit')}</dt><dd class="eq num">${N((netSales()-COGS)*F())}</dd><dt>%</dt><dd class="num">${pct((netSales()-COGS)/netSales()*100)}</dd></dl>`+note('One calculation on the combined company totals for the period. Product or channel percentages are never averaged.'),foot:odoo('Accounting › Reporting › Profit and Loss')}),
-  kmInv:()=>({crumb:'Key metrics',title:'Inventory at cost',sub:t('as of today'),body:simpleRows(WH.map((w,i)=>[w,M(stock.filter(r=>r.wh===w).reduce((s,r)=>s+Math.max(0,r.oh)*r.cost,0))])),foot:odoo('Inventory › Reporting › Valuation')}),
-  kmOtif:()=>({crumb:'Key metrics',title:'OTIF',sub:periodLabel(),body:`<div class="big num">${pct(otif.ok/otif.due*100)}</div>`+note('Orders that missed on time or in full:')+`<div class="rows">${otifFails.map(r=>`<div class="row click" data-open="so:S02331"><span class="l"><span>${r[0]} · ${esc(r[1])}<small>${lang==='ar'?'مستحق':'Due'} ${r[2]} · ${lang==='ar'?'سُلّم':'delivered'} ${r[3]} · ${r[4]}</small></span></span><span class="chip ${OT[r[5]][1]}">${esc(t(OT[r[5]][0]))}</span></div>`).join('')}</div>`,foot:odoo('Sales › Orders · due in period')}),
-  kmRoas:()=>({crumb:'Key metrics',title:'ROAS',sub:periodLabel(),body:table([{t:'Channel',f:v=>esc(t(v))},{t:'Net sales',n:1,f:(v,r)=>N(netOf(r)*F())},{t:'Ad spend',n:1,f:(v,r)=>r[3]?N(r[3]*F()):'—'},{t:'ROAS',n:1,f:(v,r)=>r[3]?times(netOf(r)/r[3]):'—'}],channels,r=>'kmChan:'+r[0])+note('Where ad spend comes from is open question Q1.'),foot:odoo('Accounting › Journal items · advertising accounts')}),
+  kmInv:()=>({crumb:'Key metrics',title:'Inventory at cost',sub:lang==='ar'?'في نهاية الفترة':'At the end of the period',body:simpleRows(WH.map((w,i)=>[w,M(stock.filter(r=>r.wh===w).reduce((s,r)=>s+Math.max(0,r.oh)*r.cost,0))])),foot:odoo('Inventory › Reporting › Valuation')}),
+  kmOtif:()=>({crumb:'Key metrics',title:'OTIF',sub:periodLabel(),body:`<div class="big num">${pct(otif.ok/otif.due*100)}</div>`+note('No tolerance: due = Delivery Date (or expected date) in the period and already passed; on time = every delivery done by the end of that day; in full = every ordered product quantity delivered. Service lines are not counted. Orders that missed:')+`<div class="rows">${otifFails.map(r=>`<div class="row click" data-open="so:S02331"><span class="l"><span>${r[0]} · ${esc(r[1])}<small>${lang==='ar'?'مستحق':'Due'} ${r[2]} · ${lang==='ar'?'سُلّم':'delivered'} ${r[3]} · ${r[4]}</small></span></span><span class="chip ${OT[r[5]][1]}">${esc(t(OT[r[5]][0]))}</span></div>`).join('')}</div>`,foot:odoo('Sales › Orders · due in period')}),
+  kmRoas:()=>({crumb:'Key metrics',title:'ROAS',sub:periodLabel(),body:`<div class="big num">${times(netSales()/adAccounts.reduce((s,a)=>s+a[2],0))}</div>`+simpleRows(adAccounts.map(a=>[a[1],N(a[2]*F()),'',a[0]]))+`<div class="total-row"><span>${t('Ad spend')}</span><span class="num">${N(adAccounts.reduce((s,a)=>s+a[2],0)*F())} ${t('EGP')}</span></div>`+note('Advertising expense accounts are chosen in Executive Dashboard settings.'),foot:odoo('Accounting › General Ledger · advertising accounts')}),
+  kmWc:()=>{ const bc=bankCash.reduce((s,a)=>s+a[2],0), inv=stock.reduce((s,r)=>s+Math.max(0,r.oh)*r.cost,0); return {crumb:'Key metrics',title:'Working capital',sub:lang==='ar'?'في نهاية الفترة':'At the end of the period',body:simpleRows([['Available cash','+'+N(bc),'bankcash','Bank and Cash Accounts'],['Inventory at cost','+'+N(inv),'kmInv','Stock valuation'],['Accounts receivable','+'+N(22.8e6),'recvAged','Open customer invoices'],['Accounts payable','−'+N(12.6e6),'payAged','Open vendor bills']])+`<div class="total-row"><span>${t('Working capital')}</span><span class="num">${N(bc+inv+22.8e6-12.6e6)} ${t('EGP')}</span></div>`,foot:odoo('Accounting › Reporting › Balance Sheet')}; },
   search:()=>({sec:null,crumb:'Quick access',title:'Search',sub:t('Searches the whole database with your access rights, not only what the dashboard shows.'),body:`<input class="search-input" id="q" type="search" autocomplete="off" placeholder="${esc(t('Search orders, invoices, contacts, products, employees…'))}"><div id="qres"><p class="note">${t('Type at least 2 characters.')}</p></div>`}),
   attention:()=>({sec:null,crumb:'Quick access',title:'Needs attention',sub:t('Ranked by severity, then value'),body:`<div>${attention.map(a=>`<button class="att" data-att="${a[4]}:${a[5]}"><span><span class="sev ${a[0]}">${t(a[0]==='crit'?'Critical':a[0]==='warn'?'Warning':'Review')}</span><b>${esc(a[1])}</b><small>${esc(a[2])}</small></span><span class="amt num">${esc(a[3])}</span></button>`).join('')}</div>`}),
   definitions:()=>({sec:null,crumb:'Quick access',title:'Definitions',sub:'',body:`<dl class="def"><dt>Revenue, gross profit, net profit</dt><dd>Profit and Loss report, posted entries, selected period and company.</dd><dt>Bank & Cash</dt><dd>The accounts under the Balance Sheet line “Bank and Cash Accounts” and their balances as of today.</dd><dt>Receivables / Payables · Aged</dt><dd>Aged Receivable / Aged Payable reports as of today.</dd><dt>Receivables / Payables · Expected</dt><dd>Amount still due on open posted customer invoices / vendor bills, grouped by due date.</dd><dt>Delivery Status</dt><dd>The Delivery Status field of each sales order, as Odoo sets it.</dd><dt>Top customers by payments received</dt><dd>Customer payments posted in the period.</dd><dt>Checked in today</dt><dd>Employees with an attendance check-in today (Attendances app).</dd><dt>Shifts today</dt><dd>Published Planning shifts for today (Planning app).</dd><dt>Search</dt><dd>Looks up records across the database that you are allowed to read.</dd></dl>`}),
@@ -891,6 +931,7 @@ let toastT; const toast=m=>{ const el=$('#toast'); el.textContent=m; el.classLis
 /* ---------- render ---------- */
 const loaded = new Set(['welcome']);
 function drawCharts(){
+  $$('[data-pie="chan"]').forEach(h=>pieChart(h));
   $$('[data-line="fin"]').forEach(h=>lineChart(h,[{name:'Revenue',v:revenue,c:'var(--s1)',area:true},{name:'Net profit',v:profit,c:'var(--s2)'}]));
   $$('[data-line="sales"]').forEach(h=>lineChart(h,[{name:'Invoiced sales',v:revenue,c:'var(--c-sal)',area:true}]));
   $$('[data-col="recv"]').forEach(h=>columnChart(h,recvExp.map((d,i)=>[d[0],d[1],i?null:'var(--crit)']),'recvExp'));
