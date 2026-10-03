@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="executive_dashboard.KeyMetricsSection">
+        <t t-set="kpiList" t-value="kpis"/>
+        <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
+            <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
+                <span class="ed-kic"><Icon name="kpi.icon"/></span>
+                <span class="ed-kpi-label" t-esc="kpi.label"/>
+                <span class="ed-kpi-value ed-num"><t t-esc="kpi.value"/> <small t-if="kpi.money" t-esc="currency"/></span>
+                <span class="ed-kpi-cap"><bdi t-esc="kpi.cap"/></span>
+            </button>
+        </section>
+
+        <div class="ed-grid">
+            <!-- Net sales by channel: donut (five largest channels, the rest as Other) and every channel in the table. -->
+            <section class="ed-panel ed-span-12">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Net sales by channel</h2>
+                        <p>Excluding VAT · after discounts, cancellations, returns and credit notes · channel = Source on the sales order</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('net_sales')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <p t-if="!w.net_sales.channels.length" class="ed-note">No invoiced sales in this period.</p>
+                <div t-else="" class="ed-chan">
+                    <DonutChart items="slices" centerValue="compact(w.net_sales.total)" centerLabel.translate="Net sales"
+                                valueLabel.translate="Net sales" shareLabel.translate="Share" onSelect.bind="selectSlice"/>
+                    <div class="ed-tbl-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Channel</th><th class="n">Invoiced</th><th class="n">Credit notes</th><th class="n">Net sales</th><th class="n">Share</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="shownChannels" t-as="c" t-key="c.key" class="click" tabindex="0"
+                                    t-on-click="() => this.openChannel(c)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openChannel(c)">
+                                    <td t-att-data-label="labels.channel"><i class="ed-dot" t-att-style="'background:' + c.color"/><t t-esc="c.name"/></td>
+                                    <td t-att-data-label="labels.invoiced" class="n ed-num" t-esc="whole(c.invoiced)"/>
+                                    <td t-att-data-label="labels.refunds" class="n ed-num"><bdi t-esc="c.refunds ? '−' + whole(c.refunds) : whole(0)"/></td>
+                                    <td t-att-data-label="labels.net" class="n ed-num" t-esc="whole(c.net)"/>
+                                    <td t-att-data-label="labels.share" class="n ed-num"><t t-if="c.share !== null"><t t-esc="c.share"/>%</t></td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td>Total</td>
+                                    <td class="n ed-num" t-esc="whole(w.net_sales.invoiced)"/>
+                                    <td class="n ed-num"><bdi t-esc="'−' + whole(w.net_sales.refunds)"/></td>
+                                    <td class="n ed-num"><t t-esc="whole(w.net_sales.total)"/> <t t-esc="currency"/></td>
+                                    <td class="n ed-num">100%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div t-if="channels.length > state.rows" class="ed-more">
+                            <span class="ed-note"><t t-esc="state.rows"/> / <t t-esc="channels.length"/></span>
+                            <button type="button" class="ed-btn" t-on-click="showMoreChannels">Show more</button>
+                        </div>
+                    </div>
+                </div>
+                <p t-if="!w.net_sales.by_source" class="ed-note">Install Sales to split net sales by the Source of the sales order.</p>
+            </section>
+
+            <t t-set="third" t-value="w.otif ? 'ed-panel ed-span-4' : 'ed-panel ed-span-6'"/>
+            <section t-att-class="third">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Gross profit %</h2>
+                        <p>Whole company · from combined totals</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('gross_profit')">
+                        Details <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <div class="ed-gauge"><span class="ed-big ed-num" t-esc="pct(w.gross_profit.percent)"/></div>
+                <dl class="ed-formula">
+                    <dt>Net sales</dt><dd class="ed-num" t-esc="whole(w.gross_profit.revenue)"/>
+                    <dt>− Cost of goods sold</dt><dd class="ed-num" t-esc="whole(w.gross_profit.cogs)"/>
+                    <dt class="ed-eq">= Gross profit</dt><dd class="ed-eq ed-num" t-esc="whole(w.gross_profit.gross_profit)"/>
+                    <dt>÷ Net sales × 100</dt><dd class="ed-num" t-esc="pct(w.gross_profit.percent)"/>
+                </dl>
+                <p class="ed-note mt-2">Never an average of product or channel margins.</p>
+            </section>
+
+            <section t-if="w.otif" class="ed-panel ed-span-4">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>OTIF</h2>
+                        <p>Orders due in the period · no tolerance</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('otif')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <div class="ed-gauge">
+                    <span class="ed-big ed-num" t-esc="pct(w.otif.percent)"/>
+                    <span class="ed-note ed-num"><t t-esc="w.otif.ok"/> / <t t-esc="w.otif.due"/></span>
+                </div>
+                <div class="ed-tiles mt-2" style="--tn:2">
+                    <button t-foreach="otifTiles" t-as="tile" t-key="tile.kind" type="button"
+                            t-att-class="'ed-tile ' + tile.cls" t-on-click="() => this.open('otif', { kind: tile.kind })">
+                        <b class="ed-num" t-esc="whole(tile.count)"/>
+                        <span t-esc="tile.label"/>
+                    </button>
+                </div>
+            </section>
+
+            <section t-att-class="third">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>ROAS</h2>
+                        <p>Net sales ÷ ad spend</p>
+                    </div>
+                    <button type="button" class="ed-link" t-on-click="() => this.open('roas')">
+                        View all <Icon name="'arrow'" flip="true"/>
+                    </button>
+                </header>
+                <div class="ed-gauge"><span class="ed-big ed-num" t-esc="times(w.roas.roas)"/></div>
+                <dl class="ed-formula">
+                    <dt>Net sales</dt><dd class="ed-num" t-esc="whole(w.roas.sales)"/>
+                    <dt>÷ Ad spend</dt><dd class="ed-num" t-esc="whole(w.roas.spend)"/>
+                    <dt class="ed-eq">= ROAS</dt><dd class="ed-eq ed-num" t-esc="times(w.roas.roas)"/>
+                </dl>
+                <p t-if="w.roas.accounts" class="ed-note mt-2">Ad spend = posted entries on the advertising expense accounts chosen in Settings.</p>
+                <p t-else="" class="ed-note mt-2">No advertising accounts are chosen. A system administrator chooses them in Executive Dashboard settings.</p>
+            </section>
+
+            <section class="ed-panel ed-span-12">
+                <header class="ed-panel-head">
+                    <div>
+                        <h2>Working capital</h2>
+                        <p>At the end of the period · <bdi t-esc="asOf"/></p>
+                    </div>
+                </header>
+                <div class="ed-wc" t-att-style="'--wn:' + wcTiles.length">
+                    <button t-foreach="wcTiles" t-as="tile" t-key="tile.key" type="button"
+                            t-att-class="'ed-tile ' + tile.cls" t-on-click="tile.open">
+                        <span class="ed-sub" t-esc="tile.sub"/>
+                        <b class="ed-num" t-esc="compact(tile.value)"/>
+                        <span t-esc="tile.label"/>
+                        <span class="ed-cat" t-esc="tile.cat"/>
+                    </button>
+                </div>
+                <button type="button" class="ed-wc-total" t-on-click="() => this.open('working_capital')">
+                    <span>
+                        <strong>Working capital</strong>
+                        <t t-if="w.working_capital.inventory !== null">Available cash + inventory + receivables − payables</t>
+                        <t t-else="">Available cash + receivables − payables</t>
+                    </span>
+                    <b class="ed-num"><t t-esc="whole(w.working_capital.total)"/> <small t-esc="currency"/></b>
+                </button>
+            </section>
+        </div>
+    </t>
+</templates>

@@ -178,3 +178,70 @@ export class ColumnChart extends Component {
         }
     }
 }
+
+/**
+ * Donut for a part-to-whole of at most six slices. `items`: [{ label, value, color }]
+ * (positive values); `onSelect(index)` opens the slice's records. The centre shows
+ * `centerValue` over `centerLabel`; hovering a slice shows its value and share.
+ */
+export class DonutChart extends Component {
+    static template = "executive_dashboard.DonutChart";
+    static props = {
+        items: Array,
+        centerValue: { type: String, optional: true },
+        centerLabel: { type: String, optional: true },
+        shareLabel: { type: String, optional: true },
+        valueLabel: { type: String, optional: true },
+        onSelect: { type: Function, optional: true },
+    };
+
+    setup() {
+        this.state = useState({ hover: null, x: 0, y: 0 });
+    }
+
+    get slices() {
+        const items = this.props.items.filter((d) => d.value > 0);
+        const total = items.reduce((s, d) => s + d.value, 0);
+        if (!total) {
+            return [];
+        }
+        const rtl = localization.direction === "rtl";
+        const C = 110, R = 100, r = 64;
+        const pt = (a, rad) => [C + (rtl ? -1 : 1) * rad * Math.cos(a), C + rad * Math.sin(a)];
+        let a0 = -Math.PI / 2;
+        return items.map((d) => {
+            const share = d.value / total;
+            // A full circle cannot be drawn as one arc: stop just short of it.
+            const a1 = a0 + Math.min(share, 0.9999) * 2 * Math.PI;
+            const big = a1 - a0 > Math.PI ? 1 : 0;
+            const sweep = rtl ? 0 : 1;
+            const [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R), [x2, y2] = pt(a1, r), [x3, y3] = pt(a0, r);
+            const path = ["M", x0, y0, "A", R, R, 0, big, sweep, x1, y1, "L", x2, y2,
+                "A", r, r, 0, big, 1 - sweep, x3, y3, "Z"].join(" ");
+            a0 += share * 2 * Math.PI;
+            return { ...d, path, share: Math.round(share * 1000) / 10, index: this.props.items.indexOf(d) };
+        });
+    }
+
+    onMove(ev, slice) {
+        const box = ev.currentTarget.closest(".ed-donut").getBoundingClientRect();
+        this.state.hover = slice.index;
+        this.state.x = Math.max(0, Math.min(box.width - 170, ev.clientX - box.left + 12));
+        this.state.y = ev.clientY - box.top + 12;
+    }
+
+    onLeave() {
+        this.state.hover = null;
+    }
+
+    select(slice) {
+        this.props.onSelect?.(slice.index);
+    }
+
+    onKey(ev, slice) {
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            this.select(slice);
+        }
+    }
+}

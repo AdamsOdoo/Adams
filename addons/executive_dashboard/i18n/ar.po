@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-26 10:04+0000\n"
-"PO-Revision-Date: 2026-09-26 10:04+0000\n"
+"POT-Creation-Date: 2026-10-03 20:41+0000\n"
+"PO-Revision-Date: 2026-10-03 20:41+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -32,6 +32,12 @@ msgstr "%(count)s سجّلوا الحضور · %(in)s ما زالوا حاضري
 #: code:addons/executive_dashboard/static/src/sections/people.js:0
 msgid "%(in)s still in · %(out)s checked out"
 msgstr "%(in)s ما زالوا حاضرين · %(out)s انصرفوا"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "%(ok)s / %(due)s orders"
+msgstr "%(ok)s / %(due)s طلبات"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -194,9 +200,59 @@ msgstr "91–120 يوماً"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "= Gross profit"
+msgstr "= مجمل الربح"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "= ROAS"
+msgstr "= العائد على الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Accounts payable"
+msgstr "الذمم الدائنة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Accounts receivable"
+msgstr "الذمم المدينة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/people.js:0
 msgid "Active employees"
 msgstr "موظفون نشطون"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Ad spend"
+msgstr "الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Ad spend %s"
+msgstr "الإنفاق الإعلاني %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid ""
+"Ad spend = posted entries on the advertising expense accounts chosen in "
+"Settings."
+msgstr ""
+"الإنفاق الإعلاني = القيود المرحّلة على حسابات مصروفات الإعلان المختارة في "
+"الإعدادات."
 
 #. module: executive_dashboard
 #: model:res.groups,name:executive_dashboard.group_admin
@@ -210,6 +266,13 @@ msgstr "مدير"
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Advances & unmatched payments"
 msgstr "دفعات مقدمة ودفعات غير مطابقة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
+msgid "Advertising accounts"
+msgstr "حسابات الإعلان"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -255,9 +318,27 @@ msgstr "إجازات معتمدة"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "As of %s"
+msgstr "في %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "As of today"
 msgstr "حتى اليوم"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Asset"
+msgstr "أصل"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "At the end of the period ·"
+msgstr "في نهاية الفترة ·"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -290,6 +371,36 @@ msgstr "متاح"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Available cash"
+msgstr "النقدية المتاحة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Available cash + inventory + receivables − payables"
+msgstr "النقدية المتاحة + المخزون + الذمم المدينة − الذمم الدائنة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"Available cash + inventory at cost + receivables - payables, at the end of "
+"the period."
+msgstr ""
+"النقدية المتاحة + المخزون بالتكلفة + الذمم المدينة - الذمم الدائنة، في نهاية"
+" الفترة."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Available cash + receivables − payables"
+msgstr "النقدية المتاحة + الذمم المدينة − الذمم الدائنة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "Back"
 msgstr "رجوع"
@@ -298,6 +409,7 @@ msgstr "رجوع"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "Balance Sheet"
 msgstr "الميزانية العمومية"
@@ -323,6 +435,14 @@ msgstr "الميزانية العمومية › حسابات البنوك وال
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "Bank & Cash"
 msgstr "البنوك والنقدية"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Bank and Cash Accounts"
+msgstr "حسابات البنوك والنقدية"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -375,6 +495,12 @@ msgid "By probability"
 msgstr "حسب الاحتمالية"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "By product category"
+msgstr "حسب فئة المنتج"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 #: code:addons/executive_dashboard/static/src/sections/crm.js:0
@@ -383,10 +509,22 @@ msgid "CRM"
 msgstr "إدارة العملاء"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Calculation"
+msgstr "طريقة الحساب"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "Category"
 msgstr "الفئة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Channel"
+msgstr "القناة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -506,6 +644,30 @@ msgid "Confirmed sales orders in the period"
 msgstr "أوامر البيع المؤكدة في الفترة"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Cost of goods sold"
+msgstr "تكلفة البضاعة المباعة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Cost of goods sold by account"
+msgstr "تكلفة البضاعة المباعة حسب الحساب"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Credit notes"
+msgstr "الإشعارات الدائنة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Credit notes (untaxed)"
+msgstr "الإشعارات الدائنة (بدون ضريبة)"
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Custom"
@@ -562,6 +724,12 @@ msgid "Dashboard: Inventory"
 msgstr "لوحة المعلومات: المخزون"
 
 #. module: executive_dashboard
+#: model:ir.model.fields,field_description:executive_dashboard.field_res_company__executive_dashboard_key_metrics
+#: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__executive_dashboard_key_metrics
+msgid "Dashboard: Key metrics"
+msgstr "لوحة المعلومات: المؤشرات الرئيسية"
+
+#. module: executive_dashboard
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_company__executive_dashboard_people
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__executive_dashboard_people
 msgid "Dashboard: People"
@@ -578,6 +746,12 @@ msgstr "لوحة المعلومات: المشتريات"
 #: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__executive_dashboard_sales
 msgid "Dashboard: Sales"
 msgstr "لوحة المعلومات: المبيعات"
+
+#. module: executive_dashboard
+#: model:ir.model.fields,field_description:executive_dashboard.field_res_company__executive_dashboard_ad_account_ids
+#: model:ir.model.fields,field_description:executive_dashboard.field_res_config_settings__executive_dashboard_ad_account_ids
+msgid "Dashboard: advertising accounts"
+msgstr "لوحة المعلومات: حسابات الإعلان"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -649,6 +823,7 @@ msgstr "القسم"
 #. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 msgid "Details"
 msgstr "التفاصيل"
 
@@ -707,6 +882,28 @@ msgstr "أدخل تاريخي بداية ونهاية صحيحين."
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Excluding VAT"
+msgstr "بدون ضريبة القيمة المضافة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Excluding VAT · %s"
+msgstr "بدون ضريبة القيمة المضافة · %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid ""
+"Excluding VAT · after discounts, cancellations, returns and credit notes · "
+"channel = Source on the sales order"
+msgstr ""
+"بدون ضريبة القيمة المضافة · بعد الخصومات والإلغاءات والمرتجعات والإشعارات "
+"الدائنة · القناة = المصدر في أمر البيع"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/dashboard.js:0
 #: code:addons/executive_dashboard/static/src/dashboard.xml:0
 #: model:ir.actions.client,name:executive_dashboard.action_dashboard
@@ -737,6 +934,16 @@ msgstr "الإيراد المتوقع"
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
 msgid "Expected revenue in each stage"
 msgstr "الإيراد المتوقع لكل مرحلة"
+
+#. module: executive_dashboard
+#: model:ir.model.fields,help:executive_dashboard.field_res_company__executive_dashboard_ad_account_ids
+#: model:ir.model.fields,help:executive_dashboard.field_res_config_settings__executive_dashboard_ad_account_ids
+msgid ""
+"Expense accounts whose posted entries are the ad spend of ROAS (Key "
+"metrics)."
+msgstr ""
+"حسابات المصروفات التي تمثّل قيودها المرحّلة الإنفاق الإعلاني في العائد على "
+"الإنفاق الإعلاني (المؤشرات الرئيسية)."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -787,9 +994,26 @@ msgstr "أهلاً بك، %(name)s"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "Gross profit"
 msgstr "مجمل الربح"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Gross profit %"
+msgstr "نسبة مجمل الربح"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Gross profit %s"
+msgstr "مجمل الربح %s"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -825,9 +1049,23 @@ msgstr "المعرف"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "In full, late"
+msgstr "مكتمل، متأخر"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
 msgid "Incoming, not done"
 msgstr "واردة، غير مكتملة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Install Sales to split net sales by the Source of the sales order."
+msgstr "ثبّت تطبيق المبيعات لتقسيم صافي المبيعات حسب المصدر في أمر البيع."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -836,6 +1074,14 @@ msgstr "واردة، غير مكتملة"
 #: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
 msgid "Inventory"
 msgstr "المخزون"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Inventory at cost"
+msgstr "المخزون بالتكلفة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -850,11 +1096,31 @@ msgid "Invoice Status"
 msgstr "حالة الفوترة"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"Invoice lines without a sales order, or from an order without a Source."
+msgstr "بنود فواتير بدون أمر بيع، أو من أمر بيع بدون مصدر."
+
+#. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Invoiced"
 msgstr "المُفوتَر"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Invoiced %(invoiced)s · credit notes %(refunds)s"
+msgstr "المفوتر %(invoiced)s · الإشعارات الدائنة %(refunds)s"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Invoiced (untaxed)"
+msgstr "المفوتر (بدون ضريبة)"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -892,6 +1158,12 @@ msgstr "المبيعات المفوترة والطلبات ومندوبو الم
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Invoices and credit notes"
+msgstr "الفواتير والإشعارات الدائنة"
+
+#. module: executive_dashboard
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Journal Entries"
 msgstr "القيود اليومية"
@@ -899,8 +1171,17 @@ msgstr "القيود اليومية"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 msgid "Journal Items"
 msgstr "عناصر اليومية"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
+msgid "Key metrics"
+msgstr "المؤشرات الرئيسية"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -913,6 +1194,14 @@ msgstr "الشهر الماضي"
 #: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "Late"
 msgstr "متأخر"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Late and not in full"
+msgstr "متأخر وغير مكتمل"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -955,6 +1244,12 @@ msgstr "العملاء المحتملون"
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 msgid "Leads and opportunities created in the period"
 msgstr "العملاء المحتملون والفرص المُنشأة في الفترة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Liability"
+msgstr "التزام"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -1014,6 +1309,67 @@ msgstr "صافي الربح %s"
 #. module: executive_dashboard
 #. odoo-javascript
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Net sales"
+msgstr "صافي المبيعات"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Net sales (excluding VAT)"
+msgstr "صافي المبيعات (بدون ضريبة القيمة المضافة)"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"Net sales / ad spend. Ad spend = posted entries on the advertising expense "
+"accounts chosen in Executive Dashboard settings."
+msgstr ""
+"صافي المبيعات / الإنفاق الإعلاني. الإنفاق الإعلاني = القيود المرحّلة على "
+"حسابات مصروفات الإعلان المختارة في إعدادات لوحة المعلومات التنفيذية."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Net sales by channel"
+msgstr "صافي المبيعات حسب القناة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/constants.js:0
+msgid "Net sales by channel, gross profit %, working capital, OTIF and ROAS"
+msgstr ""
+"صافي المبيعات حسب القناة ونسبة مجمل الربح ورأس المال العامل والتسليم في "
+"الموعد وبالكامل والعائد على الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Net sales · %s"
+msgstr "صافي المبيعات · %s"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Net sales ÷ ad spend"
+msgstr "صافي المبيعات ÷ الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Never an average of product or channel margins."
+msgstr "لا يُحتسب كمتوسط لهوامش المنتجات أو القنوات."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/static/src/sections/crm.js:0
 msgid "New leads"
@@ -1044,6 +1400,24 @@ msgstr "لا يوجد موظفون نشطون."
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid ""
+"No advertising accounts are chosen. A system administrator chooses them in "
+"Executive Dashboard settings."
+msgstr ""
+"لم يتم اختيار حسابات إعلان. يختارها مسؤول النظام في إعدادات لوحة المعلومات "
+"التنفيذية."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "No advertising accounts chosen"
+msgstr "لم يتم اختيار حسابات إعلان"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/people.xml:0
 msgid "No approved time off."
 msgstr "لا توجد إجازات معتمدة."
@@ -1053,6 +1427,18 @@ msgstr "لا توجد إجازات معتمدة."
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "No bank or cash accounts."
 msgstr "لا توجد حسابات بنوك أو نقدية."
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "No category"
+msgstr "بدون فئة"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "No channel"
+msgstr "بدون قناة"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1077,6 +1463,12 @@ msgstr "لم تُعدّ أرقام لهذا القسم بعد."
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "No invoiced products in this period."
 msgstr "لا توجد منتجات مفوترة في هذه الفترة."
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "No invoiced sales in this period."
+msgstr "لا توجد مبيعات مفوترة في هذه الفترة."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1208,6 +1600,28 @@ msgstr "لا توجد مبالغ متأخرة"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "OTIF"
+msgstr "التسليم في الموعد وبالكامل"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"OTIF % = (orders completed on time and in full / total orders due) x 100. "
+"Due = Delivery Date, else expected date, in the period and passed. No "
+"tolerance; service lines are not counted."
+msgstr ""
+"نسبة التسليم في الموعد وبالكامل = (الطلبات المكتملة في الموعد وبالكامل / "
+"إجمالي الطلبات المستحقة) × 100. الاستحقاق = تاريخ التسليم، وإلا التاريخ "
+"المتوقع، ضمن الفترة وقد مضى. بدون هامش سماح؛ لا تُحتسب بنود الخدمات."
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/inventory.js:0
 msgid "Oldest %s days"
 msgstr "الأقدم منذ %s أيام"
@@ -1233,6 +1647,14 @@ msgstr "الكمية المتوفرة حسب المستودع"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "On time and in full"
+msgstr "في الموعد وبالكامل"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/people.js:0
 msgid "On time off"
 msgstr "في إجازة"
@@ -1244,8 +1666,30 @@ msgid "On time off today"
 msgstr "في إجازة اليوم"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "On time, not in full"
+msgstr "في الموعد، غير مكتمل"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"One calculation on the company totals: (net sales - cost of goods sold) / "
+"net sales x 100. Product or channel margins are never averaged."
+msgstr ""
+"عملية حساب واحدة على إجماليات الشركة: (صافي المبيعات - تكلفة البضاعة "
+"المباعة) / صافي المبيعات × 100. لا يُحتسب متوسط هوامش المنتجات أو القنوات "
+"أبداً."
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
 msgid "Open customer invoices"
 msgstr "فواتير العملاء المفتوحة"
 
@@ -1326,8 +1770,11 @@ msgid "Open shift"
 msgstr "وردية مفتوحة"
 
 #. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
 msgid "Open vendor bills"
 msgstr "فواتير الموردين المفتوحة"
 
@@ -1397,6 +1844,36 @@ msgstr "المطلوب %(ordered)s · المستلم %(received)s %(unit)s"
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Orders"
+msgstr "الطلبات"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Orders due"
+msgstr "الطلبات المستحقة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Orders due in the period · no tolerance"
+msgstr "الطلبات المستحقة في الفترة · بدون هامش سماح"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Orders due · %s"
+msgstr "الطلبات المستحقة · %s"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Orders that missed"
+msgstr "الطلبات التي لم تتحقق"
+
+#. module: executive_dashboard
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Orders to Invoice"
 msgstr "طلبات بانتظار الفوترة"
@@ -1408,6 +1885,12 @@ msgstr "طلبات بانتظار الفوترة"
 #: code:addons/executive_dashboard/static/src/sections/sales.js:0
 msgid "Orders to invoice"
 msgstr "طلبات بانتظار الفوترة"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Other (%s)"
+msgstr "أخرى (%s)"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1535,6 +2018,16 @@ msgstr "فواتير العملاء وإشعارات الدائن المرحّل
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"Posted customer invoices minus credit notes, untaxed, after discounts. "
+"Channel = Source on the sales order."
+msgstr ""
+"فواتير العملاء المرحّلة ناقص الإشعارات الدائنة، بدون ضريبة، بعد الخصومات. "
+"القناة = المصدر في أمر البيع."
+
+#. module: executive_dashboard
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "Posted entries by account · %(date_from)s – %(date_to)s"
 msgstr "القيود المرحّلة حسب الحساب · %(date_from)s – %(date_to)s"
@@ -1592,6 +2085,7 @@ msgstr "المنتج"
 #. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
 msgid "Profit and Loss"
 msgstr "الأرباح والخسائر"
@@ -1677,6 +2171,25 @@ msgstr "عروض الأسعار"
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Quotations and quotations sent · as of today"
 msgstr "عروض الأسعار والعروض المرسلة · حتى اليوم"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "ROAS"
+msgstr "العائد على الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#: model_terms:ir.ui.view,arch_db:executive_dashboard.view_settings
+msgid ""
+"ROAS = net sales / the posted entries of these expense accounts in the "
+"period."
+msgstr ""
+"العائد على الإنفاق الإعلاني = صافي المبيعات / القيود المرحّلة على حسابات "
+"المصروفات هذه في الفترة."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1806,6 +2319,7 @@ msgstr "أمر البيع"
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Sales Orders"
 msgstr "أوامر البيع"
@@ -1899,6 +2413,12 @@ msgstr "الإعدادات"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Share"
+msgstr "الحصة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/people.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
@@ -1909,6 +2429,7 @@ msgstr "ورديات اليوم"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 #: code:addons/executive_dashboard/static/src/side_panel.xml:0
 msgid "Show more"
 msgstr "عرض المزيد"
@@ -1955,6 +2476,7 @@ msgstr "الحالة"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 msgid "Stock"
 msgstr "المخزون"
 
@@ -1971,6 +2493,20 @@ msgstr "تقرير المخزون"
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "Stock report, deliveries and receipts"
 msgstr "تقرير المخزون وأوامر التسليم والاستلام"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Stock valuation"
+msgstr "تقييم المخزون"
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Summary"
+msgstr "الملخص"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -2013,6 +2549,12 @@ msgstr ""
 "%(amount)s %(currency)s."
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "The stock list shows today’s quantities and values."
+msgstr "تعرض قائمة المخزون كميات وقيم اليوم."
+
+#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/constants.js:0
 msgid "This month"
@@ -2046,6 +2588,7 @@ msgstr "هذا القسم غير متاح للشركة الحالية."
 #. odoo-python
 #: code:addons/executive_dashboard/models/dashboard.py:0
 #: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/models/sections/people.py:0
 msgid "This section is not available to you."
 msgstr "هذا القسم غير متاح لك."
@@ -2123,8 +2666,10 @@ msgstr "أعلى الموردين حسب قيمة المشتريات"
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 #: code:addons/executive_dashboard/static/src/sections/finance.xml:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "Total"
 msgstr "الإجمالي"
@@ -2168,6 +2713,7 @@ msgstr "الوحدة"
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 #: code:addons/executive_dashboard/models/sections/inventory.py:0
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 #: code:addons/executive_dashboard/models/sections/people.py:0
 #: code:addons/executive_dashboard/models/sections/procurement.py:0
 #: code:addons/executive_dashboard/models/sections/sales.py:0
@@ -2207,6 +2753,7 @@ msgstr "القيمة"
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
 #: code:addons/executive_dashboard/static/src/sections/inventory.xml:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 #: code:addons/executive_dashboard/static/src/sections/people.xml:0
 #: code:addons/executive_dashboard/static/src/sections/procurement.xml:0
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
@@ -2256,6 +2803,12 @@ msgstr "الترحيب"
 
 #. module: executive_dashboard
 #. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Whole company · from combined totals"
+msgstr "الشركة بالكامل · من الإجماليات المجمعة"
+
+#. module: executive_dashboard
+#. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
 #: code:addons/executive_dashboard/static/src/constants.js:0
@@ -2281,6 +2834,16 @@ msgstr "هاتف العمل"
 #: code:addons/executive_dashboard/static/src/sections/people.xml:0
 msgid "Worked"
 msgstr "ساعات العمل"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+#: code:addons/executive_dashboard/static/src/constants.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "Working capital"
+msgstr "رأس المال العامل"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -2326,9 +2889,9 @@ msgstr "أيام"
 
 #. module: executive_dashboard
 #. odoo-python
-#: code:addons/executive_dashboard/models/sections/inventory.py:0
-msgid "incoming"
-msgstr ""
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "due %s"
+msgstr "مستحق %s"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -2343,12 +2906,6 @@ msgid "lines."
 msgstr "بنود."
 
 #. module: executive_dashboard
-#. odoo-python
-#: code:addons/executive_dashboard/models/sections/people.py:0
-msgid "next"
-msgstr ""
-
-#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/crm.xml:0
 msgid "opportunities"
@@ -2361,13 +2918,25 @@ msgid "orders"
 msgstr "طلبات"
 
 #. module: executive_dashboard
-#. odoo-python
-#: code:addons/executive_dashboard/models/sections/inventory.py:0
-msgid "outgoing"
-msgstr ""
-
-#. module: executive_dashboard
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/sales.xml:0
 msgid "receipts"
 msgstr "مقبوضات"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "÷ Ad spend"
+msgstr "÷ الإنفاق الإعلاني"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "÷ Net sales × 100"
+msgstr "÷ صافي المبيعات × 100"
+
+#. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
+msgid "− Cost of goods sold"
+msgstr "− تكلفة البضاعة المباعة"

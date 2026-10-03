@@ -18,6 +18,7 @@ from odoo.fields import Domain
 # data is read with elevated rights (``_elevated``), limited to the companies the user may
 # use. Buttons to Odoo's own screens are shown only when the user may open them (``_open_info``).
 SECTIONS = {
+    'key_metrics': {'models': ('account.move.line',), 'period': True},
     'finance': {'models': ('account.move.line',), 'period': True},
     'sales': {'models': ('sale.order',), 'period': True},
     'crm': {'models': ('crm.lead',), 'period': True},

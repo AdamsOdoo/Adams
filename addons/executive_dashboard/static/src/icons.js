@@ -3,6 +3,9 @@ import { Component, markup } from "@odoo/owl";
 
 // Stroke icons from the reference page (24x24, currentColor).
 export const ICONS = {
+    key_metrics: '<path d="M4 13a8 8 0 0 1 16 0"/><path d="M12 13l4-4"/><circle cx="12" cy="13" r="1.4"/><path d="M4 19h16"/>',
+    percent: '<path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>',
+    megaphone: '<path d="M3 10v4h4l8 5V5L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>',
     welcome: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
     finance: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     sales: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',

@@ -11,7 +11,7 @@ handover; nothing else from earlier sessions is needed.
 
 - One module **`executive_dashboard`**, display name **"Executive Dashboard"**, installable on any Odoo 19 database (target: Odoo.sh **Enterprise**). No customer name anywhere.
 - `depends`: `['web', 'account']` only. Every other app is detected at runtime; its section/widget is hidden when missing or unreadable. Do not inherit other apps' models/views and do not reference their XML ids in data files; resolve actions at click time with `env.ref(..., raise_if_not_found=False)`.
-- Sections in order: Welcome, Finance, Sales, CRM, Procurement, Inventory, People. Welcome shows **no figures**: "Greetings, <user>", date, company, search, section cards.
+- Sections in order: Welcome, Key metrics (added 2026-10-03, see the build log), Finance, Sales, CRM, Procurement, Inventory, People. Welcome shows **no figures**: "Greetings, <user>", date, company, search, section cards.
 - No comparisons anywhere. Periods: This month, Last month, This quarter, Year to date, Custom. Inventory and People show the current position (no period selector).
 - Use native values as they are, e.g. `sale.order.delivery_status` (Not Delivered / Started / Partially Delivered / Fully Delivered).
 - Invoiced sales use the accounting date (`date`). Definitions (Phase 6) says in one line that Odoo's Invoice Analysis uses the invoice date and can differ at month ends.
