@@ -128,6 +128,8 @@ class TestKeyMetrics(SalesCrmCase):
         named = [c['net'] for c in widgets['net_sales']['channels'] if c['id']]
         self.assertEqual(named, sorted(named, reverse=True))
         self.assertIs(widgets['net_sales']['channels'][-1]['id'], False)
+        none = self.drawer('channel', source_id=False)
+        self.assertEqual(none['total']['value'].split()[0], self.Dashboard._fin_format(self.channel(widgets, False)['net']))
         # The channel's panel lists its invoices and adds up to the same figure.
         panel = self.drawer('channel', source_id=web.id)
         self.assertEqual(panel['total']['value'].split()[0], '400')
@@ -183,7 +185,12 @@ class TestKeyMetrics(SalesCrmCase):
         self.company.executive_dashboard_finance = False
         receivables = self.drawer('open_items', kind='receivables', view='aged')
         self.assertTrue(receivables['action'] is None or receivables['action']['key'] == 'key_metrics.open_items')
-        self.drawer('bank_cash')
+        reader = new_test_user(self.env, login='ed_key_reader', company_id=self.company.id,
+                               company_ids=[self.company.id],
+                               groups='executive_dashboard.group_admin,account.group_account_readonly')
+        rows = self.Dashboard.with_user(reader).get_drawer('key_metrics.bank_cash', {'period': 'month'})['rows']
+        self.assertTrue(rows)
+        self.assertTrue(all(row['action']['key'] == 'key_metrics.account' for row in rows))
 
     # -- A5 OTIF -------------------------------------------------------------
 
@@ -203,17 +210,21 @@ class TestKeyMetrics(SalesCrmCase):
             picking.with_context(cancel_backorder=True)._action_done()
             picking.move_ids.filtered(lambda m: m.state == 'done').write({'date': when})
 
-        ok, late_full, short, waiting, never = (self._order(3.0, commitment=due) for _i in range(5))
+        ok, late_full, short, waiting, never, partial = (self._order(3.0, commitment=due) for _i in range(6))
         deliver(ok, 3.0, on_time)
         deliver(late_full, 3.0, late)
         deliver(short, 1.0, on_time)
+        # Delivered short on time, the rest still to deliver (backorder open).
+        partial.picking_ids.move_ids.write({'quantity': 1.0, 'picked': True})
+        partial.picking_ids.with_context(cancel_backorder=False)._action_done()
+        partial.picking_ids.move_ids.filtered(lambda m: m.state == 'done').write({'date': on_time})
         # Nothing delivered and nothing left to deliver (the delivery was cancelled).
         never.picking_ids.action_cancel()
         args = {'date_from': fields.Date.to_string(yesterday - timedelta(days=1)), 'date_to': fields.Date.to_string(self.today)}
         scope = self.Dashboard._elevated()._period_scope('key_metrics', 'custom', **args)
         kinds = {order: kind for order, _day, kind in self.Dashboard._elevated()._key_otif_orders(scope)}
-        self.assertEqual((kinds[ok], kinds[late_full], kinds[short], kinds[waiting], kinds[never]),
-                         ('ok', 'late', 'not_full', 'both', 'both'))
+        self.assertEqual((kinds[ok], kinds[late_full], kinds[short], kinds[waiting], kinds[never], kinds[partial]),
+                         ('ok', 'late', 'not_full', 'both', 'both', 'both'))
         otif = self.widgets('custom', **args)['otif']
         self.assertEqual(otif['due'], len(kinds))
         self.assertAlmostEqual(otif['percent'], otif['ok'] / otif['due'] * 100)
@@ -266,11 +277,14 @@ class TestKeyMetrics(SalesCrmCase):
 
     def test_a8_query_limit(self):
         self._invoice(100.0)
+        if self.Dashboard._fin_engine():
+            self.skipTest('Enterprise reports: the native engines add their own queries')
+        if 'sale.order' in self.env:
+            for name in ('Example A', 'Example B', 'Example C'):
+                self._invoice_order(self._order(1.0, self.env['utm.source'].create({'name': name})))
         self.widgets()  # warm the ORM caches (fields, rules)
         dashboard_module.cache_clear()
         self.env.invalidate_all()
-        # One query per channel (Source) with sales in the period.
-        channels = len(self.Dashboard._elevated()._key_net_sales(
-            self.Dashboard._period_scope('key_metrics', 'month'))['channels'])
-        with self.assertQueryCount(**{self.env.user.login: 55 + channels}):
+        # The number of channels does not change the number of queries.
+        with self.assertQueryCount(**{self.env.user.login: 55}):
             self.Dashboard.get_section('key_metrics', 'month')

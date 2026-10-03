@@ -96,6 +96,12 @@ export class KeyMetricsSection extends Component {
         });
     }
 
+    /** Column names, also shown next to each value when the table stacks on narrow screens. */
+    get labels() {
+        return { channel: _t("Channel"), invoiced: _t("Invoiced"), refunds: _t("Credit notes"),
+                 net: _t("Net sales"), share: _t("Share") };
+    }
+
     get shownChannels() {
         return this.channels.slice(0, this.state.rows);
     }

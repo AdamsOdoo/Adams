@@ -32,7 +32,7 @@ import pytz
 from odoo import fields, models
 from odoo.exceptions import AccessError, ValidationError
 from odoo.fields import Domain
-from odoo.tools import float_compare
+from odoo.tools import SQL, float_compare
 from odoo.tools.misc import format_date, formatLang
 
 from .sales import INVOICE_TYPES
@@ -122,6 +122,35 @@ class ExecutiveDashboard(models.AbstractModel):
             return Domain.TRUE
         return Domain('sale_line_ids', '=', False) | Domain('sale_line_ids.order_id.source_id', '=', False)
 
+    def _key_channel_sums(self, scope, by_move=False):
+        """``{(company, move_type, source_id or False, move_id or None): balance}`` of the period's sales lines,
+        in one query. Each invoice line belongs to exactly one channel: the Source of the order of its first
+        sales order line (an invoice line rarely comes from several orders)."""
+        Line = self.env['account.move.line']
+        query = Line._search(self._key_sales_domain(scope))
+        self.env.flush_all()
+        source = SQL('so.source_id') if self._key_channels_ready() else SQL('NULL::int')
+        joins = SQL("""
+            LEFT JOIN LATERAL (SELECT MIN(rel.order_line_id) AS line_id FROM sale_order_line_invoice_rel rel
+                               WHERE rel.invoice_line_id = aml.id) first_line ON TRUE
+            LEFT JOIN sale_order_line sol ON sol.id = first_line.line_id
+            LEFT JOIN sale_order so ON so.id = sol.order_id""") if self._key_channels_ready() else SQL('')
+        self.env.cr.execute(SQL("""
+            SELECT aml.company_id, am.move_type, %(source)s, %(move)s, SUM(aml.balance)
+              FROM account_move_line aml
+              JOIN account_move am ON am.id = aml.move_id
+              %(joins)s
+             WHERE aml.id IN %(ids)s
+          GROUP BY 1, 2, 3, 4""", source=source, move=SQL('aml.move_id') if by_move else SQL('NULL::int'),
+                                joins=joins, ids=query.subselect()))
+        return {(company, move_type, source_id or False, move_id): balance
+                for company, move_type, source_id, move_id, balance in self.env.cr.fetchall()}
+
+    def _key_signed(self, scope, company_id, move_type, balance):
+        """``(invoiced, credit note)`` part of a balance, positive, in the dashboard currency."""
+        amount = -self._fin_convert(scope, balance, self.env['res.company'].browse(company_id), scope['date_to'])
+        return (0.0, -amount) if move_type == 'out_refund' else (amount, 0.0)
+
     def _key_split(self, scope, domain):
         """``(invoiced, credit notes)`` of ``domain``, untaxed, positive amounts."""
         invoiced = refunds = 0.0
@@ -134,27 +163,27 @@ class ExecutiveDashboard(models.AbstractModel):
                 invoiced += amount
         return invoiced, refunds
 
+    def _key_total(self, scope):
+        invoiced, refunds = self._key_split(scope, self._key_sales_domain(scope))
+        return invoiced - refunds
+
     def _key_net_sales(self, scope):
         """Total, invoiced and credit notes, and ``channels``: ``[{id, name, invoiced, refunds, net}]``,
         largest first, "No channel" last."""
-        base = self._key_sales_domain(scope)
-        invoiced, refunds = self._key_split(scope, base)
-        channels = []
-        if self._key_channels_ready():
-            sources = [source for source, in self.env['sale.order']._read_group(
-                [('source_id', '!=', False), ('order_line.invoice_lines', 'any', base)], ['source_id'])]
-            for source in sources:
-                inv, ref = self._key_split(scope, base & self._key_channel_domain(source.id))
-                channels.append({'id': source.id, 'name': source.name, 'invoiced': inv, 'refunds': ref,
-                                 'net': inv - ref})
-            channels.sort(key=lambda c: (-c['net'], c['name']))
-        # "No channel" is the rest, so the channels always add up to the total.
-        rest_inv = invoiced - sum(c['invoiced'] for c in channels)
-        rest_ref = refunds - sum(c['refunds'] for c in channels)
-        currency = scope['company'].currency_id
-        if not (currency.is_zero(rest_inv) and currency.is_zero(rest_ref)):
-            channels.append({'id': False, 'name': self.env._('No channel'), 'invoiced': rest_inv, 'refunds': rest_ref,
-                             'net': rest_inv - rest_ref})
+        sums = defaultdict(lambda: [0.0, 0.0])
+        for (company_id, move_type, source_id, _move), balance in self._key_channel_sums(scope).items():
+            inv, ref = self._key_signed(scope, company_id, move_type, balance)
+            sums[source_id][0] += inv
+            sums[source_id][1] += ref
+        sources = self.env['utm.source'].browse([s for s in sums if s]) if self._key_channels_ready() else ()
+        channels = sorted(({'id': source.id, 'name': source.name, 'invoiced': sums[source.id][0],
+                            'refunds': sums[source.id][1], 'net': sums[source.id][0] - sums[source.id][1]}
+                           for source in sources), key=lambda c: (-c['net'], c['name']))
+        if False in sums:
+            channels.append({'id': False, 'name': self.env._('No channel'), 'invoiced': sums[False][0],
+                             'refunds': sums[False][1], 'net': sums[False][0] - sums[False][1]})
+        invoiced = sum(c['invoiced'] for c in channels)
+        refunds = sum(c['refunds'] for c in channels)
         return {'total': invoiced - refunds, 'invoiced': invoiced, 'refunds': refunds, 'channels': channels,
                 'by_source': self._key_channels_ready()}
 
@@ -184,10 +213,8 @@ class ExecutiveDashboard(models.AbstractModel):
         Product = self.env['product.product'].with_company(company).with_context(
             allowed_company_ids=company.ids, skip_kit_qty_available=True)._with_valuation_context()
         if scope['as_of'] < scope['today']:
-            # End of the user's day, in UTC.
-            end = self.env.tz.localize(datetime.combine(scope['as_of'] + timedelta(days=1), time.min))
-            end = end.astimezone(pytz.utc).replace(tzinfo=None)
-            Product = Product.with_context(at_date=end, to_date=end)
+            # A date, as the Inventory Valuation report passes it (Odoo takes the end of that day).
+            Product = Product.with_context(at_date=scope['as_of'], to_date=scope['as_of'])
         domain = Domain(company._get_valuation_product_domain())
         held = Domain('qty_available', '!=', 0)
         if 'lot_valuated' in Product._fields:
@@ -258,19 +285,31 @@ class ExecutiveDashboard(models.AbstractModel):
         for order, (day, order_lines) in due.items():
             end_of_day = self.env.tz.localize(datetime.combine(day + timedelta(days=1), time.min))
             deadline[order.id] = end_of_day.astimezone(pytz.utc).replace(tzinfo=None)
+        kits, late_kits = set(), set()
         for move in self.env['stock.move'].search_fetch(
                 [('sale_line_id', 'in', lines.ids), ('state', '=', 'done'), ('location_dest_usage', '=', 'customer')],
-                ['sale_line_id', 'date', 'quantity', 'product_uom']):
+                ['sale_line_id', 'product_id', 'date', 'quantity', 'product_uom']):
             line = move.sale_line_id
+            late = move.date >= deadline[line.order_id.id]
+            if late:
+                late_moves.add(line.order_id.id)
+            if move.product_id != line.product_id:
+                # A kit's components: the line's own delivered quantity counts (Manufacturing computes it).
+                kits.add(line)
+                if late:
+                    late_kits.add(line)
+                continue
             qty = move.product_uom._compute_quantity(move.quantity, line.product_uom_id, rounding_method='HALF-UP')
             delivered[line] += qty
-            if move.date < deadline[line.order_id.id]:
+            if not late:
                 on_time[line] += qty
-            else:
-                late_moves.add(line.order_id.id)
-        open_orders = {order.id for order, in self.env['stock.picking']._read_group(
-            [('sale_id', 'in', [o.id for o in due]), ('state', 'not in', ('done', 'cancel')),
-             ('picking_type_id.code', '=', 'outgoing')], ['sale_id'])} if 'sale_id' in self.env['stock.picking']._fields else set()
+        for line in kits:
+            delivered[line] = line.qty_delivered
+            on_time[line] = 0.0 if line in late_kits else line.qty_delivered
+        # Deliveries still to do (any route to the customer, dropship included).
+        open_orders = {line.order_id.id for line, in self.env['stock.move']._read_group(
+            [('sale_line_id', 'in', lines.ids), ('state', 'not in', ('done', 'cancel')),
+             ('location_dest_usage', '=', 'customer')], ['sale_line_id'])}
         digits = self.env['decimal.precision'].precision_get('Product Unit')
         full = lambda qty, line: float_compare(qty, line.product_uom_qty, precision_digits=digits) >= 0  # noqa: E731
         result = []
@@ -354,18 +393,20 @@ class ExecutiveDashboard(models.AbstractModel):
     def _drawer_key_metrics_channel(self, args):
         source = self._key_source_arg(args)
         scope, _ = self._key_scope(args), self.env._
-        domain = self._key_lines_domain(scope, source)
         by_move = defaultdict(float)
-        for company, move, balance in self.env['account.move.line']._read_group(
-                domain, ['company_id', 'move_id'], ['balance:sum']):
-            by_move[move] -= self._fin_convert(scope, balance, company, scope['date_to'])
+        invoiced = refunds = 0.0
+        for (company_id, move_type, source_id, move_id), balance in self._key_channel_sums(scope, by_move=True).items():
+            if source_id == (source.id if source else False):
+                inv, ref = self._key_signed(scope, company_id, move_type, balance)
+                by_move[self.env['account.move'].browse(move_id)] += inv - ref
+                invoiced += inv
+                refunds += ref
         moves, more = self._drawer_page(sorted(by_move, key=lambda m: (-abs(by_move[m]), m.id)))
         period = self._key_period_args(args)
         rows = [{'label': move.name, 'sub': '%s · %s' % (move.partner_id.display_name or '',
                                                          format_date(self.env, move.date, date_format='d MMM y')),
                  'value': self._fin_format(by_move[move]),
                  'action': {'key': 'key_metrics.move', 'args': {'move_id': move.id}}} for move in moves]
-        invoiced, refunds = self._key_split(scope, domain)
         name = source.name if source else _('No channel')
         return {'title': name, 'sub': _('Net sales · %s', self._key_period_label(scope)),
                 'groups': [{'title': _('Summary'), 'rows': [
@@ -398,7 +439,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _drawer_key_metrics_gross_profit(self, args):
         scope, _ = self._key_scope(args), self.env._
-        net = self._key_net_sales(scope)['total']
+        net = self._key_total(scope)
         costs = self._key_cogs_rows(scope)
         cogs = sum(costs.values())
         period = self._key_period_args(args)
@@ -428,7 +469,7 @@ class ExecutiveDashboard(models.AbstractModel):
         return formatLang(self.env, value, digits=1)
 
     def _drawer_key_metrics_bank_cash(self, args):
-        return self._key_rekey(self._drawer_finance_bank_cash(args))
+        return self._key_rekey(self.with_context(ed_account_key='key_metrics.account')._drawer_finance_bank_cash(args))
 
     def _drawer_key_metrics_open_items(self, args):
         return self._key_rekey(self._drawer_finance_open_items(args))
@@ -456,10 +497,9 @@ class ExecutiveDashboard(models.AbstractModel):
     def _action_key_metrics_stock(self, args):
         if 'stock.quant' not in self.env:
             raise ValidationError(self.env._('Unknown detail.'))
-        action = self.env['stock.quant'].action_view_quants()
-        action.update(name=self.env._('Stock'), target='current', domain=[
+        # The plain quants list (``action_view_quants`` would also merge quants).
+        return self._window('stock.stock_quant_action', self.env._('Stock'), 'stock.quant', [
             ('location_id.usage', 'in', ('internal', 'transit')), ('company_id', 'in', self.env.companies.ids)])
-        return action
 
     def _drawer_key_metrics_working_capital(self, args):
         scope, _ = self._key_scope(args), self.env._
@@ -548,7 +588,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _drawer_key_metrics_roas(self, args):
         scope, _ = self._key_scope(args), self.env._
-        net = self._key_net_sales(scope)['total']
+        net = self._key_total(scope)
         spend = self._key_ad_spend(scope)
         period = self._key_period_args(args)
         roas = self._key_ratio(net, spend['total'])

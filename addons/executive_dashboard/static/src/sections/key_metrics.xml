@@ -35,11 +35,11 @@
                             <tbody>
                                 <tr t-foreach="shownChannels" t-as="c" t-key="c.key" class="click" tabindex="0"
                                     t-on-click="() => this.openChannel(c)" t-on-keydown="(ev) => ev.key === 'Enter' and this.openChannel(c)">
-                                    <td data-label="Channel"><i class="ed-dot" t-att-style="'background:' + c.color"/><t t-esc="c.name"/></td>
-                                    <td data-label="Invoiced" class="n ed-num" t-esc="whole(c.invoiced)"/>
-                                    <td data-label="Credit notes" class="n ed-num"><bdi t-esc="c.refunds ? '−' + whole(c.refunds) : whole(0)"/></td>
-                                    <td data-label="Net sales" class="n ed-num" t-esc="whole(c.net)"/>
-                                    <td data-label="Share" class="n ed-num"><t t-if="c.share !== null"><t t-esc="c.share"/>%</t></td>
+                                    <td t-att-data-label="labels.channel"><i class="ed-dot" t-att-style="'background:' + c.color"/><t t-esc="c.name"/></td>
+                                    <td t-att-data-label="labels.invoiced" class="n ed-num" t-esc="whole(c.invoiced)"/>
+                                    <td t-att-data-label="labels.refunds" class="n ed-num"><bdi t-esc="c.refunds ? '−' + whole(c.refunds) : whole(0)"/></td>
+                                    <td t-att-data-label="labels.net" class="n ed-num" t-esc="whole(c.net)"/>
+                                    <td t-att-data-label="labels.share" class="n ed-num"><t t-if="c.share !== null"><t t-esc="c.share"/>%</t></td>
                                 </tr>
                             </tbody>
                             <tfoot>
