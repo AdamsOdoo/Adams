@@ -4,3 +4,4 @@ from . import crm
 from . import procurement
 from . import inventory
 from . import people
+from . import key_metrics

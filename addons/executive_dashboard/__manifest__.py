@@ -1,7 +1,7 @@
 {
     'name': 'Executive Dashboard',
-    'version': '19.0.1.8.0',
-    'summary': 'One screen for finance, sales, CRM, procurement, inventory and people',
+    'version': '19.0.1.9.0',
+    'summary': 'One screen for key metrics, finance, sales, CRM, procurement, inventory and people',
     'category': 'Productivity',
     'author': 'Executive Dashboard',
     'license': 'LGPL-3',

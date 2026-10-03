@@ -56,4 +56,25 @@
             </svg>
         </div>
     </t>
+
+    <t t-name="executive_dashboard.DonutChart">
+        <div class="ed-donut">
+            <t t-set="list" t-value="slices"/>
+            <svg viewBox="0 0 220 220" role="img" t-att-aria-label="props.centerLabel">
+                <circle t-if="!list.length" cx="110" cy="110" r="82" fill="none" stroke="var(--line)" stroke-width="36"/>
+                <path t-foreach="list" t-as="slice" t-key="slice.index" t-att-d="slice.path" t-att-fill="slice.color"
+                      tabindex="0" role="button" t-att-aria-label="slice.label + ': ' + slice.share + '%'"
+                      t-on-pointermove="(ev) => this.onMove(ev, slice)" t-on-pointerleave="onLeave"
+                      t-on-click="() => this.select(slice)" t-on-keydown="(ev) => this.onKey(ev, slice)"/>
+            </svg>
+            <div class="ed-donut-mid"><div><b class="ed-num" t-esc="props.centerValue"/><span t-esc="props.centerLabel"/></div></div>
+            <t t-foreach="list" t-as="slice" t-key="slice.index">
+                <div t-if="state.hover === slice.index" class="ed-tip" t-att-style="'left:' + state.x + 'px;top:' + state.y + 'px'">
+                    <b t-esc="slice.label"/>
+                    <div><span t-esc="props.valueLabel"/><span class="ed-num" t-esc="slice.text"/></div>
+                    <div><span t-esc="props.shareLabel"/><span class="ed-num"><t t-esc="slice.share"/>%</span></div>
+                </div>
+            </t>
+        </div>
+    </t>
 </templates>
