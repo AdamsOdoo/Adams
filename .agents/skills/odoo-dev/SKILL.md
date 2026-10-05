@@ -5,69 +5,82 @@ description: Build, fix or extend Odoo 19 Enterprise modules for an Odoo.sh proj
 
 # Odoo development for Odoo.sh (Odoo 19 Enterprise)
 
-Deliver a working, tested change the way a senior Odoo developer would: reuse standard Odoo first, keep the customization small and upgrade-safe, and prove it with tests. `oh` means `.odoo-harness/oh`.
+Deliver a working, tested change the way a senior Odoo developer would: reuse standard Odoo first, keep the customization small and upgrade-safe, and prove it with tests and verified screens. `oh` means `.odoo-harness/oh`; its commands and options are in `references/testing.md`.
 
 ## 1. Frame the request
 
-Restate the goal in a sentence or two, then write numbered acceptance criteria (A1, A2, …). Include the roles, companies and languages involved when they matter. If a business rule is missing and you can't infer it from the code, data or existing behaviour, ask once, with all your questions together. For anything else, state an assumption and continue.
+Write numbered acceptance criteria (A1, A2, …) with the roles, companies and languages that matter. A business rule you can't infer from the code, the data or existing behaviour is a question for the user: ask all of them in one message. Everything else is an assumption: state it, build it, and list it in the feature notes.
 
-Size the work; the size decides how much process it needs.
+Size the work, because the size decides how much process it gets:
 
 | Size | Typical change | Design | Tests | Documentation |
 |---|---|---|---|---|
 | S | label, field, view tweak, small fix | a line in the commit message | update or add the affected test | none, or a line in the feature notes |
-| M | new rule, computed field, report, wizard, permission change | short notes: data model, rules, access | a test per criterion, including a denied-access case when security is involved | feature notes |
-| L | new app or flow, several modules, migrating existing data | `references/design.md` before coding | also an upgrade test and a tour when a UI flow matters | feature notes, user guide in English and Arabic, upgrade notes |
+| M | new rule, computed field, report, wizard, permission change | short notes: data model, rules, access | a test per criterion, plus a denied-access case when security is involved | feature notes |
+| L | new app or flow, several modules, migrating existing data | `references/design.md` before coding | also an upgrade test, and at most one tour per main UI flow | feature notes, user guide in English and Arabic, upgrade notes |
 
 A change that touches money, access rights or existing data is at least M, however small the diff.
 
+For M and L, before coding: get every business decision and, for a new screen, the layout (a sketch, a mockup or an existing Odoo screen to follow) agreed in one message; map each criterion to the cheapest test that proves it (`references/testing.md`, "Plan the tests") and write the map next to the criteria in the feature notes; cut work that won't fit one session into milestones that each end with committed, passing work, building one of several similar parts end to end before the others.
+
 ## 2. Look before building
 
-- Search standard Odoo first: `oh src "<regex>"` (add `--module sale` or `--glob '*.xml'` to narrow it, `--where sale` to locate a module). Enterprise apps may already cover the need, for example Approvals, Documents, Sign, Planning, Helpdesk, Subscriptions or Accounting reports. Prefer configuration, data records or a small inheritance over new models.
-- Read the models you will extend: their fields, compute methods, `_inherit` chain and access rules.
-- Read `references/odoo19.md` before writing Python or XML; it lists the Odoo 19 changes that break older habits.
+Search standard Odoo first (`oh src`): Enterprise apps such as Approvals, Documents, Sign, Planning, Helpdesk, Subscriptions or Accounting reports may already cover the need, and configuration, data records or a small inheritance beat a new model. Read the models you extend (fields, computes, `_inherit` chain, access rules). Read `references/odoo19.md` before writing Python or XML: Odoo 19 differs from what older examples show.
 
 ## 3. Implement
 
-- One module per business capability. Inherit, don't copy: `_inherit`, `inherit_id` with `xpath`, `super()`. Match the project's existing module prefix and style.
-- Every new model needs access rights, plus a company record rule if it has `company_id`: see `references/security.md`.
-- User-facing strings need Arabic translations in `i18n/ar.po`: see `references/i18n-rtl.md`.
-- When an installed module's data, fields or views change, bump `version` in `__manifest__.py`. Add a migration script when existing records must be transformed: see `references/data-migrations.md`.
-- Figures, dashboards and reports: use the standard report's result when one provides the figure; a custom calculation needs a written reason and explicit filters. See `references/reports.md`.
-- Views, menus, Owl components, assets and tours: see `references/views-ui.md`.
+- One module per business capability, with the project's module prefix and style. Inherit, don't copy: `_inherit`, `inherit_id` with `xpath`, `super()`.
+- Every new model needs access rights, plus a company record rule when it has `company_id` (`references/security.md`).
+- User-facing strings need Arabic (`references/i18n-rtl.md`); figures come from the standard report that provides them (`references/reports.md`); views, menus, Owl and tours follow `references/views-ui.md`.
+- A change to an installed module bumps `version` in `__manifest__.py`; transformed stored data needs a migration script and an upgrade test (`references/data-migrations.md`).
 
-## 4. Test: fast loop first, then broaden
+## 4. Test
 
-- Write or update tests alongside the code (`references/testing.md`). Test observable behaviour: button methods, `Form`, and access checks run as a real user. Give each acceptance criterion a test and note it (A1 → `TestX.test_a1`).
-- While iterating, run one test: `oh test <module> --tags /<module>:<TestClass>.<test_method>`. It takes seconds and isn't recorded as evidence.
-- Then run the module's tests and require the criteria's tests: `oh test <module> --require TestX.test_a1 --require TestX.test_a2`. **PASSED** means they all ran and passed. **NOT VERIFIED** lists what didn't run (no tests, skipped tests, a missing required test): fix that; it is not a pass.
-- An identical run (same source, environment and selection) that passed on this machine in the last 24 hours, with its log intact, is reused instead of repeated; `--rerun` forces a run. The output says when a run can't be reused.
-- For a change to a module that is already deployed, also run `oh test <module> --upgrade-from origin/<production-branch>`. It installs the deployed version first, then updates to yours, like Odoo.sh does on staging and production. When the change alters stored data, add `prepare_upgrade(env)` and an `oh_upgrade` test that checks the migrated records (`references/data-migrations.md`); without them the run is **not verified**.
-- For M and L changes to modules that other project modules build on, add `--with-dependents`. Before delivering an L change, also run `oh test --all`.
-- Read the summary it prints. Open the log it names only when the summary isn't enough.
-- If a test fails because of your change, fix the code, not the test. Change a test only when the requirement changed, and say so.
-- After three attempts at the same failure, stop, rethink the approach, and write down what you tried in the handoff.
+Test business behaviour, not looks: button methods, computed values, `Form`, and access checks as real users. Looks are checked on screenshots, not asserted in tests (they break with every design change and find few defects).
+
+- `oh check` runs static checks in seconds, by itself before every `oh test` and, in Claude Code, after every edit; fix what it reports before an Odoo run.
+- While iterating, run one test (`--tags … --no-record`: a `--tags` run is recorded otherwise, as a partial record, which is the S route's one recorded run); once per milestone, run the module with the criteria's tests required (`--require`). **PASSED** means they all ran and passed; **NOT VERIFIED** lists what didn't run and is not a pass.
+- A deployed module also gets `--upgrade-from origin/<production-branch>`; M and L changes to a module other project modules build on get `--with-dependents`; an L change gets `oh test --all` before delivery.
+- The local run matches an Odoo.sh test database (English only, demo data). A test that needs Arabic loads it itself.
+- A test that fails because of your change means fixing the code, not the test; change a test only when the requirement changed, and say so. After three attempts at the same failure, stop, rethink the approach, and write down what you tried in the handoff.
 
 ## 5. Verify on Odoo.sh when needed
 
-Local runs use Odoo Community, plus Enterprise when `project.json` points to its source. When `oh test` says **blocked**, or the behaviour depends on production data, push the feature branch; Odoo.sh builds it as a development build (fresh database, demo data, tests). Read the result from the commit status on GitHub if the project has enabled that; otherwise ask the user for the build status or the failing log lines. See `references/odoo-sh.md`.
+Local runs use Odoo Community, plus Enterprise when `project.json` points to its source. When `oh test` says **blocked**, or the behaviour depends on production data, push the feature branch: Odoo.sh builds it with a fresh database, demo data and the tests. One build per milestone at most; iterate locally and let the build confirm. Read the result from the commit status when the project reports it to GitHub, otherwise ask the user for the build status or the failing log lines (`references/odoo-sh.md`).
 
 ## 6. Review and deliver
 
-- For M and L changes, get an independent review. In Claude Code, give the `odoo-reviewer` agent the acceptance criteria and the base branch; it reads the code and the evidence but can't change them. Elsewhere, review in a fresh session with the `odoo-review` skill; that is independent but not enforced read-only, so say so. Reviewing your own work in the same session is a self-review: call it that. Fix what the review finds; while a finding about behaviour, security or data safety is open, the outcome is not **completed**.
-- For UI changes, check the changed screens in English and Arabic: `oh test <module> --keep`, then `oh shot /odoo/action-<module>.<action_id> --out docs/features/<id>/screens --expect '<css of the new element>'`. Add `--login <user> --password <password>` to see a role's view (create the user with `oh shell`). Only images marked `ok` count; `DIAG` images show a loading screen, an error, a database of unknown or outdated origin, or the wrong screen, user or language. Open the verified images and check them; don't claim a layout works without seeing it.
-- Update the feature notes, using `assets/feature.md` as the template, in `docs/features/<id>.md` or wherever the project keeps them. Keep them in proportion to the size of the change.
-- Commit the code, the feature notes and `.odoo-harness/evidence/` (records with their logs and screenshots) to the feature branch, then push it. `oh evidence` must show each record intact and matching the committed source. Never push to or merge into the production or staging branch; the user promotes on Odoo.sh.
+- M and L changes get an independent review before they are done. In Claude Code, give the `odoo-reviewer` agent the acceptance criteria and the base branch; it reads the code and the evidence and can't change them. Fix what it finds. A blocking finding (behaviour, security, data safety) gets a re-review of the fix: give the reviewer the commit of its first review so it reads only what changed since. Elsewhere, review in a fresh session with the `odoo-review` skill (independent, read-only not enforced: say so); a review in your own session is a self-review and is called that.
+- `odoo-scout` answers a broad question about standard Odoo without filling your context. Subagents start without your context: don't use them for S changes or for implementation, and run one at a time.
+- UI changes are checked on verified screenshots in English and Arabic (`references/views-ui.md`): only images marked `ok` count. Look at the contact sheet first, then open the full images of the screens that changed; don't claim a layout works without seeing it.
+- Update the feature notes (`assets/feature.md` as the template, in proportion to the size of the change), then commit the code, the notes and `.odoo-harness/evidence/` to the feature branch and push it. `oh evidence` must show each record intact and matching the committed source. Never push to or merge into the production or staging branch; the user promotes on Odoo.sh.
 - Final report: what changed; the results (local and/or Odoo.sh, with counts and the evidence records); the review (independent, or self-review); the outcome (**completed**, **blocked** or **not verified**); and anything the user must do (merge, configure, check data).
+
+## 7. Short sessions and handover
+
+Work one milestone per session: a long session carries its whole history on every turn and uses up the user's limit. Hand over when a milestone is done, when the user asks, or when the session has grown long and a stopping point is near. In Claude Code a Stop hook holds a stop with uncommitted or unpushed work once: hand over before stopping, or say in one line why the work stays uncommitted.
+
+1. Bring the work to a clean point: the tests for what you changed pass, or the failure is written down.
+2. Overwrite `.odoo-harness/HANDOFF.md` (short, under about 45 lines, the active track only): milestones with their state, the exact next action, evidence, decisions the user gave that aren't in the feature notes yet, and what failed. Durable facts about a feature (gotchas, assumptions) go in its feature notes, not in the handoff.
+3. Commit the code, the evidence and `HANDOFF.md`, and push the feature branch. `git status` is clean and `git rev-parse HEAD` equals `git rev-parse origin/<branch>`.
+4. End your reply with the prompt for the next session in a code block, and put the same prompt in `HANDOFF.md`:
+   ```
+   Resume <owner/repo> on branch <branch> at <short commit> from .odoo-harness/HANDOFF.md.
+   Milestone <n> of <total>: <name>. Next action: <exact step>.
+   <anything the user must do or decide first; otherwise omit this line>
+   ```
+   Below it, tell the user in one or two lines: start the new session on that repository and branch, and the effort to use (`medium`; `high` only for a hard milestone or after a failed attempt).
+
+When resuming: read `HANDOFF.md`, check that `git rev-parse --short HEAD` is the commit in the prompt (fetch the branch if it isn't; if it still differs, stop and tell the user), run `oh evidence`, then continue from the next action. What the handoff records as done is done; re-test it only when the next action needs it.
 
 ## References
 
 | File | Read it when |
 |---|---|
 | `references/odoo19.md` | before writing Odoo 19 Python or XML |
+| `references/testing.md` | every `oh` command and option; planning and writing tests; reading results |
 | `references/security.md` | new models, groups, record rules, multi-company, `sudo`, controllers |
 | `references/views-ui.md` | views, actions, menus, Owl/JavaScript, assets, tours, screenshots |
-| `references/testing.md` | writing tests, `oh test` options, reading results |
 | `references/data-migrations.md` | changing a deployed module: stored fields, data files, migration scripts |
 | `references/reports.md` | QWeb/PDF reports, dashboards, KPIs and any figure users will compare |
 | `references/i18n-rtl.md` | user-facing text, Arabic translations, right-to-left layout |

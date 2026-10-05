@@ -1,9 +1,9 @@
-name: Harness connection metadata
+name: Harness installation and connection metadata
 on:
   push:
-    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
+    paths: ['.odoo-harness/**', '.agents/skills/**', '.claude/**', 'AGENTS.md', 'CLAUDE.md', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
   pull_request:
-    paths: ['.odoo-harness/connection.json', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
+    paths: ['.odoo-harness/**', '.agents/skills/**', '.claude/**', 'AGENTS.md', 'CLAUDE.md', 'scripts/work-harness.py', 'tests/test_work_harness.py', '.github/workflows/harness-metadata.yml']
 permissions:
   contents: read
 jobs:
@@ -13,6 +13,21 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
+      - name: Check installed harness hashes, hooks and client parity (not Odoo testing)
+        run: |
+          python3 - <<'PY'
+          import importlib.machinery
+          import importlib.util
+          from pathlib import Path
+          loader = importlib.machinery.SourceFileLoader('installed_oh', '.odoo-harness/oh')
+          spec = importlib.util.spec_from_loader(loader.name, loader)
+          oh = importlib.util.module_from_spec(spec)
+          loader.exec_module(oh)
+          problems, notes = oh.verify_install(Path.cwd())
+          for line in notes + problems:
+              print(line)
+          raise SystemExit(bool(problems))
+          PY
       - name: Check public connection metadata (not Odoo testing)
         run: python3 scripts/work-harness.py check --metadata-only
       - name: Reject candidate-identity overrides

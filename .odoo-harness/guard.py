@@ -11,8 +11,13 @@ hook is a second line of defence in Claude Code. It blocks:
     to merge, ref, contents, ruleset or branch-protection endpoints, and the GitHub MCP merge,
     auto-merge and approving-review tools;
   - GitHub MCP writes to a protected branch, or without a branch (that means the default branch).
+These rules cover the project's own repository: the repository of CLAUDE_PROJECT_DIR and the remotes it pushes
+to. A push to another repository (a second checkout in the session, the harness repository), a last-resort
+match in a command that runs in another repository and doesn't name the project's, and a GitHub MCP call on
+another owner/repo are allowed. When the repository can't be resolved (no git repository, no remote, an unknown
+remote name, a command git can't place), the rules apply: closed, not open.
 
-For the odoo-reviewer subagent (Claude Code sends its `agent_type`) and with --read-only, it allows
+For the odoo-reviewer and odoo-scout subagents (Claude Code sends their `agent_type`) and with --read-only, it allows
 reading only: git inspection commands, `oh src|evidence|doctor`, `oh test --no-record`, and
 read-only shell tools, with their writing or program-running options refused (sed w/e, sort -o,
 uniq OUTPUT, tree -o, rg --pre, git grep -O, GIT_* variables, ...). It is an allowlist for honest
@@ -23,6 +28,7 @@ It reads the hook JSON on stdin and exits 2 with a reason to block; anything els
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import shlex
@@ -45,8 +51,12 @@ GRAPHQL_WRITES = re.compile(r"\b(mergePullRequest|enablePullRequestAutoMerge|mer
                             r"addPullRequestReview|submitPullRequestReview)\b")
 TEXT_TOOLS = {"echo", "printf", "grep", "egrep", "fgrep", "rg", "cat", "head", "tail", "less", "wc", "ls", "jq", "diff",
               "cd", "true"}
+INTERPRETERS = {"python", "python3", "python2", "node", "nodejs", "perl", "ruby", "php", "awk", "gawk", "mawk", "lua"}
+# Programs that hand their arguments to another program (so a quoted string may be code after all).
+LAUNCHERS = {"env", "timeout", "sudo", "nohup", "nice", "xargs", "uv", "uvx", "pipx", "poetry", "exec", "eval", "command",
+             "sh", "bash", "zsh", "dash", "oh", "odoo-bin"}
 PROBE = "odoo-harness-read-only-probe"
-REVIEWER = "odoo-reviewer"
+READ_ONLY_AGENTS = {"odoo-reviewer", "odoo-scout"}
 
 READ_ONLY_GIT = {"diff", "log", "show", "status", "rev-parse", "ls-files", "ls-tree", "blame", "grep", "merge-base",
                  "cat-file", "describe", "shortlog", "name-rev", "rev-list", "whatchanged", "show-ref",
@@ -55,7 +65,7 @@ READ_ONLY_TOOLS = {"cat", "head", "tail", "grep", "egrep", "fgrep", "rg", "ls", 
                    "stat", "file", "tree", "echo", "printf", "pwd", "true", "false", "test", "[", "basename",
                    "dirname", "realpath", "readlink", "jq", "nl", "column", "tr", "cd", "comm", "md5sum",
                    "sha256sum", "date", "which", "sed", "find", "zcat"}
-READ_ONLY_OH = {"src", "evidence", "doctor"}
+READ_ONLY_OH = {"src", "check", "evidence", "deps", "doctor"}
 SAFE_VARIABLES = {"LC_ALL", "LANG", "LANGUAGE", "TZ", "COLUMNS", "LINES", "NO_COLOR", "TERM"}
 BRANCH_LISTING = ("-a", "--all", "-r", "--remotes", "-l", "--list", "-v", "-vv", "--verbose", "--show-current",
                   "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--sort", "--format",
@@ -76,6 +86,77 @@ def protected_branches(project_dir):
         names.update(config.get("staging_branches") or [])
     names.update(config.get("protected_branches") or [])
     return names if config.get("production_branch") else names | DEFAULT_PROTECTED
+
+
+def repo_url(url):
+    """A remote URL in one comparable form (host/path, lower case): without scheme, credentials, `.git` or a
+    trailing slash, so https://x-token@github.com/Owner/Repo.git and git@github.com:owner/repo are the same."""
+    url = (url or "").strip()
+    if not url:
+        return None
+    url = re.sub(r"^[a-z][a-z0-9+.-]*://", "", url, flags=re.I)
+    url = re.sub(r"^[^/@]+@", "", url)
+    if re.match(r"^[^/]+:", url):  # scp-like host:path
+        url = url.replace(":", "/", 1)
+    url = re.sub(r"(\.git)?/*$", "", url, flags=re.I)
+    return url.lower().rstrip("/") or None
+
+
+def project_scope(project_dir):
+    """The project's own repository: its root and every remote URL it pushes to (comparable form), with the
+    owner/repo slugs GitHub tools name it by. None when the project is not a git repository or has no remote:
+    then nothing can be told apart and the rules apply everywhere."""
+    root = ask_git(project_dir, "rev-parse", "--show-toplevel")
+    if not root:
+        return None
+    urls = set()
+    for name in ask_git(root, "remote").split():
+        for url in (ask_git(root, "remote", "get-url", "--push", name), ask_git(root, "remote", "get-url", name)):
+            if repo_url(url):
+                urls.add(repo_url(url))
+    if not urls:
+        return None
+    return {"root": os.path.realpath(root), "urls": urls, "slugs": {"/".join(u.rsplit("/", 2)[-2:]) for u in urls}}
+
+
+def in_scope(url, scope):
+    """Whether a push to `url` (comparable form, None when unresolved) concerns the project's repository."""
+    return scope is None or url is None or url in scope["urls"]
+
+
+def push_remote(args, where):
+    """The repository `git push <args>` in `where` sends to, in comparable form; None when it can't be resolved."""
+    positional, remote, i = [], None, 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--repo" and i + 1 < len(args):
+            remote, i = args[i + 1], i + 1
+        elif arg.startswith("--repo="):
+            remote = arg.split("=", 1)[1]
+        elif arg in PUSH_VALUE_OPTIONS and i + 1 < len(args):
+            i += 1
+        elif not arg.startswith("-"):
+            positional.append(arg)
+        i += 1
+    remote = positional[0] if positional else remote
+    if not remote:
+        upstream = ask_git(where, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+        remote = ask_git(where, "config", "--get", "remote.pushDefault") or (
+            upstream.split("/", 1)[0] if "/" in upstream else "origin")
+    url = ask_git(where, "remote", "get-url", "--push", remote) or ask_git(where, "remote", "get-url", remote)
+    if not url and ("/" in remote or ":" in remote):
+        url = remote  # a URL or path given directly
+    return repo_url(url) if url else None
+
+
+def concerns_project(command, cwd, scope):
+    """Whether a command the parser can't see into may act on the project's repository: it runs inside it (or
+    where git can't say), or it names the project's path, a remote URL or an owner/repo of it."""
+    top = ask_git(cwd, "rev-parse", "--show-toplevel")
+    if not top or os.path.realpath(top) == scope["root"]:
+        return True
+    text = command.lower()
+    return scope["root"].lower() in text or any(name in text for name in scope["urls"] | scope["slugs"])
 
 
 def split_commands(command):
@@ -186,24 +267,26 @@ def http_method(tokens, method_flags, data_flags):
     return "POST" if any(t in data_flags or t.split("=", 1)[0] in data_flags for t in tokens) else "GET"
 
 
-def check_segment(tokens, cwd, protected, depth=0):
+def check_segment(tokens, cwd, protected, depth=0, scope=None):
     names = [os.path.basename(t) for t in tokens]
     for i, name in enumerate(names):
         if name in SHELLS and i + 2 < len(tokens) and re.match(r"^-[a-z]*c[a-z]*$", tokens[i + 1]):
-            return check_bash(tokens[i + 2], cwd, protected, depth + 1)
+            return check_bash(tokens[i + 2], cwd, protected, depth + 1, scope)
         if name == "eval" and i + 1 < len(tokens):
-            return check_bash(" ".join(tokens[i + 1:]), cwd, protected, depth + 1)
+            return check_bash(" ".join(tokens[i + 1:]), cwd, protected, depth + 1, scope)
     parsed = git_command(tokens, cwd)
     if parsed:
         sub, args, where = parsed
         if sub == "!":
-            return check_bash(args[0], where, protected, depth + 1)
+            return check_bash(args[0], where, protected, depth + 1, scope)
         if sub == "subtree" and args[:1] == ["push"]:
             positional = [a for a in args[1:] if not a.startswith("-")]
             sub, args = "push", positional[-2:]
         if sub == "send-pack":
             sub, args = "push", [a for a in args if not a.startswith("-")]
         if sub == "push":
+            if not in_scope(push_remote(args, where), scope):
+                return None  # another repository: its branches are not the Odoo.sh deploy branches
             targets, wide = push_targets(args, where)
             if wide:
                 return "this push may update the protected branches (--all/--mirror, wildcard, computed or " \
@@ -233,7 +316,7 @@ def check_segment(tokens, cwd, protected, depth=0):
     return None
 
 
-def check_bash(command, cwd, protected, depth=0):
+def check_bash(command, cwd, protected, depth=0, scope=None):
     if depth > 4:
         return "command nesting is too deep to check"
     try:
@@ -243,21 +326,88 @@ def check_bash(command, cwd, protected, depth=0):
             return "could not parse this command; run a plain `git push origin <feature-branch>`"
         return None
     for tokens in segments:
-        reason = check_segment(tokens, cwd, protected, depth)
+        reason = check_segment(tokens, cwd, protected, depth, scope)
         if reason:
             return reason
     # Last resort for programs the parser can't see into (python -c, node -e, scripts): a command that
-    # mentions both a push and a protected branch, and isn't just text tools, is not allowed.
-    words = set(re.findall(r"[A-Za-z0-9._/-]+", command))
+    # mentions both a push and a protected branch, and isn't just text tools, is not allowed. Quoted text and
+    # heredoc bodies are skipped only when no token anywhere could run them: `sed -i 's/.../push to main/' notes.md`
+    # writes prose, while `python3 -c "..."`, `env python3 -c "..."`, `oh shell -c "..."` or `timeout 9 node -e "..."`
+    # may run git. A double-quoted `$(...)` or backtick runs in the shell itself and is always scanned.
+    interpreted = runs_code(segments)
+    scanned = command if interpreted else unquoted(command)
+    words = set(re.findall(r"[A-Za-z0-9._/-]+", scanned))
     if ("push" in words and words & (protected | {f"refs/heads/{b}" for b in protected})
             and not any(git_command(t, cwd) for t in segments)
-            and not all(os.path.basename(t[0]) in TEXT_TOOLS for t in segments)):
+            and not all(os.path.basename(t[0]) in TEXT_TOOLS for t in segments)
+            and (scope is None or concerns_project(command, cwd, scope))):
         return "this command mentions a push and a protected branch; use a plain `git push origin <feature-branch>`"
     return None
 
 
-def check_mcp(tool, tool_input, protected):
+def runs_code(segments):
+    """True when a token of the command is an interpreter or a program that starts one (in any position: launchers
+    such as env, timeout or sudo put the interpreter second)."""
+    for tokens in segments:
+        for token in tokens:
+            base = os.path.basename(token)
+            if base in INTERPRETERS or base in LAUNCHERS or base.startswith(("python", "node")):
+                return True
+    return False
+
+
+def unquoted(command):
+    """The command without its quoted strings and heredoc bodies: what the shell itself would run. A double-quoted
+    string holding a command substitution is kept, because the shell runs it."""
+    text = re.sub(r"<<-?\s*'?\"?(\w+)'?\"?[^\n]*\n.*?^\1\s*$", " ", command, flags=re.S | re.M)  # heredocs
+    text = re.sub(r"'[^']*'", " ", text)
+    return re.sub(r'"(?:[^"\\]|\\.)*"', lambda m: m.group(0) if re.search(r"\$\(|`|\$\{", m.group(0)) else " ", text)
+
+
+def stop_check(event):
+    """Stop hook: a stop with unsaved work is held once per session and state of that work, so the agent commits or
+    hands over (or says why it is leaving the tree as it is). The next stop with the same unsaved work goes
+    through; new unsaved work is held once more."""
+    if event.get("stop_hook_active"):
+        return None
+    cwd = event.get("cwd") or os.getcwd()
+    if not ask_git(cwd, "rev-parse", "--is-inside-work-tree"):
+        return None
+    dirty = [l for l in ask_git(cwd, "status", "--porcelain", "--untracked-files=normal").splitlines() if l.strip()]
+    branch = ask_git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    remote = ask_git(cwd, "rev-parse", "--abbrev-ref", "@{u}")
+    if not remote and branch not in ("HEAD", "") and ask_git(cwd, "rev-parse", "--verify", "-q", "refs/remotes/origin/" + branch):
+        remote = "origin/" + branch  # pushed before, without tracking
+    ahead = ask_git(cwd, "rev-list", "--count", f"{remote}..HEAD") if remote else ""
+    reasons = []
+    if dirty:
+        reasons.append(f"{len(dirty)} uncommitted change(s) (e.g. {dirty[0][3:]})")
+    if remote and ahead not in ("", "0"):
+        reasons.append(f"{ahead} commit(s) on {branch} not pushed to {remote}")
+    elif not remote and branch not in ("HEAD", ""):
+        reasons.append(f"branch {branch} has never been pushed")
+    if not reasons:
+        return None
+    state = hashlib.sha256("\n".join([branch, ahead, *sorted(dirty)]).encode()).hexdigest()[:16]
+    session = re.sub(r"[^A-Za-z0-9._-]", "_", str(event.get("session_id") or "session"))
+    marker = Path(os.environ.get("OH_CACHE") or Path.home() / ".cache" / "odoo-harness") / "stops" / session
+    try:
+        if marker.is_file() and marker.read_text().strip() == state:
+            return None  # held once already for this unsaved work
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(state)
+    except OSError:
+        pass
+    return ("the session is stopping with unsaved work: " + "; ".join(reasons) + ". Hand over (odoo-dev §7): "
+            "commit the work with its evidence and HANDOFF.md and push the branch, or say in one line why it "
+            "stays uncommitted, then stop again.")
+
+
+def check_mcp(tool, tool_input, protected, scope=None):
     name = tool.rsplit("__", 1)[-1]
+    owner, repo = tool_input.get("owner"), tool_input.get("repo")
+    if scope and owner and repo and f"{owner}/{repo}".lower() not in scope["slugs"]:
+        return None  # another repository: not the one Odoo.sh deploys
     if name in MCP_ALWAYS_BLOCKED:
         return "merging a pull request deploys on Odoo.sh; the user merges"
     if name == "pull_request_review_write" and str(tool_input.get("event", "")).upper() == "APPROVE":
@@ -399,10 +549,13 @@ def read_only_bash(command):
         if name == "oh" or tokens[0].endswith(".odoo-harness/oh"):
             sub = args[0] if args else ""
             if sub in READ_ONLY_OH or sub in ("-h", "--help"):
+                if sub == "evidence" and any(a.split("=")[0].startswith("--p") for a in args) \
+                        and not any(a.startswith("--d") for a in args):
+                    return "the reviewer does not prune evidence (`oh evidence --dry-run` lists what a prune would delete)"
                 continue
             if sub == "test" and "--no-record" in args and "--keep" not in args:
                 continue
-            return "in read-only review use `oh src`, `oh evidence`, `oh doctor` or `oh test ... --no-record`"
+            return "in read-only review use `oh src`, `oh check`, `oh evidence`, `oh deps`, `oh doctor` or `oh test ... --no-record`"
         if name not in READ_ONLY_TOOLS:
             return f"`{name}` is not on the read-only list"
         problem = tool_problem(name, args)
@@ -431,18 +584,25 @@ def main(argv=None):
         return 0
     tool, tool_input = event.get("tool_name", ""), event.get("tool_input") or {}
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or os.getcwd()
+    if "--stop" in argv:
+        reason = stop_check(dict(event, cwd=event.get("cwd") or project_dir))
+        if reason:
+            print(f"odoo-harness: {reason}", file=sys.stderr)
+            return 2
+        return 0
     # Hooks in a subagent's own definition don't run in `-p` sessions or untrusted folders; the settings
     # hook does, and Claude Code tells it which subagent is calling.
-    if "--read-only" in argv or event.get("agent_type") == REVIEWER:
+    if "--read-only" in argv or event.get("agent_type") in READ_ONLY_AGENTS:
         reason = read_only(tool, tool_input)
         if reason:
             print(f"Blocked by odoo-harness guard (read-only review): {reason}.", file=sys.stderr)
             return 2
     protected = protected_branches(project_dir)
     if tool == "Bash":
-        reason = check_bash(tool_input.get("command", ""), event.get("cwd") or project_dir, protected)
+        reason = check_bash(tool_input.get("command", ""), event.get("cwd") or project_dir, protected,
+                            scope=project_scope(project_dir))
     elif tool.startswith("mcp__") and "github" in tool.lower():
-        reason = check_mcp(tool, tool_input, protected)
+        reason = check_mcp(tool, tool_input, protected, project_scope(project_dir))
     else:
         reason = None
     if reason:
