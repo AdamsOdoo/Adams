@@ -22,6 +22,58 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.odoo-harness/oh\" check --hook",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.odoo-harness/guard.py\" --stop",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(.odoo-harness/oh src:*)",
+      "Bash(.odoo-harness/oh check:*)",
+      "Bash(.odoo-harness/oh evidence:*)",
+      "Bash(.odoo-harness/oh doctor:*)",
+      "Bash(.odoo-harness/oh test:*)",
+      "Bash(.odoo-harness/oh shot:*)",
+      "Bash(.odoo-harness/oh shell:*)",
+      "Bash(.odoo-harness/oh i18n:*)",
+      "Bash(python3 .odoo-harness/oh src:*)",
+      "Bash(python3 .odoo-harness/oh check:*)",
+      "Bash(python3 .odoo-harness/oh evidence:*)",
+      "Bash(python3 .odoo-harness/oh doctor:*)",
+      "Bash(python3 .odoo-harness/oh test:*)",
+      "Bash(python3 .odoo-harness/oh i18n:*)",
+      "Bash(python3 .odoo-harness/oh shell:*)",
+      "Bash(python3 .odoo-harness/oh shot:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(.odoo-harness/oh deps:*)",
+      "Bash(python3 .odoo-harness/oh deps:*)"
     ]
   }
 }
