@@ -27,7 +27,7 @@ from odoo.addons.shopify.models.graphql_queries import DELETE_SHOPIFY_SUBSCRIPTI
 from odoo.addons.shopify.models.misc import process_response, extract_numeric_id, convert_html_to_shopify_rich_text, _convert_shopify_rich_text_to_html, \
     convert_shopify_metafield_measurement
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 ACCOUNT_STATE = [('not_confirmed', 'Not Confirmed'), ('confirmed', 'Confirmed')]
 # How many attempts before giving up (rate limit / transient transport failures).
@@ -81,7 +81,7 @@ class MkInstance(models.Model):
 
     marketplace = fields.Selection(selection_add=[('shopify', "Shopify")], string='Marketplace')
     password = fields.Char("Password", copy=False, groups="base_marketplace.group_base_marketplace_manager")
-    shop_url = fields.Char("Shopify Shop URL", copy=False, help="Exp. https://teqstars.myshopify.com")
+    shop_url = fields.Char("Shopify Shop URL", copy=False, help="Exp. https://your-store.myshopify.com")
     is_token = fields.Boolean("I have API Access Token", default=True, help="You can find Admin API Access token from Shopify Apps.", copy=False)
     api_token = fields.Char("API access token", copy=False, groups="base_marketplace.group_base_marketplace_manager")
 

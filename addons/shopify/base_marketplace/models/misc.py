@@ -4,7 +4,7 @@ import logging
 
 from odoo.tools.mimetypes import _mime_mappings
 
-_logger = logging.getLogger("Teqstars:Base Marketplace")
+_logger = logging.getLogger("Qamah:Base Marketplace")
 
 
 def check_go_live(instance_arg=None):

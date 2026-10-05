@@ -22,7 +22,7 @@ from odoo.addons.shopify.models.graphql_queries import (GET_ORDERS_BY_IDS, GET_P
 from odoo.addons.shopify.models.misc import convert_shopify_datetime_to_utc, log_traceback_for_exception, extract_numeric_id
 from odoo.addons.shopify.shopify.pyactiveresource.connection import ResourceNotFound
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 FINANCIAL_STATUS = [('PENDING', 'Pending'),
                     ('AUTHORIZED', 'Authorized'),

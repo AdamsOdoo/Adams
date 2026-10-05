@@ -7,7 +7,7 @@ import logging
 
 from odoo import api, Command, SUPERUSER_ID
 
-_logger = logging.getLogger("TeqStars:Base Marketplace")
+_logger = logging.getLogger("Qamah:Base Marketplace")
 
 LINK = ('sales_team.group_sale_salesman',)
 UNLINK = ('sales_team.group_sale_manager', 'account.group_account_invoice',)

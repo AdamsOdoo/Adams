@@ -7,7 +7,7 @@ from odoo.addons.shopify.models.graphql_queries import CREATE_SHOPIFY_WEBHOOK, D
     GET_WEBHOOK_SUBSCRIPTION_USING_URI_AND_TOPIC
 from odoo.addons.shopify.models.misc import extract_numeric_id
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 WEBHOOK_EVENTS = [('customers/create', 'Create Customer'),
                   ('orders/create', 'Create Orders'),

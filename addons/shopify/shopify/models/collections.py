@@ -22,7 +22,7 @@ from odoo.addons.shopify.models.misc import convert_shopify_datetime_to_utc, ext
 from odoo.addons.shopify.models.collections_condition import resolve_condition_spec, RELATION_COMPAT
 from odoo.addons.shopify.models.collections_source import default_source_title
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 SORT_ORDER_SELECTION = [('ALPHA_ASC', 'Alphabetically, in ascending order (A - Z)'),
                         ('ALPHA_DESC', 'Alphabetically, in descending order (Z - A)'),

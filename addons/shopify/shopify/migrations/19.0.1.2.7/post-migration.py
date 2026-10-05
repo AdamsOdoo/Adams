@@ -2,7 +2,7 @@ import logging
 
 from odoo import api, SUPERUSER_ID
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 # Condition columns the new model needs; the data file does not add them to an existing database.
 CANONICAL_COLUMNS = [

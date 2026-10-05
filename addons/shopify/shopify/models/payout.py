@@ -8,7 +8,7 @@ from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 from odoo.addons.shopify.models.graphql_queries import GET_PAYOUTS_BY_DATE_RANGE, GET_TRANSACTIONS_FOR_PAYOUT
 from odoo.addons.shopify.models.misc import convert_shopify_datetime_to_utc, extract_numeric_id
 
-_logger = logging.getLogger("Teqstars: Shopify-Payout")
+_logger = logging.getLogger("Qamah:Shopify-Payout")
 
 INVOICE_AND_PAYMENT_TYPES = {
     'CHARGE': {'invoice_type': 'out_invoice', 'payment_type': 'inbound'},

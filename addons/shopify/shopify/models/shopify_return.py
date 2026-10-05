@@ -16,7 +16,7 @@ from odoo.addons.shopify.models.graphql_queries import (
 )
 from odoo.addons.shopify.models.misc import extract_numeric_id, log_traceback_for_exception
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 RETURN_STATUS = [
     ('REQUESTED', 'Requested'),

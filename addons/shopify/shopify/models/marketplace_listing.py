@@ -33,7 +33,7 @@ from odoo.addons.shopify.models.graphql_queries import (GET_SPECIFIC_PRODUCT_DAT
                                                         BULK_OPERATION_UPDATE_SALES_CHANNEL_UNPUBLISH, GET_PRODUCT_MEDIA_BATCH, GET_METAOBJECTS_BY_IDS)
 from odoo.addons.shopify.models.misc import convert_shopify_datetime_to_utc, extract_numeric_id, upload_content_to_staged_target
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 INVENTORY_MANAGEMENT = [('shopify', 'Track Quantity'), ('dont_track', 'Dont track Inventory')]
 FULFILLMENT_SERVICE = [('manual', 'Manual'), ('shopify', 'shopify'), ('gift_card', 'Gift Card')]

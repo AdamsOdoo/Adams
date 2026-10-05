@@ -2,7 +2,7 @@ import logging
 
 from odoo import api, SUPERUSER_ID
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 # Old ReturnReason enum -> new ReturnReasonDefinition handle
 RETURN_REASON_ENUM_TO_HANDLE = {

@@ -461,15 +461,7 @@ class MarketplaceOnboardingPanel {
             );
         };
 
-        const learnMoreLink = document.createElement('a');
-        learnMoreLink.href = 'https://docs.teqstars.com/19.0/';
-        learnMoreLink.target = '_blank';
-        learnMoreLink.rel = 'noopener noreferrer';
-        learnMoreLink.className = 'o_mk_onboarding_secondary_btn o_mk_learn_more';
-        learnMoreLink.textContent = 'Documentation';
-
         actions.appendChild(setupButton);
-        actions.appendChild(learnMoreLink);
 
         textContent.appendChild(label);
         textContent.appendChild(title);

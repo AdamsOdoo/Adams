@@ -8,8 +8,8 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-05-25 11:31+0000\n"
 "PO-Revision-Date: 2026-05-25 11:31+0000\n"
-"Last-Translator: TeqStars <support@teqstars.com>\n"
-"Language-Team: Russian <https://teqstars.com>\n"
+"Last-Translator: Qamah Solutions\n"
+"Language-Team: Russian\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -2207,8 +2207,8 @@ msgstr "Существует в Shopify"
 
 #. module: shopify
 #: model:ir.model.fields,help:shopify.field_mk_instance__shop_url
-msgid "Exp. https://teqstars.myshopify.com"
-msgstr "Пример: https://teqstars.myshopify.com"
+msgid "Exp. https://your-store.myshopify.com"
+msgstr "Пример: https://your-store.myshopify.com"
 
 #. module: shopify
 #: model:ir.model.fields.selection,name:shopify.selection__mk_operation__shopify_operations__export
@@ -5028,10 +5028,10 @@ msgstr "Требуется URL магазина."
 #. module: shopify
 #: model_terms:ir.ui.view,arch_db:shopify.shopify_marketplace_instance_form_view
 msgid ""
-"Shop URL used for authentication (Exp. https://teqstars.myshopify.com)."
+"Shop URL used for authentication (Exp. https://your-store.myshopify.com)."
 msgstr ""
 "URL магазина, используемый для аутентификации (Пример: "
-"https://teqstars.myshopify.com)."
+"https://your-store.myshopify.com)."
 
 #. module: shopify
 #. odoo-javascript

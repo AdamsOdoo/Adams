@@ -1,9 +1,8 @@
 {
     "name": "Odoo Shopify Connector",
-    "version": "1.2.9",
+    "version": "1.2.10",
     "category": "eCommerce",
-    "summary": """Integrate and manage your Shopify marketplace directly from Odoo using the TeqStars Shopify Odoo Connector and Shopify Odoo Marketplace Integration solution. This Odoo Shopify Integration and Shopify Integration Odoo module helps automate product sync, order management, inventory updates, shipping workflows, and financial reconciliation. Shopify TeqStars integration provides a fast, reliable, and scalable marketplace automation solution for Odoo.
-                  Connect Shopify with Odoo — the Odoo Shopify Connector and Shopify Integration for Odoo, with product sync, order import and stock updates, built on TeqStars Base Marketplace, the shared core behind every TeqStars marketplace connector.""",
+    'summary': 'Qamah Solutions Shopify Connector for Odoo: product and inventory sync, order and customer import, fulfilment and tracking export, payments, refunds, returns and payouts, built on Qamah Solutions Base Marketplace.',
     "depends": ['base_marketplace'],
 
     'data': [
@@ -77,10 +76,8 @@
         "shopify/**/*",  # exclude all files in a folder hierarchy recursively
         'static/description/**/*',  # exclude all files in a folder hierarchy recursively
     ],
-    "author": "TeqStars",
-    "website": "https://teqstars.com/r/bSq",
-    'support': 'support@teqstars.com',
-    'maintainer': 'TeqStars',
+    "author": "Qamah Solutions",
+    'maintainer': 'Qamah Solutions',
 
     'demo': [],
 
@@ -95,11 +92,8 @@
     },
 
     'license': 'OPL-1',
-    'live_test_url': 'https://teqstars.com/r/1rY',
     'auto_install': False,
     'installable': True,
     'application': True,
     'qweb': [],
-    "price": "379.99",
-    "currency": "EUR",
 }

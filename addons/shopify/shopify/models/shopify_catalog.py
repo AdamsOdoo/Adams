@@ -14,7 +14,7 @@ PRICING_VARIANT_BATCH = 100
 
 PRICING_NOT_FOUND_RETRIES = 2
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 CATALOG_TYPES = [
     ('MARKET', 'Market'),

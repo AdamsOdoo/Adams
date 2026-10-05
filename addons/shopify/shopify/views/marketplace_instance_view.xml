@@ -50,8 +50,6 @@
                                 <label string="I have API Access Token/ Generate Access Token" for="is_token"/>
                                 <div class="text-muted">
                                     You can find Admin API Access token from Shopify Apps.
-                                    <a href='https://teqstars.com/r/Hq6' invisible="marketplace != 'shopify'" target='_blank'><i class="fa fa-question-circle" title="Help"
-                                                                                                                                 style="font-size: 1.0rem;"/></a>
                                 </div>
                             </div>
                         </div>
@@ -88,7 +86,7 @@
                             <div class="o_setting_right_pane">
                                 <label string="Shop URL" for="shop_url"/>
                                 <div class="text-muted">
-                                    Shop URL used for authentication (Exp. https://teqstars.myshopify.com).
+                                    Shop URL used for authentication (Exp. https://your-store.myshopify.com).
                                 </div>
                                 <div class="text-muted">
                                     <b>
@@ -114,7 +112,7 @@
                                     <div class="flex-grow-1">
                                         <div class="fw-bold mb-1"><i class="fa fa-link me-2"/>Copy the Redirect URL</div>
                                         <div class="text-muted mb-2">
-                                            <a href="https://teqstars.com/r/Q1w" target="_blank" class="fw-bold"><i class="fa fa-play-circle me-1"/>Watch Video</a> for create an App.
+                                            Create an app for this store in Shopify, then copy this Redirect URL into it.
                                         </div>
                                     </div>
                                 </div>
@@ -509,10 +507,6 @@
                         <field string="Catalogs" name="shopify_catalog_count" widget="statinfo"/>
                     </button>
                 </div>
-                <field name="marketplace" position="after">
-                    <a href='https://docs.teqstars.com/19.0/applications/shopify/overview.html' invisible="marketplace != 'shopify'" target='_blank'><i class="fa fa-question-circle" title="Help"
-                                                                                                                                                        style="font-size: 1.1rem;"/> User Guide</a>
-                </field>
                 <xpath expr="//div[@name='tax_rounding']" position="after">
                     <div class="col-xs-12 col-md-6 o_setting_box" invisible="marketplace != 'shopify'" groups="base.group_no_one">
                         <div class="o_setting_left_pane"/>
@@ -578,11 +572,6 @@
                                         <field name="enable_metaobject" widget="boolean_toggle" nolabel="1" readonly="not is_marketplace_manager"/>
                                     </div>
                                 </div>
-
-                                <a href="https://docs.teqstars.com/19.0/applications/shopify/product_management/product_metafield_management.html" target="_blank" class="o_meta_dock_docs"
-                                   title="Open metafield documentation" role="button">
-                                    <i class="fa fa-book" title="Documentation"/> Documentation <i class="fa fa-external-link" title="Opens in a new tab"/>
-                                </a>
                             </div>
 
                             <!-- Resource Cards -->

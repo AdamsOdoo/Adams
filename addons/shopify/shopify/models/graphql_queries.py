@@ -4074,7 +4074,7 @@ mutation quantityRulesDelete($priceListId: ID!, $variantIds: [ID!]!) {
 # ----------------------------------------------------------------------------
 
 LIST_ORDER_RETURNS_BY_DATE = """
-query teqstarsListOrderReturns($searchQuery: String!, $pageSize: Int!, $afterCursor: String) {
+query qamahListOrderReturns($searchQuery: String!, $pageSize: Int!, $afterCursor: String) {
   orders(first: $pageSize, query: $searchQuery, after: $afterCursor) {
     nodes {
       id
@@ -4098,7 +4098,7 @@ query teqstarsListOrderReturns($searchQuery: String!, $pageSize: Int!, $afterCur
 """
 
 GET_ORDER_RETURNS_WITH_LINES_BY_DATE = """
-query teqstarsOrderReturnsWithLines($searchQuery: String!, $afterCursor: String) {
+query qamahOrderReturnsWithLines($searchQuery: String!, $afterCursor: String) {
   orders(first: 250, query: $searchQuery, after: $afterCursor) {
     nodes {
       id
@@ -4200,7 +4200,7 @@ query teqstarsOrderReturnsWithLines($searchQuery: String!, $afterCursor: String)
 """
 
 GET_ORDER_RETURNS_AFTER_CURSOR = """
-query teqstarsOrderReturnsAfterCursor($id: ID!, $cursor: String) {
+query qamahOrderReturnsAfterCursor($id: ID!, $cursor: String) {
   order(id: $id) {
     id
     returns(first: 20, after: $cursor) {
@@ -4296,7 +4296,7 @@ query teqstarsOrderReturnsAfterCursor($id: ID!, $cursor: String) {
 """
 
 GET_RETURN_REVERSE_FULFILLMENT_ORDERS_AFTER_CURSOR = """
-query teqstarsReturnRfoAfterCursor($id: ID!, $cursor: String) {
+query qamahReturnRfoAfterCursor($id: ID!, $cursor: String) {
   return(id: $id) {
     id
     reverseFulfillmentOrders(first: 100, after: $cursor) {
@@ -4335,7 +4335,7 @@ query teqstarsReturnRfoAfterCursor($id: ID!, $cursor: String) {
 """
 
 GET_RFO_LINE_ITEMS_AFTER_CURSOR = """
-query teqstarsRfoLineItemsAfterCursor($id: ID!, $cursor: String) {
+query qamahRfoLineItemsAfterCursor($id: ID!, $cursor: String) {
   reverseFulfillmentOrder(id: $id) {
     id
     lineItems(first: 250, after: $cursor) {
@@ -4364,7 +4364,7 @@ query teqstarsRfoLineItemsAfterCursor($id: ID!, $cursor: String) {
 """
 
 GET_RETURN_LINE_ITEMS_AFTER_CURSOR = """
-query teqstarsReturnLineItemsAfterCursor($id: ID!, $cursor: String) {
+query qamahReturnLineItemsAfterCursor($id: ID!, $cursor: String) {
   return(id: $id) {
     id
     returnLineItems(first: 250, after: $cursor) {
@@ -4408,7 +4408,7 @@ query teqstarsReturnLineItemsAfterCursor($id: ID!, $cursor: String) {
 """
 
 GET_SHOPIFY_RETURN_DETAILS = """
-query teqstarsGetReturn($returnId: ID!) {
+query qamahGetReturn($returnId: ID!) {
   return(id: $returnId) {
     id
     name
@@ -4570,7 +4570,7 @@ query teqstarsGetReturn($returnId: ID!) {
 """
 
 GET_RETURNABLE_FULFILLMENTS_FOR_ORDER = """
-query teqstarsReturnableFulfillments($orderGid: ID!, $maxFulfillments: Int!) {
+query qamahReturnableFulfillments($orderGid: ID!, $maxFulfillments: Int!) {
   returnableFulfillments(orderId: $orderGid, first: $maxFulfillments) {
     nodes {
       id
@@ -4603,7 +4603,7 @@ query teqstarsReturnableFulfillments($orderGid: ID!, $maxFulfillments: Int!) {
 """
 
 RETURN_CREATE_FROM_ODOO = """
-mutation teqstarsReturnCreate($returnInput: ReturnInput!) {
+mutation qamahReturnCreate($returnInput: ReturnInput!) {
   returnCreate(returnInput: $returnInput) {
     return {
       id
@@ -4619,7 +4619,7 @@ mutation teqstarsReturnCreate($returnInput: ReturnInput!) {
 """
 
 RETURN_REQUEST_APPROVE_FROM_ODOO = """
-mutation teqstarsReturnApproveRequest($input: ReturnApproveRequestInput!) {
+mutation qamahReturnApproveRequest($input: ReturnApproveRequestInput!) {
   returnApproveRequest(input: $input) {
     return {
       id
@@ -4634,7 +4634,7 @@ mutation teqstarsReturnApproveRequest($input: ReturnApproveRequestInput!) {
 """
 
 RETURN_REQUEST_DECLINE_FROM_ODOO = """
-mutation teqstarsReturnDeclineRequest($input: ReturnDeclineRequestInput!) {
+mutation qamahReturnDeclineRequest($input: ReturnDeclineRequestInput!) {
   returnDeclineRequest(input: $input) {
     return {
       id
@@ -4649,7 +4649,7 @@ mutation teqstarsReturnDeclineRequest($input: ReturnDeclineRequestInput!) {
 """
 
 RETURN_PROCESS_FROM_ODOO = """
-mutation teqstarsReturnProcess($input: ReturnProcessInput!) {
+mutation qamahReturnProcess($input: ReturnProcessInput!) {
   returnProcess(input: $input) {
     return {
       id
@@ -4786,7 +4786,7 @@ mutation teqstarsReturnProcess($input: ReturnProcessInput!) {
 """
 
 RETURN_CLOSE_FROM_ODOO = """
-mutation teqstarsReturnClose($id: ID!) {
+mutation qamahReturnClose($id: ID!) {
   returnClose(id: $id) {
     return {
       id
@@ -4801,7 +4801,7 @@ mutation teqstarsReturnClose($id: ID!) {
 """
 
 RETURN_CANCEL_FROM_ODOO = """
-mutation teqstarsReturnCancel($id: ID!) {
+mutation qamahReturnCancel($id: ID!) {
   returnCancel(id: $id) {
     return {
       id
@@ -4969,7 +4969,7 @@ query MultipleReturnsByIds($returnIds: [ID!]!) {
 """
 
 RETURN_REASON_DEFINITIONS = """
-query teqstarsReturnReasonDefinitions($handles: [String!]) {
+query qamahReturnReasonDefinitions($handles: [String!]) {
   returnReasonDefinitions(first: 250, handles: $handles) {
     edges {
       node {

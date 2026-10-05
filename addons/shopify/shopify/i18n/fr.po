@@ -8,8 +8,8 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-05-25 10:50+0000\n"
 "PO-Revision-Date: 2026-05-25 10:50+0000\n"
-"Last-Translator: TeqStars <support@teqstars.com>\n"
-"Language-Team: French <https://teqstars.com>\n"
+"Last-Translator: Qamah Solutions\n"
+"Language-Team: French\n"
 "Language: fr\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -1911,8 +1911,8 @@ msgstr "Existe dans Shopify"
 
 #. module: shopify
 #: model:ir.model.fields,help:shopify.field_mk_instance__shop_url
-msgid "Exp. https://teqstars.myshopify.com"
-msgstr "Ex. https://teqstars.myshopify.com"
+msgid "Exp. https://your-store.myshopify.com"
+msgstr "Ex. https://your-store.myshopify.com"
 
 #. module: shopify
 #: model:ir.model.fields.selection,name:shopify.selection__mk_operation__shopify_operations__export
@@ -4880,10 +4880,10 @@ msgstr "L'URL de la boutique est requise."
 #. module: shopify
 #: model_terms:ir.ui.view,arch_db:shopify.shopify_marketplace_instance_form_view
 msgid ""
-"Shop URL used for authentication (Exp. https://teqstars.myshopify.com)."
+"Shop URL used for authentication (Exp. https://your-store.myshopify.com)."
 msgstr ""
 "URL de la boutique utilisée pour l'authentification (Ex. "
-"https://teqstars.myshopify.com)."
+"https://your-store.myshopify.com)."
 
 #. module: shopify
 #. odoo-javascript

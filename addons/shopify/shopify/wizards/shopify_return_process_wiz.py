@@ -3,7 +3,7 @@ import logging
 from odoo import models, fields, _
 from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 
 class ShopifyReturnProcessWizard(models.TransientModel):

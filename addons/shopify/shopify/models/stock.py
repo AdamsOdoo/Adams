@@ -8,7 +8,7 @@ from odoo.addons.shopify.models.graphql_queries import UPDATE_PICKUP_STATUS, GET
     INVENTORY_BULK_TOGGLE_ACTIVATION
 from odoo.addons.shopify.models.misc import extract_numeric_id
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 
 class StockMove(models.Model):

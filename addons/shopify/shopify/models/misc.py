@@ -9,7 +9,7 @@ import requests
 from bs4 import BeautifulSoup, NavigableString
 from pytz import timezone
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 # Task: T7609 - (connect, read) seconds allowed for one staged upload to the bucket.
 STAGED_UPLOAD_TIMEOUT = (10, 300)

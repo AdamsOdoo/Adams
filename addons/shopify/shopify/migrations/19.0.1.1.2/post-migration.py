@@ -4,7 +4,7 @@ from odoo import api, SUPERUSER_ID
 from odoo.addons.shopify.models.graphql_queries import GET_ALL_PRODUCT_PUBLICATIONS
 from odoo.addons.shopify.models.misc import extract_numeric_id
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 
 def migrate(cr, version):

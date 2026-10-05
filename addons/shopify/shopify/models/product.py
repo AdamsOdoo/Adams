@@ -4,7 +4,7 @@ import logging
 from odoo import models, _
 from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 # Pricelist item fields that, when changed, can affect the resolved price.
 PRICELIST_ITEM_PRICE_FIELDS = (

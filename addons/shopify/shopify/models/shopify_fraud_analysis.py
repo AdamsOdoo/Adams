@@ -2,7 +2,7 @@ import logging
 
 from odoo import models, fields
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 RECOMMENDATION = [('CANCEL', 'Cancel'), ('INVESTIGATE', 'Investigate'), ('ACCEPT', 'Accept'), ('NONE', 'None')]
 RISK_LEVELS = [('HIGH', 'HIGH'), ('LOW', 'LOW'), ('MEDIUM', 'MEDIUM'), ('NONE', 'NONE'), ('PENDING', 'PENDING')]

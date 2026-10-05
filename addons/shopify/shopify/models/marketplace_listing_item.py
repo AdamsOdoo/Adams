@@ -3,7 +3,7 @@ import logging
 from odoo import models, fields, _, tools
 from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 CONTINUE_SELLING = [('CONTINUE', 'Allow'), ('DENY', 'Deny')]
 WEIGHT_UNIT = [('g', 'Gram'), ('kg', 'KG'), ('oz', 'Oz'), ('lb', 'LB')]

@@ -2,7 +2,7 @@ import logging
 
 from odoo import api, SUPERUSER_ID
 
-_logger = logging.getLogger("TeqStars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 RECOMPUTE_BATCH_SIZE = 1000
 

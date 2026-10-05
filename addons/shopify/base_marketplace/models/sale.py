@@ -3,7 +3,7 @@ from odoo import models, fields, Command, _
 from odoo.tools.misc import format_date
 from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 
-_logger = logging.getLogger("Teqstars: Base Marketplace")
+_logger = logging.getLogger("Qamah:Base Marketplace")
 
 
 class SaleOrder(models.Model):

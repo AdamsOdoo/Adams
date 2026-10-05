@@ -14,7 +14,7 @@ from odoo.addons.shopify.models.graphql_queries import GET_BULK_OPERATION_BY_ID,
 from odoo.addons.shopify.models.marketplace_listing import SHOPIFY_MAX_CONCURRENT_BULK
 from odoo.addons.shopify.models.misc import convert_shopify_datetime_to_utc, extract_numeric_id
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 MAX_RETRIES = 3
 

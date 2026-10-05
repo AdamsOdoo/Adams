@@ -2,7 +2,7 @@ import logging
 
 from odoo import api, SUPERUSER_ID
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 
 def migrate(cr, version):

@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from odoo.exceptions import AccessError
 from odoo.addons.base_marketplace.models.exceptions import MarketplaceException
 
-_logger = logging.getLogger("Teqstars:Base Marketplace")
+_logger = logging.getLogger("Qamah:Base Marketplace")
 
 
 class MkQueueJob(models.Model):

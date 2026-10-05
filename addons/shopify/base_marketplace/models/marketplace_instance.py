@@ -301,7 +301,7 @@ class MkInstance(models.Model):
         if is_cron:
             # During cron processing just log a warning and skip the API request
             # silently (no popup/exception), so the scheduled job keeps running.
-            _mk_logger = logging.getLogger(f"Teqstars:[{mk_instance_id.marketplace}]{mk_instance_id.name}")
+            _mk_logger = logging.getLogger(f"Qamah:[{mk_instance_id.marketplace}]{mk_instance_id.name}")
             _mk_logger.warning(error_msg)
             return False
         # Only an interactive UI request can render the redirect button. Background

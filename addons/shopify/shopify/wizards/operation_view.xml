@@ -196,13 +196,6 @@
                                 <strong>Description, Name, Tags, Product Category, Product Type, Vendor, Weight, Weight Unit, Internal Reference, Charge tax on this variant,
                                     Barcode, Track quantity, Continue selling when out of stock, Attributes and its Attribute Value.</strong>
                             </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/product_update.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
-                            </li>
                         </ul>
                     </p>
 
@@ -216,13 +209,6 @@
                             <li>
                                 Inventory will be updated in Shopify based on configured location in the Instance configuration under <strong> Marketplace > Shopify > Locations > Stock
                                 Location Field. </strong>
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/export_inventory.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -276,13 +262,6 @@
                                 Inventory will be updated in Shopify based on configured location in the Instance configuration under <strong> Marketplace > Shopify > Locations >
                                 Stock
                                 Location Field. </strong>
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/export_inventory.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -727,13 +706,6 @@
                             <li>
                                 If <strong>Last Customer Imported On</strong> date not set in the instance then it will fetch all the customers from Shopify.
                             </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/customer_management/customer_import.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
-                            </li>
                         </ul>
                     </p>
 
@@ -763,13 +735,6 @@
                             </li>
                             <li>
                                 You can import multiple orders by separating the IDs with a comma (','). For example: <strong>5869502038181, 9869502038181, 4586950203818.</strong>
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/order_management/order_import.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -802,13 +767,6 @@
                             <li>
                                 You can import multiple records using by giving <strong>comma ' , '</strong> between ids. <strong>Exp. 5869502038181, 9869502038181,
                                 4586950203818</strong>
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/product_import.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -887,13 +845,6 @@
                                 If <strong>Validate Inventory Adjustment?</strong> configuration is enabled under Instance setting, the system will automatically apply the
                                 inventory changes. Otherwise, you will need to manually process the inventory adjustment record in order for the stock changes to take effect.
                             </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/import_inventory.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
-                            </li>
                         </ul>
                     </p>
 
@@ -905,13 +856,6 @@
                                 It will update following listings details to the Shopify.
                                 <strong>Description, Name, Tags, Product Category, Product Type, Vendor, Weight, Weight Unit, Internal Reference, Charge tax on this variant, Barcode, Track quantity,
                                     Continue selling when out of stock, Attributes and its Attribute Value.</strong>
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/product_update.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -943,13 +887,6 @@
                              <li>
                                 Inventory will be exported based on the date specified in the <strong>Last Stock Updated On </strong> field in the wizard.
                             </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/export_inventory.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
-                            </li>
                         </ul>
                     </p>
 
@@ -962,13 +899,6 @@
                             </li>
                             <li>
                                 Only validated Delivery Orders will be going to update in Shopify.
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/order_management/update_order_status.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>
@@ -985,13 +915,6 @@
                             </li>
                             <li>
                                 Listings where the corresponding product is in Draft or Archived state will not be published or unpublished.
-                            </li>
-                            <li>
-                                For additional information, please refer to the
-                                <a href='https://docs.teqstars.com/19.0/applications/shopify/product_management/product_export.html'
-                                   target="_blank">
-                                    documentation.
-                                </a>
                             </li>
                         </ul>
                     </p>

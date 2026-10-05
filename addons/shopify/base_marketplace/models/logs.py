@@ -5,7 +5,7 @@ from odoo.tools.misc import split_every
 
 from odoo import models, fields, api, _
 
-_logger = logging.getLogger("Teqstars:Base Marketplace")
+_logger = logging.getLogger("Qamah:Base Marketplace")
 
 
 class MKLog(models.Model):
@@ -42,7 +42,7 @@ class MKLog(models.Model):
         if mk_log_line_dict:
             for log_type, log_list in mk_log_line_dict.items():
                 # Task: T7493 - Converted strings to f-strings.
-                _mk_logger = logging.getLogger(f"Teqstars:[{mk_instance_id.marketplace}]{mk_instance_id.name}")
+                _mk_logger = logging.getLogger(f"Qamah:[{mk_instance_id.marketplace}]{mk_instance_id.name}")
                 log_func = _mk_logger.error if log_type == 'error' else _mk_logger.info
                 for log_data in log_list:
                     log_func(log_data.get('log_message'))

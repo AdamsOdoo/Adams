@@ -14,7 +14,7 @@ from odoo.modules.registry import Registry
 from odoo import api, http, SUPERUSER_ID, _
 from odoo.addons.shopify.models.misc import log_traceback_for_exception, extract_numeric_id
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 
 class ShopifyWebhook(http.Controller):

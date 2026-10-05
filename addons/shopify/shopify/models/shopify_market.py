@@ -2,7 +2,7 @@ import logging
 
 from odoo import models, fields, _
 
-_logger = logging.getLogger("Teqstars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 MARKET_TYPES = [
     ('COMPANY_LOCATION', 'Company Location'),

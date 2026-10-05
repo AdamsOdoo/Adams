@@ -14,7 +14,7 @@ from odoo.addons.base_marketplace.models.misc import guess_mimetype
 from odoo.addons.shopify.models.graphql_queries import STAGED_UPLOADS_CREATE
 from odoo.addons.shopify.models.misc import upload_content_to_staged_target
 
-_logger = logging.getLogger("TeqStars:Shopify")
+_logger = logging.getLogger("Qamah:Shopify")
 
 # Task: T7609 - One chunk is read, staged and uploaded as a unit. Kept small on purpose: the parent
 # prepares the next chunk while the current one uploads, so only two chunks of bytes are ever in memory.

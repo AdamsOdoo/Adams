@@ -1,8 +1,8 @@
 {
     "name": "Base Marketplace",
-    "version": "19.0.1.1.2",
+    "version": "19.0.1.1.3",
     "category": "Extra",
-    'summary': 'TeqStars Base Marketplace app for Odoo provides the core framework required for TeqStars marketplace connector integrations. This base module helps manage common marketplace functionalities, shared configurations, and integration workflows across multiple marketplace connectors. The module simplifies connector management, improves integration consistency, and serves as the foundation for TeqStars marketplace solutions in Odoo such as WooCommerce (woo, woo commerce), Shopify, Bol (bol.com), BigCommerce, Etsy, eBay, Mirakl, PrestaShop (Presta Shop).',
+    'summary': 'Qamah Solutions Base Marketplace: the shared framework behind the Qamah Solutions marketplace connectors (instances, listings, queue jobs, logs, order workflows and the marketplace dashboard).',
     "depends": ['delivery', 'sale_management', 'sale_stock'],
 
     'data': [
@@ -63,19 +63,14 @@
         'static/src/js/chart_lib/**/*',  # exclude all files in a folder hierarchy recursively
         'static/description/**/*',  # exclude all files in a folder hierarchy recursively
     ],
-    "author": "TeqStars",
-    "website": "https://teqstars.com/r/bSq",
-    'support': 'support@teqstars.com',
-    'maintainer': 'TeqStars',
+    "author": "Qamah Solutions",
+    'maintainer': 'Qamah Solutions',
 
     "description": """""",
 
     'demo': [],
     'license': 'OPL-1',
-    'live_test_url': '',
     'auto_install': False,
     'installable': True,
     'application': False,
-    "price": "20.00",
-    "currency": "EUR",
 }
