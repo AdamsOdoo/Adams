@@ -7548,3 +7548,18 @@ msgstr ""
 #, python-format
 msgid "⚠️ Failed to fetch Shopify listing item Sales Channels: %(errors)s"
 msgstr ""
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_char
+msgid "Single-Line Value"
+msgstr ""
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_weight_unit
+msgid "Shopify Weight Unit"
+msgstr ""
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_volume_unit
+msgid "Shopify Volume Unit"
+msgstr ""

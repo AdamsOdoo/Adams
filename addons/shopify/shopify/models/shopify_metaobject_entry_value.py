@@ -52,7 +52,7 @@ class ShopifyMetaobjectEntryValue(models.Model):
     # ------------------------------------------------------------------
     # TYPED INPUTS - the only columns the user ever edits.
     # ------------------------------------------------------------------
-    val_char = fields.Char(string="Value", help="single_line_text_field, url, color, id, and the URL part of link.")
+    val_char = fields.Char(string="Single-Line Value", help="single_line_text_field, url, color, id, and the URL part of link.")
     val_text = fields.Text(string="Text Value", help="multi_line_text_field and json.")
     val_html = fields.Html(string="Rich Text Value", sanitize=False, help="rich_text_field.")
     val_int = fields.Integer(string="Integer Value", help="number_integer.")
@@ -65,10 +65,10 @@ class ShopifyMetaobjectEntryValue(models.Model):
     val_link_text = fields.Char(string="Link Text", help="Text part of a link value.")
     # Two selections rather than one: Odoo cannot filter Selection options per record, and a
     # single combined list let a weight unit be picked on a volume field.
-    val_weight_unit = fields.Selection(WEIGHT_UNITS, string="Shopify Unit",
+    val_weight_unit = fields.Selection(WEIGHT_UNITS, string="Shopify Weight Unit",
                                        help="Unit Shopify stores this weight in. The value beside it is held in "
                                             "Odoo's own unit and converted back to this one on push.")
-    val_volume_unit = fields.Selection(VOLUME_UNITS, string="Shopify Unit",
+    val_volume_unit = fields.Selection(VOLUME_UNITS, string="Shopify Volume Unit",
                                        help="Unit Shopify stores this volume in. The value beside it is held in "
                                             "Odoo's own unit and converted back to this one on push.")
     odoo_uom_label = fields.Char(string="Odoo Unit", compute='_compute_shopify_odoo_uom_label',

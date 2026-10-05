@@ -8093,3 +8093,18 @@ msgstr "تحديث عنصر القائمة: فشل تحديث قنوات الم�
 #, python-format
 msgid "UPDATE LISTING ITEM: Sales channels updated for %s (%s)"
 msgstr "تحديث عنصر القائمة: تم تحديث قنوات المبيعات لـ %s (%s)"
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_char
+msgid "Single-Line Value"
+msgstr "قيمة من سطر واحد"
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_weight_unit
+msgid "Shopify Weight Unit"
+msgstr "وحدة الوزن في Shopify"
+
+#. module: shopify
+#: model:ir.model.fields,field_description:shopify.field_shopify_metaobject_entry_value_ts__val_volume_unit
+msgid "Shopify Volume Unit"
+msgstr "وحدة الحجم في Shopify"
