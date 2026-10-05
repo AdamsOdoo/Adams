@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--METAOBJECT DEFINITION-->
+    <record id="shopify_metaobject_definition_search_view" model="ir.ui.view">
+        <field name="name">shopify.metaobject.definition.search</field>
+        <field name="model">shopify.metaobject.definition.ts</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="shopify_type"/>
+                <field name="mk_instance_id"/>
+                <filter string="Writable by Apps" name="app_writable" domain="[('is_app_writable', '=', True)]"/>
+                <filter string="Read Only (Shopify Restricted)" name="merchant_only"
+                        domain="[('is_app_writable', '=', False)]"/>
+                <filter string="Has Entries" name="has_entries" domain="[('entry_ids', '!=', False)]"/>
+                <group>
+                    <filter string="Instance" name="instance" context="{'group_by': 'mk_instance_id'}"/>
+                </group>
+                <searchpanel>
+                    <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_definition_list" model="ir.ui.view">
+        <field name="name">shopify.metaobject.definition.list</field>
+        <field name="model">shopify.metaobject.definition.ts</field>
+        <field name="arch" type="xml">
+            <list string="Metaobject Definitions" create="false" delete="true" class="o_shopify_metaobject_definition_list">
+                <header>
+                    <button name="action_fetch_shopify_metaobject_definitions" type="object" string="Fetch Definitions"
+                            display="always" class="btn btn-primary" icon="fa-download"
+                            groups="base_marketplace.group_base_marketplace_manager"/>
+                </header>
+                <field name="name" readonly="1"/>
+                <field name="shopify_type" widget="badge" decoration-info="1" readonly="1" optional="hide"/>
+                <field name="entry_count" string="Entries" readonly="1" optional="hide"/>
+                <field name="admin_access" string="Admin API Access" widget="badge" readonly="1"
+                       decoration-success="admin_access == 'PUBLIC_READ_WRITE'"
+                       decoration-muted="admin_access != 'PUBLIC_READ_WRITE'" optional="hide"/>
+                <field name="mk_instance_id" readonly="1" optional="show"/>
+                <field name="mk_id" readonly="1" optional="hide" column_invisible="True"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_definition_form" model="ir.ui.view">
+        <field name="name">shopify.metaobject.definition.form</field>
+        <field name="model">shopify.metaobject.definition.ts</field>
+        <field name="arch" type="xml">
+            <form string="Metaobject Definition" create="false" duplicate="false">
+                <header>
+                    <button name="action_fetch_shopify_entries" type="object" string="Fetch Entries" icon="fa-cloud-download"
+                            class="btn-primary" groups="base_marketplace.group_base_marketplace_manager"/>
+                    <button name="action_add_shopify_entry" type="object" string="Add Entry" icon="fa-plus-circle"
+                            class="btn-secondary" groups="base_marketplace.group_base_marketplace_manager" invisible="not is_app_writable"/>
+                    <button name="action_delete_shopify_definition" type="object" string="Delete Metaobject" icon="fa-trash-o"
+                            class="btn-secondary" groups="base_marketplace.group_base_marketplace_manager"
+                            confirm="Delete this metaobject definition from Shopify AND Odoo, including every one of its entries. This cannot be undone. Blocked automatically if any entry is still referenced by a product or another record."
+                            invisible="not is_app_writable"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box" invisible="not entry_count">
+                        <button name="action_open_shopify_entries" type="object" class="oe_stat_button" icon="fa-database">
+                            <field name="entry_count" widget="statinfo" string="Entries"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="1" placeholder="Product highlight"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="shopify_type" readonly="1"/>
+                            <field name="mk_instance_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="mk_id" string="Shopify ID" readonly="1" groups="base.group_no_one" invisible="True"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Fields" name="fields">
+                            <div class="alert alert-info" role="status">
+                                The schema is managed in Shopify. Fields are imported as read-only.
+                            </div>
+                            <field name="field_ids" readonly="1">
+                                <list create="false" delete="false">
+                                    <field name="name"/>
+                                    <field name="key"/>
+                                    <field name="field_type" widget="badge" decoration-info="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_field_form" model="ir.ui.view">
+        <field name="name">shopify.metaobject.field.form</field>
+        <field name="model">shopify.metaobject.field.ts</field>
+        <field name="arch" type="xml">
+            <!-- Read-only: opened by clicking a row in the Definition's Fields list. Only rating and reference fields carry the extra detail worth a click. -->
+            <form string="Field" create="false" edit="false" duplicate="false" delete="false">
+                <group>
+                    <group>
+                        <field name="name"/>
+                        <field name="key"/>
+                        <field name="field_type" widget="badge" decoration-info="1"/>
+                    </group>
+                    <group invisible="field_type != 'rating'">
+                        <field name="scale_min"/>
+                        <field name="scale_max"/>
+                    </group>
+                    <group invisible="field_type not in ['metaobject_reference', 'list.metaobject_reference']">
+                        <field name="ref_definition_id"/>
+                    </group>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- METAOBJECT ENTRY                                             -->
+    <!-- ============================================================ -->
+
+    <record id="shopify_metaobject_entry_search_view" model="ir.ui.view">
+        <field name="name">shopify.metaobject.entry.search</field>
+        <field name="model">shopify.metaobject.entry.ts</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="display_name_ts"/>
+                <field name="mk_id"/>
+                <field name="definition_id"/>
+                <filter string="Not in Shopify" name="not_pushed" domain="[('mk_id', '=', False)]"/>
+                <group>
+                    <filter string="Metaobject" name="definition" context="{'group_by': 'definition_id'}"/>
+                    <filter string="Instance" name="instance" context="{'group_by': 'mk_instance_id'}"/>
+                </group>
+                <searchpanel>
+                    <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                </searchpanel>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_entry_list" model="ir.ui.view">
+        <field name="name">shopify.metaobject.entry.list</field>
+        <field name="model">shopify.metaobject.entry.ts</field>
+        <field name="arch" type="xml">
+            <list string="Metaobject Entries" decoration-warning="not mk_id" create="false">
+                <field name="display_name_ts" string="Display Name"/>
+                <field name="definition_id"/>
+                <field name="handle" column_invisible="True"/>
+                <field name="mk_id" string="Shopify ID" column_invisible="True"/>
+                <field name="is_app_writable" string="Writable by Apps"/>
+                <field name="mk_instance_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_entry_form" model="ir.ui.view">
+        <field name="name">shopify.metaobject.entry.form</field>
+        <field name="model">shopify.metaobject.entry.ts</field>
+        <field name="arch" type="xml">
+            <form string="Metaobject Entry">
+                <header>
+                    <button name="action_push_to_shopify" type="object"
+                            class="btn-primary" groups="base_marketplace.group_base_marketplace_manager"
+                            invisible="not definition_id or not is_app_writable"><img src="/shopify/static/description/shopify-brands-solid-fulls.svg"
+                                                                                      alt="Shopify"
+                                                                                      class="me-1"
+                                                                                      style="width: 18px; height: 18px; vertical-align: middle; filter: brightness(0) invert(1);"/>
+                        <span style="vertical-align: middle;">Sync to Shopify</span>
+                    </button>
+                    <button name="action_delete_from_shopify" type="object" string="Delete Entry"
+                            class="btn-secondary" groups="base_marketplace.group_base_marketplace_manager" icon="fa-trash"
+                            invisible="not is_app_writable"
+                            confirm="Delete this entry from Shopify (if it was pushed) and remove it from Odoo? This cannot be undone. Blocked automatically if it is still referenced by a product or another record."/>
+                    <field name="is_app_writable" invisible="1"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Not in Shopify" bg_color="text-bg-warning"
+                            invisible="mk_id or not is_app_writable"/>
+                    <widget name="web_ribbon" title="Read Only" bg_color="text-bg-info"
+                            invisible="is_app_writable or not id"/>
+                    <!-- Reserves the height of the ribbon so it stays off the Values tab. The fields are centred in that
+                         space, so an entry Shopify has not named yet does not leave a blank band above them. -->
+                    <div class="d-flex flex-column justify-content-center" style="min-height: 9.5rem;">
+                        <div class="oe_title" style="margin-right: 100px;" invisible="not display_name_ts">
+                            <label for="display_name_ts"/>
+                            <h1><field name="display_name_ts" string="Display Name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="mk_instance_id" options="{'no_create': True}"
+                                       readonly="1"/>
+                                <field name="definition_id" options="{'no_create': True}"
+                                       readonly="1"/>
+                                <field name="shopify_type" invisible="1"/>
+                            </group>
+                            <group>
+                                <field name="handle" readonly="mk_id"
+                                       placeholder="Generated by Shopify when left empty" invisible="True"/>
+                                <field name="mk_id" string="Shopify ID" readonly="1" groups="base.group_no_one" invisible="1"/>
+                            </group>
+                        </group>
+                    </div>
+                    <notebook>
+                        <page string="Values" name="values">
+                            <field name="value_ids" nolabel="1">
+                                <!-- Three tidy columns. Clicking a row opens the dialog below,
+                                     which shows only the widget matching that field's type. -->
+                                <list create="false" delete="false">
+                                    <field name="val_char" column_invisible="1"/>
+                                    <field name="val_int" column_invisible="1"/>
+                                    <field name="val_float" column_invisible="1"/>
+                                    <field name="val_bool" column_invisible="1"/>
+                                    <field name="val_text" column_invisible="1"/>
+                                    <field name="val_html" column_invisible="1"/>
+                                    <field name="val_date" column_invisible="1"/>
+                                    <field name="val_datetime" column_invisible="1"/>
+                                    <field name="val_product_id" column_invisible="1"/>
+                                    <field name="val_variant_id" column_invisible="1"/>
+                                    <field name="val_entry_id" column_invisible="1"/>
+                                    <field name="val_product_ids" column_invisible="1"/>
+                                    <field name="val_variant_ids" column_invisible="1"/>
+                                    <field name="val_entry_ids" column_invisible="1"/>
+                                    <field name="field_id" string="Field" readonly="1" force_save="1"
+                                           options="{'no_open': True}"/>
+                                    <field name="is_supported" column_invisible="1"/>
+                                    <field name="field_type" string="Type" widget="badge" readonly="1"
+                                           decoration-info="is_supported" decoration-muted="not is_supported"/>
+                                    <field name="display_value" string="Value" readonly="1"/>
+                                </list>
+
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_metaobject_entry_value_form" model="ir.ui.view">
+        <field name="name">shopify.metaobject.entry.value.form</field>
+        <field name="model">shopify.metaobject.entry.value.ts</field>
+        <field name="arch" type="xml">
+            <form string="Value" create="false" duplicate="false">
+                <group>
+                    <group>
+                        <field name="field_id" readonly="1" force_save="1" options="{'no_open': True}"/>
+                        <field name="field_type" widget="badge" readonly="1"
+                               decoration-info="is_supported" decoration-muted="not is_supported"/>
+                    </group>
+                    <group>
+                        <field name="is_supported" readonly="1" invisible="True"/>
+                        <field name="ref_definition_id" invisible="1"/>
+                        <field name="scale_min" readonly="1" invisible="field_type != 'rating'"/>
+                        <field name="scale_max" readonly="1" invisible="field_type != 'rating'"/>
+                    </group>
+                </group>
+
+                <div class="alert alert-info" role="status" invisible="is_supported">
+                    Unsupported field type: Read-only in Odoo.
+                    The value is displayed as returned by Shopify and is not included when the entry is synced to Shopify.
+                </div>
+
+                <group string="Value" invisible="not is_supported">
+                    <field name="val_char" string="Value"
+                           invisible="field_type not in ['single_line_text_field', 'url', 'id', 'link']"/>
+                    <field name="val_char" string="Colour" widget="color"
+                           invisible="field_type != 'color'"/>
+                    <field name="val_link_text" string="Link Text" invisible="field_type != 'link'"/>
+                    <field name="val_int" string="Value" invisible="field_type != 'number_integer'"
+                           placeholder="Whole number, e.g. 12"/>
+                    <field name="val_float" string="Value"
+                           invisible="field_type not in ['number_decimal', 'rating', 'money']"/>
+                    <label for="val_float" string="Value" invisible="field_type not in ['weight', 'volume']"/>
+                    <div class="o_row" invisible="field_type not in ['weight', 'volume']">
+                        <field name="val_float" nolabel="1" options="{'digits': [16, 6]}"/>
+                        <field name="odoo_uom_label" nolabel="1" readonly="1" class="oe_inline text-muted"/>
+                    </div>
+                    <field name="val_weight_unit" invisible="field_type != 'weight'"/>
+                    <field name="val_volume_unit" invisible="field_type != 'volume'"/>
+                    <field name="val_bool" string="Value" invisible="field_type != 'boolean'"/>
+                    <field name="val_date" string="Value" invisible="field_type != 'date'"/>
+                    <field name="val_datetime" string="Value" invisible="field_type != 'date_time'"/>
+                    <field name="val_product_id" string="Product" invisible="field_type != 'product_reference'"
+                           options="{'no_open': True, 'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                    <field name="val_variant_id" string="Variant" invisible="field_type != 'variant_reference'"
+                           options="{'no_open': True, 'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                    <field name="val_entry_id" string="Metaobject Entry"
+                           invisible="field_type != 'metaobject_reference'"
+                           options="{'no_open': True, 'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                    <field name="val_product_ids" string="Products" widget="many2many_tags"
+                           invisible="field_type != 'list.product_reference'"
+                           options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                    <field name="val_variant_ids" string="Variants" widget="many2many_tags"
+                           invisible="field_type != 'list.variant_reference'"
+                           options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                    <field name="val_entry_ids" string="Metaobject Entries" widget="many2many_tags"
+                           invisible="field_type != 'list.metaobject_reference'"
+                           options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"/>
+                </group>
+
+                <group invisible="field_type not in ['multi_line_text_field', 'json'] or not is_supported">
+                    <field name="val_text" nolabel="1" colspan="2"/>
+                </group>
+                <group invisible="field_type != 'rich_text_field' or not is_supported">
+                    <field name="val_html" nolabel="1" colspan="2"/>
+                </group>
+                <group string="Shopify Value (read only)" invisible="is_supported">
+                    <field name="val_text" nolabel="1" colspan="2" readonly="1"/>
+                </group>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- ACTIONS                                                      -->
+    <!-- ============================================================ -->
+
+    <record id="action_shopify_metaobject_definitions" model="ir.actions.act_window">
+        <field name="name">Metaobjects</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">shopify.metaobject.definition.ts</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="shopify_metaobject_definition_search_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No metaobject definitions yet</p>
+            <p>Use <b>Fetch Definitions</b> to import the metaobject defined in your Shopify store, along
+                with their entries.</p>
+        </field>
+    </record>
+
+    <record id="action_shopify_metaobject_entries" model="ir.actions.act_window">
+        <field name="name">Metaobject Entries</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">shopify.metaobject.entry.ts</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="shopify_metaobject_entry_search_view"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No metaobject entries yet</p>
+            <p>Entries are imported from Shopify, or created here and pushed back.</p>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--    List view   -->
+        <record id="view_shopify_bulk_query_list" model="ir.ui.view">
+            <field name="name">shopify.bulk.query.list</field>
+            <field name="model">shopify.bulk.query</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Bulk Queries" create="false">
+                    <field name="name"/>
+                    <field name="shopify_operation_type"/>
+                    <field name="bulk_operation_id"/>
+                    <field name="mk_instance_id"/>
+                    <field name="chunk_sequence" optional="hide"/>
+                    <field name="chunk_total" optional="hide"/>
+                    <field name="status" widget="badge"
+                           decoration-success="status == 'COMPLETED'"
+                           decoration-danger="status == 'FAILED'"
+                           decoration-info="status == 'RUNNING'"
+                           decoration-warning="status == 'CANCELING'"
+                           decoration-muted="status in ('CANCELED', 'EXPIRED', 'QUEUED')"/>
+                </list>
+            </field>
+        </record>
+
+        <!--    Form view   -->
+        <record id="view_shopify_bulk_query_form" model="ir.ui.view">
+            <field name="name">shopify.bulk.query.form</field>
+            <field name="model">shopify.bulk.query</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Bulk Query" create="false">
+
+                    <header>
+                        <button name="action_fetch_shopify_bulk_query_status" string="Fetch Bulk Queue Status" type="object" class="btn-primary" invisible="status not in ('QUEUED', 'RUNNING', 'CANCELING')"/>
+                        <button name="action_process_shopify_bulk_export_result" string="Process Manually" type="object" class="btn-primary" invisible="status != 'COMPLETED' or not result_url"/>
+                        <field name="status" widget="statusbar" statusbar_visible="RUNNING,COMPLETED"/>
+                    </header>
+
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button class="oe_stat_button"
+                                    name="action_click_on_retry_count"
+                                    type="object"
+                                    icon="fa-refresh">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value">
+                                        <field name="no_of_retry_count" readonly="1"/>
+                                        / 3
+                                    </span>
+                                    <span class="o_stat_text">Retries</span>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+
+                        <group>
+                            <group>
+                                <field name="mk_instance_id" readonly="1"/>
+                                <field name="shopify_operation_type" readonly="1"/>
+                                <field name="bulk_operation_id" readonly="1"/>
+                            </group>
+
+                            <group>
+                                <field name="create_date" readonly="1"/>
+                                <field name="write_date" readonly="1"/>
+                                 <field name="mk_log_id" readonly="1"/>
+                                <field name="chunk_sequence" readonly="1" invisible="chunk_total &lt;= 1"/>
+                                <field name="chunk_total" readonly="1" invisible="chunk_total &lt;= 1"/>
+                                <field name="bulk_group_key" readonly="1" invisible="1"/>
+                                <field name="jsonl_attachment_id" readonly="1" invisible="1"/>
+                                <field name="batch_offset" readonly="1" invisible="1"/>
+                                <field name="result_url" readonly="1" invisible="0"/>
+                                <field name="result_attachment_id" readonly="1" invisible="1"/>
+                            </group>
+                        </group>
+
+                        <group>
+                            <field name="message" readonly="1" widget="text"/>
+                        </group>
+
+                        <notebook>
+                            <page string="Export Data" invisible="shopify_operation_type not in ('export_listing', 'export_price', 'export_inventory', 'update_listing')" groups="base.group_no_one">
+                                <field name="export_pending_data" widget="ace" options="{'mode': 'python'}" nolabel="1" readonly="1" />
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="view_shopify_bulk_query_search" model="ir.ui.view">
+            <field name="name">shopify.bulk.query.search</field>
+            <field name="model">shopify.bulk.query</field>
+            <field name="arch" type="xml">
+                <search string="Shopify Bulk Queries">
+                    <filter string="Queued" name="filter_queued" domain="[('status', '=', 'QUEUED')]"/>
+                    <filter string="Running" name="filter_running" domain="[('status', '=', 'RUNNING')]"/>
+                    <filter string="Completed" name="filter_completed" domain="[('status', '=', 'COMPLETED')]"/>
+                    <filter string="Failed" name="filter_failed" domain="[('status', '=', 'FAILED')]"/>
+                    <filter string="Canceled" name="filter_canceled" domain="[('status', '=', 'CANCELED')]"/>
+                    <field name="bulk_operation_id"/>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_shopify_bulk_query" model="ir.actions.act_window">
+            <field name="name">Shopify Bulk Queries</field>
+            <field name="res_model">shopify.bulk.query</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_filter_running': 1}</field>
+        </record>
+
+    </data>
+</odoo>

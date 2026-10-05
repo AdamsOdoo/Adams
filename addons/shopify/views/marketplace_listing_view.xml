@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="shopify_mk_listing_form_view" model="ir.ui.view">
+            <field name="name">shopify.marketplace.listing.form.view</field>
+            <field name="model">mk.listing</field>
+            <field name="inherit_id" ref="base_marketplace.mk_listing_form_view"/>
+            <field name="arch" type="xml">
+                <page name="product_images" position="after">
+                    <page string="Other Details" invisible="marketplace != 'shopify'">
+                        <group>
+                            <group>
+                            </group>
+                            <group>
+                                <field name="number_of_variants_in_mk" readonly="1"/>
+                            </group>
+                        </group>
+                    </page>
+                </page>
+                <field name="is_listed" position="before">
+                    <field name="shopify_product_category_id" string="Product Category" options='{"no_open": True, "no_create": True}' invisible="marketplace != 'shopify'"/>
+                    <field name="shopify_product_type_id" options='{"no_open": True, "no_create": True}' invisible="marketplace != 'shopify'"/>
+                </field>
+                <field name="is_listed" position="after">
+                    <field name="skip_listing_sync" readonly="1" invisible="True"/><!-- always invisible: technical field required by view logic -->
+                    <field name="tag_ids" string="Tags" widget="many2many_tags" invisible="marketplace != 'shopify'"/>
+                    <field name="shopify_sales_channel_ids" string="Sales Channels" invisible="marketplace != 'shopify'" readonly="1" widget="many2many_tags" domain="[('mk_instance_id', '=', mk_instance_id)]"/>
+                </field>
+
+                <!-- Task: T7871 - Add Shopify Collections and Catalogs smart buttons on listing form view. -->
+                <button name="open_listing_in_marketplace" position="before">
+                    <button name="action_view_shopify_collections" type="object" icon="fa-gift" class="oe_stat_button"
+                            invisible="marketplace != 'shopify' or shopify_collection_count &lt;= 0">
+                        <field string="Collections" name="shopify_collection_count" widget="statinfo"/>
+                    </button>
+                    <button name="action_view_shopify_catalogs" type="object" icon="fa-list-alt" class="oe_stat_button"
+                            invisible="marketplace != 'shopify' or shopify_catalog_count &lt;= 0">
+                        <field string="Catalogs" name="shopify_catalog_count" widget="statinfo"/>
+                    </button>
+                </button>
+
+                <div class="oe_button_box" position="inside">
+                    <button name="skip_shopify_listing_sync" type="object" class="oe_stat_button o_stat_text o_value text-success" icon="fa-refresh" string="Allow Sync"
+                            invisible="not skip_listing_sync or not is_listed or marketplace != 'shopify'"
+                            help="Toggle whether this listing participates in Shopify sync activities."/>
+                    <button name="skip_shopify_listing_sync" type="object" class="oe_stat_button o_stat_text o_value text-danger" icon="fa-refresh" string="No Allow Sync"
+                            invisible="skip_listing_sync or not is_listed or marketplace != 'shopify'"
+                            help="Toggle whether this listing participates in Shopify sync activities."/>
+                    <button class="oe_stat_button" name="action_publish_unpublish_shopify_products" type="object" icon="fa-globe"
+                            invisible="skip_listing_sync or not is_listed or marketplace != 'shopify'">
+                        <div class="o_stat_info o_field_widget">
+                            <span class="text-success">Manage Sales Channels</span>
+                        </div>
+                    </button>
+                </div>
+
+                <xpath expr="//sheet/group/group[2]/field[@name='listing_update_date']" position="after">
+                    <div invisible="marketplace != 'shopify' or not is_listed or skip_listing_sync"
+                         style="display: flex; gap: 8px; padding: 8px 0;">
+                        <button name="action_sync_listing_to_odoo" type="object"
+                                class="btn btn-primary d-inline-flex flex-row align-items-center gap-2 text-nowrap"
+                                help="Update this listing by importing the latest product data from Shopify.">
+                            <i class="fa fa-cloud-download" style="font-size:20px;"/>
+                            <span>Sync to Odoo</span>
+                        </button>
+                        <div invisible="not mk_id" style="display: contents;">
+                            <button name="action_sync_listing_to_shopify" type="object"
+                                    class="btn btn-success d-inline-flex flex-row align-items-center gap-2 text-nowrap"
+                                    help="Update the listing in Shopify with the latest product details, price, quantity, and images from Odoo to Shopify. Sales channels are not affected.">
+                                <img src="/shopify/static/description/shopify-brands-solid-fulls.svg" alt="Shopify" style="width:20px;height:20px;flex-shrink:0;filter:brightness(0) invert(1);"/>
+                                <span style="color:#fff;">Sync to Shopify</span>
+                            </button>
+                        </div>
+                    </div>
+                </xpath>
+
+                <xpath expr="//form/sheet" position="inside">
+                    <div style="position: absolute; top: 10px; right: 10px; z-index: 10;" invisible="marketplace != 'shopify'">
+                        <div invisible="skip_listing_sync" style="display: flex; align-items: center; gap: 6px; background-color: #28a745; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;">
+                            <i class="fa fa-circle"/><span>Allowed Sync</span>
+                        </div>
+                        <div invisible="not skip_listing_sync" style="display: flex; align-items: center; gap: 6px; background-color: #dc3545; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;">
+                            <i class="fa fa-circle"/><span>Not Allowed Sync</span>
+                        </div>
+                    </div>
+
+                </xpath>
+            </field>
+        </record>
+
+        <record id="shopify_mk_listing_tree_view" model="ir.ui.view">
+            <field name="name">shopify.mk.listing.list.view.inherit</field>
+            <field name="model">mk.listing</field>
+            <field name="inherit_id" ref="base_marketplace.mk_listing_tree_view"/>
+            <field name="arch" type="xml">
+                <list position="attributes">
+                    <attribute name="decoration-muted">skip_listing_sync</attribute>
+                </list>
+                <field name="is_published" position="after">
+                    <field name="skip_listing_sync" string="Sync Off" optional="show"/>
+                </field>
+            </field>
+        </record>
+
+        <record id="shopify_mk_listing_search_view" model="ir.ui.view">
+            <field name="name">shopify.mk.listing.search.view.inherit</field>
+            <field name="model">mk.listing</field>
+            <field name="inherit_id" ref="base_marketplace.mk_listing_search_view"/>
+            <field name="arch" type="xml">
+                <filter name="not_listed" position="after">
+                    <separator/>
+                    <filter string="Sync Enabled" name="sync_enabled" domain="[('skip_listing_sync', '=', False)]"/>
+                    <filter string="Sync Disabled" name="sync_disabled" domain="[('skip_listing_sync', '=', True)]"/>
+                </filter>
+            </field>
+        </record>
+
+    </data>
+</odoo>

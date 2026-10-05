@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="shopify_product_category_view_tree" model="ir.ui.view">
+            <field name="name">shopify.product.category.tree</field>
+            <field name="model">shopify.product.category.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Product Categories" create="false" delete="false">
+                    <header>
+                        <button name="fetch_category_from_shopify" type="object" string="Fetch Categories" display="always" icon="fa-download" class="btn-primary"/>
+                    </header>
+                    <field name="display_name" string="Shopify Product Category" readonly="True"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="shopify_product_category_view_form" model="ir.ui.view">
+            <field name="name">shopify.product.category.form</field>
+            <field name="model">shopify.product.category.ts</field>
+            <field name="arch" type="xml">
+                <form class="oe_form_configuration" create="false" delete="false">
+                    <sheet>
+                        <div class="oe_button_box" name="button_box" invisible="not listing_count">
+                            <button class="oe_stat_button"
+                                    name="action_view_shopify_listings"
+                                    icon="fa-th-list"
+                                    type="object">
+                                <div class="o_field_widget o_stat_info">
+                                    <span class="o_stat_value"><field name="listing_count"/></span>
+                                    <span class="o_stat_text"> Listings</span>
+                                </div>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="name" string="Category"/>
+                            <h1><field name="name" placeholder="e.g. Lamps" readonly="True"/></h1>
+                        </div>
+                        <group name="first" col="2">
+                            <field name="parent_id" class="oe_inline" readonly="True"/>
+                            <field name="shopify_category_id" readonly="True"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_product_category_view_search" model="ir.ui.view">
+            <field name="name">shopify.product.category.search</field>
+            <field name="model">shopify.product.category.ts</field>
+            <field name="arch" type="xml">
+                <search string="Shopify Product Categories">
+                    <group>
+                        <filter string="Parent Category" name="group_by_parent_id" context="{'group_by': 'parent_id'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_shopify_product_categories" model="ir.actions.act_window">
+            <field name="name">Shopify Product Categories</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.product.category.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="context">{'search_default_group_by_parent_id': 1}</field>
+        </record>
+    </data>
+</odoo>

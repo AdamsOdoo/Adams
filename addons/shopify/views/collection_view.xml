@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+
+        <record id="shopify_collection_ts_form_view" model="ir.ui.view">
+            <field name="name">shopify_collection_ts_form_view</field>
+            <field name="model">shopify.collection.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Collection">
+                    <sheet>
+                        <widget name="shopify_collection_notice"/>
+                        <div class="oe_button_box" name="button_box">
+                            <button type="object" name="open_collection_in_shopify" class="oe_stat_button" icon='fa-eye' string="Show in Marketplace" invisible="not shopify_collection_id"/>
+                            <button name="action_collection_products" type="object" icon="fa-product-hunt" class="oe_stat_button" invisible="product_count &lt;= 0">
+                                <field string="Products" name="product_count" widget="statinfo"/>
+                            </button>
+                            <button class="oe_stat_button" name="action_publish_unpublish_shopify_collection"
+                                    type="object" icon="fa-globe" invisible="marketplace != 'shopify' or not shopify_collection_id">
+                                <div class="o_stat_info o_field_widget">
+                                    <span class="text-success">Manage Sales Channels</span>
+                                </div>
+                            </button>
+                        </div>
+                        <field name="image" widget="image" class="oe_avatar"/>
+                        <div class="oe_title">
+                            <label class="oe_edit_only" for="name" string="Collection Name"/>
+                            <h1>
+                                <field name="name" placeholder="Collection Name"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="mk_instance_id" required="1" domain="[('state','=','confirmed'),('marketplace','=','shopify')]" readonly="shopify_collection_id"
+                                       options="{'no_create': True}"/>
+                                <field name="marketplace" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="shopify_collection_id" readonly="1"/>
+                                <field name="shopify_sales_channel_ids" string="Sales Channels" invisible="marketplace != 'shopify'" readonly="1" widget="many2many_tags"
+                                       domain="[('mk_instance_id', '=', mk_instance_id)]"/>
+                                <field name="exported_in_shopify" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="is_available_in_website" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                            <group>
+                                <field name="shopify_update_date" readonly="1"/>
+                                <field name="image_url" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <!-- Both buttons need the collection on Shopify, as a listing needs its mk_id; a new one is sent by the Export Collections operation. -->
+                                <div colspan="2" invisible="marketplace != 'shopify' or not shopify_collection_id" style="display: flex; gap: 8px; padding: 8px 0;">
+                                    <button name="action_sync_collection_to_odoo" type="object"
+                                            class="btn btn-primary d-inline-flex flex-row align-items-center gap-2 text-nowrap"
+                                            help="Update this collection by importing the latest data from Shopify: its conditions, sources and products.">
+                                        <i class="fa fa-cloud-download" style="font-size:20px;"/>
+                                        <span>Sync to Odoo</span>
+                                    </button>
+                                    <button name="action_sync_collection_to_shopify" type="object"
+                                            class="btn btn-success d-inline-flex flex-row align-items-center gap-2 text-nowrap"
+                                            help="Send this collection to Shopify with the latest conditions and products from Odoo. Sales channels are not affected. Sync it to Odoo first: Shopify has changed how collections work, so the latest data keeps the update correct.">
+                                        <img src="/shopify/static/description/shopify-brands-solid-fulls.svg" alt="Shopify"
+                                             style="width:20px;height:20px;flex-shrink:0;filter:brightness(0) invert(1);"/>
+                                        <span style="color:#fff;">Sync to Shopify</span>
+                                    </button>
+                                </div>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description"/>
+                            </page>
+                            <page string="Sources">
+                                <field name="source_ids" nolabel="1">
+                                    <list>
+                                        <field name="shopify_source_id" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="source_type" string="Type" readonly="shopify_source_id"/>
+                                        <field name="inclusion_match_type" string="Match"/>
+                                        <button name="action_open_select_collections_wizard" type="object" string="Add Collections"
+                                                icon="fa-plus" class="btn-link" invisible="source_type != 'collections'"/>
+                                        <button name="action_open_select_products_wizard" type="object" string="Add Products"
+                                                icon="fa-plus" class="btn-link" invisible="source_type != 'products'"/>
+                                        <button name="action_open_select_products_wizard" type="object" string="Add Variants"
+                                                icon="fa-plus" class="btn-link" invisible="source_type != 'variants'"/>
+                                    </list>
+                                    <form string="Collection Source" class="ts_collection_source_dialog">
+                                        <group>
+                                            <group>
+                                                <field name="shopify_source_id" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <field name="source_type" readonly="shopify_source_id"/>
+                                            </group>
+                                            <group/>
+                                        </group>
+                                        <group invisible="source_type != 'collections'">
+                                            <field name="sub_collection_ids" widget="many2many_tags" string="Pull products from"
+                                                   placeholder="Pick the collections this source takes its products from..."
+                                                   domain="[('mk_instance_id', '=', parent.mk_instance_id), ('id', '!=', parent.id)]" options="{'no_create': True}"/>
+                                        </group>
+                                        <notebook invisible="source_type == 'collections'">
+                                            <page string="Conditions">
+                                                <field name="condition_count" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <field name="exclusion_condition_count" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <field name="has_category_condition" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <field name="has_exclusion_category_condition" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <field name="has_status_condition" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                                <p class="alert alert-warning" role="alert" style="border-radius: 1em;">
+                                                    <h3>Information:</h3>
+                                                    <ul>
+                                                        <li>
+                                                            <strong>Product Title, Type, Vendor, Variant Title, and Tag:</strong> You can enter one or more
+                                                            values, separated by commas. Ex: red, blue.
+                                                        </li>
+                                                        <li>
+                                                            <strong>Price, Compare at Price, Weight, and Inventory Stock:</strong> Enter one number in
+                                                            <strong>Values</strong>. Ex: 400. To use another number, add a separate condition.
+                                                        </li>
+                                                        <li>
+                                                            <strong>Product Category:</strong> Select a category from <strong>Categories</strong> instead of
+                                                            entering it in <strong>Values</strong>. Enable <strong>Sub-categories</strong> if you also want to
+                                                            include products from its sub-categories.
+                                                        </li>
+                                                        <li>
+                                                            <strong>Product Status:</strong> Select one or more of these options: Active, Archived, Draft, or Unlisted.
+                                                        </li>
+                                                    </ul>
+                                                </p>
+                                                <separator string="Include"/>
+                                                <group invisible="condition_count &lt; 2">
+                                                    <field name="inclusion_match_type" widget="radio"/>
+                                                </group>
+                                                <field name="condition_ids" nolabel="1">
+                                                    <list editable="bottom">
+                                                        <field name="kind" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="column_id" required="1" options="{'no_create': True, 'no_open': True, 'no_create_edit': True}"
+                                                               domain="[('shopify_name', 'in', ['TITLE','TYPE','VENDOR','VARIANT_TITLE','TAG','PRODUCT_STATUS','PRODUCT_CATEGORY_ID','VARIANT_PRICE','VARIANT_COMPARE_AT_PRICE','VARIANT_WEIGHT','VARIANT_INVENTORY'])]"/>
+                                                        <field name="relation" required="1"/>
+                                                        <field name="match_type" string="Match"/>
+                                                        <field name="is_category_condition" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="is_status_condition" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="condition" string="Values" invisible="is_category_condition or is_status_condition"
+                                                               help="Separate several values with a comma, for example: red, blue"/>
+                                                        <field name="status_ids" string="Status" widget="many2many_tags" invisible="not is_status_condition"
+                                                               column_invisible="not parent.has_status_condition" options="{'no_create': True}"/>
+                                                        <field name="category_ids" string="Categories" widget="many2many_tags" invisible="not is_category_condition"
+                                                               column_invisible="not parent.has_category_condition" domain="[('shopify_category_id', '!=', False)]"
+                                                               options="{'no_create': True}"/>
+                                                        <field name="include_descendants" string="Sub-categories" widget="boolean_toggle"
+                                                               invisible="not is_category_condition" column_invisible="not parent.has_category_condition"/>
+                                                    </list>
+                                                </field>
+                                                <separator string="Exclude" invisible="source_type == 'variants'"/>
+                                                <group invisible="source_type == 'variants' or exclusion_condition_count &lt; 2">
+                                                    <field name="exclusion_match_type" widget="radio"/>
+                                                </group>
+                                                <field name="exclusion_condition_ids" nolabel="1" invisible="source_type == 'variants'">
+                                                    <list editable="bottom">
+                                                        <field name="kind" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="column_shopify_name" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="column_id" required="1" options="{'no_create': True, 'no_open': True, 'no_create_edit': True}"
+                                                               domain="[('shopify_name', 'in', ['TAG','TYPE','VENDOR','PRODUCT_CATEGORY_ID','EXCLUDE_COLLECTION'])]"/>
+                                                        <field name="relation" readonly="column_shopify_name == 'EXCLUDE_COLLECTION'"
+                                                               required="column_shopify_name != 'EXCLUDE_COLLECTION'"/>
+                                                        <field name="match_type" string="Match" readonly="column_shopify_name == 'EXCLUDE_COLLECTION'"/>
+                                                        <field name="is_category_condition" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                                        <field name="condition" string="Values" invisible="is_category_condition"
+                                                               help="Separate several values with a comma, for example: red, blue"/>
+                                                        <field name="category_ids" string="Categories" widget="many2many_tags"
+                                                               invisible="not is_category_condition" column_invisible="not parent.has_exclusion_category_condition"
+                                                               domain="[('shopify_category_id', '!=', False)]" options="{'no_create': True}"/>
+                                                        <field name="include_descendants" string="Sub-categories" widget="boolean_toggle"
+                                                               invisible="not is_category_condition" column_invisible="not parent.has_exclusion_category_condition"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Manually Included Products" invisible="source_type == 'variants'">
+                                                <field name="selection_listing_ids" nolabel="1" string="Products to Include"
+                                                       domain="[('mk_instance_id', '=', parent.mk_instance_id), ('is_listed', '=', True)]" options="{'no_create': True}">
+                                                    <list create="0">
+                                                        <field name="name"/>
+                                                        <field name="product_tmpl_id" string="Product Template"/>
+                                                        <field name="mk_id" string="Marketplace Identification"/>
+                                                        <field name="item_count" string="Variants"/>
+                                                        <field name="is_listed" string="Listed?" readonly="1" optional="hide"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Manually Excluded Products" invisible="source_type == 'variants'">
+                                                <field name="exclusion_listing_ids" nolabel="1" string="Products to Exclude"
+                                                       domain="[('mk_instance_id', '=', parent.mk_instance_id), ('is_listed', '=', True)]" options="{'no_create': True}">
+                                                    <list create="0">
+                                                        <field name="name"/>
+                                                        <field name="product_tmpl_id" string="Product Template"/>
+                                                        <field name="mk_id" string="Marketplace Identification"/>
+                                                        <field name="item_count" string="Variants"/>
+                                                        <field name="is_listed" string="Listed?" readonly="1" optional="hide"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Manually Included Variants" invisible="source_type != 'variants'">
+                                                <field name="selection_ids" nolabel="1">
+                                                    <list editable="bottom">
+                                                        <field name="mk_listing_id" string="Listings" required="1" domain="[('mk_instance_id', '=', parent.mk_instance_id)]"
+                                                               options="{'no_create': True, 'no_open': True}"/>
+                                                        <field name="mk_listing_item_ids" string="Listing Items" widget="many2many_tags" placeholder="Pick the listing items..."
+                                                               domain="[('mk_listing_id', '=', mk_listing_id)]" options="{'no_create': True}"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </form>
+                                </field>
+                            </page>
+                            <page string="Collection Items" name="collection_items">
+                                <field name="hand_picked_listing_ids" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="mk_listing_ids" mode="kanban" nolabel="1" options="{'link': False}" class="ts_collection_items">
+                                    <kanban create="0" can_open="0">
+                                        <field name="id"/>
+                                        <field name="name"/>
+                                        <field name="collection_variant_summary"/>
+                                        <field name="collection_image_256"/>
+                                        <templates>
+                                            <!-- laid out like Shopify's cards: image on top, name and variants below -->
+                                            <t t-name="card" class="flex-column p-0 ts_collection_item">
+                                                <div class="ts_collection_item_image">
+                                                    <t t-if="record.collection_image_256.raw_value">
+                                                        <field name="collection_image_256" widget="image" alt="Product" options="{'img_class': 'ts_collection_item_img'}"/>
+                                                    </t>
+                                                    <i t-else="" class="fa fa-picture-o fa-lg text-muted" title="No image"/>
+                                                </div>
+                                                <div class="ts_collection_item_body">
+                                                    <!-- the name opens the listing, as the product opens on Shopify -->
+                                                    <a name="get_formview_action" type="object" class="ts_collection_item_name" title="Open this listing">
+                                                        <t t-esc="record.name.value"/>
+                                                    </a>
+                                                    <!-- "1 of 3 variants", as on Shopify: opens the variants -->
+                                                    <widget name="shopify_collection_item_variants"/>
+                                                </div>
+                                                <a type="delete" class="fa fa-times ts_collection_item_remove" title="Remove from this collection"
+                                                   invisible="id not in parent.hand_picked_listing_ids"/>
+                                            </t>
+                                        </templates>
+                                    </kanban>
+                                </field>
+                            </page>
+                            <page string="Configuration">
+                                <group>
+                                    <group>
+                                        <field name="handle" readonly="1"/>
+                                        <field name="template_suffix"/>
+                                    </group>
+                                    <group>
+                                        <field name="sort_order"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Collection Job" groups="base.group_no_one">
+                                <field name="collection_job_ids">
+                                    <list create="0" edit="0" delete="1" no_open="True">
+                                        <field name="job_id" readonly="True"/>
+                                        <field name="response_data" string="Products in Job" readonly="True"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_collection_ts_search_view" model="ir.ui.view">
+            <field name="name">shopify_collection_ts_search_view</field>
+            <field name="model">shopify.collection.ts</field>
+            <field name="arch" type="xml">
+                <search string="Shopify Collection">
+                    <field name="name" filter_domain="['|', '|', ('name', 'ilike', self), ('shopify_collection_id', '=', self), ('handle', 'ilike', self)]"/>
+                    <field name="shopify_collection_id"/>
+                    <field name="mk_instance_id"/>
+                    <field name="mk_listing_ids" string="Product"/>
+                    <separator/>
+                    <filter string="Listed" name="listed" domain="[('exported_in_shopify', '=', True)]"/>
+                    <filter string="Not Listed" name="not_listed" domain="[('exported_in_shopify', '=', False)]"/>
+                    <group>
+                        <filter string="Instance" name="group_by_instance" context="{'group_by': 'mk_instance_id'}"/>
+                        <filter string="Sort Order" name="group_by_sort_order" context="{'group_by': 'sort_order'}"/>
+                        <filter string="Update Date" name="group_by_update_date" context="{'group_by': 'shopify_update_date'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <record id="shopify_collection_ts_tree_view" model="ir.ui.view">
+            <field name="name">shopify_collection_ts_tree_view</field>
+            <field name="model">shopify.collection.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Collection">
+                    <header>
+                        <button name="%(shopify.action_collection_operation_to_marketplace)d" icon="fa-edit" type="action" string="Export/Update to Marketplace"/>
+                    </header>
+                    <field name="name"/>
+                    <field name="mk_instance_id" readonly="1"/>
+                    <field name="sort_order"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Task: T7722 - Restructure Shopify Menus-->
+        <record id="action_shopify_all_collections" model="ir.actions.act_window">
+            <field name="name">All Collections</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.collection.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p></p>
+            </field>
+        </record>
+
+        <record id="action_shopify_automated_collection_dashboard_ts" model="ir.actions.act_window">
+            <field name="name">Collection</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.collection.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('mk_instance_id', '=', active_id)]</field>
+            <field name="help" type="html">
+                <p></p>
+            </field>
+        </record>
+    </data>
+</odoo>

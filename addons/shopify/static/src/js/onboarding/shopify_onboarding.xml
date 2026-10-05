@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- Shopify-only: inline API scope-check actions in the onboarding bottom nav.
+         Extends the shared wizard template; all additions are gated on state.scopeCheck
+         (null for every other connector) so nothing else is affected. -->
+    <t t-name="shopify.MarketplaceOnboardingMain" t-inherit="base_marketplace.MarketplaceOnboardingMain" t-inherit-mode="extension">
+        <xpath expr="//button[hasclass('o_mk_nav_btn_save')]" position="attributes">
+            <attribute name="t-if">state.currentStep === state.totalSteps and !state.scopeCheck</attribute>
+        </xpath>
+        <xpath expr="//button[hasclass('o_mk_nav_btn_save')]" position="after">
+            <button type="button" class="o_mk_edge_btn o_mk_nav_btn_ignore"
+                    t-on-click="onScopeIgnoreConfirm"
+                    t-if="state.scopeCheck and state.currentStep === state.totalSteps"
+                    t-att-disabled="state.saving">
+                <span>Ignore &amp; Confirm</span>
+            </button>
+            <button type="button" class="o_mk_edge_btn o_mk_edge_btn_primary o_mk_nav_btn_next o_mk_nav_btn_recheck"
+                    t-on-click="onScopeCheckAgain"
+                    t-if="state.scopeCheck and state.currentStep === state.totalSteps"
+                    t-att-disabled="state.saving">
+                <t t-if="state.scopeBusy === 'recheck'">
+                    <span class="spinner-border spinner-border-sm o_mk_nav_save_spinner"/>
+                </t>
+                <t t-else="">
+                    <span>Check Again</span>
+                    <i class="fa fa-refresh"/>
+                </t>
+            </button>
+        </xpath>
+    </t>
+
+    <t t-name="shopify.MarketplaceOnboarding_shopify_step_1">
+        <div class="o_mk_shopify_step1">
+            <h5 class="fw-semibold mb-4">Connection</h5>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Instance name</label>
+                <input type="text" class="form-control" required="required" autocomplete="off"
+                       placeholder="e.g. My Shopify store"
+                       t-att-value="state.formData.name"
+                       t-on-input="onInput('name')"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Import order after</label>
+                <p class="text-muted small mb-2">Only orders created after this date are imported. Leave empty to import all.</p>
+                <input type="datetime-local" class="form-control"
+                       t-att-value="state.formData.import_order_after_date"
+                       t-on-input="onInput('import_order_after_date')"/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-medium">Shop URL</label>
+                <input type="text" class="form-control" placeholder="https://your-store.myshopify.com"
+                       t-att-value="state.formData.shop_url"
+                       t-on-input="onInput('shop_url')"/>
+            </div>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="mk_onb_is_token"
+                       t-att-checked="state.formData.is_token"
+                       t-on-change="onInput('is_token')"/>
+                <label class="form-check-label" for="mk_onb_is_token">I have an API access token</label>
+            </div>
+            <div class="mb-3" t-if="state.formData.is_token">
+                <label class="form-label fw-medium">API access token</label>
+                <input type="password" class="form-control" autocomplete="off"
+                       t-att-value="state.formData.api_token"
+                       t-on-input="onInput('api_token')"/>
+            </div>
+            <div class="mb-0" t-if="!state.formData.is_token">
+                <label class="form-label fw-medium">Password</label>
+                <input type="password" class="form-control" autocomplete="off"
+                       t-att-value="state.formData.password"
+                       t-on-input="onInput('password')"/>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="shopify.MarketplaceOnboarding_shopify_step_2">
+        <div class="o_mk_shopify_step2">
+            <h5 class="fw-semibold mb-2">Sync products by</h5>
+            <p class="text-muted small mb-4">Match Odoo products using barcode, SKU, or either.</p>
+            <div class="d-flex flex-column gap-3 mb-4">
+                <t t-foreach="state.formData.sync_product_with_options" t-as="opt" t-key="opt.value">
+                    <div t-att-class="'o_mk_radio_card ' + (state.formData.sync_product_with === opt.value ? 'is-selected' : '')"
+                         t-on-click="makeSelectSyncHandler(opt.value)">
+                        <div class="fw-medium" t-esc="opt.label"/>
+                    </div>
+                </t>
+            </div>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="mk_onb_create_products"
+                       t-att-checked="state.formData.is_create_products"
+                       t-on-change="onInput('is_create_products')"/>
+                <label class="form-check-label" for="mk_onb_create_products">Create Odoo products if missing during sync</label>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="shopify.MarketplaceOnboarding_shopify_step_3">
+        <div class="o_mk_shopify_step3">
+            <h5 class="fw-semibold mb-2">Tax behaviour</h5>
+            <p class="text-muted small mb-3">How taxes should be applied on imported orders.</p>
+            <select class="form-select mb-3" t-att-value="state.formData.tax_system" t-on-change="onTaxChange">
+                <t t-foreach="state.formData.tax_system_options" t-as="opt" t-key="opt.value">
+                    <option t-att-value="opt.value" t-esc="opt.label"
+                            t-att-selected="state.formData.tax_system === opt.value"/>
+                </t>
+            </select>
+            <t t-if="state.formData.tax_system !== 'default'">
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Tax Account</label>
+                    <p class="text-muted small mb-2">Account used when creating taxes from marketplace data (same as instance settings).</p>
+                    <select class="form-select"
+                            required="required"
+                            t-att-value="state.formData.tax_account_id ? '' + state.formData.tax_account_id : ''"
+                            t-on-change="makeTaxAccountSelectHandler('tax_account_id')">
+                        <option value="" disabled="disabled">Select an account</option>
+                        <t t-foreach="state.formData.tax_account_options" t-as="acc" t-key="acc.id">
+                            <option t-att-value="'' + acc.id" t-esc="acc.name"
+                                    t-att-selected="state.formData.tax_account_id === acc.id"/>
+                        </t>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-medium">Tax Account on Credit Notes</label>
+                    <p class="text-muted small mb-2">Account used for refund tax lines (same as instance settings).</p>
+                    <select class="form-select"
+                            required="required"
+                            t-att-value="state.formData.tax_refund_account_id ? '' + state.formData.tax_refund_account_id : ''"
+                            t-on-change="makeTaxAccountSelectHandler('tax_refund_account_id')">
+                        <option value="" disabled="disabled">Select an account</option>
+                        <t t-foreach="state.formData.tax_account_options" t-as="acc" t-key="acc.id">
+                            <option t-att-value="'' + acc.id" t-esc="acc.name"
+                                    t-att-selected="state.formData.tax_refund_account_id === acc.id"/>
+                        </t>
+                    </select>
+                </div>
+            </t>
+            <h5 class="fw-semibold mb-2">Fulfillment statuses</h5>
+            <p class="text-muted small mb-3">Import orders that match these fulfillment statuses.</p>
+            <div class="d-flex flex-wrap gap-2">
+                <t t-foreach="state.formData.fulfillment_status_options" t-as="st" t-key="st.id">
+                    <button type="button"
+                            t-att-class="isFulfillmentSelected(st.id) ? 'o_mk_tag is-on' : 'o_mk_tag'"
+                            t-on-click="makeFulfillmentToggleHandler(st.id)">
+                        <t t-esc="st.name"/>
+                    </button>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="shopify.MarketplaceOnboarding_shopify_step_4">
+        <div class="o_mk_shopify_step4">
+            <t t-if="state.scopeCheck">
+                <div class="o_mk_scope_check">
+                    <h5 class="fw-semibold mb-2"><i class="fa fa-exclamation-triangle text-warning me-2"/>Confirm Permissions</h5>
+                    <p class="text-muted small mb-3">We detected missing permissions required for full functionality. Please update these in your Shopify App settings.</p>
+                    <t t-if="state.scopeCheck.missing.length">
+                        <div class="fw-semibold small mb-2">Missing Scopes</div>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <span t-foreach="state.scopeCheck.missing" t-as="s" t-key="s" class="o_mk_scope_chip is-missing">
+                                <i class="fa fa-times-circle me-1"/><t t-esc="s"/>
+                            </span>
+                        </div>
+                    </t>
+                    <div class="fw-semibold small mb-2">Granted Scopes</div>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <span t-foreach="state.scopeCheck.granted" t-as="s" t-key="s" class="o_mk_scope_chip is-granted">
+                            <i class="fa fa-check-circle me-1"/><t t-esc="s"/>
+                        </span>
+                    </div>
+                </div>
+            </t>
+            <t t-else="">
+            <h5 class="fw-semibold mb-4">Summary</h5>
+            <div class="o_mk_review_section">
+                <h6>Instance</h6>
+                <div class="small"><strong>Name:</strong> <t t-esc="state.formData.name"/></div>
+                <div class="small mt-1"><strong>Import Order After: </strong>
+                    <t t-if="state.formData.import_order_after_date" t-esc="state.formData.import_order_after_date"/>
+                    <t t-else="">Not set</t>
+                </div>
+            </div>
+            <div class="o_mk_review_section">
+                <h6>Connection</h6>
+                <div class="small text-break"><strong>Shop URL:</strong> <t t-esc="state.formData.shop_url"/></div>
+                <div class="small mt-1"><strong>Auth: </strong>
+                    <t t-if="state.formData.is_token">API Token</t>
+                    <t t-else="">Password</t>
+                </div>
+            </div>
+            <div class="o_mk_review_section">
+                <h6>Products</h6>
+                <div class="small"><strong>Sync by:</strong> <t t-esc="syncOptionLabel(state.formData.sync_product_with)"/></div>
+                <div class="small mt-1"><strong>Create Products: </strong>
+                    <t t-if="state.formData.is_create_products">Yes</t>
+                    <t t-else="">No</t>
+                </div>
+            </div>
+            <div class="o_mk_review_section mb-0">
+                <h6>Orders</h6>
+                <div class="small"><strong>Tax:</strong> <t t-esc="taxOptionLabel(state.formData.tax_system)"/></div>
+                <t t-if="state.formData.tax_system !== 'default'">
+                    <div class="small mt-1"><strong>Tax account:</strong> <t t-esc="taxAccountLabel('invoice')"/></div>
+                    <div class="small mt-1"><strong>Tax account (credit notes):</strong> <t t-esc="taxAccountLabel('refund')"/></div>
+                </t>
+                <div class="small mt-2"><strong>Fulfillment Statuses:</strong> <t t-esc="fulfillmentSummaryText()"/></div>
+            </div>
+            </t>
+        </div>
+    </t>
+</templates>

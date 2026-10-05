@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="shopify_catalog_form_view" model="ir.ui.view">
+            <field name="name">shopify.catalog.form.view</field>
+            <field name="model">shopify.catalog.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Catalog" create="false">
+                    <header>
+                        <button name="action_sync_shopify_catalog_to_odoo" string="Sync to Odoo" icon="fa-cloud-download" type="object" invisible="not shopify_catalog_id"
+                                class="oe_highlight" help="Update this catalog by importing the latest product data, market from Shopify."/>
+                        <button name="action_update_catalog_to_shopify" string="Sync to Shopify" icon="fa-cloud-upload" type="object" invisible="not shopify_catalog_id"
+                                class="oe_highlight" help="Push local changes (title, status, market/location, auto-include, prices, quantity rules, volume tiers) to Shopify."
+                                confirm="Are you sure you want to update catalog? This action directly reflect on Shopify."/>
+                        <field name="status" widget="statusbar" statusbar_visible="ARCHIVED,DRAFT,ACTIVE" options="{'clickable': '1'}"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_shopify_catalog_products" type="object" icon="fa-product-hunt" class="oe_stat_button" invisible="catalog_product_count &lt;= 0">
+                                <field string="Products" name="catalog_product_count" widget="statinfo"/>
+                            </button>
+                            <div class="oe_button_box" name="button_box">
+                                <button type="object" name="open_catalog_in_shopify" class="oe_stat_button" icon='fa-eye' string="Show in Marketplace"
+                                        invisible="not shopify_catalog_id"/>
+                            </div>
+                        </div>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="title"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <label for="catalog_type"/>
+                                <div class="o_row">
+                                    <field name="catalog_type" readonly="1"/>
+                                    <field name="market_ids" placeholder="Select Market" widget="many2many_tags" invisible="catalog_type != 'MARKET'" options='{"no_open": True, "no_create": True}'/>
+                                    <field name="company_location_ids" placeholder="Select Company Location" widget="many2many_tags" invisible="catalog_type != 'COMPANY_LOCATION'" options='{"no_open": True, "no_create": True}'/>
+                                    <field name="app_ids" placeholder="Select App" widget="many2many_tags" invisible="catalog_type != 'APP'" options='{"no_open": True, "no_create": True}'/>
+                                </div>
+                                <field name="shopify_catalog_id" string="Catalog ID" readonly="1"/>
+                            </group>
+
+                            <group>
+                                <field name="mk_instance_id" readonly="1"/>
+                                <field name="company_id" readonly="1" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="active" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                        </group>
+                        <separator string="Price" class="mt-4"/>
+                        <group>
+                            <group>
+                                <field name="currency_id" string="Set prices in" readonly="1"/>
+                                <label for="adjustment_value" string="Price Adjustment"/>
+                                <div class="o_row">
+                                    <field name="adjustment_value"/>
+                                    <span>%</span>
+                                    <field name="adjustment_type" placeholder="Direction"/>
+                                </div>
+                            </group>
+                            <group>
+                                <field name="include_compare_at_price" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Included Products Price">
+                                <group>
+                                    <group>
+                                        <field name="auto_include_new_products" string="Automatically include new products" widget="boolean_toggle"/>
+                                    </group>
+                                    <group>
+                                        <field name="price_list_name" readonly="1" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="price_list_shopify_id" readonly="1" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                    </group>
+                                </group>
+                                <button name="action_open_shopify_add_listings_wizard" string="Add Listings to Catalog" icon="fa-plus" type="object" invisible="not shopify_catalog_id" class="btn-secondary float-end"
+                                        help="Open a listing picker; selected listings' variants will be added to this catalog's price list."/>
+
+                                <field name="variant_price_ids" readonly="0">
+                                    <list create="false" editable="bottom" delete="true" open_form_view="True">
+                                        <field name="mk_listing_id" readonly="1" options="{'no_open': False}" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="mk_listing_item_id" readonly="1" options="{'no_open': False}"/>
+                                        <field name="currency_id" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="variant_shopify_id" readonly="1" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                        <field name="compare_at_price" string="Compare at price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                        <field name="minimum_quantity" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="maximum_quantity" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="increment" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <field name="origin_type" optional="show" readonly="1"/>
+                                        <field name="is_default" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                        <button name="action_open_variant_price_form" type="object" string="Rules" icon="fa-external-link" title="Open detailed view to edit quantity rules and volume pricing" invisible="not show_rule_shopify_button"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_catalog_tree_view" model="ir.ui.view">
+            <field name="name">shopify.catalog.list.view</field>
+            <field name="model">shopify.catalog.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Catalogs" create="false">
+                    <header>
+                        <button name="action_update_catalog_to_shopify" type="object" string="Sync to Shopify" icon="fa-cloud-upload" confirm="Are you sure you want to update catalog? This action directly reflect on Shopify."/>
+                    </header>
+                    <field name="title"/>
+                    <field name="catalog_type"/>
+                    <field name="status" widget="badge" decoration-info="status == 'DRAFT'" decoration-success="status == 'ACTIVE'"
+                           decoration-danger="status == 'ARCHIVED'"/>
+                    <field name="mk_instance_id"/>
+                    <field name="shopify_catalog_id" string="Catalog ID" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="shopify_catalog_search_view" model="ir.ui.view">
+            <field name="name">shopify.catalog.search.view</field>
+            <field name="model">shopify.catalog.ts</field>
+            <field name="arch" type="xml">
+                <search string="Catalogs">
+                    <field name="title"/>
+                    <field name="shopify_catalog_id" string="Catalog ID"/>
+                    <field name="mk_instance_id"/>
+                    <filter string="Market" name="filter_market" domain="[('catalog_type', '=', 'MARKET')]"/>
+                    <filter string="Company Location" name="filter_company_location" domain="[('catalog_type', '=', 'COMPANY_LOCATION')]"/>
+                    <filter string="App" name="filter_app" domain="[('catalog_type', '=', 'APP')]"/>
+                    <separator/>
+                    <filter string="Active" name="filter_active_status" domain="[('status', '=', 'ACTIVE')]"/>
+                    <filter string="Draft" name="filter_draft" domain="[('status', '=', 'DRAFT')]"/>
+                    <filter string="Archived" name="filter_archived_status" domain="[('status', '=', 'ARCHIVED'), ('active', '=', False)]"/>
+                    <separator/>
+                    <group>
+                        <filter string="Instance" name="group_by_instance" context="{'group_by': 'mk_instance_id'}"/>
+                        <filter string="Type" name="group_by_type" context="{'group_by': 'catalog_type'}"/>
+                        <filter string="Status" name="group_by_status" context="{'group_by': 'status'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_shopify_catalog" model="ir.actions.act_window">
+            <field name="name">Catalogs</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.catalog.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Shopify Catalogs imported yet.
+                </p>
+                <p>
+                    Run <b>Markets &amp; Catalogs &#8594; Import Catalogs</b> from the Shopify operation wizard.
+                </p>
+            </field>
+        </record>
+
+        <record id="action_shopify_catalog_dashboard_ts" model="ir.actions.act_window">
+            <field name="name">Catalogs</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.catalog.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('mk_instance_id', '=', active_id)]</field>
+        </record>
+
+        <record id="shopify_catalog_variant_price_form_view" model="ir.ui.view">
+            <field name="name">shopify.catalog.variant.price.form.view</field>
+            <field name="model">shopify.catalog.variant.price.ts</field>
+            <field name="arch" type="xml">
+                <form string="Variant Pricing &amp; Rules" create="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h2>
+                                <field name="mk_listing_item_id" readonly="1" options="{'no_open': False}"/>
+                            </h2>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="catalog_id" readonly="1"/>
+                                <field name="variant_shopify_id" readonly="1"/>
+                                <field name="currency_id" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="show_rule_shopify_button" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                            <group>
+                                <field name="origin_type" readonly="1" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="is_default" readonly="1" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                        </group>
+
+                        <separator string="Price"/>
+                        <group>
+                            <field name="price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            <field name="compare_at_price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                        </group>
+
+                        <separator string="Quantity Rules" invisible="not show_rule_shopify_button"/>
+                        <group invisible="not show_rule_shopify_button">
+                            <field name="increment"/>
+                            <field name="minimum_quantity"/>
+                            <field name="maximum_quantity"/>
+                        </group>
+
+                        <separator string="Volume Pricing" invisible="not show_rule_shopify_button"/>
+                        <field name="has_validation_error" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                        <div class="alert alert-danger" role="alert" invisible="not has_validation_error">
+                            <i class="fa fa-exclamation-circle" title="Validation Error"/>
+                            <strong> Error</strong>
+                            <div class="mt-1">
+                                <field name="validation_error_summary" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+                        <p class="text-muted" invisible="not show_rule_shopify_button">
+                            Tiered price breaks for this variant. Each tier applies when the customer buys at least the minimum quantity.
+                        </p>
+                        <field name="quantity_price_break_ids" invisible="not show_rule_shopify_button">
+                            <list editable="bottom" decoration-danger="is_invalid">
+                                <field name="is_invalid" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="minimum_quantity"/>
+                                <field name="currency_id" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            </list>
+                        </field>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_catalog_variant_price_rules_form_view" model="ir.ui.view">
+            <field name="name">shopify.catalog.variant.price.rules.form.view</field>
+            <field name="model">shopify.catalog.variant.price.ts</field>
+            <field name="arch" type="xml">
+                <form string="Edit quantity rules and volume pricing" create="false" class="o_form_dialog">
+                    <sheet>
+                        <field name="currency_id" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                        <field name="show_rule_shopify_button" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                        <field name="has_validation_error" invisible="1"/><!-- always invisible: technical field required by view logic -->
+
+                        <h5 class="mb-3">Quantity rules</h5>
+                        <div class="row mb-4">
+                            <div class="col">
+                                <label for="increment" class="o_form_label d-block mb-2">Increment</label>
+                                <field name="increment" nolabel="1"/>
+                            </div>
+                            <div class="col">
+                                <label for="minimum_quantity" class="o_form_label d-block mb-2">Minimum</label>
+                                <field name="minimum_quantity" nolabel="1"/>
+                            </div>
+                            <div class="col">
+                                <label for="maximum_quantity" class="o_form_label d-block mb-2">Maximum</label>
+                                <field name="maximum_quantity" nolabel="1"/>
+                            </div>
+                        </div>
+
+                        <h5 class="mb-3">Volume pricing</h5>
+                        <div class="alert alert-danger" role="alert" invisible="not has_validation_error">
+                            <i class="fa fa-exclamation-circle" title="Validation Error"/>
+                            <strong> Error</strong>
+                            <div class="mt-1">
+                                <field name="validation_error_summary" readonly="1" nolabel="1"/>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col"><strong>Quantity</strong></div>
+                            <div class="col"><strong>Price</strong></div>
+                        </div>
+                        <div class="row mb-2 align-items-center">
+                            <div class="col d-flex align-items-center">
+                                <span class="badge text-bg-light border me-2 py-2">Minimum</span>
+                                <field name="minimum_quantity" nolabel="1" readonly="1"/>
+                            </div>
+                            <div class="col">
+                                <field name="price" widget="monetary" nolabel="1" options="{'currency_field': 'currency_id'}"/>
+                            </div>
+                        </div>
+                        <field name="quantity_price_break_ids" nolabel="1">
+                            <list editable="bottom" decoration-danger="is_invalid">
+                                <field name="is_invalid" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="currency_id" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="break_label" string="Break" readonly="1"/>
+                                <field name="minimum_quantity" string="Quantity"/>
+                                <field name="price" string="Price" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                            </list>
+                        </field>
+                    </sheet>
+                    <footer>
+                        <button string="Done" special="save" class="btn-primary"/>
+                        <button string="Cancel" special="cancel" class="btn-secondary"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

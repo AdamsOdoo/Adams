@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="marketplace_sale_order_form_view" model="ir.ui.view">
+            <field name="name">marketplace.sale.order.form.view</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_order_form"/>
+            <field name="arch" type="xml">
+                <button name="action_cancel" position="after">
+                    <field name="shopify_financial_status" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                    <field name="shopify_force_refund" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                    <field name="show_mark_as_paid_button" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                    <button name="cancel_in_shopify" string="Cancel In Shopify" type="object" icon="fa-close" class="oe_highlight"
+                            groups="base_marketplace.group_base_marketplace"
+                            invisible="state != 'cancel' or canceled_in_marketplace or not mk_instance_id or marketplace != 'shopify' or fulfillment_status == 'fulfilled' "/>
+                    <button name="process_shopify_order_payment_status" string="Mark Order as Paid" type="object" icon="fa-check-circle" class="oe_highlight"
+                            confirm="Are you sure you want to mark order as paid in Shopify? This action directly reflect on Shopify."
+                            groups="base_marketplace.group_base_marketplace"
+                            invisible=" not show_mark_as_paid_button or state != 'sale' or not mk_instance_id or marketplace != 'shopify' or shopify_financial_status in ('PAID', 'REFUNDED', 'PARTIALLY_REFUNDED', 'VOIDED')"/>
+                </button>
+                <xpath expr="//div[@name='button_box']" position="after">
+                    <div name="marketplace" class="badge rounded-pill float-end fs-6 text-white"
+                         style="background-color: #95BF46; font-size: 1.08333333rem !important; border: 1px solid #95BF46 !important;"
+                         groups="base_marketplace.group_base_marketplace"
+                         invisible="marketplace != 'shopify'"><field name="marketplace" style="margin-bottom: auto;"/>
+                    </div>
+                </xpath>
+                <xpath expr="//div[@name='button_box']" position="inside">
+                    <button name="action_view_shopify_returns" type="object" class="oe_stat_button" icon="fa-undo"
+                            groups="base_marketplace.group_base_marketplace"
+                            invisible="marketplace != 'shopify' or shopify_return_count == 0">
+                        <field name="shopify_return_count" widget="statinfo" string="Shopify Returns"/>
+                    </button>
+                </xpath>
+                <field name="payment_term_id" position="after">
+                    <field name="shopify_fraud_analysis_status" decoration-success="shopify_fraud_analysis_status == 'accept'" decoration-danger="shopify_fraud_analysis_status == 'investigate'"
+                           invisible="marketplace != 'shopify'" style="font-weight:bold;" groups="base_marketplace.group_base_marketplace"/>
+                </field>
+            </field>
+        </record>
+
+        <record id="shopify_marketplace_sale_order_form_view" model="ir.ui.view">
+            <field name="name">shopify.marketplace.sale.order.form.view</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="base_marketplace.marketplace_sale_order_form_view"/>
+            <field name="arch" type="xml">
+                <field name="mk_order_number" position="after">
+                    <field name="shopify_order_source_name" readonly="1" invisible="marketplace != 'shopify'"/>
+                    <field name="is_pickup" readonly="1" invisible="marketplace != 'shopify'"/>
+                    <field name="pickup_status" invisible="marketplace != 'shopify' or not is_pickup" readonly="1"/>
+                    <field name="shopify_force_refund" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                </field>
+                <group name="sub_group1" position="inside">
+                    <field name="shopify_financial_status" string="Financial Status" readonly="1" invisible="marketplace != 'shopify'"/>
+                    <field name="fulfillment_status" readonly="1" invisible="marketplace != 'shopify'"/>
+                    <field name="shopify_payment_gateway_id" string="Payment Gateway" readonly="1" invisible="marketplace != 'shopify'"/>
+                </group>
+                <group name="main_group" position="after">
+                    <label for="fraud_analysis_ids" string="Fraud Analysis" readonly="1" invisible="fraud_analysis_ids in ['',[], False] or marketplace != 'shopify'"/>
+                    <field name="fraud_analysis_ids" widget="one2many" readonly="1" invisible="fraud_analysis_ids in ['',[], False] or marketplace != 'shopify'">
+                        <list>
+                            <field name="message"/>
+                            <field name="recommendation"/>
+                            <field name="risk_level"/>
+                            <field name="risk_source"/>
+                        </list>
+                    </field>
+                </group>
+            </field>
+        </record>
+
+        <record id="action_marketplace_fraud_orders" model="ir.actions.act_window">
+            <field name="name">Fraud Orders</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">sale.order</field>
+            <field name="view_mode">list,kanban,form,calendar,pivot,graph,activity</field>
+            <field name="search_view_id" ref="sale.sale_order_view_search_inherit_sale"/>
+            <field name="context">{}</field>
+            <field name="domain">[('marketplace', '=', 'shopify'), ('is_fraud_order', '=', True)]</field>
+        </record>
+
+        <record id="shopify_marketplace_sale_order_search_view_inherit" model="ir.ui.view">
+            <field name="name">shopify.marketplace.sale.order.search.view.inherit</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//filter[@name='my_sale_orders_filter']" position="after">
+                    <separator groups="base_marketplace.group_base_marketplace"/>
+                    <filter string="Local Pickup Orders" name="local_pickup_orders" domain="[('is_pickup','=',True)]" groups="base_marketplace.group_base_marketplace"/>
+                    <separator groups="base_marketplace.group_base_marketplace"/>
+                </xpath>
+            </field>
+        </record>
+
+        <record id="shopify_marketplace_sale_order_search_view_inherit_groupby" model="ir.ui.view">
+            <field name="name">shopify.marketplace.sale.order.search.view.inherit.groupby</field>
+            <field name="model">sale.order</field>
+            <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+            <field name="arch" type="xml">
+                <xpath expr="//group" position="inside">
+                    <filter name="shopify_order_source_name_groupby" string="Shopify Order Source" context="{'group_by': 'shopify_order_source_name'}" groups="base_marketplace.group_base_marketplace"/>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,85 @@
+// Shopify onboarding — styling for the inline API scope check (Confirm Permissions)
+// shown on the Review & Confirm step, and the Shopify toggle fix. Kept in the
+// Shopify module so no other marketplace is affected. Literal values are used so
+// this file does not depend on base_marketplace SCSS variables.
+
+// Inline API scope chips (missing = red, granted = green).
+// !important beats the base light-card blanket `span/div { color:#1a1a1a !important }`.
+.o_mk_onboarding_card.o_mk_edge_card_inner {
+    .o_mk_scope_chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 15px;
+        font-weight: 500;
+
+        &.is-missing {
+            background: #fef2f2;
+            color: #991b1b !important;
+            i { color: #991b1b !important; }
+        }
+
+        &.is-granted {
+            background: #ecfdf5;
+            color: #065f46 !important;
+            i { color: #065f46 !important; }
+        }
+    }
+}
+
+// "Ignore & Confirm" nav button — same blue + size as the primary slide buttons.
+.o_marketplace_onboarding.o_mk_edge .o_mk_edge_nav_pair .o_mk_nav_btn_ignore {
+    min-height: 64px;
+    height: 64px;
+    padding: 0 1.75rem;
+    border-radius: 16px;
+    background: #186ade;
+    color: #fff;
+    border: none;
+    font-size: 1.625rem;
+    font-weight: 500;
+
+    &:hover:not(:disabled) {
+        background: #1576d6;
+        color: #fff;
+    }
+}
+
+// Shopify toggles sit on the always-light inner card → force light-mode colors
+// even under Odoo dark mode (otherwise the switch knob is drawn light and becomes
+// invisible on the light card). Scoped to Shopify steps only.
+.o_mk_onboarding_card.o_mk_edge_card_inner [class*="o_mk_shopify_step"] {
+    .form-switch .form-check-input {
+        background-color: #fff;
+        border-color: rgba(0, 0, 0, 0.25);
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='rgba%280, 0, 0, 0.25%29'/%3e%3c/svg%3e");
+
+        &:checked {
+            background-color: #0066ff;
+            border-color: #0066ff;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+        }
+    }
+
+    // Native <select> dropdown: force light rendering so the option list is
+    // readable on the light card even when Odoo dark mode is active (otherwise
+    // the popup is drawn dark with dark text and becomes invisible).
+    .form-select {
+        color-scheme: light;
+
+        option {
+            background-color: #fff;
+            color: #1a1a1a;
+        }
+    }
+
+    // Checkboxes (e.g. "I have an API access token") — blue with a white checkmark
+    // when checked (Odoo dark mode otherwise draws a dark checkmark). The more
+    // specific `.form-switch .form-check-input:checked` rule above keeps its knob.
+    .form-check-input:checked {
+        background-color: #0066ff;
+        border-color: #0066ff;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+    }
+}

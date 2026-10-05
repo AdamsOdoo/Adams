@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!-- Return list -->
+        <record id="shopify_return_list_view" model="ir.ui.view">
+            <field name="name">shopify.return.ts.list</field>
+            <field name="model">shopify.return.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Returns"
+                      decoration-info="status == 'REQUESTED'"
+                      decoration-warning="status == 'OPEN'"
+                      decoration-success="status == 'CLOSED'"
+                      decoration-muted="status in ('DECLINED','CANCELED')"
+                      create="0">
+                    <field name="name" readonly="1"/>
+                    <field name="shopify_return_id"/>
+                    <field name="sale_order_id"/>
+                    <field name="status"/>
+                    <field name="total_quantity"/>
+                    <field name="picking_count"/>
+                    <field name="credit_note_count"/>
+                    <field name="last_imported_at"/>
+                    <field name="mk_instance_id"/>
+                </list>
+            </field>
+        </record>
+
+        <!-- Return form -->
+        <record id="shopify_return_form_view" model="ir.ui.view">
+            <field name="name">shopify.return.ts.form</field>
+            <field name="model">shopify.return.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Return" duplicate="0" create="0">
+                    <header>
+                        <button string="Approve Request" name="action_approve_shopify_return_request" type="object" class="oe_highlight"
+                                invisible="status != 'REQUESTED'" data-hotkey="a"/>
+                        <button string="Decline Request" name="action_decline_shopify_return_request" type="object"
+                                invisible="status != 'REQUESTED'" data-hotkey="d"/>
+                        <button string="Process and Close" name="action_open_shopify_return_process_wizard" type="object" class="oe_highlight"
+                                invisible="status != 'OPEN'" data-hotkey="p"/>
+                        <button string="Cancel Return" name="action_cancel" type="object" invisible="status != 'OPEN'"/>
+                        <button string="Resync from Shopify" name="action_resync_shopify_return_from_shopify" type="object"
+                                help="Refetch this return from Shopify and update local data."/>
+                        <button string="Force Restock" name="action_force_restock" type="object"
+                                class="btn-warning" icon="fa-exclamation-triangle"
+                                invisible="not is_restock_skipped_in_shopify"
+                                confirm="Shopify marked this return as not restocked. Are you sure the items were received back in your warehouse?"
+                                help="Use this option when the return was processed in Shopify without restocking inventory and you need to restock the items in Odoo."/>
+
+                        <field name="status" widget="statusbar" statusbar_visible="REQUESTED,OPEN,CLOSED"/>
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box">
+                            <button name="action_view_pickings" type="object" class="oe_stat_button" icon="fa-truck"
+                                    invisible="picking_count == 0">
+                                <field name="picking_count" widget="statinfo" string="Pickings"/>
+                            </button>
+                            <button name="action_view_return_moves" type="object" class="oe_stat_button" icon="fa-exchange"
+                                    invisible="return_move_count == 0">
+                                <field name="return_move_count" widget="statinfo" string="Return Moves"/>
+                            </button>
+                            <button name="action_view_credit_notes" type="object" class="oe_stat_button" icon="fa-money"
+                                    invisible="credit_note_count == 0">
+                                <field name="credit_note_count" widget="statinfo" string="Credit Notes"/>
+                            </button>
+                        </div>
+                        <div class="oe_title">
+                            <label for="name" class="oe_edit_only" string="Return Name"/>
+                            <h1><field name="name" placeholder="Return Name" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="shopify_return_id" readonly="1"/>
+                                <field name="mk_instance_id" readonly="1"/>
+                                <field name="sale_order_id" readonly="1"/>
+                                <field name="company_id" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="is_restock_skipped_in_shopify" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                            <group>
+                                <field name="restock_shopify_location_id" options="{'no_create': True, 'no_create_edit': True}" readonly="status not in ('REQUESTED', 'OPEN')"/>
+                                <field name="total_quantity" readonly="1"/>
+                                <field name="last_imported_at" readonly="1"/>
+                                <field name="decline_reason" readonly="1" invisible="not decline_reason"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Lines" name="lines">
+                                <field name="return_line_ids" readonly="1">
+                                    <list>
+                                        <field name="title"/>
+                                        <field name="sku"/>
+                                        <field name="quantity"/>
+                                        <field name="refundable_quantity"/>
+                                        <field name="refunded_quantity"/>
+                                        <field name="return_reason_definition_id" optional="hide" options="{'no_create': True, 'no_open': True}"/>
+                                        <field name="return_reason_note" optional="hide"/>
+                                        <field name="sale_order_line_id" optional="hide"/>
+                                        <field name="product_id" optional="show"/>
+                                    </list>
+                                </field>
+                            </page>
+                            <page string="Decline Note" name="decline_note" invisible="not decline_note">
+                                <field name="decline_note" readonly="1"/>
+                            </page>
+                            <page string="Raw Payload" name="payload" groups="base.group_no_one">
+                                <field name="shopify_payload_json" readonly="1" widget="text"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                    <chatter/>
+                </form>
+            </field>
+        </record>
+
+        <!-- Return search -->
+        <record id="shopify_return_search_view" model="ir.ui.view">
+            <field name="name">shopify.return.ts.search</field>
+            <field name="model">shopify.return.ts</field>
+            <field name="arch" type="xml">
+                <search string="Shopify Returns">
+                    <field name="name"/>
+                    <field name="shopify_return_id"/>
+                    <field name="sale_order_id"/>
+                    <field name="mk_instance_id"/>
+                    <separator/>
+                    <filter string="Requested" name="filter_requested" domain="[('status', '=', 'REQUESTED')]"/>
+                    <filter string="Open" name="filter_open" domain="[('status', '=', 'OPEN')]"/>
+                    <filter string="Closed" name="filter_closed" domain="[('status', '=', 'CLOSED')]"/>
+                    <filter string="Declined" name="filter_declined" domain="[('status', '=', 'DECLINED')]"/>
+                    <filter string="Canceled" name="filter_canceled" domain="[('status', '=', 'CANCELED')]"/>
+                    <group>
+                        <filter string="Status" name="group_status" context="{'group_by': 'status'}"/>
+                        <filter string="Instance" name="group_instance" context="{'group_by': 'mk_instance_id'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                        <field name="status" icon="fa-flag" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <!-- Return line form -->
+        <record id="shopify_return_line_form_view" model="ir.ui.view">
+            <field name="name">shopify.return.line.ts.form</field>
+            <field name="model">shopify.return.line.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Return Line" create="0" edit="0">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1><field name="title" readonly="1"/></h1>
+                        </div>
+                        <group>
+                            <group string="Product">
+                                <field name="sku" readonly="1"/>
+                                <field name="product_id" readonly="1"/>
+                            </group>
+                            <group string="Quantities">
+                                <field name="quantity" readonly="1"/>
+                                <field name="refundable_quantity" readonly="1"/>
+                                <field name="refunded_quantity" readonly="1"/>
+                            </group>
+                        </group>
+                        <group string="Return">
+                            <field name="return_id" readonly="1"/>
+                            <field name="sale_order_id" readonly="1"/>
+                            <field name="return_reason_definition_id" readonly="1"
+                                   options="{'no_create': True, 'no_open': True}"/>
+                            <field name="return_reason_note" readonly="1"
+                                   invisible="not return_reason_note"/>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <!-- Return kanban -->
+        <record id="shopify_return_kanban_view" model="ir.ui.view">
+            <field name="name">shopify.return.ts.kanban</field>
+            <field name="model">shopify.return.ts</field>
+            <field name="arch" type="xml">
+                <kanban default_group_by="status" group_create="false" group_delete="false" class="o_kanban_small_column">
+                    <field name="name"/>
+                    <field name="shopify_return_id"/>
+                    <field name="sale_order_id"/>
+                    <field name="status"/>
+                    <field name="total_quantity"/>
+                    <field name="picking_count"/>
+                    <field name="credit_note_count"/>
+                    <field name="mk_instance_id"/>
+                    <templates>
+                        <t t-name="card">
+                            <div class="card oe_kanban_global_click p-2">
+                                <div class="d-flex justify-content-between">
+                                    <strong>
+                                        <field name="name"/>
+                                    </strong>
+                                    <span class="text-muted">
+                                        <field name="sale_order_id"/>
+                                    </span>
+                                </div>
+                                <div class="mt-2">
+                                    <div>Qty: <field name="total_quantity"/></div>
+                                    <div t-if="record.picking_count.raw_value">Pickings: <field name="picking_count"/></div>
+                                    <div t-if="record.credit_note_count.raw_value">Credits: <field name="credit_note_count"/></div>
+                                </div>
+                                <div class="mt-2 text-muted small">
+                                    <field name="mk_instance_id"/>
+                                </div>
+                            </div>
+                        </t>
+                    </templates>
+                </kanban>
+            </field>
+        </record>
+
+        <!-- Return action -->
+        <record id="action_shopify_return" model="ir.actions.act_window">
+            <field name="name">Shopify Returns</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.return.ts</field>
+            <field name="view_mode">list,kanban,form</field>
+            <field name="search_view_id" ref="shopify_return_search_view"/>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Shopify returns yet.
+                </p><p>
+                    Returns appear here automatically once <i>Import Returns</i> runs or a RETURNS_* webhook fires.
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Task: T8887 - "1 of 3 variants" on a Collection Items card; opens the variants dropdown. -->
+    <t t-name="shopify.CollectionItemVariants">
+        <a t-if="summary" href="#" class="small text-muted ts_collection_item_variants" t-on-click.prevent.stop="toggle">
+            <t t-esc="summary"/> <i t-attf-class="fa fa-angle-{{ state.open ? 'up' : 'down' }}"/>
+        </a>
+    </t>
+
+    <t t-name="shopify.CollectionItemVariantsPopover">
+        <div class="ts_collection_item_variants_popover p-2">
+            <div class="d-flex align-items-center gap-2 pb-2 border-bottom">
+                <img t-att-src="props.imageSrc" alt="" class="ts_collection_item_variants_image rounded border"/>
+                <div class="flex-grow-1">
+                    <div class="fw-bold" t-esc="props.name"/>
+                    <div class="small text-muted" t-esc="props.summary"/>
+                </div>
+                <button type="button" class="btn btn-link text-muted p-0" title="Close" t-on-click="props.close">
+                    <i class="fa fa-times"/>
+                </button>
+            </div>
+            <div class="ts_collection_item_variants_list d-flex flex-wrap gap-1 pt-2">
+                <span t-foreach="props.variants" t-as="variant" t-key="variant.id"
+                      class="badge rounded-pill text-bg-light border" t-esc="variant.name"/>
+            </div>
+        </div>
+    </t>
+
+</templates>
