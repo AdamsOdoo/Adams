@@ -1,6 +1,6 @@
 {
     "name": "Odoo Shopify Connector",
-    "version": "1.2.8",
+    "version": "1.2.9",
     "category": "eCommerce",
     "summary": """Integrate and manage your Shopify marketplace directly from Odoo using the TeqStars Shopify Odoo Connector and Shopify Odoo Marketplace Integration solution. This Odoo Shopify Integration and Shopify Integration Odoo module helps automate product sync, order management, inventory updates, shipping workflows, and financial reconciliation. Shopify TeqStars integration provides a fast, reliable, and scalable marketplace automation solution for Odoo.
                   Connect Shopify with Odoo — the Odoo Shopify Connector and Shopify Integration for Odoo, with product sync, order import and stock updates, built on TeqStars Base Marketplace, the shared core behind every TeqStars marketplace connector.""",
