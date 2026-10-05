@@ -361,7 +361,9 @@ class ExecutiveDashboard(models.AbstractModel):
                       key=lambda row: (-row['balance'], row['code']))
         # One check of the account's native screen (the same report for every account).
         first = next((row for row in rows if row['can_open']), None)
-        if first and not self._target({'key': 'finance.account', 'args': {'account_id': first['id']}}):
+        # Key metrics reuses this list under its own key (it opens with Finance hidden).
+        key = self.env.context.get('ed_account_key', 'finance.account')
+        if first and not self._target({'key': key, 'args': {'account_id': first['id']}}):
             for row in rows:
                 row['can_open'] = False
         return {'rows': rows, 'total': sum(balances.values()), 'source': source,

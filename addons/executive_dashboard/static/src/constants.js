@@ -6,6 +6,11 @@ import { _t } from "@web/core/l10n/translation";
 export function sectionInfo() {
     return {
         welcome: { key: "welcome", name: _t("Welcome") },
+        key_metrics: {
+            key: "key_metrics", name: _t("Key metrics"),
+            description: _t("Net sales by channel, gross profit %, working capital, OTIF and ROAS"),
+            chips: [_t("Net sales by channel"), _t("Gross profit %"), _t("Working capital"), _t("OTIF"), _t("ROAS")],
+        },
         finance: {
             key: "finance", name: _t("Finance"),
             description: _t("Revenue, profit, bank & cash, receivables and payables"),

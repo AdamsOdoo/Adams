@@ -1,6 +1,0 @@
-<odoo>
-    <record id="group_dashboard_user" model="res.groups">
-        <field name="name">Executive Dashboard</field>
-        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-    </record>
-</odoo>

@@ -5,7 +5,9 @@ description: Review an Odoo 19 change (a diff, branch or pull request) for defec
 
 # Odoo change review
 
-Review the change, not the whole codebase. Get the diff (`git diff <base>...HEAD`, plus uncommitted changes), the acceptance criteria, and the result records (`.odoo-harness/oh evidence`). Confirm a suspicion before reporting it: read the surrounding code, check standard behaviour with `.odoo-harness/oh src`, and run `.odoo-harness/oh test <module> --no-record` or a single test when that settles the question. Don't edit the code, the tests or the evidence records; report what should change.
+Review the change, not the whole codebase. Get the diff (`git diff <base>...HEAD`, plus uncommitted changes), the acceptance criteria, and the result records (`.odoo-harness/oh evidence`). Start with `.odoo-harness/oh check <module>`: what it reports as a problem or warning needs no further confirmation; its `lint:` lines (pylint-odoo) are leads to read, not findings by themselves. Confirm a suspicion before reporting it: read the surrounding code, check standard behaviour with `.odoo-harness/oh src`, and run `.odoo-harness/oh test <module> --no-record` or a single test when that settles the question. Don't edit the code, the tests or the evidence records; report what should change.
+
+A **re-review** (you were given the commit of an earlier review and its findings) covers only `git diff <that commit>...HEAD` plus uncommitted changes: say for each earlier finding whether it is fixed, and look for defects the fixes introduced. Don't re-review the rest; a blocking finding needs a re-review, nits don't.
 
 ## What to look for (most costly first)
 
@@ -24,4 +26,4 @@ Review the change, not the whole codebase. Get the diff (`git diff <base>...HEAD
 
 Start with one line that binds the review to what you reviewed: `Reviewed <branch>@<commit> (+uncommitted changes, if any) digest <candidate digest from oh evidence> · <independent review, read-only enforced | independent review, read-only not enforced | self-review> · evidence: <record>: <status>, <intact and matching the commit | stale | problem | missing>`. Run `oh evidence` again at the end: if the candidate digest changed during the review, say so in that line, because the review no longer describes one fixed candidate.
 
-Then findings only, most severe first. For each: `file:line`, what goes wrong in a concrete scenario, and the smallest fix. Then list the acceptance criteria that no test demonstrates, and any result record that is missing, stale or **not verified**. Don't include style preferences unless they cause defects. If nothing is wrong, say so in one line after the first line.
+Then findings only, most severe first, each labelled **blocking** (wrong behaviour, security, data safety: needs a fix and a re-review), **should fix** (fix before delivery, no re-review) or **nit**. For each: `file:line`, what goes wrong in a concrete scenario, and the smallest fix. Then list the acceptance criteria that no test demonstrates, and any result record that is missing, stale or **not verified**. Don't include style preferences unless they cause defects. If nothing is wrong, say so in one line after the first line.

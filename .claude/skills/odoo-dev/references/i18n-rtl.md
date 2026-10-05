@@ -12,11 +12,11 @@ The project languages are in `.odoo-harness/project.json` (default `en_US` and `
 ## Producing `ar.po`
 
 1. `oh test my_module --keep` (after your last code change, so the database knows every new term).
-2. `oh i18n my_module` regenerates `my_module/i18n/ar.po`, keeping existing translations, and prints how many entries are still untranslated. `--pot` also writes the template. It runs Odoo's `odoo-bin i18n export`.
+2. `oh i18n my_module` regenerates `my_module/i18n/ar.po` and prints how many entries are still untranslated. `--pot` also writes the template. It runs Odoo's `odoo-bin i18n export`, whose output drops the translations of Python terms, so `oh i18n` restores every translation the previous file had for an unchanged term and says how many it kept.
 3. Fill in every empty `msgstr`. For standard concepts, reuse the wording of Odoo's own Arabic translation of the related module: it's the `i18n/ar.po` file under the path printed by `oh src --where <module>`. Use the customer's glossary where one exists.
 4. Re-run `oh test`, then check the Arabic screenshots.
 
-Untranslated terms show up in English on Arabic screens; check the `oh shot` images for them.
+Untranslated terms show up in English on Arabic screens; check the `oh shot` images for them. Test databases (local and Odoo.sh) have only English: a test about Arabic text activates the language itself (`testing.md`).
 
 ## Right-to-left layout
 
