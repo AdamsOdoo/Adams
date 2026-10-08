@@ -73,7 +73,9 @@
       "Bash(git branch:*)",
       "Bash(git fetch:*)",
       "Bash(.odoo-harness/oh deps:*)",
-      "Bash(python3 .odoo-harness/oh deps:*)"
+      "Bash(python3 .odoo-harness/oh deps:*)",
+      "Bash(.odoo-harness/oh status:*)",
+      "Bash(python3 .odoo-harness/oh status:*)"
     ]
   }
 }

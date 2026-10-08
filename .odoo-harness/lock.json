@@ -1,22 +1,23 @@
 {
   "harness": {
-    "version": "1.3.3",
-    "commit": "f6af65e1d2e9207528cf9ecd9c8d1fc15bf3aa1c",
+    "version": "1.4.0",
+    "commit": "256dd4ee75711da0d7761227ea8074022f1f370f",
     "dirty": false,
     "repository": "https://github.com/MostafaEssamm12/Odoo.git",
     "branch": "main"
   },
   "files": {
-    ".agents/skills/odoo-dev/SKILL.md": "5f9341d2ceccf79d535f26f6711526da0c4c74ac4291cc36e09f98e0b62f85c8",
+    ".agents/skills/odoo-dev/SKILL.md": "a105bb67ea11c9512c3bd6227bc72921f54e91a5b81e43ece34858916342e261",
     ".agents/skills/odoo-dev/assets/feature.md": "65fefb98176d144d6eb7fc352a62fd0ac75a447b4a73d1fd3d0815c867da6b17",
     ".agents/skills/odoo-dev/references/data-migrations.md": "eae95052ef432b0e7770d306f39b91513fad5418f45d48f7b80e4b26b7f5d4e3",
+    ".agents/skills/odoo-dev/references/delivery.md": "7e59d7218745de73148b7917fd97fbbbbdfa034f261df3e6f0412b201aaa5713",
     ".agents/skills/odoo-dev/references/design.md": "3bc0ceeafbf5665f0a6f0fb2f0d2c84a402f830db797cbdeb3c5645798631612",
     ".agents/skills/odoo-dev/references/i18n-rtl.md": "9e2107ac128c35a02cedb6018db89c34418e69705bbf0819137df74fba71c8e0",
     ".agents/skills/odoo-dev/references/odoo-sh.md": "8fc9694e72d611a306484ff41a9388a0525c967f31df09ccde06d16363dc5581",
     ".agents/skills/odoo-dev/references/odoo19.md": "9bc2ce0e5cdbd5f946ba6f8594c9175dc5bb7818af5e1dac2eb4e7d3262c3073",
     ".agents/skills/odoo-dev/references/reports.md": "ed94ef75cadc62448a068db33e6d1989693e06baabbdedf905d8423a1137de9e",
     ".agents/skills/odoo-dev/references/security.md": "5d0a79597839937c478c55fb5a85262be9cc233f5c0d074728049f5eebc2d471",
-    ".agents/skills/odoo-dev/references/testing.md": "c8dc468bcb6ede5e241f27121f9915f9aaa52084197a4197220e27912d94519e",
+    ".agents/skills/odoo-dev/references/testing.md": "bdc2a600e9477b8ce8ac7724a6a55e092124ab15f266d4374278e6c4cc9cac71",
     ".agents/skills/odoo-dev/references/views-ui.md": "183098f73084564edb5966fca94125d0fb0adf29166d2857b5ca3628fb454005",
     ".agents/skills/odoo-review/SKILL.md": "ae4df954f4b3b3d6d6f3f952b50aa2c688d80d4044443d63dde0cdc101c46ad3",
     ".claude/agents/odoo-reviewer.md": "e2aee064b55583919679d4af788d3a1e985833c03ee78b1ba2332f2838ee47a7",
@@ -24,22 +25,23 @@
     ".claude/rules/odoo-i18n.md": "9a015d86a32260d98ec071ef838679cfd70b761c60e0bb605493db9a6bb10e7c",
     ".claude/rules/odoo-migrations.md": "4f4fdbfee47a8e1c8d75ba2efacad6b73fa0b85900ce180a5d4be9667d005aeb",
     ".claude/rules/odoo-security.md": "2d5b477932763609674a60aa03310d62e03ec1a96f52e8e5ae23f4289f87a494",
-    ".claude/skills/odoo-dev/SKILL.md": "5f9341d2ceccf79d535f26f6711526da0c4c74ac4291cc36e09f98e0b62f85c8",
+    ".claude/skills/odoo-dev/SKILL.md": "a105bb67ea11c9512c3bd6227bc72921f54e91a5b81e43ece34858916342e261",
     ".claude/skills/odoo-dev/assets/feature.md": "65fefb98176d144d6eb7fc352a62fd0ac75a447b4a73d1fd3d0815c867da6b17",
     ".claude/skills/odoo-dev/references/data-migrations.md": "eae95052ef432b0e7770d306f39b91513fad5418f45d48f7b80e4b26b7f5d4e3",
+    ".claude/skills/odoo-dev/references/delivery.md": "7e59d7218745de73148b7917fd97fbbbbdfa034f261df3e6f0412b201aaa5713",
     ".claude/skills/odoo-dev/references/design.md": "3bc0ceeafbf5665f0a6f0fb2f0d2c84a402f830db797cbdeb3c5645798631612",
     ".claude/skills/odoo-dev/references/i18n-rtl.md": "9e2107ac128c35a02cedb6018db89c34418e69705bbf0819137df74fba71c8e0",
     ".claude/skills/odoo-dev/references/odoo-sh.md": "8fc9694e72d611a306484ff41a9388a0525c967f31df09ccde06d16363dc5581",
     ".claude/skills/odoo-dev/references/odoo19.md": "9bc2ce0e5cdbd5f946ba6f8594c9175dc5bb7818af5e1dac2eb4e7d3262c3073",
     ".claude/skills/odoo-dev/references/reports.md": "ed94ef75cadc62448a068db33e6d1989693e06baabbdedf905d8423a1137de9e",
     ".claude/skills/odoo-dev/references/security.md": "5d0a79597839937c478c55fb5a85262be9cc233f5c0d074728049f5eebc2d471",
-    ".claude/skills/odoo-dev/references/testing.md": "c8dc468bcb6ede5e241f27121f9915f9aaa52084197a4197220e27912d94519e",
+    ".claude/skills/odoo-dev/references/testing.md": "bdc2a600e9477b8ce8ac7724a6a55e092124ab15f266d4374278e6c4cc9cac71",
     ".claude/skills/odoo-dev/references/views-ui.md": "183098f73084564edb5966fca94125d0fb0adf29166d2857b5ca3628fb454005",
     ".claude/skills/odoo-review/SKILL.md": "ae4df954f4b3b3d6d6f3f952b50aa2c688d80d4044443d63dde0cdc101c46ad3",
-    ".odoo-harness/guard.py": "e5fb538ae537bf20c66404e12b4c9abc964f78c9bb86bde4b795f7d617c64a43",
-    ".odoo-harness/oh": "60c3ed3ea10fdffea99bfeb2fa7fb4236bb96633bed91f535fa96528a57339c7"
+    ".odoo-harness/guard.py": "4039266e5947cc45dc4bcc51af637ed2305461cb2f3625d12ab26a1a3ba6193c",
+    ".odoo-harness/oh": "3f79a8407262f186e330545cff9bdee693d0c25f5c07824af4e4e3cf75c3dc5e"
   },
-  "block": "8069c998fbe6eefcf589d67a16d5b9e4f94c0468a8b1956fc96f74c0fce218d1",
+  "block": "d31cd479f530f86f65905e7973a3fd6a5ee587bfe7eb70506eddea8a0fcf39e4",
   "hooks": [
     {
       "event": "PreToolUse",
@@ -102,6 +104,8 @@
     "Bash(git branch:*)",
     "Bash(git fetch:*)",
     "Bash(.odoo-harness/oh deps:*)",
-    "Bash(python3 .odoo-harness/oh deps:*)"
+    "Bash(python3 .odoo-harness/oh deps:*)",
+    "Bash(.odoo-harness/oh status:*)",
+    "Bash(python3 .odoo-harness/oh status:*)"
   ]
 }

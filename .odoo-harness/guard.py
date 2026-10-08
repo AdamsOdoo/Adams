@@ -364,6 +364,29 @@ def unquoted(command):
     return re.sub(r'"(?:[^"\\]|\\.)*"', lambda m: m.group(0) if re.search(r"\$\(|`|\$\{", m.group(0)) else " ", text)
 
 
+HANDOFF_LINES, HANDOFF_BYTES = 45, 4096  # as in oh (doctor reports the same limits)
+
+
+def long_handoffs(cwd, dirty, unpushed):
+    """Handoff files (.odoo-harness/HANDOFF.md, any handoff.md) changed in the working tree, in commits not on the
+    remote yet or in the last commit, that are over the limits: a handoff that has grown into a status board."""
+    names = {re.sub(r"^\S{1,2}\s+", "", line.strip()).split(" -> ")[-1].strip('"') for line in dirty}
+    for rng in filter(None, [unpushed, "HEAD~1..HEAD"]):
+        names.update(ask_git(cwd, "diff", "--name-only", rng).splitlines())
+    top = ask_git(cwd, "rev-parse", "--show-toplevel") or cwd
+    long = []
+    for name in sorted(names):
+        if Path(name).name.lower() != "handoff.md":
+            continue
+        try:
+            data = (Path(top) / name).read_bytes()
+        except OSError:
+            continue  # deleted
+        if len(data) > HANDOFF_BYTES or len(data.splitlines()) > HANDOFF_LINES:
+            long.append(f"{name} ({len(data.splitlines())} lines, {len(data)} bytes)")
+    return long
+
+
 def stop_check(event):
     """Stop hook: a stop with unsaved work is held once per session and state of that work, so the agent commits or
     hands over (or says why it is leaving the tree as it is). The next stop with the same unsaved work goes
@@ -380,6 +403,10 @@ def stop_check(event):
         remote = "origin/" + branch  # pushed before, without tracking
     ahead = ask_git(cwd, "rev-list", "--count", f"{remote}..HEAD") if remote else ""
     reasons = []
+    long = long_handoffs(cwd, dirty, f"{remote}..HEAD" if remote else "")
+    if long:
+        reasons.append("handoff over 45 lines or 4096 bytes: " + ", ".join(long) + " (keep the active track and the "
+                       "next action; finished work belongs in the status file and the feature notes)")
     if dirty:
         reasons.append(f"{len(dirty)} uncommitted change(s) (e.g. {dirty[0][3:]})")
     if remote and ahead not in ("", "0"):
@@ -388,7 +415,7 @@ def stop_check(event):
         reasons.append(f"branch {branch} has never been pushed")
     if not reasons:
         return None
-    state = hashlib.sha256("\n".join([branch, ahead, *sorted(dirty)]).encode()).hexdigest()[:16]
+    state = hashlib.sha256("\n".join([branch, ahead, *sorted(dirty), *long]).encode()).hexdigest()[:16]
     session = re.sub(r"[^A-Za-z0-9._-]", "_", str(event.get("session_id") or "session"))
     marker = Path(os.environ.get("OH_CACHE") or Path.home() / ".cache" / "odoo-harness") / "stops" / session
     try:
@@ -399,8 +426,8 @@ def stop_check(event):
     except OSError:
         pass
     return ("the session is stopping with unsaved work: " + "; ".join(reasons) + ". Hand over (odoo-dev §7): "
-            "commit the work with its evidence and HANDOFF.md and push the branch, or say in one line why it "
-            "stays uncommitted, then stop again.")
+            "shorten the handoff if it is too long, commit the work with its evidence and the handoff and push the "
+            "branch, or say in one line why it stays as it is, then stop again.")
 
 
 def check_mcp(tool, tool_input, protected, scope=None):
