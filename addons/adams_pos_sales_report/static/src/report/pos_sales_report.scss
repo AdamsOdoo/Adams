@@ -1,54 +1,30 @@
-// POS Sales Report PDF (report assets: mirrored for right-to-left languages by rtlcss).
+// POS Sales Report PDF. Fonts, colours and table headers come from the company's
+// document layout; only spacing and the group rows are set here.
+// Report assets are mirrored for right-to-left languages by rtlcss.
 .o_psr {
-    font-size: 11px;
-
-    .o_psr_head h3 {
-        margin-bottom: 6px;
+    .o_psr_kpis .col {
+        border-left: 1px solid rgba(0, 0, 0, 0.15);
+        .o_psr_kpi_label {
+            font-size: 0.8em;
+            opacity: 0.75;
+        }
+        strong {
+            white-space: nowrap;
+        }
     }
-    .o_psr_meta,
-    .o_psr_kpis {
-        width: 100%;
-        margin-bottom: 10px;
-        border-collapse: collapse;
-    }
-    .o_psr_meta td {
-        vertical-align: top;
-        padding: 0 16px 0 0;
-        width: 33%;
-    }
-    .o_psr_meta small,
-    .o_psr_kpis small {
-        display: block;
-        color: #666c74;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-size: 8.5px;
-    }
-    .o_psr_kpis td {
-        border: 1px solid #cfd3d8;
-        padding: 4px 6px;
-        width: 12.5%;
-    }
-    .o_psr_kpis b {
-        font-size: 12.5px;
+    .o_psr_kpis .col:first-child {
+        border-left: 0;
     }
     .o_psr_table {
-        th {
-            font-size: 9px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            border-bottom: 1px solid #1d1d1f;
-        }
-        td {
-            padding-top: 2px;
-            padding-bottom: 2px;
+        font-size: 0.9em;
+        tbody td {
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         }
         tr.o_psr_group td {
             font-weight: bold;
         }
         tr.o_psr_level_0 td {
-            background-color: #f2eef1;
-            border-top: 1px solid #cfd3d8;
+            background-color: rgba(0, 0, 0, 0.05);
         }
         tr.o_psr_level_1 td:first-child {
             padding-left: 16px;
@@ -56,16 +32,26 @@
         tr.o_psr_level_2 td:first-child {
             padding-left: 28px;
         }
+        tr.o_psr_level_3 td:first-child {
+            padding-left: 40px;
+        }
         tr.o_psr_line td:first-child {
             padding-left: 22px;
         }
     }
+    .o_psr_label {
+        unicode-bidi: embed;
+    }
     .o_psr_count {
         font-weight: normal;
-        color: #666c74;
+        opacity: 0.7;
+        // Keep "(4)" intact after a Latin name in Arabic documents.
+        unicode-bidi: embed;
+        /*rtl:ignore*/
+        direction: ltr;
     }
     tr.o_psr_total td {
-        border-top: 2px solid #1d1d1f;
+        border-top: 1px solid currentColor;
         font-weight: bold;
     }
     .o_psr_negative,
@@ -73,17 +59,14 @@
         color: #b42318;
     }
     .o_psr_refund_tag {
-        font-size: 9px;
+        font-size: 0.8em;
         margin-left: 4px;
     }
-    .o_psr_lower h6 {
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-size: 9.5px;
-        margin-top: 8px;
+    .o_psr_lower table {
+        font-size: 0.9em;
     }
     .o_psr_note {
-        color: #666c74;
-        font-size: 9.5px;
+        font-size: 0.8em;
+        opacity: 0.75;
     }
 }

@@ -1,6 +1,6 @@
 {
     'name': 'POS Sales Report',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.0.1',
     'summary': 'Point of Sale sales by employee, product, session or date, printed as shown on screen',
     'category': 'Sales/Point of Sale',
     'author': 'Adams',

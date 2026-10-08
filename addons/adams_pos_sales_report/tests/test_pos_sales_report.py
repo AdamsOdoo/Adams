@@ -206,6 +206,11 @@ class TestPosSalesReport(TestPoSCommon):
         html = html.decode()
         for text in ('POS Sales Report', 'Sara Cashier', 'Order Date: October 2026', 'Grand total', self.bank_pm1.name):
             self.assertIn(text, html)
+        # Landscape on the company's own paper format and document layout, also after an update.
+        report = self.env.ref('adams_pos_sales_report.action_report_pos_sales')
+        self.assertFalse(report.paperformat_id)
+        self.assertEqual(report.get_paperformat(), self.env.company.paperformat_id or self.env.ref('base.paperformat_euro'))
+        self.assertIn('data-report-landscape', html)
 
 
 @tagged('post_install', '-at_install')
