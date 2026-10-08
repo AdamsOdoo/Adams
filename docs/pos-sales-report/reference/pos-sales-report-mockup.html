@@ -1,0 +1,507 @@
+<title>POS Sales Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Noto+Sans+Arabic:wght@400;600;700&family=Roboto:wght@400;500;700&display=swap">
+<style>
+/* Layout: a page about the mockup, holding two exhibits - the Odoo 19 screen (backend look) and the printed A4 landscape sheet that follows it. */
+:root{
+  --bg:#f3f1f4; --fg:#212529; --muted:#6c727a; --line:#dee2e6; --line-soft:#eceef0;
+  --surface:#ffffff; --surface-2:#f8f9fa; --group:#f1f2f4; --group-2:#f7f8f9;
+  --brand:#714b67; --brand-ink:#ffffff; --link:#017e84; --chip:#e9ecef; --chip-fg:#374151;
+  --facet:#e7f3f3; --facet-fg:#01585c; --neg:#c0392b; --pos:#1e7d4f; --warn:#9a6700;
+  --paper:#ffffff; --paper-fg:#1d1d1f; --paper-line:#cfd3d8; --paper-band:#f2eef1; --paper-muted:#666c74;
+  --shadow:0 1px 2px rgba(30,20,40,.06),0 8px 24px rgba(30,20,40,.08);
+  --ui:"Roboto",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  --print:"Lato","Helvetica Neue",Arial,sans-serif;
+  --ar:"Noto Sans Arabic","Segoe UI",Tahoma,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1b1d22; --fg:#e4e6ea; --muted:#9aa1ab; --line:#3a3f47; --line-soft:#30343b;
+  --surface:#262a30; --surface-2:#2c3037; --group:#30353c; --group-2:#2b2f35;
+  --brand:#a07a97; --brand-ink:#1b1d22; --link:#4cc2c7; --chip:#3a3f47; --chip-fg:#dfe3e8;
+  --facet:#21403f; --facet-fg:#9fe0e2; --neg:#ff8a7a; --pos:#6fd39f; --warn:#e3b341;
+  --paper:#f7f7f5; --paper-fg:#1d1d1f; --paper-line:#cfd3d8; --paper-band:#efe9ee; --paper-muted:#5d636b;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b1d22; --fg:#e4e6ea; --muted:#9aa1ab; --line:#3a3f47; --line-soft:#30343b;
+  --surface:#262a30; --surface-2:#2c3037; --group:#30353c; --group-2:#2b2f35;
+  --brand:#a07a97; --brand-ink:#1b1d22; --link:#4cc2c7; --chip:#3a3f47; --chip-fg:#dfe3e8;
+  --facet:#21403f; --facet-fg:#9fe0e2; --neg:#ff8a7a; --pos:#6fd39f; --warn:#e3b341;
+  --paper:#f7f7f5; --paper-fg:#1d1d1f; --paper-line:#cfd3d8; --paper-band:#efe9ee; --paper-muted:#5d636b;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--ui);padding-inline:16px;padding-block:20px 48px}
+[dir=rtl] body, body[dir=rtl]{font-family:var(--ar)}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:28px}
+h1,h2,h3{text-wrap:balance;margin:0}
+.num{font-variant-numeric:tabular-nums;text-align:end;white-space:nowrap}
+button{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,label:focus-within{outline:2px solid var(--link);outline-offset:2px}
+
+/* page header */
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+.top h1{font-size:26px;font-weight:700;letter-spacing:-.01em}
+.top p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.tag{display:inline-block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--brand);color:var(--brand-ink)}
+.exhibit{display:grid;gap:10px;min-width:0}
+.exhibit>header{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.exhibit>header h2{font-size:17px}
+.exhibit>header span{color:var(--muted)}
+
+/* ---- Odoo screen ---- */
+.scroll{overflow-x:auto;border-radius:8px;box-shadow:var(--shadow)}
+.odoo{min-width:980px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.nav{display:flex;align-items:center;gap:18px;background:var(--brand);color:var(--brand-ink);padding:0 14px;height:44px}
+.nav b{font-size:15px}
+.nav span{opacity:.85}
+.nav .sp{flex:1}
+.cp{display:grid;grid-template-columns:auto 1fr auto;gap:10px 16px;align-items:center;padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.crumb{display:flex;align-items:center;gap:8px}
+.crumb a{color:var(--link);text-decoration:none}
+.crumb strong{font-size:17px;font-weight:500}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:4px;padding:6px 12px;cursor:pointer;line-height:1.2}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.split{display:inline-flex;position:relative}
+.split .btn.primary:first-child{border-start-end-radius:0;border-end-end-radius:0}
+.split .btn.primary:last-child{border-start-start-radius:0;border-end-start-radius:0;border-inline-start:1px solid rgba(255,255,255,.35);padding-inline:8px}
+.menu{position:absolute;top:calc(100% + 4px);inset-inline-start:0;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:6px 0;min-width:260px}
+.menu button{display:flex;gap:10px;width:100%;text-align:start;border:0;background:none;padding:7px 14px;cursor:pointer}
+.menu button:hover{background:var(--surface-2)}
+.menu small{display:block;color:var(--muted)}
+.menu .chk{width:16px;flex:none;color:var(--brand);font-weight:700}
+.search{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:4px;padding:4px 6px;min-height:34px;position:relative;background:var(--surface)}
+.facet{display:inline-flex;align-items:center;gap:6px;background:var(--facet);color:var(--facet-fg);border-radius:3px;padding:2px 4px 2px 0;font-size:13px;white-space:nowrap}
+.facet i{font-style:normal;background:var(--brand);color:var(--brand-ink);padding:2px 6px;border-radius:3px 0 0 3px;font-size:12px}
+[dir=rtl] .facet i{border-radius:0 3px 3px 0}
+.facet button{border:0;background:none;cursor:pointer;color:inherit;padding:0 4px;opacity:.7}
+.search .ph{color:var(--muted);flex:1;padding-inline:4px}
+.search .tog{border:0;border-inline-start:1px solid var(--line);background:none;cursor:pointer;padding:2px 8px;color:var(--muted)}
+.panel{position:absolute;top:calc(100% + 4px);inset-inline-end:0;z-index:20;display:grid;grid-template-columns:repeat(3,minmax(190px,1fr));background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:12px 0}
+.panel section{padding:0 14px;border-inline-start:1px solid var(--line-soft)}
+.panel section:first-child{border:0}
+.panel h4{margin:0 0 6px;font-size:13px;display:flex;gap:6px;align-items:center}
+.panel h4 em{font-style:normal;color:var(--brand)}
+.panel button{display:flex;gap:8px;width:100%;text-align:start;border:0;background:none;padding:5px 6px;border-radius:4px;cursor:pointer}
+.panel button:hover{background:var(--surface-2)}
+.panel hr{border:0;border-top:1px solid var(--line-soft);margin:6px 0}
+.panel .lvl{margin-inline-start:auto;font-size:11px;background:var(--chip);color:var(--chip-fg);border-radius:8px;padding:0 6px}
+.views{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.views span{padding:5px 10px;color:var(--muted);border-inline-start:1px solid var(--line)}
+.views span:first-child{border:0}
+.views span.on{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 -2px 0 var(--brand)}
+.pager{color:var(--muted);font-size:13px;white-space:nowrap}
+
+.kpis{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border-bottom:1px solid var(--line);background:var(--surface-2)}
+.kpi{padding:9px 14px;border-inline-start:1px solid var(--line-soft);min-width:0}
+.kpi:first-child{border:0}
+.kpi small{display:block;color:var(--muted);font-size:11.5px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi b{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi b.neg{color:var(--neg)}
+
+.listwrap{position:relative;max-height:520px;overflow:auto}
+table.list{width:100%;border-collapse:collapse;font-size:13.5px}
+.list th{position:sticky;top:0;background:var(--surface);z-index:2;text-align:start;font-weight:500;color:var(--fg);border-bottom:1px solid var(--line);padding:8px 10px;white-space:nowrap}
+.list th.num{text-align:end}
+.list td{padding:6px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+.list tr.g1 td{background:var(--group);font-weight:500;cursor:pointer}
+.list tr.g2 td{background:var(--group-2);cursor:pointer}
+.list tr.g1:hover td,.list tr.g2:hover td{filter:brightness(.98)}
+.list .caret{display:inline-block;width:14px;color:var(--muted)}
+.list .cnt{color:var(--muted);font-weight:400}
+.list .neg{color:var(--neg)}
+.list .refund{font-size:11px;color:var(--neg);border:1px solid currentColor;border-radius:8px;padding:0 5px;margin-inline-start:6px}
+.list tfoot td{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);font-weight:700}
+.list .more td{color:var(--link);cursor:default}
+.list th.opt{width:28px;padding:0;text-align:center;position:sticky}
+.optbtn{border:0;background:none;cursor:pointer;padding:6px;color:var(--muted)}
+.optmenu{position:absolute;top:36px;inset-inline-end:8px;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:6px 0;min-width:200px}
+.optmenu label{display:flex;gap:8px;align-items:center;padding:4px 14px;cursor:pointer}
+.optmenu label:hover{background:var(--surface-2)}
+.optmenu .hint{color:var(--muted);font-size:12px;padding:4px 14px 2px;border-top:1px solid var(--line-soft);margin-top:4px}
+
+.callouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.callout{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px}
+.callout b{display:block;margin-bottom:2px}
+.callout span{color:var(--muted)}
+
+/* ---- printed sheet ---- */
+.desk{background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 10px,var(--bg) 10px,var(--bg) 20px);border-radius:8px;padding:18px;overflow-x:auto}
+.sheet{width:1040px;margin:0 auto;background:var(--paper);color:var(--paper-fg);font:11.5px/1.4 var(--print);padding:34px 40px 26px;box-shadow:0 2px 10px rgba(0,0,0,.18);display:grid;gap:14px}
+[dir=rtl] .sheet{font-family:var(--ar)}
+.sh-head{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;border-bottom:2px solid var(--paper-fg);padding-bottom:10px}
+.sh-co b{font-size:15px}
+.sh-co div{color:var(--paper-muted)}
+.sh-title{text-align:end}
+.sh-title h3{font-size:19px;letter-spacing:.01em}
+.sh-title div{color:var(--paper-muted)}
+.sh-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 18px}
+.sh-meta div small{display:block;color:var(--paper-muted);text-transform:uppercase;letter-spacing:.06em;font-size:9px}
+.sh-kpi{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));border:1px solid var(--paper-line)}
+.sh-kpi div{padding:6px 8px;border-inline-start:1px solid var(--paper-line)}
+.sh-kpi div:first-child{border:0}
+.sh-kpi small{display:block;color:var(--paper-muted);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+.sh-kpi b{font-size:13px;font-variant-numeric:tabular-nums}
+table.pt{width:100%;border-collapse:collapse}
+.pt th{text-align:start;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--paper-muted);border-bottom:1px solid var(--paper-fg);padding:5px 6px;font-weight:700}
+.pt th.num{text-align:end}
+.pt td{padding:3.5px 6px;border-bottom:1px solid #e6e8eb}
+.pt tr.p1 td{background:var(--paper-band);font-weight:700;border-top:1px solid var(--paper-line)}
+.pt tr.p2 td{font-weight:700;padding-inline-start:18px}
+.pt tr.p2 td:first-child{padding-inline-start:18px}
+.pt tr.pl td:first-child{padding-inline-start:26px}
+.pt .neg{color:#b42318}
+.pt tfoot td{border-top:2px solid var(--paper-fg);border-bottom:0;font-weight:700;padding-top:6px}
+.pt .cont td{color:var(--paper-muted);font-style:italic;text-align:center;border:0;padding:10px}
+.sh-low{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+.sh-low h4{font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 4px}
+.sh-foot{display:flex;justify-content:space-between;color:var(--paper-muted);border-top:1px solid var(--paper-line);padding-top:6px;font-size:10px}
+
+/* ---- notes ---- */
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px 18px;min-width:0}
+.card h3{font-size:15px;margin-bottom:8px}
+.card ul,.card ol{margin:0;padding-inline-start:20px;display:grid;gap:6px}
+.card li span{color:var(--muted)}
+.card code{font-size:12.5px;background:var(--surface-2);padding:0 4px;border-radius:3px}
+.q b{color:var(--brand)}
+@media (max-width:640px){.top h1{font-size:22px}.desk{padding:10px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap" id="app">
+  <div class="top">
+    <div>
+      <span class="tag" data-t="mock">Mockup for approval · sample data</span>
+      <h1 data-t="h1">POS Sales Report</h1>
+      <p data-t="intro">Point of Sale › Reporting › Sales Report. One row per sold line. Filter it, group it and choose the columns on screen, then Print: the PDF follows exactly what the screen shows. Try the controls below; the printout updates with them.</p>
+    </div>
+    <div class="seg" role="group" aria-label="Language">
+      <button id="lang-en" aria-pressed="true">English</button>
+      <button id="lang-ar" aria-pressed="false">العربية</button>
+    </div>
+  </div>
+
+  <section class="exhibit">
+    <header><h2 data-t="ex1">1 · On screen</h2><span data-t="ex1s">Odoo 19 list view, standard search, grouping and optional columns.</span></header>
+    <div class="scroll"><div class="odoo" id="odoo">
+      <div class="nav"><b data-t="pos">Point of Sale</b><span data-t="dash">Dashboard</span><span data-t="orders">Orders</span><span data-t="products">Products</span><span style="opacity:1;text-decoration:underline" data-t="reporting">Reporting</span><span data-t="config">Configuration</span><span class="sp"></span><span>Adams</span></div>
+      <div class="cp">
+        <div class="crumb">
+          <strong data-t="title">Sales Report</strong>
+          <span class="split" id="printwrap">
+            <button class="btn primary" id="printbtn" data-t="print">Print</button>
+            <button class="btn primary" id="printcaret" aria-label="Print options">▾</button>
+          </span>
+        </div>
+        <div class="search" id="search">
+          <span id="facets" style="display:contents"></span>
+          <span class="ph" data-t="searchph">Search…</span>
+          <button class="tog" id="paneltog" aria-label="Filters and grouping">▾</button>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+          <span class="pager" id="pager"></span>
+          <span class="views"><span class="on">☰</span><span>▦</span><span>▮▮</span></span>
+        </div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="listwrap" id="listwrap"></div>
+    </div></div>
+    <div class="callouts">
+      <div class="callout"><b data-t="c1">Summary strip</b><span data-t="c1s">Totals for the current filters, always visible above the list and printed at the top of the PDF.</span></div>
+      <div class="callout"><b data-t="c2">Group by, up to any depth</b><span data-t="c2s">Employee, Product, Category, Session, Point of Sale, Customer, Day/Week/Month. Click a group to open it.</span></div>
+      <div class="callout"><b data-t="c3">Columns you choose</b><span data-t="c3s">The ⋮ menu at the end of the header shows or hides columns. Hidden columns are not printed.</span></div>
+      <div class="callout"><b data-t="c4">Print ▾</b><span data-t="c4s">Summary (group totals only) or Detailed (groups with their lines). Excel export stays available from the standard list.</span></div>
+    </div>
+  </section>
+
+  <section class="exhibit">
+    <header><h2 data-t="ex2">2 · Printed (PDF, A4 landscape)</h2><span id="modeLabel"></span></header>
+    <div class="desk"><div class="sheet" id="sheet"></div></div>
+  </section>
+
+  <section class="notes">
+    <div class="card">
+      <h3 data-t="n1">What the report contains</h3>
+      <ul>
+        <li><b data-t="n1a">Rows</b> <span data-t="n1as">one per POS order line (sales and refunds), from paid, posted and invoiced orders. Draft and cancelled orders are left out.</span></li>
+        <li><b data-t="n1b">Columns</b> <span data-t="n1bs">Date, Order, Session, Point of Sale, Employee, Customer, Product, Category, Qty, Unit price, Discount, Net (excl. tax), Tax, Total, and Margin for POS administrators.</span></li>
+        <li><b data-t="n1c">Amounts</b> <span data-t="n1cs">in company currency, refunds negative, figures identical to Point of Sale › Reporting › Orders (same source, Odoo's standard POS analysis).</span></li>
+        <li><b data-t="n1d">Payments</b> <span data-t="n1ds">printed as a separate table from the actual payments, because one order can be paid with several methods. Payment method is a filter, not a line column.</span></li>
+        <li><b data-t="n1e">Header of the PDF</b> <span data-t="n1es">company, period, every active filter and grouping in words, who printed it and when, page x of y.</span></li>
+      </ul>
+    </div>
+    <div class="card q">
+      <h3 data-t="n2">Please confirm (proposed answer in bold)</h3>
+      <ol>
+        <li data-t="q1"><b>Employee</b> means the cashier logged in on the till (POS employee login). Orders without one show the Odoo user.</li>
+        <li data-t="q2">Who opens it: <b>POS Administrators see all sales</b>; POS users see only sessions of their own shops, or not at all?</li>
+        <li data-t="q3"><b>Margin and cost</b> column only for POS Administrators.</li>
+        <li data-t="q4"><b>Refunds included</b> as negative lines by default, with an "Exclude refunds" filter.</li>
+        <li data-t="q5">Default view on opening: <b>this month, grouped by Day</b>, or another default?</li>
+        <li data-t="q6">One more figure needed on the PDF (for example cash counted per session, or a signature line)?</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+/* ---------- sample data (deterministic) ---------- */
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646};
+const pick=a=>a[Math.floor(rnd()*a.length)];
+const VAT=0.14;
+const EMP=[{en:"Sara Ahmed",ar:"سارة أحمد"},{en:"Omar Khalil",ar:"عمر خليل"},{en:"Lina Haddad",ar:"لينا حداد"},{en:"Youssef Nabil",ar:"يوسف نبيل"}];
+const POS=[{en:"Main Store",ar:"المتجر الرئيسي",code:"MS"},{en:"Mall Kiosk",ar:"كشك المول",code:"MK"}];
+const CUST=[{en:"Walk-in",ar:"عميل نقدي"},{en:"Walk-in",ar:"عميل نقدي"},{en:"Walk-in",ar:"عميل نقدي"},{en:"Nour Mansour",ar:"نور منصور"},{en:"Hany Fawzy",ar:"هاني فوزي"},{en:"Cairo Tech LLC",ar:"كايرو تك"}];
+const PROD=[
+ {en:"Espresso",ar:"إسبريسو",c:{en:"Coffee",ar:"قهوة"},p:45,cost:14},
+ {en:"Cappuccino",ar:"كابتشينو",c:{en:"Coffee",ar:"قهوة"},p:65,cost:20},
+ {en:"Latte",ar:"لاتيه",c:{en:"Coffee",ar:"قهوة"},p:70,cost:22},
+ {en:"Turkish coffee",ar:"قهوة تركي",c:{en:"Coffee",ar:"قهوة"},p:40,cost:11},
+ {en:"Croissant",ar:"كرواسون",c:{en:"Bakery",ar:"مخبوزات"},p:55,cost:21},
+ {en:"Date cake slice",ar:"شريحة كيك التمر",c:{en:"Bakery",ar:"مخبوزات"},p:60,cost:23},
+ {en:"Cheesecake",ar:"تشيز كيك",c:{en:"Bakery",ar:"مخبوزات"},p:85,cost:34},
+ {en:"Water 500 ml",ar:"مياه 500 مل",c:{en:"Drinks",ar:"مشروبات"},p:15,cost:6},
+ {en:"Fresh orange juice",ar:"عصير برتقال طازج",c:{en:"Drinks",ar:"مشروبات"},p:50,cost:18},
+ {en:"Coffee beans 250 g",ar:"بن 250 جم",c:{en:"Retail",ar:"منتجات للبيع"},p:320,cost:190},
+ {en:"Ceramic mug",ar:"كوب سيراميك",c:{en:"Retail",ar:"منتجات للبيع"},p:180,cost:95}];
+const PM=[{en:"Cash",ar:"نقدي"},{en:"Card",ar:"بطاقة"},{en:"Wallet",ar:"محفظة إلكترونية"}];
+const lines=[], payments=[];
+let onum={MS:118,MK:52};
+for(let d=1; d<=7; d++){
+  POS.forEach((pos,pi)=>{
+    const sess="POS/"+String(410+d*2+pi).padStart(5,"0");
+    const n=pi===0? 7+Math.floor(rnd()*4) : 3+Math.floor(rnd()*3);
+    const emps= pi===0? [EMP[0],EMP[1],EMP[3]] : [EMP[2],EMP[3]];
+    for(let k=0;k<n;k++){
+      const emp=pick(emps), cust=pick(CUST);
+      const ord=pos.code+"/"+String(++onum[pos.code]).padStart(4,"0");
+      const h=8+Math.floor(rnd()*12), m=Math.floor(rnd()*60);
+      const nl=1+Math.floor(rnd()*3); let ordTotal=0;
+      for(let j=0;j<nl;j++){
+        const pr=pick(PROD); const qty= pr.p>150?1:1+Math.floor(rnd()*3);
+        const disc= rnd()<0.12?10:0;
+        const net=+(qty*pr.p*(1-disc/100)).toFixed(2), tax=+(net*VAT).toFixed(2);
+        lines.push({day:d,time:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,order:ord,session:sess,pos,emp,cust,prod:pr,qty,price:pr.p,disc,discAmt:+(qty*pr.p*disc/100).toFixed(2),net,tax,total:+(net+tax).toFixed(2),margin:+(net-qty*pr.cost).toFixed(2),refund:false});
+        ordTotal+=net+tax;
+      }
+      if(rnd()<0.15){const c=+(ordTotal*0.5).toFixed(2); payments.push({pos:pi,pm:PM[0],amt:c,order:ord},{pos:pi,pm:PM[1],amt:+(ordTotal-c).toFixed(2),order:ord});}
+      else payments.push({pos:pi,pm:pick([PM[0],PM[0],PM[1],PM[1],PM[2]]),amt:+ordTotal.toFixed(2),order:ord});
+    }
+    if((d===3&&pi===0)||(d===6&&pi===1)||(d===5&&pi===0)){
+      const src=lines.filter(l=>l.pos===pos&&l.day===d)[0]; const ord=pos.code+"/"+String(++onum[pos.code]).padStart(4,"0");
+      const net=-src.price, tax=+(net*VAT).toFixed(2);
+      lines.push({...src,order:ord,qty:-1,disc:0,discAmt:0,net,tax,total:+(net+tax).toFixed(2),margin:+(net+src.prod.cost).toFixed(2),refund:true,time:"18:40"});
+      payments.push({pos:pi,pm:PM[0],amt:+(net+tax).toFixed(2),order:ord});
+    }
+  });
+}
+
+/* ---------- i18n ---------- */
+const T={
+ en:{},
+ ar:{mock:"نموذج للاعتماد · بيانات تجريبية",h1:"تقرير مبيعات نقاط البيع",intro:"نقطة البيع › التقارير › تقرير المبيعات. صف لكل سطر مباع. صفِّ البيانات وجمّعها واختر الأعمدة على الشاشة ثم اطبع: ملف PDF يتبع ما تعرضه الشاشة تمامًا. جرّب عناصر التحكم أدناه وستتحدث الطباعة معها.",
+ ex1:"1 · على الشاشة",ex1s:"عرض قائمة أودو 19 مع البحث والتجميع والأعمدة الاختيارية.",pos:"نقطة البيع",dash:"لوحة المعلومات",orders:"الطلبات",products:"المنتجات",reporting:"التقارير",config:"الإعدادات",title:"تقرير المبيعات",print:"طباعة",searchph:"بحث…",
+ c1:"شريط الملخص",c1s:"إجماليات حسب عوامل التصفية الحالية، ظاهرة دائمًا فوق القائمة ومطبوعة أعلى ملف PDF.",c2:"التجميع بأي عمق",c2s:"الموظف، المنتج، الفئة، الجلسة، نقطة البيع، العميل، يوم/أسبوع/شهر. انقر على المجموعة لفتحها.",c3:"أعمدة تختارها",c3s:"قائمة ⋮ في نهاية الرأس تُظهر الأعمدة أو تخفيها. الأعمدة المخفية لا تُطبع.",c4:"طباعة ▾",c4s:"ملخص (إجماليات المجموعات فقط) أو تفصيلي (المجموعات مع سطورها). يبقى التصدير إلى Excel متاحًا من القائمة القياسية.",
+ ex2:"2 · المطبوع (PDF، A4 أفقي)",n1:"محتوى التقرير",n1a:"الصفوف",n1as:"صف لكل سطر طلب نقطة بيع (مبيعات ومرتجعات) من الطلبات المدفوعة والمرحّلة والمفوترة. تُستبعد المسودات والملغاة.",n1b:"الأعمدة",n1bs:"التاريخ، الطلب، الجلسة، نقطة البيع، الموظف، العميل، المنتج، الفئة، الكمية، سعر الوحدة، الخصم، الصافي (دون ضريبة)، الضريبة، الإجمالي، والهامش لمسؤولي نقاط البيع.",n1c:"المبالغ",n1cs:"بعملة الشركة، المرتجعات بالسالب، والأرقام مطابقة لنقطة البيع › التقارير › الطلبات (المصدر نفسه، تحليل نقاط البيع القياسي في أودو).",n1d:"المدفوعات",n1ds:"تُطبع في جدول منفصل من المدفوعات الفعلية، لأن الطلب الواحد قد يُدفع بأكثر من طريقة. طريقة الدفع عامل تصفية وليست عمودًا في السطر.",n1e:"رأس ملف PDF",n1es:"الشركة، الفترة، كل عوامل التصفية والتجميع النشطة بالكلمات، من طبعه ومتى، صفحة س من ص.",
+ n2:"يرجى التأكيد (الإجابة المقترحة بالخط العريض)",q1:"<b>الموظف</b> هو الكاشير المسجّل دخوله على الجهاز (تسجيل دخول موظف نقطة البيع). الطلبات بدونه تُظهر مستخدم أودو.",q2:"من يفتحه: <b>مسؤولو نقاط البيع يرون كل المبيعات</b>؛ ومستخدمو نقاط البيع يرون جلسات متاجرهم فقط أم لا يرونه إطلاقًا؟",q3:"عمود <b>الهامش والتكلفة</b> لمسؤولي نقاط البيع فقط.",q4:"<b>المرتجعات مشمولة</b> كسطور سالبة افتراضيًا، مع عامل تصفية \"استبعاد المرتجعات\".",q5:"العرض الافتراضي عند الفتح: <b>هذا الشهر مجمّعًا حسب اليوم</b>، أم افتراضي آخر؟",q6:"هل يلزم رقم إضافي في ملف PDF (مثل النقد المعدود لكل جلسة، أو سطر توقيع)؟"}
+};
+const L={
+ en:{date:"Date",order:"Order",session:"Session",pos:"Point of Sale",emp:"Employee",cust:"Customer",prod:"Product",categ:"Product Category",qty:"Qty",price:"Unit Price",disc:"Discount",net:"Net",tax:"Tax",total:"Total",margin:"Margin",
+  day:"Day",week:"Week",month:"Month",orders:"Orders",items:"Items sold",netSales:"Net sales",taxes:"Tax",totalK:"Total",discounts:"Discounts",refunds:"Refunds",avg:"Avg. ticket",
+  filters:"Filters",groupby:"Group By",fav:"Favorites",period:"Order Date",oct:"October 1 – 7, 2026",excl:"Exclude refunds",withDisc:"With discount",onlyMS:"Main Store",onlyMK:"Mall Kiosk",state:"Paid, Posted, Invoiced",stateLbl:"Status",
+  addCustom:"Add Custom Group",saveFav:"Save current search",total2:"Total",refund:"Refund",loadMore:"more lines…",
+  summary:"Summary",summaryS:"Group totals only, one page for most periods",detailed:"Detailed",detailedS:"Groups with every line under them",
+  rep:"POS Sales Report",periodL:"Period",filtersL:"Filters",groupL:"Grouped by",printedL:"Printed",none:"None",byWhom:"Sara Ahmed · Oct 8, 2026 10:42",
+  pay:"Payments received",payM:"Method",payN:"Payments",amount:"Amount",taxT:"Taxes",taxN:"Tax",base:"Base",vat:"VAT 14%",
+  foot1:"Amounts in EGP · refunds negative · source: Point of Sale orders",page:"Page 1 of 1",pageN:n=>`Page 1 of ${n}`,cont:n=>`… continues on ${n} more page(s): the PDF prints every line`,
+  modeS:"Summary mode", modeD:"Detailed mode", walk:"", optHint:"Hidden columns are not printed", grand:"Grand total",cols:"columns",lines:"lines",address:"Cairo, Egypt · VAT 300-123-456"},
+ ar:{date:"التاريخ",order:"الطلب",session:"الجلسة",pos:"نقطة البيع",emp:"الموظف",cust:"العميل",prod:"المنتج",categ:"فئة المنتج",qty:"الكمية",price:"سعر الوحدة",disc:"الخصم",net:"الصافي",tax:"الضريبة",total:"الإجمالي",margin:"الهامش",
+  day:"اليوم",week:"الأسبوع",month:"الشهر",orders:"الطلبات",items:"الأصناف المباعة",netSales:"صافي المبيعات",taxes:"الضريبة",totalK:"الإجمالي",discounts:"الخصومات",refunds:"المرتجعات",avg:"متوسط الفاتورة",
+  filters:"عوامل التصفية",groupby:"تجميع حسب",fav:"المفضلة",period:"تاريخ الطلب",oct:"1 – 7 أكتوبر 2026",excl:"استبعاد المرتجعات",withDisc:"بها خصم",onlyMS:"المتجر الرئيسي",onlyMK:"كشك المول",state:"مدفوع، مرحّل، مفوتر",stateLbl:"الحالة",
+  addCustom:"إضافة تجميع مخصص",saveFav:"حفظ البحث الحالي",total2:"الإجمالي",refund:"مرتجع",loadMore:"سطور أخرى…",
+  summary:"ملخص",summaryS:"إجماليات المجموعات فقط، صفحة واحدة لمعظم الفترات",detailed:"تفصيلي",detailedS:"المجموعات مع كل سطورها",
+  rep:"تقرير مبيعات نقاط البيع",periodL:"الفترة",filtersL:"عوامل التصفية",groupL:"التجميع حسب",printedL:"طُبع",none:"لا يوجد",byWhom:"سارة أحمد · 8 أكتوبر 2026 10:42",
+  pay:"المدفوعات المستلمة",payM:"الطريقة",payN:"عدد الدفعات",amount:"المبلغ",taxT:"الضرائب",taxN:"الضريبة",base:"الأساس",vat:"ض.ق.م \u200e14%",
+  foot1:"المبالغ بالجنيه المصري · المرتجعات بالسالب · المصدر: طلبات نقاط البيع",page:"صفحة 1 من 1",pageN:n=>`صفحة 1 من ${n}`,cont:n=>`… يتبع في ${n} صفحة أخرى: ملف PDF يطبع كل السطور`,
+  modeS:"وضع الملخص",modeD:"الوضع التفصيلي",optHint:"الأعمدة المخفية لا تُطبع",grand:"الإجمالي العام",cols:"أعمدة",lines:"سطور",address:"القاهرة، مصر · رقم ضريبي 300-123-456"}
+};
+let lang="en";
+const t=k=>L[lang][k];
+const nm=o=>o[lang]||o.en;
+
+/* ---------- columns & groupings ---------- */
+const COLS=[
+ {k:"date",v:l=>fmtDay(l.day)+" "+l.time},
+ {k:"order",v:l=>l.order},
+ {k:"session",v:l=>l.session},
+ {k:"pos",v:l=>nm(l.pos)},
+ {k:"emp",v:l=>nm(l.emp)},
+ {k:"cust",v:l=>nm(l.cust)},
+ {k:"prod",v:l=>nm(l.prod)},
+ {k:"categ",v:l=>nm(l.prod.c)},
+ {k:"qty",n:1,sum:1,v:l=>l.qty,f:v=>fmtQ(v)},
+ {k:"price",n:1,v:l=>l.price,f:v=>money(v)},
+ {k:"disc",n:1,sum:1,v:l=>l.discAmt,f:v=>v?money(v):"–"},
+ {k:"net",n:1,sum:1,v:l=>l.net,f:v=>money(v)},
+ {k:"tax",n:1,sum:1,v:l=>l.tax,f:v=>money(v)},
+ {k:"total",n:1,sum:1,v:l=>l.total,f:v=>money(v)},
+ {k:"margin",n:1,sum:1,v:l=>l.margin,f:v=>money(v)}];
+const visible=new Set(["date","order","emp","prod","qty","price","disc","net","tax","total"]);
+const GB={
+ emp:{v:l=>nm(l.emp)}, prod:{v:l=>nm(l.prod)}, categ:{v:l=>nm(l.prod.c)}, session:{v:l=>l.session+" · "+nm(l.pos)},
+ pos:{v:l=>nm(l.pos)}, cust:{v:l=>nm(l.cust)}, day:{v:l=>fmtDay(l.day),s:l=>l.day}, week:{v:()=>(lang==="ar"?"الأسبوع 40، 2026":"W40 2026")}, month:{v:()=>(lang==="ar"?"أكتوبر 2026":"October 2026")}};
+const GB_ORDER=["emp","prod","categ","session","pos","cust","day","week","month"];
+const state={groups:["emp","prod"],excl:false,disc:false,shop:null,open:new Set(),mode:"summary",panel:false,opt:false,pmenu:false};
+
+/* ---------- formatting ---------- */
+const nf=()=>new Intl.NumberFormat(lang==="ar"?"ar-EG-u-nu-latn":"en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=v=>(v<0?"-":"")+nf().format(Math.abs(v));
+const fmtQ=v=>String(v);
+const fmtDay=d=>new Date(2026,9,d).toLocaleDateString(lang==="ar"?"ar-EG-u-nu-latn":"en-US",{month:"short",day:"numeric",year:"numeric"});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- data pipeline ---------- */
+function rows(){
+  return lines.filter(l=>(!state.excl||!l.refund)&&(!state.disc||l.disc>0)&&(!state.shop||l.pos.code===state.shop))
+   .sort((a,b)=>a.day-b.day||a.time.localeCompare(b.time));
+}
+function agg(rs){const o={};COLS.forEach(c=>{if(c.sum)o[c.k]=rs.reduce((s,l)=>s+c.v(l),0)});return o;}
+function group(rs,level){
+  const g=state.groups[level]; if(!g) return null;
+  const m=new Map();
+  rs.forEach(l=>{const k=GB[g].v(l); if(!m.has(k)) m.set(k,{key:k,s:GB[g].s?GB[g].s(l):null,rows:[]}); m.get(k).rows.push(l)});
+  let arr=[...m.values()];
+  if(g==="day") arr.sort((a,b)=>a.s-b.s); else arr.sort((a,b)=>agg(b.rows).total-agg(a.rows).total);
+  arr.forEach(x=>{x.agg=agg(x.rows); x.sub=group(x.rows,level+1)});
+  return arr;
+}
+function kpi(rs){
+  const ords=new Set(rs.filter(l=>!l.refund).map(l=>l.order));
+  const a=agg(rs); const ref=rs.filter(l=>l.refund).reduce((s,l)=>s+l.total,0);
+  return [["orders",ords.size,""],["items",rs.reduce((s,l)=>s+l.qty,0),""],["netSales",money(a.net),""],["taxes",money(a.tax),""],["totalK",money(a.total),""],["discounts",money(a.disc),""],["refunds",money(ref),ref<0?"neg":""],["avg",money(ords.size?a.total/ords.size:0),""]];
+}
+
+/* ---------- screen ---------- */
+const $=id=>document.getElementById(id);
+function facetsHTML(){
+  let h=`<span class="facet"><i>📅</i>${esc(t("period"))}: ${esc(t("oct"))}<button data-x="none" aria-label="remove">×</button></span>`;
+  const f=[t("state")]; if(state.excl) f.push(t("excl")); if(state.disc) f.push(t("withDisc")); if(state.shop) f.push(state.shop==="MS"?t("onlyMS"):t("onlyMK"));
+  h+=`<span class="facet"><i>⏷</i>${f.map(esc).join(` <span style="opacity:.6">${lang==="ar"?"أو":"or"}</span> `)}<button data-x="filters" aria-label="remove">×</button></span>`;
+  if(state.groups.length) h+=`<span class="facet"><i>≡</i>${state.groups.map(g=>esc(t(g==="emp"?"emp":g))).join(" &gt; ")}<button data-x="groups" aria-label="remove">×</button></span>`;
+  return h;
+}
+function panelHTML(){
+  const fb=(id,on,label)=>`<button data-f="${id}"><span class="chk" style="color:var(--brand)">${on?"✓":""}</span>${esc(label)}</button>`;
+  const gb=GB_ORDER.map(g=>{const i=state.groups.indexOf(g);return `<button data-g="${g}"><span class="chk" style="color:var(--brand)">${i>=0?"✓":""}</span>${esc(t(g))}${i>=0?`<span class="lvl">${i+1}</span>`:""}</button>`}).join("");
+  return `<div class="panel" id="panel">
+   <section><h4><em>⏷</em>${esc(t("filters"))}</h4>${fb("state",true,t("state"))}<hr>${fb("excl",state.excl,t("excl"))}${fb("disc",state.disc,t("withDisc"))}<hr>${fb("MS",state.shop==="MS",t("onlyMS"))}${fb("MK",state.shop==="MK",t("onlyMK"))}<hr>${fb("p",true,t("period")+": "+t("oct"))}</section>
+   <section><h4><em>≡</em>${esc(t("groupby"))}</h4>${gb}<hr><button disabled style="color:var(--muted)">${esc(t("addCustom"))} ▾</button></section>
+   <section><h4><em>★</em>${esc(t("fav"))}</h4><button disabled style="color:var(--muted)">${esc(t("saveFav"))}</button></section></div>`;
+}
+function screen(){
+  $("facets").innerHTML=facetsHTML();
+  const old=$("panel"); if(old) old.remove();
+  if(state.panel) $("search").insertAdjacentHTML("beforeend",panelHTML());
+  const pw=$("printwrap"); const om=pw.querySelector(".menu"); if(om) om.remove();
+  if(state.pmenu) pw.insertAdjacentHTML("beforeend",`<div class="menu" role="menu">
+    <button data-m="summary"><span class="chk">${state.mode==="summary"?"✓":""}</span><span>${esc(t("summary"))}<small>${esc(t("summaryS"))}</small></span></button>
+    <button data-m="detailed"><span class="chk">${state.mode==="detailed"?"✓":""}</span><span>${esc(t("detailed"))}<small>${esc(t("detailedS"))}</small></span></button></div>`);
+  const rs=rows();
+  $("kpis").innerHTML=kpi(rs).map(([k,v,c])=>`<div class="kpi"><small>${esc(t(k))}</small><b class="${c}">${esc(v)}</b></div>`).join("");
+  const cols=COLS.filter(c=>visible.has(c.k));
+  const tree=group(rs,0);
+  $("pager").textContent= tree? `1-${tree.length} / ${tree.length}` : `1-80 / ${rs.length}`;
+  let h=`<table class="list"><thead><tr>${cols.map(c=>`<th class="${c.n?"num":""}">${esc(t(c.k))}</th>`).join("")}<th class="opt"><button class="optbtn" id="optbtn" aria-label="Optional columns">⋮</button></th></tr></thead><tbody>`;
+  const lineRow=l=>`<tr>${cols.map(c=>{const v=c.v(l);return `<td class="${c.n?"num":""} ${c.n&&v<0?"neg":""}">${esc(c.f?c.f(v):v)}${c.k==="order"&&l.refund?`<span class="refund">${esc(t("refund"))}</span>`:""}</td>`}).join("")}<td></td></tr>`;
+  const grpRow=(g,lvl,path)=>{const open=state.open.has(path);
+    let first=true; const cells=cols.map(c=>{ if(!c.n){ if(first){first=false;return `<td colspan="1" style="padding-inline-start:${10+lvl*18}px"><span class="caret">${open?"▾":(document.dir==="rtl"?"◂":"▸")}</span>${esc(g.key)} <span class="cnt">(${g.rows.length})</span></td>`} return "<td></td>"}
+      return `<td class="num ${c.sum&&g.agg[c.k]<0?"neg":""}">${c.sum?esc(c.f(g.agg[c.k])):""}</td>`});
+    if(first) cells[0]=`<td style="padding-inline-start:${10+lvl*18}px"><span class="caret">${open?"▾":"▸"}</span>${esc(g.key)} <span class="cnt">(${g.rows.length})</span></td>`;
+    return `<tr class="g${lvl+1}" data-p="${esc(path)}">${cells.join("")}<td></td></tr>`;};
+  const walk=(arr,lvl,pre)=>arr.map(g=>{const p=pre+"|"+g.key; let s=grpRow(g,lvl,p);
+     if(state.open.has(p)){ if(g.sub) s+=walk(g.sub,lvl+1,p); else { s+=g.rows.slice(0,8).map(lineRow).join(""); if(g.rows.length>8) s+=`<tr class="more"><td colspan="${cols.length+1}" style="padding-inline-start:${28+lvl*18}px">+ ${g.rows.length-8} ${esc(t("loadMore"))}</td></tr>`;} }
+     return s}).join("");
+  h+= tree? walk(tree,0,"") : rs.slice(0,40).map(lineRow).join("");
+  const a=agg(rs);
+  h+=`</tbody><tfoot><tr>${cols.map((c,i)=>`<td class="${c.n?"num":""}">${c.sum?esc(c.f(a[c.k])):""}</td>`).join("")}<td></td></tr></tfoot></table>`;
+  if(state.opt) h+=`<div class="optmenu" id="optmenu">${COLS.map(c=>`<label><input type="checkbox" id="col-${c.k}" data-c="${c.k}" ${visible.has(c.k)?"checked":""}>${esc(t(c.k))}</label>`).join("")}<div class="hint">${esc(t("optHint"))}</div></div>`;
+  const lw=$("listwrap"), st=lw.scrollTop; lw.innerHTML=h; lw.scrollTop=st;
+}
+
+/* ---------- print ---------- */
+function sheet(){
+  const rs=rows(); const tree=group(rs,0); const a=agg(rs);
+  const gset=new Set(state.groups.map(g=>g==="day"||g==="week"||g==="month"?"__":g));
+  const textCols=COLS.filter(c=>visible.has(c.k)&&!c.n&&!gset.has(c.k));
+  const numCols=COLS.filter(c=>visible.has(c.k)&&c.n);
+  const detailed=state.mode==="detailed"||!tree;
+  const cols= detailed? [...textCols,...numCols] : numCols.filter(c=>c.sum);
+  const labelSpan= detailed? Math.max(textCols.length,1) : 1;
+  const f=[t("state")]; if(state.excl) f.push(t("excl")); if(state.disc) f.push(t("withDisc")); if(state.shop) f.push(state.shop==="MS"?t("onlyMS"):t("onlyMK"));
+  let h=`<div class="sh-head"><div class="sh-co"><b>Adams</b><div>${esc(t("address"))}</div></div>
+   <div class="sh-title"><h3>${esc(t("rep"))}</h3><div>${esc(t("oct"))}</div></div></div>
+   <div class="sh-meta"><div><small>${esc(t("periodL"))}</small>${esc(t("period"))}: ${esc(t("oct"))}</div><div><small>${esc(t("filtersL"))}</small>${f.map(esc).join(" · ")}</div>
+   <div><small>${esc(t("groupL"))}</small>${state.groups.length?state.groups.map(g=>esc(t(g))).join(" › "):esc(t("none"))}</div><div><small>${esc(t("printedL"))}</small>${esc(t("byWhom"))}</div></div>
+   <div class="sh-kpi">${kpi(rs).map(([k,v,c])=>`<div><small>${esc(t(k))}</small><b class="${c?"neg":""}" style="${c?"color:#b42318":""}">${esc(v)}</b></div>`).join("")}</div>`;
+  const firstHead= detailed? textCols.map(c=>`<th>${esc(t(c.k))}</th>`).join("")||"<th></th>" : `<th>${state.groups.map(g=>esc(t(g))).join(" / ")}</th>`;
+  h+=`<table class="pt"><thead><tr>${firstHead}${(detailed?numCols:cols).map(c=>`<th class="num">${esc(t(c.k))}</th>`).join("")}</tr></thead><tbody>`;
+  const nums=detailed?numCols:cols;
+  const cell=(c,v)=>`<td class="num ${v<0?"neg":""}">${esc(c.f(v))}</td>`;
+  let count=0; const CAP=46; let cut=0;
+  const grow=(g,lvl)=>{count++; return `<tr class="p${lvl+1}"><td colspan="${detailed?labelSpan:1}">${esc(g.key)} <span style="font-weight:400;color:var(--paper-muted)">(${g.rows.length})</span></td>${nums.map(c=>c.sum?cell(c,g.agg[c.k]):"<td></td>").join("")}</tr>`};
+  const lrow=l=>{count++; return `<tr class="pl">${(textCols.length?textCols:[{v:()=>""}]).map(c=>`<td>${esc(c.v(l))}${c.k==="order"&&l.refund?` <span class="neg">(${esc(t("refund"))})</span>`:""}</td>`).join("")}${numCols.map(c=>cell(c,c.v(l))).join("")}</tr>`};
+  const walk=(arr,lvl)=>{let s=""; for(const g of arr){ if(count>=CAP){cut+=g.rows.length; continue;} s+=grow(g,lvl); if(g.sub) s+=walk(g.sub,lvl+1); else if(detailed){ for(const l of g.rows){ if(count>=CAP){cut++;continue;} s+=lrow(l);} } } return s;};
+  if(tree) h+=walk(tree,0); else { for(const l of rs){ if(count>=CAP){cut++;continue;} h+=lrow(l);} }
+  const pages=Math.max(1,Math.ceil((count+cut)/34));
+  if(cut) h+=`<tr class="cont"><td colspan="${(detailed?labelSpan:1)+nums.length}">${esc(L[lang].cont(pages-1))}</td></tr>`;
+  h+=`</tbody><tfoot><tr><td colspan="${detailed?labelSpan:1}">${esc(t("grand"))}</td>${nums.map(c=>c.sum?cell(c,a[c.k]):"<td></td>").join("")}</tr></tfoot></table>`;
+  // payments & taxes
+  const ordset=new Set(rs.map(l=>l.order)); const pm=new Map();
+  payments.filter(p=>ordset.has(p.order)).forEach(p=>{const k=nm(p.pm); const o=pm.get(k)||{n:0,a:0}; o.n++; o.a+=p.amt; pm.set(k,o)});
+  const pmT=[...pm.values()].reduce((s,o)=>s+o.a,0), pmN=[...pm.values()].reduce((s,o)=>s+o.n,0);
+  h+=`<div class="sh-low"><div><h4>${esc(t("pay"))}</h4><table class="pt"><thead><tr><th>${esc(t("payM"))}</th><th class="num">${esc(t("payN"))}</th><th class="num">${esc(t("amount"))}</th></tr></thead><tbody>
+   ${[...pm.entries()].map(([k,o])=>`<tr><td>${esc(k)}</td><td class="num">${o.n}</td><td class="num">${esc(money(o.a))}</td></tr>`).join("")}</tbody>
+   <tfoot><tr><td>${esc(t("total2"))}</td><td class="num">${pmN}</td><td class="num">${esc(money(pmT))}</td></tr></tfoot></table></div>
+   <div><h4>${esc(t("taxT"))}</h4><table class="pt"><thead><tr><th>${esc(t("taxN"))}</th><th class="num">${esc(t("base"))}</th><th class="num">${esc(t("amount"))}</th></tr></thead><tbody>
+   <tr><td>${esc(t("vat"))}</td><td class="num">${esc(money(a.net))}</td><td class="num">${esc(money(a.tax))}</td></tr></tbody>
+   <tfoot><tr><td>${esc(t("total2"))}</td><td class="num">${esc(money(a.net))}</td><td class="num">${esc(money(a.tax))}</td></tr></tfoot></table></div></div>
+   <div class="sh-foot"><span>${esc(t("foot1"))}</span><span>${esc(L[lang].pageN(pages))}</span></div>`;
+  $("sheet").innerHTML=h;
+  $("modeLabel").textContent=(state.mode==="summary"&&tree?t("modeS"):t("modeD"))+" · "+(lang==="ar"?"يتبع الأعمدة والتصفية والتجميع أعلاه":"follows the columns, filters and grouping above");
+}
+
+function render(){screen();sheet();}
+
+/* ---------- events ---------- */
+document.addEventListener("click",e=>{
+  const el=e.target.closest("button,[data-p],input");
+  if(el&&el.id==="paneltog"){state.panel=!state.panel;state.opt=false;state.pmenu=false;return render();}
+  if(el&&el.id==="printcaret"){state.pmenu=!state.pmenu;state.panel=false;state.opt=false;return render();}
+  if(el&&el.id==="printbtn"){state.pmenu=false;render();document.querySelector(".desk").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});return;}
+  if(el&&el.id==="optbtn"){state.opt=!state.opt;state.panel=false;state.pmenu=false;return render();}
+  if(el&&el.dataset.m){state.mode=el.dataset.m;state.pmenu=false;return render();}
+  if(el&&el.dataset.g){const g=el.dataset.g,i=state.groups.indexOf(g); if(i>=0) state.groups.splice(i,1); else state.groups.push(g); state.open.clear(); return render();}
+  if(el&&el.dataset.f){const f=el.dataset.f; if(f==="excl")state.excl=!state.excl; else if(f==="disc")state.disc=!state.disc; else if(f==="MS"||f==="MK")state.shop=state.shop===f?null:f; return render();}
+  if(el&&el.dataset.x){const x=el.dataset.x; if(x==="groups"){state.groups=[];state.open.clear();} if(x==="filters"){state.excl=false;state.disc=false;state.shop=null;} return render();}
+  if(el&&el.dataset.c){ if(el.checked) visible.add(el.dataset.c); else visible.delete(el.dataset.c); return render(); }
+  if(el&&el.dataset.p!==undefined){const p=el.dataset.p; state.open.has(p)?state.open.delete(p):state.open.add(p); return render();}
+  if(!e.target.closest(".panel,.optmenu,.menu")&&(state.panel||state.opt||state.pmenu)){state.panel=state.opt=state.pmenu=false;render();}
+});
+function setLang(l){
+  lang=l; const ar=l==="ar";
+  document.documentElement.lang=ar?"ar":"en"; document.documentElement.dir=ar?"rtl":"ltr"; document.body.dir=ar?"rtl":"ltr";
+  document.body.style.fontFamily=ar?"var(--ar)":"";
+  document.querySelectorAll("[data-t]").forEach(n=>{const k=n.dataset.t; if(!n.dataset.en) n.dataset.en=n.innerHTML; n.innerHTML= ar&&T.ar[k]? T.ar[k] : n.dataset.en;});
+  $("lang-en").setAttribute("aria-pressed",!ar); $("lang-ar").setAttribute("aria-pressed",ar);
+  render();
+}
+$("lang-en").onclick=()=>setLang("en"); $("lang-ar").onclick=()=>setLang("ar");
+// open the first employee group so the screen shows depth at rest
+const t0=group(rows(),0); if(t0){state.open.add("|"+t0[0].key); if(t0[0].sub) state.open.add("|"+t0[0].key+"|"+t0[0].sub[0].key);}
+render();
+})();
+</script>
