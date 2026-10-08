@@ -1,4 +1,4 @@
-> **Current development entrypoint — odoo-harness 1.3.3, installed in this repository:** use the `odoo-dev` / `odoo-review` skills and `.odoo-harness/oh` described in the managed block at the end of this file. The adopted harness source is pinned in `.odoo-harness/lock.json` (MostafaEssamm12/Odoo `f6af65e1d2e9207528cf9ecd9c8d1fc15bf3aa1c`). Resume from the feature's current handoff and `.odoo-harness/HANDOFF.md`. The earlier external-toolkit adapter (`.odoo-harness/connection.json`, `scripts/work-harness.py`, [former onboarding](docs/harness-onboarding.md)) is superseded and kept only for provenance and its metadata check; do not run both workflows.
+> **Current development entrypoint — odoo-harness 1.4.0, installed in this repository:** use the `odoo-dev` / `odoo-review` skills and `.odoo-harness/oh` described in the managed block at the end of this file. The adopted harness source is pinned in `.odoo-harness/lock.json` (MostafaEssamm12/Odoo `256dd4ee75711da0d7761227ea8074022f1f370f`). Resume from the feature's current handoff and `.odoo-harness/HANDOFF.md`. The earlier external-toolkit adapter (`.odoo-harness/connection.json`, `scripts/work-harness.py`, [former onboarding](docs/harness-onboarding.md)) is superseded and kept only for provenance and its metadata check; do not run both workflows.
 >
 > **This repository is public.** Never commit customer data, credentials, Enterprise source, or screenshots/logs taken from customer databases. Keep `.odoo-harness/evidence/` and other detailed evidence private (the folder is git-ignored here) and commit only sanitized summaries; this overrides the harness default of committing evidence. Only the owner deploys to `main` (production) and `staging`. The historical governance below is preserved for provenance; its research-only phase and role assignments do not override newly authorized development.
 
@@ -53,8 +53,8 @@ An agent moves Proposed → Approved → Active only when:
 3. Its definition is added under `/.claude/agents/` with least-privilege tools
    and the project's citation/handoff rules baked in.
 
-<!-- odoo-harness:start (managed by odoo-harness 1.3.3; change it in the harness repo, not here) -->
-## Odoo development (odoo-harness 1.3.3)
+<!-- odoo-harness:start (managed by odoo-harness 1.4.0; change it in the harness repo, not here) -->
+## Odoo development (odoo-harness 1.4.0)
 
 This repository holds custom Odoo 19 Enterprise modules deployed on Odoo.sh. Project settings, including the production and staging branch names, are in `.odoo-harness/project.json`.
 
@@ -66,5 +66,5 @@ This repository holds custom Odoo 19 Enterprise modules deployed on Odoo.sh. Pro
 - Enforce access rules on the server (access rights, record rules, multi-company checks). New user-facing text needs English and Arabic, and layouts must work right-to-left. Figures come from Odoo's standard reports whenever one provides them.
 - Run tests, fix failures and re-run them without asking. Ask the user only for business decisions you can't infer from the code or data; otherwise state your assumption and continue.
 - The work is done when the acceptance criteria are met, the tests pass (locally and/or on the Odoo.sh build), the result records in `.odoo-harness/evidence/` (with their logs and screenshots) are committed with the change and `oh evidence` shows them intact and current, and the feature notes are updated. End with one outcome: **completed**; **blocked** (say why); or **not verified** (say what couldn't be checked). Say whether the review was independent or a self-review.
-- Keep sessions short: one milestone per session. At the end of a milestone, when the session grows long, or before stopping with work left, hand over: update `.odoo-harness/HANDOFF.md` (the active track only, under about 45 lines), commit and push the feature branch, and give the user the prompt for the next session (odoo-dev §7). When resuming, read `.odoo-harness/HANDOFF.md` first.
+- Keep sessions short: one milestone per session. At the end of a milestone, when the session grows long, or before stopping with work left, hand over: update the handoff (the active track only, at most 45 lines and 4 KB; finished work goes in the status file, `status_file` in `project.json`), commit and push the feature branch, and give the user the prompt for the next session (odoo-dev §7; the merge step and where the handoff lives are in its `references/delivery.md`). When resuming, read the handoff named in the prompt first.
 <!-- odoo-harness:end -->

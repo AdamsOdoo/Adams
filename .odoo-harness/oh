@@ -34,6 +34,7 @@ import csv
 import glob
 import gzip
 import hashlib
+import html
 import json
 import os
 import re
@@ -71,6 +72,7 @@ DEFAULTS = {
     "protected_branches": [],
     "with_demo": True,
     "python": "python3.12",
+    "status_file": None,
 }
 TEMPLATE_FORMAT = 3  # bump when template databases are built differently
 VENV_FORMAT = 1  # bump when venvs are built differently
@@ -114,6 +116,7 @@ LINT_CHECKS = [
 ]
 ENTERPRISE_TOKEN = "OH_ENTERPRISE_TOKEN"  # a GitHub token that can read the private Enterprise repository (https URL)
 HANDOFF_LINES = 45  # a longer HANDOFF.md is a status board, read on every resume (the skill says "under about 45 lines")
+HANDOFF_BYTES = 4096  # and so is one of 45 very long lines; guard.py --stop holds a stop over either limit
 # Odoo 19 rejects or ignores these at install; `oh check` finds them before an Odoo run does.
 WARN = "warning: "  # a check result with this prefix is reported but doesn't fail the check
 XML_REJECTED = [(re.compile(r"<tree[\s>]"), "<tree> is <list> in Odoo 19"),
@@ -282,7 +285,7 @@ def load_config(root):
 def config_problems(config):
     problems = []
     for key in ("odoo_ref", "production_branch", "base_branch", "enterprise_path", "enterprise_repo",
-                "enterprise_ref", "python"):
+                "enterprise_ref", "python", "status_file"):
         if config.get(key) is not None and not isinstance(config.get(key), str):
             problems.append(f"{key} must be a string")
     for key in ("staging_branches", "protected_branches", "languages", "addons_paths"):
@@ -3426,6 +3429,254 @@ def cmd_deps(args):
     return PASSED
 
 
+# --------------------------------------------------------------------------- status
+
+# Status words, first match wins: live, done, active, partial, waiting, todo. Anything else is "other".
+STATUS_KINDS = [
+    ("live", re.compile(r"\b(in production|deployed|live|released)\b")),
+    ("done", re.compile(r"\b(merged|done|completed?|built|delivered)\b")),
+    ("active", re.compile(r"\b(in progress|in review|design approved|questions asked|building)\b")),
+    ("partial", re.compile(r"\b(partly|partial)")),
+    ("waiting", re.compile(r"\b(deferred|blocked|on hold|waiting|not needed|cancell?ed)\b")),
+    ("todo", re.compile(r"\b(not started|planned|to do|todo|open)\b")),
+]
+STATUS_LABELS = {"live": "In production", "done": "Built, not in production", "active": "Active", "partial": "Partly covered", "waiting": "Deferred or not needed",
+                 "todo": "Not started", "other": "Other"}
+MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+
+
+def plain(text):
+    """Markdown cell text without links, emphasis or code marks."""
+    return re.sub(r"[*_`]", "", MD_LINK.sub(r"\1", text)).strip()
+
+
+def table_rows(lines):
+    """[(header, rows)] for each markdown table in `lines`."""
+    tables, i = [], 0
+    split = lambda line: [c.strip() for c in line.strip().strip("|").split("|")]
+    while i < len(lines):
+        if lines[i].lstrip().startswith("|") and i + 1 < len(lines) and re.match(r"^\s*\|[\s:|-]+\|\s*$", lines[i + 1]):
+            header, rows, i = split(lines[i]), [], i + 2
+            while i < len(lines) and lines[i].lstrip().startswith("|"):
+                rows.append(split(lines[i]))
+                i += 1
+            tables.append((header, rows))
+        else:
+            i += 1
+    return tables
+
+
+def status_phrase(cell):
+    """The leading status of a cell: '**in production** (`x` 1.0): ...' -> 'in production'."""
+    text = plain(cell).lower()
+    return re.split(r"[.(:;,]| - | — ", text, maxsplit=1)[0].strip() or "?"
+
+
+def status_kind(phrase):
+    return next((kind for kind, pattern in STATUS_KINDS if pattern.search(phrase)), "other")
+
+
+def status_items(text):
+    """(item, phrase, kind) for each row of every table with a Status column."""
+    items = []
+    for header, rows in table_rows(text.splitlines()):
+        names = [plain(h).lower() for h in header]
+        if "status" not in names:
+            continue
+        col = names.index("status")
+        label = next((i for i, n in enumerate(names) if i != col and n not in ("#", "id", "")), 0)
+        for row in rows:
+            if col < len(row):
+                phrase = status_phrase(row[col])
+                items.append((plain(row[label]) if label < len(row) else "?", phrase, status_kind(phrase)))
+    return items
+
+
+def md_inline(text, link):
+    """Escaped HTML of one line of markdown: code, links, bold, italic."""
+    held = []
+
+    def hold(fragment):
+        held.append(fragment)
+        return f"\x00{len(held) - 1}\x00"
+    text = re.sub(r"`([^`]+)`", lambda m: hold(f"<code>{html.escape(m.group(1))}</code>"), text)
+    text = MD_LINK.sub(lambda m: hold(f'<a href="{html.escape(link(m.group(2)), quote=True)}">'
+                                      f'{md_inline(m.group(1), link)}</a>'), text)
+    text = html.escape(text, quote=False)
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"<em>\1</em>", text)
+    while "\x00" in text:
+        text = re.sub(r"\x00(\d+)\x00", lambda m: held[int(m.group(1))], text)
+    return text
+
+
+def md_html(text, link):
+    """A small markdown renderer for status files: headings, paragraphs, lists, tables (Status cells get a badge)."""
+    lines, out, i = text.splitlines(), [], 0
+    para, title = [], None
+
+    def flush():
+        if para:
+            out.append(f"<p>{md_inline(' '.join(para), link)}</p>")
+            para.clear()
+    while i < len(lines):
+        line = lines[i]
+        heading = re.match(r"^(#{1,4})\s+(.*)$", line)
+        if not line.strip():
+            flush()
+            i += 1
+        elif heading:
+            flush()
+            level = len(heading.group(1))
+            if level == 1 and title is None:
+                title = plain(heading.group(2))
+            else:
+                out.append(f"<h{level + 1}>{md_inline(heading.group(2), link)}</h{level + 1}>")
+            i += 1
+        elif line.lstrip().startswith("|") and table_rows(lines[i:i + 2]):
+            flush()
+            header, rows = table_rows(lines[i:])[0]
+            i += 2 + len(rows)
+            col = [plain(h).lower() for h in header].index("status") if "status" in [plain(h).lower() for h in header] else -1
+            cells = "".join(f"<th>{md_inline(h, link)}</th>" for h in header)
+            body = []
+            for row in rows:
+                tds = []
+                for n, cell in enumerate(row):
+                    inner = md_inline(cell, link)
+                    if n == col:
+                        phrase = status_phrase(cell)
+                        rest = re.sub(r"^\*\*([^*]+)\*\*", lambda m: "" if plain(m.group(1)).lower().strip(" .:;,") == phrase else m.group(0), cell.strip())
+                        if rest[:len(phrase)].lower() == phrase:
+                            rest = rest[len(phrase):]
+                        rest = rest.lstrip(" .:;,")
+                        inner = f'<span class="badge {status_kind(phrase)}">{html.escape(phrase)}</span> {md_inline(rest, link)}'
+                    tds.append(f'<td class="{"status" if n == col else ""}">{inner}</td>')
+                body.append("<tr>" + "".join(tds) + "</tr>")
+            out.append(f'<div class="table"><table><thead><tr>{cells}</tr></thead><tbody>{"".join(body)}</tbody></table></div>')
+        elif re.match(r"^\s*([-*]|\d+\.)\s+", line):
+            flush()
+            tag = "ol" if re.match(r"^\s*\d+\.", line) else "ul"
+            items = []
+            while i < len(lines) and re.match(r"^\s*([-*]|\d+\.)\s+", lines[i]):
+                items.append(re.sub(r"^\s*([-*]|\d+\.)\s+", "", lines[i]))
+                i += 1
+                while i < len(lines) and lines[i].startswith("  ") and lines[i].strip():
+                    items[-1] += " " + lines[i].strip()
+                    i += 1
+            out.append(f"<{tag}>" + "".join(f"<li>{md_inline(item, link)}</li>" for item in items) + f"</{tag}>")
+        else:
+            para.append(line.strip())
+            i += 1
+    flush()
+    return title, "\n".join(out)
+
+
+# A page fragment: the artifact host (or a browser, in quirks mode) supplies <html>, <head> and <body>.
+STATUS_PAGE = """<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{title}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;600;700&display=swap">
+<style>
+/* Layout: one reading column; the summary bar first, then the file as written, wide tables scroll in their own box. */
+:root {{ color-scheme: light;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #fafaf9; --surface: #ffffff; --text: #1c1917; --muted: #57534e; --line: #e7e5e4; --link: #1d4ed8;
+  --live: #15803d; --done: #0d9488; --active: #1d4ed8; --partial: #b45309; --waiting: #78716c; --todo: #a8a29e; --other: #7c3aed; }}
+@media (prefers-color-scheme: dark) {{ :root:not([data-theme="light"]) {{ color-scheme: dark;
+  --bg: #0c0a09; --surface: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524; --link: #93c5fd;
+  --live: #4ade80; --done: #2dd4bf; --active: #60a5fa; --partial: #fbbf24; --waiting: #a8a29e; --todo: #78716c; --other: #c4b5fd; }} }}
+:root[data-theme="dark"] {{ color-scheme: dark;
+  --bg: #0c0a09; --surface: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524; --link: #93c5fd;
+  --live: #4ade80; --done: #2dd4bf; --active: #60a5fa; --partial: #fbbf24; --waiting: #a8a29e; --todo: #78716c; --other: #c4b5fd; }}
+* {{ box-sizing: border-box; }}
+body {{ margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--sans); }}
+main {{ max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }}
+main > p, main > ul, main > ol {{ max-width: 75ch; }}
+h1, h2, h3 {{ text-wrap: balance; }}
+h1 {{ font-size: 28px; line-height: 1.2; margin: 0 0 4px; }}
+h2 {{ font-size: 20px; margin: 32px 0 8px; }} h3, h4, h5 {{ font-size: 16px; margin: 24px 0 6px; }}
+.meta {{ color: var(--muted); font-size: 13px; margin: 0 0 24px; }}
+a {{ color: var(--link); }} a:focus-visible {{ outline: 2px solid var(--link); outline-offset: 2px; }}
+code {{ font: 13px var(--mono); overflow-wrap: anywhere; }}
+.summary {{ background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 24px; }}
+.bar {{ display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); }}
+.bar span {{ display: block; }}
+.legend {{ display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; font-size: 14px; }}
+.legend b {{ font-variant-numeric: tabular-nums; }}
+.dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }}
+.table {{ overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }}
+table {{ border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }}
+th, td {{ text-align: start; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }}
+th {{ position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 600; }}
+tr:last-child td {{ border-bottom: 0; }} td.status {{ min-width: 280px; }}
+.badge {{ display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid currentColor; margin: 0 4px 4px 0; white-space: nowrap; }}
+{colors}
+</style>
+<main>
+<h1>{title}</h1>
+<p class="meta">Rendered from <code>{source}</code> at {commit} on {date} by <code>oh status</code>. Edit the file, not this page.</p>
+{summary}
+{body}
+</main>
+"""
+
+
+def cmd_status(args):
+    """Count the rows of the status file's tables by status and, with --html, render the file as one page."""
+    root = project_root()
+    config = load_config(root)
+    name = args.file or config.get("status_file")
+    if not name:
+        raise OhError("no status file: set status_file in .odoo-harness/project.json (the one file that tracks what "
+                      "is done and what is left) or pass FILE")
+    path = (root / name).resolve()
+    if not path.is_file():
+        raise OhError(f"{name} does not exist")
+    text = path.read_text(encoding="utf-8")
+    items = status_items(text)
+    counts = {kind: sum(1 for item in items if item[2] == kind) for kind in STATUS_LABELS}
+    rel = path.relative_to(root).as_posix() if path.is_relative_to(root) else str(path)
+    print(f"{rel}: {len(items)} item(s) " + " · ".join(f"{STATUS_LABELS[k].lower()} {n}" for k, n in counts.items() if n))
+    for item, phrase, kind in items:
+        if kind == "other":
+            print(f"  unrecognized status: {item}: {phrase}")
+    if not args.html:
+        return PASSED
+    commit = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"], text=True, capture_output=True).stdout.strip()
+    remote = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"], text=True, capture_output=True).stdout.strip()
+    match = re.search(r"github\.com[:/]+([^/]+/[^/]+?)(?:\.git)?/*$", remote)
+    ref = args.ref or config.get("base_branch") or commit
+
+    def link(target):
+        if re.match(r"^[a-z]+:|^#", target) or not match:
+            return target
+        file, _, anchor = target.partition("#")
+        resolved = os.path.normpath(os.path.join(os.path.dirname(rel), file)).replace(os.sep, "/")
+        resolved += "/" if file.endswith("/") else ""
+        return f"https://github.com/{match.group(1)}/blob/{ref}/{resolved}" + (f"#{anchor}" if anchor else "")
+    title, body = md_html(text, link)
+    title = title or path.stem.replace("-", " ").capitalize()
+    total = len(items) or 1
+    bar = "".join(f'<span style="width:{100 * n / total:.3f}%;background:var(--{k})" title="{STATUS_LABELS[k]} {n}"></span>'
+                  for k, n in counts.items() if n)
+    legend = "".join(f'<span><i class="dot" style="background:var(--{k})"></i>{STATUS_LABELS[k]} <b>{n}</b></span>'
+                     for k, n in counts.items() if n)
+    summary = (f'<section class="summary" aria-label="Summary"><div class="bar">{bar}</div>'
+               f'<div class="legend"><span><b>{len(items)}</b> items</span>{legend}</div></section>') if items else ""
+    colors = "\n".join(f".badge.{k} {{ color: var(--{k}); }}" for k in STATUS_LABELS)
+    page = STATUS_PAGE.format(title=html.escape(title), source=html.escape(rel), commit=html.escape(commit or "?"),
+                              date=time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), summary=summary, body=body,
+                              colors=colors)
+    out = Path(args.html)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(page, encoding="utf-8")
+    print(f"page: {out}")
+    return PASSED
+
+
 def cmd_doctor(args):
     root = project_root()
     problems, notes = verify_install(root)
@@ -3487,9 +3738,15 @@ def cmd_doctor(args):
     print(f"evidence      {len(records)} record(s) in {EVIDENCE}/ (check them: oh evidence)")
     handoff = root / ".odoo-harness" / "HANDOFF.md"
     if handoff.is_file():
-        lines = len(handoff.read_text(encoding="utf-8").splitlines())
-        print(f"handoff       {lines} lines" + (f": over {HANDOFF_LINES}; keep only the active track and the next action, "
-                                                  "move durable notes to the feature notes" if lines > HANDOFF_LINES else ""))
+        text = handoff.read_text(encoding="utf-8")
+        lines, size = len(text.splitlines()), len(text.encode())
+        over = lines > HANDOFF_LINES or size > HANDOFF_BYTES
+        print(f"handoff       {lines} lines, {size} bytes" + (
+            f": over {HANDOFF_LINES} lines or {HANDOFF_BYTES} bytes; keep only the active track and the next action, "
+            "move durable notes to the feature notes and status to the status file" if over else ""))
+    if config.get("status_file"):
+        status = root / config["status_file"]
+        print(f"status file   {config['status_file']}" + ("" if status.is_file() else ": missing"))
     if problems or "not enforced" in verdicts:
         return FAILED
     return PASSED if verdicts == {"enforced"} else UNVERIFIED
@@ -3654,6 +3911,10 @@ def main(argv=None):
     p = sub.add_parser("deps", help="print the changed modules (or MODULES) with the project modules they depend on, as "
                                     "paths: git diff --quiet A B -- $(oh deps) says whether A and B differ in any of them")
     p.add_argument("modules", nargs="*", help="project modules (default: modules changed vs the base branch)")
+    p = sub.add_parser("status", help="count the status file's items by status; --html renders it as one page")
+    p.add_argument("file", nargs="?", help="markdown file (default: status_file in project.json)")
+    p.add_argument("--html", metavar="PATH", help="write a self-contained HTML page (light and dark) to PATH")
+    p.add_argument("--ref", help="branch or commit the page's relative links open on GitHub (default: base_branch)")
     sub.add_parser("doctor", help="check installation, settings, runtime and GitHub branch protection")
     sub.add_parser("protect", help="print a GitHub ruleset for the production and staging branches")
     p = sub.add_parser("clean", help="drop this project's databases")
@@ -3662,7 +3923,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     args.argv = argv
     handler = {"env": cmd_env, "check": cmd_check, "test": cmd_test, "shell": cmd_shell, "serve": cmd_serve, "stop": cmd_stop,
-               "shot": cmd_shot, "src": cmd_src, "i18n": cmd_i18n, "evidence": cmd_evidence, "deps": cmd_deps, "doctor": cmd_doctor,
+               "shot": cmd_shot, "src": cmd_src, "i18n": cmd_i18n, "evidence": cmd_evidence, "deps": cmd_deps, "status": cmd_status, "doctor": cmd_doctor,
                "protect": cmd_protect, "clean": cmd_clean}[args.command]
     try:
         return handler(args)
