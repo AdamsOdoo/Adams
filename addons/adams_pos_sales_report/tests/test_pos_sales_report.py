@@ -1,9 +1,12 @@
 import ast
+import json
+from urllib.parse import quote
 from unittest.mock import patch
 
 from odoo import api
 from odoo.exceptions import AccessError, UserError
 from odoo.tests import HttpCase, new_test_user, tagged
+from odoo.tools import mute_logger
 
 from odoo.addons.point_of_sale.tests.common import TestPoSCommon
 
@@ -119,10 +122,12 @@ class TestPosSalesReport(TestPoSCommon):
         lines = data['groups'][0]['lines']
         self.assertEqual(len(lines), 3)
         self.assertEqual(sorted(l['is_refund'] for l in lines), [False, False, True])
-        # No grouping: a detailed list of every line.
-        data = self.Report._psr_report_data(self._options([], ['product_id', 'qty']))
-        self.assertEqual(data['mode'], 'detailed')
+        # No grouping: Detailed lists every line, Summary only the figures and totals.
+        data = self.Report._psr_report_data(self._options([], ['product_id', 'qty'], 'detailed'))
         self.assertEqual(len(data['lines']), 3)
+        data = self.Report._psr_report_data(self._options([], ['product_id', 'qty']))
+        self.assertEqual((data['mode'], data['lines'], data['groups']), ('summary', [], []))
+        self.assertAlmostEqual(data['totals']['qty'], 4.0)
 
     # A7: payments come from the payments: a split order appears under both methods.
     def test_payments_and_taxes(self):
@@ -155,6 +160,43 @@ class TestPosSalesReport(TestPoSCommon):
                 self.Report.action_print_sales_report(self.domain, ['cashier'], [], 'detailed')
             action = self.Report.action_print_sales_report(self.domain, ['cashier'], [], 'summary')
             self.assertEqual(action['data']['mode'], 'summary')
+            # Summary without grouping prints no lines, so the limit does not apply.
+            html, _type = self.env['ir.actions.report'].with_user(self.manager)._render_qweb_html(
+                'adams_pos_sales_report.action_report_pos_sales', [], data=self._options([], ['qty', 'price_total']))
+            self.assertIn('Grand total', html.decode())
+
+    # A1: the menu is for POS Administrators only.
+    def test_menu_restricted(self):
+        menu = self.env.ref('adams_pos_sales_report.menu_pos_sales_report')
+        self.assertEqual(menu.group_ids, self.env.ref('point_of_sale.group_pos_manager'))
+
+    # A6: amounts of different currencies are never added up under one currency.
+    def test_several_currencies_refused(self):
+        other = self.env['res.company'].create({'name': 'PSR Other Co', 'currency_id': self.other_currency.id})
+        self.manager.company_ids |= other
+        # Move one order to the other company at the database level: the view reads its currency from there.
+        self.env.cr.execute("UPDATE pos_order SET company_id = %s WHERE id = %s", [other.id, self.order_b.id])
+        self.env.invalidate_all()
+        Report = self.Report.with_context(allowed_company_ids=[self.env.company.id, other.id])
+        with self.assertRaises(UserError):
+            Report.action_print_sales_report(self.domain, [], [], 'summary')
+        # One company selected: its own currency is printed.
+        Report = self.Report.with_context(allowed_company_ids=[other.id])
+        data = Report._psr_report_data(Report._psr_options(self.domain, [], [], 'summary', None))
+        self.assertEqual(data['currency'], self.other_currency)
+
+    # A4, A7: a filtered print with nested groups renders the filtered lines only.
+    def test_filtered_nested_print(self):
+        domain = self.domain + [('is_refund', '=', False)]
+        options = self.Report._psr_options(domain, ['cashier', 'product_id'], ['product_id', 'qty', 'price_total'], 'detailed', ['Exclude refunds'])
+        data = self.Report._psr_report_data(options)
+        self.assertFalse(data['kpis']['refunds'])
+        self.assertAlmostEqual(data['totals']['price_total'], 196.2 + 150.0)
+        html, _type = self.env['ir.actions.report'].with_user(self.manager)._render_qweb_html(
+            'adams_pos_sales_report.action_report_pos_sales', [], data=options)
+        html = html.decode()
+        for text in ('Sara Cashier', self.coffee.display_name, self.water.display_name, 'Exclude refunds'):
+            self.assertIn(text, html)
 
     # A7: the template renders the data (HTML; the PDF itself is checked on Odoo.sh).
     def test_render_html(self):
@@ -168,6 +210,16 @@ class TestPosSalesReport(TestPoSCommon):
 
 @tagged('post_install', '-at_install')
 class TestPosSalesReportTour(HttpCase):
+
+    # A1: the report URL refuses a POS user.
+    def test_report_url_denied(self):
+        new_test_user(self.env, login='psr_url_user', password='psr_url_user', groups='point_of_sale.group_pos_user')
+        self.authenticate('psr_url_user', 'psr_url_user')
+        options = json.dumps({'domain': [], 'groupby': [], 'columns': ['qty'], 'mode': 'summary', 'filters': []})
+        with mute_logger('odoo.http'):
+            response = self.url_open('/report/html/adams_pos_sales_report.report_pos_sales?options=' + quote(options))
+        self.assertNotEqual(response.status_code, 200)
+        self.assertNotIn('Grand total', response.text)
 
     # A7: the Print button sends what the screen shows (default grouping, visible columns, filters).
     def test_print_follows_screen(self):

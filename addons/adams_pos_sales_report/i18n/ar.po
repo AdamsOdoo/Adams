@@ -428,3 +428,13 @@ msgstr "نعم"
 #: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
 msgid "lines. Narrow the period or filters to see them."
 msgstr "سطر. ضيّق الفترة أو عوامل التصفية لعرضها."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid ""
+"These lines are in several currencies (%(currencies)s). Select the companies"
+" of one currency, or filter on one Point of Sale."
+msgstr ""
+"هذه السطور بأكثر من عملة (%(currencies)s). اختر شركات عملة واحدة، أو صفِّ "
+"على نقطة بيع واحدة."

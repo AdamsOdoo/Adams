@@ -57,6 +57,7 @@ class ReportPosOrder(models.Model):
     def action_print_sales_report(self, domain, groupby, columns, mode='summary', filters=None):
         """Print the Sales Report as the list shows it: same domain, grouping and visible columns."""
         options = self._psr_options(domain, groupby, columns, mode, filters)
+        self._psr_currency(options['domain'])
         if options['mode'] == 'detailed':
             self._psr_check_line_count(options['domain'])
         return self.env.ref('adams_pos_sales_report.action_report_pos_sales').report_action(None, data=options)
@@ -115,11 +116,25 @@ class ReportPosOrder(models.Model):
             ))
 
     @api.model
+    def _psr_currency(self, domain):
+        """The one currency of the selected lines; amounts of several currencies are never added up."""
+        currencies = self._read_group(domain, [], ['currency_id:recordset'])[0][0]
+        if len(currencies) > 1:
+            raise UserError(self.env._(
+                "These lines are in several currencies (%(currencies)s). "
+                "Select the companies of one currency, or filter on one Point of Sale.",
+                currencies=", ".join(currencies.mapped('name')),
+            ))
+        return currencies or self.env.company.currency_id
+
+    @api.model
     def _psr_report_data(self, options):
         """Everything the PDF template needs, computed as the current user."""
         domain = Domain(options['domain'])
         groupby = options['groupby']
-        detailed = options['mode'] == 'detailed' or not groupby
+        # Summary without grouping prints the figures and totals only, never the lines.
+        detailed = options['mode'] == 'detailed'
+        currency = self._psr_currency(options['domain'])
         if detailed:
             self._psr_check_line_count(options['domain'])
 
@@ -144,7 +159,7 @@ class ReportPosOrder(models.Model):
 
         aggregates = [f'{f}:sum' for f in PSR_SUMS]
         groups = self._psr_groups(domain, groupby, 0, aggregates, fields_info, detailed) if groupby else []
-        lines = [] if groupby else self._psr_lines(domain)
+        lines = self._psr_lines(domain) if detailed and not groupby else []
 
         totals = dict(zip(PSR_SUMS, self._read_group(domain, [], aggregates)[0]))
         sales_domain = domain & Domain('is_refund', '=', False)
@@ -155,7 +170,7 @@ class ReportPosOrder(models.Model):
         company = self.env.company
         return {
             'company': company,
-            'currency': company.currency_id,
+            'currency': currency,
             'mode': 'detailed' if detailed else 'summary',
             'columns': columns,
             'line_columns': line_columns,
@@ -289,10 +304,9 @@ class ReportPosOrder(models.Model):
 
         Returns None when the selection is too large to compute line by line.
         """
-        ids = self._search(domain)
-        lines = self.env['pos.order.line'].search([('id', 'in', ids)])
-        if len(lines) > PSR_MAX_TAX_LINES:
+        if self.search_count(domain) > PSR_MAX_TAX_LINES:
             return None
+        lines = self.env['pos.order.line'].search([('id', 'in', self._search(domain))])
         details = self.env['report.point_of_sale.report_saledetails']
         result = {}
         for line in lines:
