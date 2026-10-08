@@ -35,6 +35,7 @@ On module targets `oh check` also runs pylint-odoo (a curated list: SQL injectio
 | `oh test mod --upgrade-from origin/<prod-branch>` | Install the deployed version, run `prepare_upgrade(env)` there, update to your code, then test, including the `oh_upgrade` checks (`data-migrations.md`). |
 | `oh test mod --with-dependents` | Also test the project modules that depend on `mod`. |
 | `oh deps [mod ...]` | Print the changed modules (or the given ones) with the project modules they depend on, as paths: `git diff --quiet origin/main origin/staging -- $(oh deps)` fails when the two branches differ in any of them (whether the second upgrade run is needed). |
+| `oh status [--html PATH]` | Count the rows of the status file (`status_file` in `project.json`) by status and list unrecognized ones; `--html` renders the file as one self-contained page (light and dark) for publishing. |
 | `oh test --all` | Install every project module together, closer to an Odoo.sh development build. Runs in up to 3 parallel parts (each part installs every module and runs the tests of some of them; one merged record); `--jobs N` sets the number, `--jobs 1` runs one process. The default leaves one CPU free, for the upgrade run started alongside in the merge step. |
 | `oh test mod --keep` | Keep the database, with every project language loaded, for `oh shell`, `oh serve`, `oh shot` and `oh i18n`. |
 | `oh test mod --keep --seed path/to/seed.py` | Also run a seed script (records, users, settings for screens) in `odoo shell` on the kept database and commit it. The script sees `env`. |
