@@ -1,0 +1,5 @@
+numpy
+scipy
+imagehash
+PyWavelets
+beautifulsoup4

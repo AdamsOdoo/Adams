@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="shopify_market_form_view" model="ir.ui.view">
+            <field name="name">shopify.market.form.view</field>
+            <field name="model">shopify.market.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Market" create="false">
+                    <sheet>
+                        <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                            <div invisible="status != 'ACTIVE'"
+                                 style="display: flex; align-items: center; gap: 6px; background-color: #28a745; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;">
+                                <i class="fa fa-circle"/><span>Active</span>
+                            </div>
+                            <div invisible="status != 'DRAFT'"
+                                 style="display: flex; align-items: center; gap: 6px; background-color: #17a2b8; color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;">
+                                <i class="fa fa-circle"/><span>Draft</span>
+                            </div>
+                        </div>
+
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" readonly="1"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="shopify_market_id" readonly="1"/>
+                            </group>
+                            <group>
+                                <field name="mk_instance_id" readonly="1"/>
+                                <field name="company_id" readonly="1"/>
+                                <field name="active" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Catalogs">
+                                <field name="catalog_ids" readonly="1">
+                                    <list>
+                                        <field name="title"/>
+                                        <field name="catalog_type"/>
+                                        <field name="status" widget="badge" decoration-success="status == 'ACTIVE'" decoration-info="status == 'DRAFT'" decoration-danger="status == 'ARCHIVED'"/>
+                                    </list>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_market_tree_view" model="ir.ui.view">
+            <field name="name">shopify.market.list.view</field>
+            <field name="model">shopify.market.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Markets" create="0">
+                    <field name="name"/>
+                    <field name="market_type"/>
+                    <field name="status" widget="badge" decoration-success="status == 'ACTIVE'" decoration-info="status == 'DRAFT'"/>
+                    <field name="mk_instance_id"/>
+                    <field name="shopify_market_id" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="shopify_market_search_view" model="ir.ui.view">
+            <field name="name">shopify.market.search.view</field>
+            <field name="model">shopify.market.ts</field>
+            <field name="arch" type="xml">
+                <search string="Markets">
+                    <field name="name"/>
+                    <field name="shopify_market_id"/>
+                    <field name="mk_instance_id"/>
+                    <filter string="Active" name="filter_active" domain="[('status', '=', 'ACTIVE')]"/>
+                    <filter string="Draft" name="filter_inactive" domain="[('status', '=', 'DRAFT')]"/>
+                    <group>
+                        <filter string="Instance" name="group_by_instance" context="{'group_by': 'mk_instance_id'}"/>
+                        <filter string="Type" name="group_by_type" context="{'group_by': 'market_type'}"/>
+                        <filter string="Status" name="group_by_status" context="{'group_by': 'status'}"/>
+                    </group>
+                    <searchpanel>
+                        <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_shopify_market" model="ir.actions.act_window">
+            <field name="name">Markets</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.market.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p class="o_view_nocontent_smiling_face">
+                    No Shopify Markets imported yet.
+                </p>
+                <p>
+                    Run <b>Markets &amp; Catalogs &#8594; Import Markets</b> from the Shopify operation wizard.
+                </p>
+            </field>
+        </record>
+
+        <record id="action_shopify_market_dashboard_ts" model="ir.actions.act_window">
+            <field name="name">Markets</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.market.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('mk_instance_id', '=', active_id)]</field>
+        </record>
+    </data>
+</odoo>

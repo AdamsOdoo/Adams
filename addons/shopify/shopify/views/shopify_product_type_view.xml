@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="shopify_product_type_view_tree" model="ir.ui.view">
+            <field name="name">shopify.product.type.tree</field>
+            <field name="model">shopify.product.type.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Product Type" editable="bottom">
+                    <field name="name"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_shopify_product_type" model="ir.actions.act_window">
+            <field name="name">Shopify Product Type</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.product.type.ts</field>
+            <field name="view_mode">list</field>
+        </record>
+    </data>
+</odoo>

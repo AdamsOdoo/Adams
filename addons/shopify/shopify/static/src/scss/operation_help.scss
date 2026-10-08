@@ -1,0 +1,51 @@
+.ts_op_help {
+    .ts_op_help_title {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0 0 0.25rem;
+    }
+
+    .ts_op_help_sub {
+        font-size: 0.8125rem;
+        color: var(--text-muted, #6c757d);
+        margin: 0 0 0.75rem;
+    }
+
+    .o_video_embed {
+        margin-bottom: 1.25rem;
+    }
+
+    .ts_op_help_list {
+        list-style: none;
+        padding-left: 0;
+        margin-bottom: 1rem;
+
+        > li {
+            font-size: 0.8125rem;
+            margin-bottom: 0.35rem;
+
+            > i {
+                color: #4e9a37;
+                margin-right: 0.4rem;
+            }
+        }
+    }
+
+    .ts_op_help_tip {
+        display: flex;
+        gap: 0.6rem;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        background: rgba(78, 154, 55, 0.1);
+        font-size: 0.8125rem;
+
+        > i {
+            color: #4e9a37;
+            margin-top: 0.15rem;
+        }
+
+        p {
+            margin: 0;
+        }
+    }
+}

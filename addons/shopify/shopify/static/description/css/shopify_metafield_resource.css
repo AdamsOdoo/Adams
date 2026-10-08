@@ -1,0 +1,612 @@
+/* ============================================
+   METAFIELDS — Modern Tab UI
+   ============================================ */
+
+.o_meta_wrap {
+    padding: 16px;
+    background: transparent;
+}
+
+/* ---------- Control bar: Metafields / Metaobjects switches + documentation link ---------- */
+/* One slim row. Each switch lives in its own segment that tints and lights its icon while it
+   is on, so the state reads from the bar itself, not only from the switch. */
+.o_meta_dock {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1px solid #e8ebf2;
+    border-radius: 18px;
+    padding: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 18px -10px rgba(15, 23, 42, 0.12);
+}
+
+.o_meta_dock_item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px 8px 10px;
+    border-radius: 12px;
+    transition: background 0.2s ease;
+}
+
+.o_meta_dock_icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    background: #eef0f4;
+    color: #94a3b8;
+    transition: all 0.2s ease;
+}
+
+.o_meta_dock_text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 92px;
+}
+
+.o_meta_dock_label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+
+.o_meta_dock_state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #94a3b8;
+    line-height: 1.2;
+}
+
+.o_meta_dock_state.o_meta_dock_state_on {
+    color: #16a34a;
+}
+
+.o_meta_dock_switch {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.o_meta_dock_item.o_meta_dock_metafield:has(.o_boolean_toggle input:checked) {
+    background: #E0F2FE;
+}
+
+.o_meta_dock_item.o_meta_dock_metafield:has(.o_boolean_toggle input:checked) .o_meta_dock_icon {
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -5px rgba(2, 132, 199, 0.5);
+}
+
+.o_meta_dock_item.o_meta_dock_metaobject:has(.o_boolean_toggle input:checked) {
+    background: #fdf2f8;
+}
+
+.o_meta_dock_item.o_meta_dock_metaobject:has(.o_boolean_toggle input:checked) .o_meta_dock_icon {
+    background: linear-gradient(135deg, #f472b6 0%, #db2777 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -5px rgba(219, 39, 119, 0.5);
+}
+
+.o_meta_dock_docs {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6f5cff;
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+
+.o_meta_dock_docs:hover {
+    background: #f5f3ff;
+    color: #6f5cff;
+    text-decoration: none;
+}
+
+.o_meta_dock_docs .fa-external-link {
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* ---------- Resource Kanban container ---------- */
+.o_meta_resource_kanban.o_kanban_renderer,
+.o_meta_resource_kanban .o_kanban_renderer {
+    background: transparent;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    align-items: stretch !important; 
+}
+
+.o_meta_resource_kanban .o_kanban_record {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    display: flex !important;
+}
+
+/* ---------- Resource Card ---------- */
+.o_meta_final_card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+}
+
+.o_meta_card_inner {
+    border-radius: 20px;
+    border: 1px solid transparent;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    height: 100%;
+    transition: all 0.25s ease;
+}
+
+.o_meta_card_inner.o_meta_product {
+    background: linear-gradient(180deg, #f5f3ff 0%, #ffffff 80%);
+    border-color: #ece8ff;
+}
+
+.o_meta_card_inner.o_meta_variant {
+    background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 80%);
+    border-color: #d8f4e0;
+}
+
+.o_meta_card_inner.o_meta_order {
+    background: linear-gradient(180deg, #FFF2E3 0%, #ffffff 80%);
+    border-color: #FED7AA;
+}
+
+.o_meta_card_inner.o_meta_customer {
+    background: linear-gradient(180deg, #E0F2FE 0%, #ffffff 80%);
+    border-color: #BAE6FD;
+}
+
+.o_meta_card_inner:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px -14px rgba(15, 23, 42, 0.18);
+}
+
+.o_meta_card_top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.o_meta_card_left {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.o_meta_card_icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    color: #ffffff;
+}
+
+.o_meta_card_icon.icon_product {
+    background: linear-gradient(135deg, #8b7cff 0%, #6f5cff 100%);
+    box-shadow: 0 6px 14px -4px rgba(107, 92, 255, 0.4);
+}
+
+.o_meta_card_icon.icon_variant {
+    background: linear-gradient(135deg, #34c77a 0%, #16a34a 100%);
+    box-shadow: 0 6px 14px -4px rgba(22, 163, 74, 0.4);
+}
+
+.o_meta_card_icon.icon_order {
+    background: linear-gradient(135deg, #F9B36C 0%, #EA9830 100%);
+    box-shadow: 0 6px 14px -4px rgba(234, 152, 48, 0.4);
+}
+
+.o_meta_card_icon.icon_customer {
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
+    box-shadow: 0 6px 14px -4px rgba(2, 132, 199, 0.4);
+}
+
+.o_meta_card_title_wrap {
+    min-width: 0;
+    flex: 1;
+}
+
+.o_meta_card_title_row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    margin-bottom: 3px;
+    min-width: 0;       
+}
+
+.o_meta_card_title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;     
+}
+
+.o_meta_card_subtitle {
+    font-size: 12.5px;
+    color: #64748b;
+    line-height: 1.4;
+}
+
+.o_meta_badge_active {
+    background: #ecfdf5;
+    color: #16a34a;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    border: 1px solid #d1fae5;
+    line-height: 1.4;
+    flex-shrink: 0; 
+}
+
+.o_meta_badge_disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    border: 1px solid #e2e8f0;
+    line-height: 1.4;
+    flex-shrink: 0; 
+}
+
+.o_meta_card_actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* ---------- Stats Strip ---------- */
+.o_meta_stats {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(15, 23, 42, 0.04);
+    border-radius: 14px;
+    padding: 14px 10px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.o_meta_stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px;
+    min-width: 0;
+}
+
+.o_meta_stat + .o_meta_stat {
+    border-left: 1px solid #eef0f4;
+}
+
+.o_meta_stat_icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+.o_meta_stat_icon.stat_purple {
+    background: rgba(111, 92, 255, 0.12);
+    color: #6f5cff;
+}
+
+.o_meta_stat_icon.stat_green {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+}
+
+.o_meta_stat_icon.stat_success {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+}
+
+.o_meta_stat_icon.stat_warning {
+    background: rgba(245, 158, 11, 0.14);
+    color: #f59e0b;
+}
+
+.o_meta_stat_text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.1;
+}
+
+.o_meta_stat_val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.o_meta_stat_val.val_success { color: #16a34a; }
+.o_meta_stat_val.val_warning { color: #f59e0b; }
+
+.o_meta_stat_lbl {
+    font-size: 9px;
+    color: #94a3b8;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    margin-top: 2px;
+}
+
+/* ---------- Card Buttons ---------- */
+.o_meta_card_buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.o_meta_btn_fetch,
+.o_meta_btn_config {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    line-height: 1.2;
+}
+
+.o_meta_btn_fetch {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+
+.o_meta_btn_fetch.fetch_product {
+    color: #6f5cff;
+}
+
+.o_meta_btn_fetch.fetch_product:hover {
+    background: #f5f3ff;
+    border-color: #c4b8ff;
+    color: #5b48e0;
+}
+
+.o_meta_btn_fetch.fetch_variant {
+    color: #16a34a;
+}
+
+.o_meta_btn_fetch.fetch_variant:hover {
+    background: #f0fdf4;
+    border-color: #a7e3b9;
+    color: #15803d;
+}
+
+.o_meta_btn_fetch.fetch_order {
+    color: #EA9830;
+}
+
+.o_meta_btn_fetch.fetch_order:hover {
+    background: #FFF2E3;
+    border-color: #F5D7A1;
+    color: #C97D1F;
+}
+
+.o_meta_btn_fetch.fetch_customer {
+    color: #0284C7;
+}
+
+.o_meta_btn_fetch.fetch_customer:hover {
+    background: #E0F2FE;
+    border-color: #7DD3FC;
+    color: #0369A1;
+}
+
+.o_meta_btn_config.config_product {
+    background: linear-gradient(135deg, #6f5cff 0%, #5b48e0 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -4px rgba(107, 92, 255, 0.45);
+}
+
+.o_meta_btn_config.config_product:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -6px rgba(107, 92, 255, 0.55);
+    color: #ffffff;
+}
+
+.o_meta_btn_config.config_variant {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -4px rgba(22, 163, 74, 0.45);
+}
+
+.o_meta_btn_config.config_variant:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -6px rgba(22, 163, 74, 0.55);
+    color: #ffffff;
+}
+
+.o_meta_btn_config.config_order {
+    background: linear-gradient(135deg, #F9B36C 0%, #EA9830 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -4px rgba(234, 152, 48, 0.45);
+}
+
+.o_meta_btn_config.config_order:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -6px rgba(234, 152, 48, 0.55);
+    color: #ffffff;
+}
+
+.o_meta_btn_config.config_customer {
+    background: linear-gradient(135deg, #38BDF8 0%, #0284C7 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px -4px rgba(2, 132, 199, 0.45);
+}
+
+.o_meta_btn_config.config_customer:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px -6px rgba(2, 132, 199, 0.55);
+    color: #ffffff;
+}
+
+/* ---------- Inactive State ---------- */
+.o_meta_inactive {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 0;
+}
+
+.o_meta_inactive p {
+    color: #94a3b8;
+    font-size: 13px;
+    font-style: italic;
+    margin: 0;
+}
+
+/* ---------- Feature Bar (bottom) ---------- */
+.o_meta_features {
+    margin-top: 20px;
+    background: #ffffff;
+    border: 1px solid #eef0f4;
+    border-radius: 18px;
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    box-shadow: 0 4px 18px -8px rgba(15, 23, 42, 0.06);
+}
+
+.o_meta_feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.o_meta_feature_icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 15px;
+}
+
+.o_meta_feature_icon.feat_blue   { background: #e0f2fe; color: #0284c7; }
+.o_meta_feature_icon.feat_green  { background: #dcfce7; color: #16a34a; }
+.o_meta_feature_icon.feat_indigo { background: #e0e7ff; color: #4f46e5; }
+.o_meta_feature_icon.feat_yellow { background: #fef3c7; color: #d97706; }
+.o_meta_feature_icon.feat_red    { background: #fee2e2; color: #dc2626; }
+
+.o_meta_feature_text {
+    min-width: 0;
+}
+
+.o_meta_feature_title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.25;
+    margin-bottom: 2px;
+}
+
+.o_meta_feature_desc {
+    font-size: 11.5px;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 992px) {
+    .o_meta_resource_kanban .o_kanban_record {
+        width: 100%;
+    }
+    .o_meta_features {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .o_meta_stats {
+        grid-template-columns: repeat(2, 1fr);
+        margin-top: auto;
+    }
+    .o_meta_stat + .o_meta_stat {
+        border-left: none;
+    }
+    .o_meta_features {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Theme-tied STAT icons (for the TOTAL column only) */
+.o_meta_stat_icon.stat_product  { background: #F1EDFF; color: #6F5CFF; }
+.o_meta_stat_icon.stat_variant  { background: #E9F6EF; color: #16A34A; }
+.o_meta_stat_icon.stat_order    { background: #FFF2E3; color: #EA9830; }
+.o_meta_stat_icon.stat_customer { background: #E0F2FE; color: #0284C7; }
+
+/* Task: T9096 - Metaobjects list: Fetch Definitions needs an instance, so it is hidden while the left
+   Instance panel is on "All" (panel open: its first item is the active one; panel collapsed: the
+   summary shows no instance). Odoo gives a button no way to read the panel, hence CSS. */
+.o_shopify_metaobject_definition_list:has(.o_search_panel_field > .o_search_panel_category_value:first-child > header.active) button[name="action_fetch_shopify_metaobject_definitions"] {
+    display: none !important;
+}
+.o_shopify_metaobject_definition_list:has(.o_search_panel_current_selection):not(:has(.o_search_panel_current_selection .o_search_panel_category)) button[name="action_fetch_shopify_metaobject_definitions"] {
+    display: none !important;
+}

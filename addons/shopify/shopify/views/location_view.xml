@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="shopify_location_form_view" model="ir.ui.view">
+            <field name="name">shopify_location_form_view</field>
+            <field name="model">shopify.location.ts</field>
+            <field name="arch" type="xml">
+                <form string="Shopify Location" create="false">
+                    <sheet>
+                        <div class="oe_title">
+                            <h1>
+                                <field name="name" placeholder="Shopify Location Name" readonly="1"/>
+                                <widget name="web_ribbon" title="Archived" bg_color="text-bg-danger" invisible="active"/>
+                            </h1>
+                        </div>
+                        <group>
+                            <group>
+                                <field name="shopify_location_id" readonly="1"/>
+                                <field name="mk_instance_id" readonly="1"/>
+                                <field name="company_id" readonly="1"/>
+                                <field name="order_warehouse_id" string="Warehouse" options="{'no_create': True, 'no_create_edit':True}"
+                                       domain="[('company_id', '=', company_id)]" required="is_import_export_stock"/>
+                                <field name="location_id" string="Import Stock Location" options="{'no_create': True, 'no_create_edit':True}" required="is_import_export_stock"
+                                       domain="[('company_id', '=', company_id), ('usage','=','internal')]"/>
+                                <field name="export_location_ids" string="Export Stock Location" widget="many2many_tags" options="{'no_create': True, 'no_create_edit':True}"
+                                       domain="[('company_id', '=', company_id),('usage','=', 'internal' )] " required="is_import_export_stock"/>
+                                <field name="restock_warehouse_id" string="Return Restock Warehouse" options="{'no_create': True, 'no_create_edit':True}"
+                                       domain="[('company_id', '=', company_id)]"/>
+                            </group>
+                            <group>
+                                <field name="active" invisible="1" readonly="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="is_default_location" readonly="1"/>
+                                <field name="is_import_export_stock"/>
+                            </group>
+                        </group>
+                        <p colspan="2" class="alert alert-warning" role="alert" style="border-radius: 1em;">
+                            <h3>Help</h3>
+                            <ul>
+                                <li>
+                                    When the <b>Enable Import/Export Stock'</b> option is activated, the connector will import and export stock for this location between Odoo and
+                                    Shopify
+                                </li>
+                                <li>
+                                    The system will identify the Odoo warehouse based on the location information received from Shopify Order, and the corresponding <b>Warehouse
+                                </b> will be set in the Odoo order.
+                                </li>
+                                <li>
+                                    During the process of importing/exporting inventory, the inventory from the selected <b>Stock Location</b> will be utilized.
+                                </li>
+                                <li>
+                                    Select multiple <b>Export Stock Location</b> to group your stock and automatically export one accurate, unified inventory total to Shopify.
+                                </li>
+                                <li>
+                                    The <b>Return Restock Warehouse</b> determines where returned items for this Shopify location will be restocked. If not configured, items are
+                                    restocked back into the warehouse they were fulfilled from.
+                                </li>
+                            </ul>
+                        </p>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="shopify_location_tree_view" model="ir.ui.view">
+            <field name="name">shopify_location_tree_view</field>
+            <field name="model">shopify.location.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Location">
+                    <field name="name"/>
+                    <field name="order_warehouse_id"/>
+                    <field name="is_default_location"/>
+                    <field name="location_id"/>
+                    <field name="mk_instance_id"/>
+                    <field name="is_import_export_stock"/>
+                    <field name="shopify_location_id" optional="hide"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="shopify_location_search_view" model="ir.ui.view">
+            <field name="name">shopify_location_search_view</field>
+            <field name="model">shopify.location.ts</field>
+            <field name="arch" type="xml">
+                <search string="Location">
+                    <field name="name"/>
+                    <field name="mk_instance_id"/>
+
+                    <group>
+                        <filter string="Instance" name="group_by_instance" context="{'group_by': 'mk_instance_id'}"/>
+                        <filter string="Warehouse" name="group_by_state" context="{'group_by': 'order_warehouse_id'}"/>
+                    </group>
+
+                    <searchpanel>
+                        <field name="mk_instance_id" icon="fa-shopping-bag" enable_counters="1"/>
+                    </searchpanel>
+                </search>
+            </field>
+        </record>
+
+        <record id="action_shopify_location" model="ir.actions.act_window">
+            <field name="name">Location</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.location.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="help" type="html">
+                <p>
+
+                </p>
+            </field>
+        </record>
+
+        <record id="action_shopify_location_dashboard_ts" model="ir.actions.act_window">
+            <field name="name">Locations</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.location.ts</field>
+            <field name="view_mode">list,form</field>
+            <field name="domain">[('mk_instance_id', '=', active_id)]</field>
+            <field name="help" type="html">
+                <p>
+                </p>
+            </field>
+        </record>
+
+    </data>
+</odoo>

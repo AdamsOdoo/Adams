@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="account_move_form_view_mollie" model="ir.ui.view">
+        <field name="name">account.move.form.view.mollie</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <field name="show_refund_shopify_button" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                <button string="Refund in Shopify" class="btn-primary" name="action_shopify_refund_register_payment" type="object" groups="base_marketplace.group_base_marketplace" invisible="not show_refund_shopify_button"/>
+            </header>
+        </field>
+    </record>
+
+</odoo>

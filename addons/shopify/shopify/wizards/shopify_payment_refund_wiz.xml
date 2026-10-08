@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="shopify_payment_refund_view_form_view_form" model="ir.ui.view">
+            <field name="name">shopify_payment_refund_view_form_view_form</field>
+            <field name="model">shopify.payment.refund</field>
+            <field name="arch" type="xml">
+                <form string="shopify_payment_refund_view_form_form">
+                    <sheet>
+                        <field name="available_to_refund_amount" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                        <div class="alert alert-info" role="alert" invisible="available_to_refund_amount != 0.0">
+                            <b> Info: </b> This order has already been refunded in Shopify. No further action is required.
+                        </div>
+                        <group invisible="available_to_refund_amount == 0.0">
+                            <group name="group1">
+                                <field name="is_notify_customer"/>
+                            </group>
+                            <group name="group2">
+                                <field name="refund_description"/>
+                            </group>
+                        </group>
+                        <field name="shopify_order_payment_ids" options="{'no_open': True, 'no_create': True,'no_quick_create': True}" invisible="available_to_refund_amount == 0.0">
+                            <list editable="bottom">
+                                <field name="payment_gateway_id" readonly="1" required="1" options="{'no_open': True}"/>
+                                <field name="total_amount" readonly="1" string="Total Paid Amount" sum="Order Total" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="remaining_amount" readonly="1" string="Available to Refund" sum="Available to Refund" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="refund_amount" sum="Amount to Refund" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+                                <field name="parent_transaction_id" readonly="1" optional="hide"/>
+                            </list>
+                        </field>
+                    </sheet>
+                    <footer>
+                        <button string="Refund" name="action_do_shopify_refund" type="object" class="oe_highlight" data-hotkey="q" invisible="available_to_refund_amount == 0.0"/>
+                        <button string="Cancel" class="btn btn-secondary" special="cancel" data-hotkey="z"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

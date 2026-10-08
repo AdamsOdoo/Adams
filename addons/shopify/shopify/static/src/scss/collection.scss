@@ -1,0 +1,128 @@
+// Task: T8887 - A collection source is only meaningful inside its collection: its form relies on
+// the parent collection (instance domains, the type lock once on Shopify). Odoo's expand button
+// would open it on its own in a generated form without any of that, so it is hidden here.
+.ts_collection_source_dialog .o_expand_button {
+    display: none;
+}
+
+// Task: T8887 - Collection Items: cards laid out the way Shopify's Collection items card shows
+// them - a grid of small tiles, square image on top, name and variants below.
+.ts_collection_items {
+    .o_kanban_renderer {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(9rem, 11rem));
+        gap: 0.75rem;
+        padding: 0.25rem 0;
+    }
+
+    // Odoo pads the flex layout with empty ghost cards; a grid does not need them.
+    .o_kanban_ghost {
+        display: none !important;
+    }
+
+    .o_kanban_record {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border: 1px solid var(--bs-border-color, #dee2e6) !important;
+        border-radius: 0.75rem;
+        overflow: hidden;
+        transition: box-shadow 0.15s ease-in-out;
+
+        &:hover {
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+        }
+    }
+}
+
+.ts_collection_item {
+    position: relative;
+
+    .ts_collection_item_image {
+        aspect-ratio: 1 / 1;
+        max-width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bs-tertiary-bg, #f6f6f7);
+        border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+
+        .o_field_image,
+        .o_field_image > div {
+            width: 100%;
+            height: 100%;
+        }
+
+        .ts_collection_item_img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+    }
+
+    .ts_collection_item_body {
+        padding: 0.5rem 0.625rem 0.625rem;
+        font-size: 0.8125rem;
+        line-height: 1.3;
+    }
+
+    // The name reads as plain text, as on Shopify, and shows it is a link on hover.
+    .ts_collection_item_name {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        color: inherit;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    // The remove button sits on the image's corner and shows on hover only, as on Shopify.
+    .ts_collection_item_remove {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        width: 1.5rem;
+        height: 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background-color: var(--bs-body-bg, #fff);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        color: var(--bs-body-color, #212529);
+        visibility: hidden;
+        cursor: pointer;
+    }
+
+    &:hover .ts_collection_item_remove {
+        visibility: visible;
+    }
+}
+
+// Task: T8887 - The "x of y variants" dropdown, laid out like Shopify's.
+.ts_collection_item_variants_popover {
+    min-width: 16rem;
+    max-width: 22rem;
+
+    .ts_collection_item_variants_image {
+        width: 2.5rem;
+        height: 2.5rem;
+        object-fit: contain;
+    }
+
+    // A product can hold a hundred variants; without this the popover runs off the screen.
+    .ts_collection_item_variants_list {
+        max-height: 15rem;
+        overflow-y: auto;
+    }
+
+    // Long variant titles wrap inside their pill instead of widening the popover.
+    .badge {
+        white-space: normal;
+        text-align: left;
+    }
+}

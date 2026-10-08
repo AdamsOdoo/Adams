@@ -1,0 +1,560 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <record id="transaction_type_code_fees" model="shopify.payout.transaction.type">
+            <field name="name">Fees</field>
+            <field name="transaction_type_code">FEES</field>
+        </record>
+
+        <record id="transaction_type_code_ach_bank_failure_debit_fee" model="shopify.payout.transaction.type">
+            <field name="name">Ach Bank Failure Debit Fee</field>
+            <field name="transaction_type_code">ACH_BANK_FAILURE_DEBIT_FEE</field>
+        </record>
+
+        <record id="transaction_type_code_ach_bank_failure_debit_reversal_fee" model="shopify.payout.transaction.type">
+            <field name="name">Ach Bank Failure Debit Reversal Fee</field>
+            <field name="transaction_type_code">ACH_BANK_FAILURE_DEBIT_REVERSAL_FEE</field>
+        </record>
+
+        <record id="transaction_type_code_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Adjustment</field>
+            <field name="transaction_type_code">ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_ads_publisher_credit" model="shopify.payout.transaction.type">
+            <field name="name">Ads Publisher Credit</field>
+            <field name="transaction_type_code">ADS_PUBLISHER_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_ads_publisher_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Ads Publisher Credit Reversal</field>
+            <field name="transaction_type_code">ADS_PUBLISHER_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_advance" model="shopify.payout.transaction.type">
+            <field name="name">Advance</field>
+            <field name="transaction_type_code">ADVANCE</field>
+        </record>
+
+        <record id="transaction_type_code_advance_funding" model="shopify.payout.transaction.type">
+            <field name="name">Advance Funding</field>
+            <field name="transaction_type_code">ADVANCE_FUNDING</field>
+        </record>
+
+        <record id="transaction_type_code_anomaly_credit" model="shopify.payout.transaction.type">
+            <field name="name">Anomaly Credit</field>
+            <field name="transaction_type_code">ANOMALY_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_anomaly_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Anomaly Credit Reversal</field>
+            <field name="transaction_type_code">ANOMALY_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_anomaly_debit" model="shopify.payout.transaction.type">
+            <field name="name">Anomaly Debit</field>
+            <field name="transaction_type_code">ANOMALY_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_anomaly_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Anomaly Debit Reversal</field>
+            <field name="transaction_type_code">ANOMALY_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_application_fee_refund" model="shopify.payout.transaction.type">
+            <field name="name">Application Fee Refund</field>
+            <field name="transaction_type_code">APPLICATION_FEE_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_balance_transfer_inbound" model="shopify.payout.transaction.type">
+            <field name="name">Balance Transfer Inbound</field>
+            <field name="transaction_type_code">BALANCE_TRANSFER_INBOUND</field>
+        </record>
+
+        <record id="transaction_type_code_billing_debit" model="shopify.payout.transaction.type">
+            <field name="name">Billing Debit</field>
+            <field name="transaction_type_code">BILLING_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_billing_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Billing Debit Reversal</field>
+            <field name="transaction_type_code">BILLING_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_channel_credit" model="shopify.payout.transaction.type">
+            <field name="name">Channel Credit</field>
+            <field name="transaction_type_code">CHANNEL_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_channel_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Channel Credit Reversal</field>
+            <field name="transaction_type_code">CHANNEL_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_channel_promotion_credit" model="shopify.payout.transaction.type">
+            <field name="name">Channel Promotion Credit</field>
+            <field name="transaction_type_code">CHANNEL_PROMOTION_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_channel_promotion_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Channel Promotion Credit Reversal</field>
+            <field name="transaction_type_code">CHANNEL_PROMOTION_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_channel_transfer_credit" model="shopify.payout.transaction.type">
+            <field name="name">Channel Transfer Credit</field>
+            <field name="transaction_type_code">CHANNEL_TRANSFER_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_channel_transfer_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Channel Transfer Credit Reversal</field>
+            <field name="transaction_type_code">CHANNEL_TRANSFER_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_channel_transfer_debit" model="shopify.payout.transaction.type">
+            <field name="name">Channel Transfer Debit</field>
+            <field name="transaction_type_code">CHANNEL_TRANSFER_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_channel_transfer_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Channel Transfer Debit Reversal</field>
+            <field name="transaction_type_code">CHANNEL_TRANSFER_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_charge" model="shopify.payout.transaction.type">
+            <field name="name">Charge</field>
+            <field name="transaction_type_code">CHARGE</field>
+        </record>
+
+        <record id="transaction_type_code_charge_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Charge Adjustment</field>
+            <field name="transaction_type_code">CHARGE_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_fee" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Fee</field>
+            <field name="transaction_type_code">CHARGEBACK_FEE</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_fee_refund" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Fee Refund</field>
+            <field name="transaction_type_code">CHARGEBACK_FEE_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_hold" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Hold</field>
+            <field name="transaction_type_code">CHARGEBACK_HOLD</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_hold_release" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Hold Release</field>
+            <field name="transaction_type_code">CHARGEBACK_HOLD_RELEASE</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_protection_credit" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Protection Credit</field>
+            <field name="transaction_type_code">CHARGEBACK_PROTECTION_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_protection_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Protection Credit Reversal</field>
+            <field name="transaction_type_code">CHARGEBACK_PROTECTION_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_protection_debit" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Protection Debit</field>
+            <field name="transaction_type_code">CHARGEBACK_PROTECTION_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_chargeback_protection_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Chargeback Protection Debit Reversal</field>
+            <field name="transaction_type_code">CHARGEBACK_PROTECTION_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_collections_credit" model="shopify.payout.transaction.type">
+            <field name="name">Collections Credit</field>
+            <field name="transaction_type_code">COLLECTIONS_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_collections_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Collections Credit Reversal</field>
+            <field name="transaction_type_code">COLLECTIONS_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_customs_duty" model="shopify.payout.transaction.type">
+            <field name="name">Customs Duty</field>
+            <field name="transaction_type_code">CUSTOMS_DUTY</field>
+        </record>
+
+        <record id="transaction_type_code_customs_duty_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Customs Duty Adjustment</field>
+            <field name="transaction_type_code">CUSTOMS_DUTY_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_dispute_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Dispute Reversal</field>
+            <field name="transaction_type_code">DISPUTE_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_dispute_withdrawal" model="shopify.payout.transaction.type">
+            <field name="name">Dispute Withdrawal</field>
+            <field name="transaction_type_code">DISPUTE_WITHDRAWAL</field>
+        </record>
+
+        <record id="transaction_type_code_import_tax" model="shopify.payout.transaction.type">
+            <field name="name">Import Tax</field>
+            <field name="transaction_type_code">IMPORT_TAX</field>
+        </record>
+
+        <record id="transaction_type_code_import_tax_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Import Tax Adjustment</field>
+            <field name="transaction_type_code">IMPORT_TAX_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_import_tax_refund" model="shopify.payout.transaction.type">
+            <field name="name">Import Tax Refund</field>
+            <field name="transaction_type_code">IMPORT_TAX_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_lending_capital_refund" model="shopify.payout.transaction.type">
+            <field name="name">Lending Capital Refund</field>
+            <field name="transaction_type_code">LENDING_CAPITAL_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_lending_capital_refund_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Capital Refund Reversal</field>
+            <field name="transaction_type_code">LENDING_CAPITAL_REFUND_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_lending_capital_remittance" model="shopify.payout.transaction.type">
+            <field name="name">Lending Capital Remittance</field>
+            <field name="transaction_type_code">LENDING_CAPITAL_REMITTANCE</field>
+        </record>
+
+        <record id="transaction_type_code_lending_capital_remittance_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Capital Remittance Reversal</field>
+            <field name="transaction_type_code">LENDING_CAPITAL_REMITTANCE_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit</field>
+            <field name="transaction_type_code">LENDING_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit_refund" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit Refund</field>
+            <field name="transaction_type_code">LENDING_CREDIT_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit_refund_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit Refund Reversal</field>
+            <field name="transaction_type_code">LENDING_CREDIT_REFUND_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit_remittance" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit Remittance</field>
+            <field name="transaction_type_code">LENDING_CREDIT_REMITTANCE</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit_remittance_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit Remittance Reversal</field>
+            <field name="transaction_type_code">LENDING_CREDIT_REMITTANCE_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_lending_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Credit Reversal</field>
+            <field name="transaction_type_code">LENDING_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_lending_debit" model="shopify.payout.transaction.type">
+            <field name="name">Lending Debit</field>
+            <field name="transaction_type_code">LENDING_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_lending_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Lending Debit Reversal</field>
+            <field name="transaction_type_code">LENDING_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_marketplace_fee_credit" model="shopify.payout.transaction.type">
+            <field name="name">Marketplace Fee Credit</field>
+            <field name="transaction_type_code">MARKETPLACE_FEE_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_marketplace_fee_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Marketplace Fee Credit Reversal</field>
+            <field name="transaction_type_code">MARKETPLACE_FEE_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_markets_pro_credit" model="shopify.payout.transaction.type">
+            <field name="name">Markets Pro Credit</field>
+            <field name="transaction_type_code">MARKETS_PRO_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_goodwill_credit" model="shopify.payout.transaction.type">
+            <field name="name">Merchant Goodwill Credit</field>
+            <field name="transaction_type_code">MERCHANT_GOODWILL_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_goodwill_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Merchant Goodwill Credit Reversal</field>
+            <field name="transaction_type_code">MERCHANT_GOODWILL_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_to_merchant_credit" model="shopify.payout.transaction.type">
+            <field name="name">Merchant To Merchant Credit</field>
+            <field name="transaction_type_code">MERCHANT_TO_MERCHANT_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_to_merchant_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Merchant To Merchant Credit Reversal</field>
+            <field name="transaction_type_code">MERCHANT_TO_MERCHANT_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_to_merchant_debit" model="shopify.payout.transaction.type">
+            <field name="name">Merchant To Merchant Debit</field>
+            <field name="transaction_type_code">MERCHANT_TO_MERCHANT_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_merchant_to_merchant_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Merchant To Merchant Debit Reversal</field>
+            <field name="transaction_type_code">MERCHANT_TO_MERCHANT_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_promotion_credit" model="shopify.payout.transaction.type">
+            <field name="name">Promotion Credit</field>
+            <field name="transaction_type_code">PROMOTION_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_promotion_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Promotion Credit Reversal</field>
+            <field name="transaction_type_code">PROMOTION_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_refund" model="shopify.payout.transaction.type">
+            <field name="name">Refund</field>
+            <field name="transaction_type_code">REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_refund_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Refund Adjustment</field>
+            <field name="transaction_type_code">REFUND_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_refund_failure" model="shopify.payout.transaction.type">
+            <field name="name">Refund Failure</field>
+            <field name="transaction_type_code">REFUND_FAILURE</field>
+        </record>
+
+        <record id="transaction_type_code_reserved_funds" model="shopify.payout.transaction.type">
+            <field name="name">Reserved Funds</field>
+            <field name="transaction_type_code">RESERVED_FUNDS</field>
+        </record>
+
+        <record id="transaction_type_code_reserved_funds_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Reserved Funds Reversal</field>
+            <field name="transaction_type_code">RESERVED_FUNDS_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_reserved_funds_withdrawal" model="shopify.payout.transaction.type">
+            <field name="name">Reserved Funds Withdrawal</field>
+            <field name="transaction_type_code">RESERVED_FUNDS_WITHDRAWAL</field>
+        </record>
+
+        <record id="transaction_type_code_risk_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Risk Reversal</field>
+            <field name="transaction_type_code">RISK_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_risk_withdrawal" model="shopify.payout.transaction.type">
+            <field name="name">Risk Withdrawal</field>
+            <field name="transaction_type_code">RISK_WITHDRAWAL</field>
+        </record>
+
+        <record id="transaction_type_code_seller_protection_credit" model="shopify.payout.transaction.type">
+            <field name="name">Seller Protection Credit</field>
+            <field name="transaction_type_code">SELLER_PROTECTION_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_seller_protection_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Seller Protection Credit Reversal</field>
+            <field name="transaction_type_code">SELLER_PROTECTION_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_label" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Label</field>
+            <field name="transaction_type_code">SHIPPING_LABEL</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_label_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Label Adjustment</field>
+            <field name="transaction_type_code">SHIPPING_LABEL_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_label_adjustment_base" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Label Adjustment Base</field>
+            <field name="transaction_type_code">SHIPPING_LABEL_ADJUSTMENT_BASE</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_label_adjustment_surcharge" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Label Adjustment Surcharge</field>
+            <field name="transaction_type_code">SHIPPING_LABEL_ADJUSTMENT_SURCHARGE</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_other_carrier_charge_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Other Carrier Charge Adjustment</field>
+            <field name="transaction_type_code">SHIPPING_OTHER_CARRIER_CHARGE_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_shipping_return_to_origin_adjustment" model="shopify.payout.transaction.type">
+            <field name="name">Shipping Return To Origin Adjustment</field>
+            <field name="transaction_type_code">SHIPPING_RETURN_TO_ORIGIN_ADJUSTMENT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_billing_debit" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Billing Debit</field>
+            <field name="transaction_type_code">SHOP_CASH_BILLING_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_billing_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Billing Debit Reversal</field>
+            <field name="transaction_type_code">SHOP_CASH_BILLING_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_campaign_billing_credit" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Campaign Billing Credit</field>
+            <field name="transaction_type_code">SHOP_CASH_CAMPAIGN_BILLING_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_campaign_billing_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Campaign Billing Credit Reversal</field>
+            <field name="transaction_type_code">SHOP_CASH_CAMPAIGN_BILLING_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_campaign_billing_debit" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Campaign Billing Debit</field>
+            <field name="transaction_type_code">SHOP_CASH_CAMPAIGN_BILLING_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_campaign_billing_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Campaign Billing Debit Reversal</field>
+            <field name="transaction_type_code">SHOP_CASH_CAMPAIGN_BILLING_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_credit" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Credit</field>
+            <field name="transaction_type_code">SHOP_CASH_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Credit Reversal</field>
+            <field name="transaction_type_code">SHOP_CASH_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_refund_debit" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Refund Debit</field>
+            <field name="transaction_type_code">SHOP_CASH_REFUND_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_shop_cash_refund_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shop Cash Refund Debit Reversal</field>
+            <field name="transaction_type_code">SHOP_CASH_REFUND_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_collective_credit" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Collective Credit</field>
+            <field name="transaction_type_code">SHOPIFY_COLLECTIVE_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_collective_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Collective Credit Reversal</field>
+            <field name="transaction_type_code">SHOPIFY_COLLECTIVE_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_collective_debit" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Collective Debit</field>
+            <field name="transaction_type_code">SHOPIFY_COLLECTIVE_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_collective_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Collective Debit Reversal</field>
+            <field name="transaction_type_code">SHOPIFY_COLLECTIVE_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_source_credit" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Source Credit</field>
+            <field name="transaction_type_code">SHOPIFY_SOURCE_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_source_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Source Credit Reversal</field>
+            <field name="transaction_type_code">SHOPIFY_SOURCE_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_source_debit" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Source Debit</field>
+            <field name="transaction_type_code">SHOPIFY_SOURCE_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_shopify_source_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Shopify Source Debit Reversal</field>
+            <field name="transaction_type_code">SHOPIFY_SOURCE_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_stripe_fee" model="shopify.payout.transaction.type">
+            <field name="name">Stripe Fee</field>
+            <field name="transaction_type_code">STRIPE_FEE</field>
+        </record>
+
+        <record id="transaction_type_code_tax_adjustment_credit" model="shopify.payout.transaction.type">
+            <field name="name">Tax Adjustment Credit</field>
+            <field name="transaction_type_code">TAX_ADJUSTMENT_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_tax_adjustment_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Tax Adjustment Credit Reversal</field>
+            <field name="transaction_type_code">TAX_ADJUSTMENT_CREDIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_tax_adjustment_debit" model="shopify.payout.transaction.type">
+            <field name="name">Tax Adjustment Debit</field>
+            <field name="transaction_type_code">TAX_ADJUSTMENT_DEBIT</field>
+        </record>
+
+        <record id="transaction_type_code_tax_adjustment_debit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Tax Adjustment Debit Reversal</field>
+            <field name="transaction_type_code">TAX_ADJUSTMENT_DEBIT_REVERSAL</field>
+        </record>
+
+        <record id="transaction_type_code_transfer" model="shopify.payout.transaction.type">
+            <field name="name">Transfer</field>
+            <field name="transaction_type_code">TRANSFER</field>
+        </record>
+
+        <record id="transaction_type_code_transfer_cancel" model="shopify.payout.transaction.type">
+            <field name="name">Transfer Cancel</field>
+            <field name="transaction_type_code">TRANSFER_CANCEL</field>
+        </record>
+
+        <record id="transaction_type_code_transfer_failure" model="shopify.payout.transaction.type">
+            <field name="name">Transfer Failure</field>
+            <field name="transaction_type_code">TRANSFER_FAILURE</field>
+        </record>
+
+        <record id="transaction_type_code_transfer_refund" model="shopify.payout.transaction.type">
+            <field name="name">Transfer Refund</field>
+            <field name="transaction_type_code">TRANSFER_REFUND</field>
+        </record>
+
+        <record id="transaction_type_code_creditvat_refund_credit" model="shopify.payout.transaction.type">
+            <field name="name">Creditvat Refund Credit</field>
+            <field name="transaction_type_code">CREDITVAT_REFUND_CREDIT</field>
+        </record>
+
+        <record id="transaction_type_code_vat_refund_credit_reversal" model="shopify.payout.transaction.type">
+            <field name="name">Vat Refund Credit Reversal</field>
+            <field name="transaction_type_code">VAT_REFUND_CREDIT_REVERSAL</field>
+        </record>
+
+    </data>
+</odoo>

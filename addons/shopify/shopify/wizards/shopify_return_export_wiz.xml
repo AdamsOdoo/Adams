@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="shopify_return_export_wiz_form" model="ir.ui.view">
+            <field name="name">shopify.return.export.wizard.form</field>
+            <field name="model">shopify.return.export.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Create Return in Shopify">
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="picking_id" readonly="1" options="{'no_open': True}" invisible="not picking_id"/>
+                                <field name="stock_move_id" readonly="1" options="{'no_open': True}" invisible="not stock_move_id"/>
+                                <field name="sale_order_id" readonly="1" options="{'no_open': True}"/>
+                                <field name="mk_instance_id" readonly="1" options="{'no_open': True}"/>
+                            </group>
+                            <group>
+                                <field name="notify_customer" widget="boolean_toggle"/>
+                            </group>
+                        </group>
+                        <field name="line_ids">
+                            <list editable="bottom" create="0">
+                                <field name="title" readonly="1" force_save="1"/>
+                                <field name="sku" readonly="1" force_save="1"/>
+                                <field name="available_quantity" readonly="1" force_save="1"/>
+                                <field name="quantity_to_return"/>
+                                <field name="return_reason_definition_id" domain="[('mk_instance_id', '=', parent.mk_instance_id)]"
+                                       options="{'no_create': True, 'no_create_edit': True, 'no_open':True}"/>
+                                <field name="return_reason_handle" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                                <field name="return_reason_note" readonly="return_reason_handle != 'other-reason'"/>
+                                <field name="fulfillment_line_item_gid" column_invisible="True" force_save="1"/><!-- always invisible: technical field required by view logic -->
+                                <field name="shopify_line_item_id" column_invisible="True" force_save="1"/><!-- always invisible: technical field required by view logic -->
+                            </list>
+                        </field>
+                    </sheet>
+                    <footer>
+                        <button string="Create Return" name="action_submit_return" type="object" class="oe_highlight" data-hotkey="q"/>
+                        <button string="Cancel" class="btn btn-secondary" special="cancel" data-hotkey="z"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

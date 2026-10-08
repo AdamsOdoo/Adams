@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="marketplace_log_line_shopify_view_tree" model="ir.ui.view">
+            <field name="name">marketplace.log.line.shopify.list</field>
+            <field name="model">mk.log.line</field>
+            <field name="inherit_id" ref="base_marketplace.marketplace_log_line_view_tree"/>
+            <field name="arch" type="xml">
+                <field name="state" position="after">
+                    <field name="is_configure_workflow" column_invisible="True"/><!-- always invisible: technical field required by view logic -->
+                    <button name="do_configure_shopify_order_workflow" type="object" icon="fa-cog" title="Configure Workflow" aria-label="Configure Workflow" string="Configure Workflow" class="float-right"
+                            invisible="is_configure_workflow" groups="base_marketplace.group_base_marketplace_manager"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>	

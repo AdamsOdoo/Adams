@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Task: T7722 - Restructure Shopify Menus-->
+        <menuitem name="Shopify" id="menu_shopify" parent="base_marketplace.menu_marketplace" sequence="42" groups="base_marketplace.group_base_marketplace">
+
+            <!-- Operations -->
+            <menuitem id="menu_shopify_operations" name="Operations" sequence="10" groups="base_marketplace.group_base_marketplace">
+                <menuitem id="menu_shopify_fraud_orders" name="Fraud Orders" sequence="10" action="action_marketplace_fraud_orders"/>
+                <menuitem id="menu_shopify_returns" name="Returns" sequence="14" action="action_shopify_return"/>
+            </menuitem>
+
+            <!-- Catalogs -->
+            <menuitem id="menu_shopify_catalog" name="Catalogs" sequence="20" groups="base_marketplace.group_base_marketplace">
+                            <!-- Bulk Queries -->
+                <menuitem id="menu_shopify_bulk_query" name="Bulk Queries" sequence="19" action="action_shopify_bulk_query"/>
+                <menuitem id="menu_shopify_product_categories" name="Categories" sequence="10" action="action_shopify_product_categories"/>
+                <menuitem id="menu_shopify_product_types" name="Product Types" sequence="20" action="action_shopify_product_type"/>
+                <menuitem id="menu_shopify_product_tags" name="Tags" sequence="30" action="action_shopify_tags"/>
+                <menuitem id="menu_shopify_metafields" name="Metafields" sequence="40" action="action_shopify_metafields" groups="base_marketplace.group_base_marketplace_manager"/>
+                <menuitem id="menu_shopify_metaobjects" name="Metaobjects" sequence="50" action="action_shopify_metaobject_definitions" groups="base_marketplace.group_base_marketplace_manager"/>
+                <menuitem id="menu_shopify_metaobject_entries" name="Metaobject Entries" sequence="60" action="action_shopify_metaobject_entries" groups="base_marketplace.group_base_marketplace_manager"/>
+            </menuitem>
+
+            <!-- Collections -->
+            <menuitem id="menu_shopify_product_collections" name="Collections" sequence="30" groups="base_marketplace.group_base_marketplace">
+                <menuitem id="menu_shopify_all_collections" name="Collections" sequence="10" action="action_shopify_all_collections"/>
+            </menuitem>
+
+            <!-- Markets &amp; Catalogs -->
+            <menuitem id="menu_shopify_markets_catalogs" name="Markets &amp; Catalogs" sequence="35" groups="base_marketplace.group_base_marketplace">
+                <menuitem id="menu_shopify_markets" name="Markets" sequence="10" action="action_shopify_market"/>
+                <menuitem id="menu_shopify_market_catalogs" name="Catalogs" sequence="20" action="action_shopify_catalog"/>
+            </menuitem>
+
+            <!-- Store Setups -->
+            <menuitem id="menu_shopify_configuration" name="Store Setups" sequence="40" groups="base_marketplace.group_base_marketplace">
+                <menuitem id="menu_shopify_sales_channels" name="Sales Channels" sequence="10" action="action_shopify_sales_channels" groups="base_marketplace.group_base_marketplace"/>
+                <menuitem id="menu_shopify_location" name="Locations" sequence="20" action="action_shopify_location" groups="base_marketplace.group_base_marketplace_manager"/>
+                <menuitem id="menu_shopify_payment_gateway" name="Payment Gateways" sequence="30" action="action_shopify_payment_gateway" groups="base_marketplace.group_base_marketplace_manager"/>
+            </menuitem>
+
+            <!-- Finances -->
+            <menuitem id="menu_shopify_payout" name="Finances" sequence="50" groups="base_marketplace.group_base_marketplace">
+                <menuitem id="menu_shopify_payout_report" name="Payout Reports" sequence="10" action="action_shopify_payout"/>
+            </menuitem>
+
+        </menuitem>
+    </data>
+</odoo>
