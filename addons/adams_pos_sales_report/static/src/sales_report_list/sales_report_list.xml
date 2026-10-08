@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="adams_pos_sales_report.ListView.Buttons">
+        <Dropdown>
+            <button type="button" class="btn btn-primary o_psr_print">
+                <i class="fa fa-print me-1"/>Print
+            </button>
+            <t t-set-slot="content">
+                <DropdownItem class="'o_psr_print_summary'" onSelected="() => this.onPrint('summary')">
+                    <div>Summary</div>
+                    <small class="text-muted">Group totals only</small>
+                </DropdownItem>
+                <DropdownItem class="'o_psr_print_detailed'" onSelected="() => this.onPrint('detailed')">
+                    <div>Detailed</div>
+                    <small class="text-muted">Groups with every line under them</small>
+                </DropdownItem>
+            </t>
+        </Dropdown>
+    </t>
+</templates>

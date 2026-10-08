@@ -1,0 +1,422 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* adams_pos_sales_report
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-08 08:49+0000\n"
+"PO-Revision-Date: 2026-10-08 08:49+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: adams_pos_sales_report
+#: model:ir.actions.report,print_report_name:adams_pos_sales_report.action_report_pos_sales
+msgid "'POS Sales Report'"
+msgstr "'تقرير مبيعات نقاط البيع'"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid ""
+", tax excluded unless the column says otherwise. Refunds are negative.\n"
+"                        Draft and cancelled orders are not included."
+msgstr ""
+"، دون الضريبة ما لم يذكر العمود غير ذلك. المبالغ المستردة بالسالب.\n"
+"                        لا تُشمل الطلبات المسودة والملغاة."
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "<strong>Filters</strong>"
+msgstr "<strong>عوامل التصفية</strong>"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "<strong>Grouped by</strong>"
+msgstr "<strong>التجميع حسب</strong>"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "<strong>Printed</strong>"
+msgstr "<strong>طُبع</strong>"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Amount"
+msgstr "المبلغ"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Amounts in"
+msgstr "المبالغ بعملة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Avg. ticket"
+msgstr "متوسط الفاتورة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Base"
+msgstr "الأساس"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__cashier
+msgid "Cashier"
+msgstr "أمين الصندوق"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__currency_id
+msgid "Currency"
+msgstr "العملة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Customer"
+msgstr "العميل"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Day"
+msgstr "اليوم"
+
+#. module: adams_pos_sales_report
+#. odoo-javascript
+#: code:addons/adams_pos_sales_report/static/src/sales_report_list/sales_report_list.xml:0
+msgid "Detailed"
+msgstr "تفصيلي"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_list
+msgid "Discount"
+msgstr "الخصم"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Discounts"
+msgstr "الخصومات"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_adams_pos_sales_report_report_pos_sales__display_name
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_list
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Employee"
+msgstr "الموظف"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Exclude refunds"
+msgstr "استبعاد المبالغ المستردة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Grand total"
+msgstr "الإجمالي العام"
+
+#. module: adams_pos_sales_report
+#. odoo-javascript
+#: code:addons/adams_pos_sales_report/static/src/sales_report_list/sales_report_list.xml:0
+msgid "Group totals only"
+msgstr "إجماليات المجموعات فقط"
+
+#. module: adams_pos_sales_report
+#. odoo-javascript
+#: code:addons/adams_pos_sales_report/static/src/sales_report_list/sales_report_list.xml:0
+msgid "Groups with every line under them"
+msgstr "المجموعات مع كل سطورها"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_adams_pos_sales_report_report_pos_sales__id
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Invoiced"
+msgstr "مفوتر"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Items sold"
+msgstr "الأصناف المباعة"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Month"
+msgstr "الشهر"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_list
+msgid "Net"
+msgstr "الصافي"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Net sales"
+msgstr "صافي المبيعات"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "No"
+msgstr "لا"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.actions.act_window,help:adams_pos_sales_report.action_pos_sales_report
+msgid "No sales for these filters"
+msgstr "لا توجد مبيعات لعوامل التصفية هذه"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "None"
+msgstr "لا يوجد"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Not invoiced"
+msgstr "غير مفوتر"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Only Point of Sale administrators can print the sales report."
+msgstr "لا يمكن طباعة تقرير المبيعات إلا لمسؤولي نقطة البيع."
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Order Date"
+msgstr "تاريخ الطلب"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Orders"
+msgstr "الطلبات"
+
+#. module: adams_pos_sales_report
+#: model:ir.actions.report,name:adams_pos_sales_report.action_report_pos_sales
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "POS Sales Report"
+msgstr "تقرير مبيعات نقاط البيع"
+
+#. module: adams_pos_sales_report
+#: model:ir.model,name:adams_pos_sales_report.model_report_adams_pos_sales_report_report_pos_sales
+msgid "POS Sales Report (PDF)"
+msgstr "تقرير مبيعات نقاط البيع (PDF)"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.actions.act_window,help:adams_pos_sales_report.action_pos_sales_report
+msgid ""
+"Paid and posted Point of Sale orders appear here, one row per sold line."
+msgstr "تظهر هنا طلبات نقطة البيع المدفوعة والمرحّلة، صف لكل سطر مبيع."
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Payments"
+msgstr "الدفعات"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid ""
+"Payments of the orders in this report, by method. An order paid with two "
+"methods is counted under both."
+msgstr ""
+"مدفوعات الطلبات الواردة في هذا التقرير حسب الطريقة. الطلب المدفوع بطريقتين "
+"يُحسب تحت كلتيهما."
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Payments received"
+msgstr "المدفوعات المستلمة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Point of Sale"
+msgstr "نقطة البيع"
+
+#. module: adams_pos_sales_report
+#: model:ir.model,name:adams_pos_sales_report.model_report_pos_order
+msgid "Point of Sale Orders Report"
+msgstr "تقرير طلبات نقطة البيع"
+
+#. module: adams_pos_sales_report
+#. odoo-javascript
+#: code:addons/adams_pos_sales_report/static/src/sales_report_list/sales_report_list.xml:0
+msgid "Print"
+msgstr "طباعة"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/pos_sales_report_pdf.py:0
+msgid "Print the sales report from Point of Sale > Reporting > Sales Report."
+msgstr "اطبع تقرير المبيعات من نقطة البيع > التقارير > تقرير المبيعات."
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Product"
+msgstr "المنتج"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Product Category"
+msgstr "فئة المنتج"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__qty
+msgid "Quantity"
+msgstr "الكمية"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Quarter"
+msgstr "الربع"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__is_refund
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales_line
+msgid "Refund"
+msgstr "استرداد الأموال"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Refunds"
+msgstr "المبالغ المستردة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Refunds only"
+msgstr "المبالغ المستردة فقط"
+
+#. module: adams_pos_sales_report
+#: model:ir.actions.act_window,name:adams_pos_sales_report.action_pos_sales_report
+#: model:ir.ui.menu,name:adams_pos_sales_report.menu_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_list
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Sales Report"
+msgstr "تقرير المبيعات"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "Session"
+msgstr "الجلسة"
+
+#. module: adams_pos_sales_report
+#. odoo-javascript
+#: code:addons/adams_pos_sales_report/static/src/sales_report_list/sales_report_list.xml:0
+msgid "Summary"
+msgstr "ملخص"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__tax_amount
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Tax"
+msgstr "الضريبة"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Taxes"
+msgstr "الضرائب"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Taxes by rate are listed for up to"
+msgstr "تُعرض الضرائب حسب النسبة لما يصل إلى"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid ""
+"The detailed print is limited to %(max)s lines and these filters select "
+"%(count)s. Print the Summary, or narrow the period or filters."
+msgstr ""
+"الطباعة التفصيلية محدودة بـ %(max)s سطر، وعوامل التصفية هذه تحدد %(count)s. "
+"اطبع الملخص، أو ضيّق الفترة أو عوامل التصفية."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "The report cannot be grouped by %(field)s."
+msgstr "لا يمكن تجميع التقرير حسب %(field)s."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "The report filters are not valid."
+msgstr "عوامل تصفية التقرير غير صالحة."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid ""
+"These lines are in several currencies (%(currencies)s). Select the companies"
+" of one currency, or filter on one Point of Sale."
+msgstr ""
+"هذه السطور بأكثر من عملة (%(currencies)s). اختر شركات عملة واحدة، أو صفِّ "
+"على نقطة بيع واحدة."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_list
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "Total"
+msgstr "الإجمالي"
+
+#. module: adams_pos_sales_report
+#: model:ir.model.fields,field_description:adams_pos_sales_report.field_report_pos_order__price_unit
+msgid "Unit Price"
+msgstr "سعر الوحدة"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Unknown print mode."
+msgstr "وضع طباعة غير معروف."
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Week"
+msgstr "الأسبوع"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_order_sales_report_search
+msgid "With discount"
+msgstr "بها خصم"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Year"
+msgstr "السنة"
+
+#. module: adams_pos_sales_report
+#. odoo-python
+#: code:addons/adams_pos_sales_report/models/report_pos_order.py:0
+msgid "Yes"
+msgstr "نعم"
+
+#. module: adams_pos_sales_report
+#: model_terms:ir.ui.view,arch_db:adams_pos_sales_report.report_pos_sales
+msgid "lines. Narrow the period or filters to see them."
+msgstr "سطر. ضيّق الفترة أو عوامل التصفية لعرضها."
