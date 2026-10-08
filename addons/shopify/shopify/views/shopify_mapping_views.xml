@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="shopify_metafield_mapping_search_view" model="ir.ui.view">
+        <field name="name">shopify.metafield.mapping.search</field>
+        <field name="model">shopify.metafield.mapping.ts</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="namespace_and_key"/>
+                <filter string="Ready" name="ready" domain="[('mapping_status', '=', 'ready')]"/>
+                <filter string="Missing" name="missing" domain="[('mapping_status', '=', 'missing')]"/>
+                <filter string="Active" name="active" domain="[('active_mapping', '=', True)]"/>
+                <separator/>
+                <filter string="Metaobject References" name="metaobject_ref" domain="[('metaobject_definition_id', '!=', False)]"/>
+                <group>
+                    <filter string="Type" name="type" context="{'group_by':'types'}"/>
+                    <filter string="Status" name="status" context="{'group_by':'mapping_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_metafield_mapping_list" model="ir.ui.view">
+        <field name="name">shopify.metafield.mapping.list</field>
+        <field name="model">shopify.metafield.mapping.ts</field>
+        <field name="arch" type="xml">
+            <list string="Metafield Mappings" editable="bottom"
+                  decoration-danger="mapping_status == 'not_found'"
+                  decoration-warning="mapping_status == 'missing'"
+                  decoration-success="mapping_status == 'ready'"
+                  decoration-muted="mapping_status == 'inactive'" create="false" delete="true">
+
+                <header>
+                    <button name="action_fetch_shopify_metafields" type="object" string="Fetch Metafield" display="always" class="btn btn-primary" groups="base_marketplace.group_base_marketplace_manager"
+                            invisible="not context.get('default_resource_id')"/>
+                </header>
+
+                <field name="name" readonly="1"/>
+                <field name="namespace_and_key" readonly="1" optional="show"/>
+                <field name="types" widget="badge" decoration-info="1" readonly="1" optional="show"/>
+                <field name="odoo_model_id" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                <field name="scale_min" column_invisible="1" readonly="True"/><!-- always invisible: technical field required by view logic -->
+                <field name="scale_max" column_invisible="1" readonly="True"/><!-- always invisible: technical field required by view logic -->
+                <field name="compute_odoo_field_ids" column_invisible="1"/><!-- always invisible: technical field required by view logic -->
+                <field name="odoo_field_id"
+                       required="active_mapping and types not in ['metaobject_reference', 'list.metaobject_reference']"
+                       domain="[('id', 'in',compute_odoo_field_ids)]" options="{'no_create': True, 'no_open': True}"
+                       placeholder="Select Odoo Field"/>
+                <field name="odoo_alt_text_field_id" readonly="types != 'link'" options="{'no_create': True, 'no_open': True}"
+                       optional="show"/>
+                <field name="odoo_unit_field_id" readonly="True" options="{'no_create': True, 'no_open': True}" optional="show"/>
+                <field name="metaobject_definition_id" readonly="1" options="{'no_create': True, 'no_open': True}" optional="show"/>
+                <field name="active_mapping" widget="boolean_toggle"/>
+                <field name="mapping_status" widget="badge" readonly="1"
+                       decoration-success="mapping_status == 'ready'"
+                       decoration-warning="mapping_status == 'missing'"
+                       decoration-danger="mapping_status == 'not_found'"
+                       decoration-muted="mapping_status == 'inactive'"
+                />
+            </list>
+        </field>
+    </record>
+
+    <!-- Task: T7722 - Restructure Shopify Menus-->
+    <record id="action_shopify_metafields" model="ir.actions.act_window">
+        <field name="name">Metafields</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">shopify.metafield.mapping.ts</field>
+        <field name="view_mode">list,search</field>
+        <field name="view_id" ref="view_shopify_metafield_mapping_list"/>
+        <field name="help" type="html">
+            <p></p>
+        </field>
+    </record>
+</odoo>

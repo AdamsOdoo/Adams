@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+
+    <!-- Task: T8887 - Shown until the user imports the collections, or closes it. -->
+    <t t-name="shopify.CollectionNotice">
+        <div t-if="state.visible" class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+            <span class="flex-grow-1">
+                Please import the collection from Shopify before updating it here. Shopify has changed how collections work, so importing the latest collection first will help ensure the collection is updated correctly.
+            </span>
+            <button type="button" class="btn-close ms-3" aria-label="Close" t-on-click="onDismiss"/>
+        </div>
+    </t>
+
+</templates>

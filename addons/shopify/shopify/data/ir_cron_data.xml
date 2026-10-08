@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="shopify_collection_job" model="ir.cron">
+            <field name="name">Shopify: Process Collection Job</field>
+            <field name="model_id" ref="model_shopify_collection_ts"/>
+            <field name="state">code</field>
+            <field name="code">model.process_shopify_collection_job()</field>
+            <field name='interval_number'>15</field>
+            <field name='interval_type'>minutes</field>
+            <field name="active">1</field>
+        </record>
+    </data>
+</odoo>

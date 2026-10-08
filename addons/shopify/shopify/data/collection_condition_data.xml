@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="shopify_collection_column_title" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Title</field>
+            <field name="shopify_name">TITLE</field>
+        </record>
+
+        <record id="shopify_collection_column_type" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Type</field>
+            <field name="shopify_name">TYPE</field>
+        </record>
+
+        <record id="shopify_collection_column_vendor" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Vendor</field>
+            <field name="shopify_name">VENDOR</field>
+        </record>
+
+        <record id="shopify_collection_column_variant_title" model="shopify.collection.condition.column.ts">
+            <field name="name">Variant Title</field>
+            <field name="shopify_name">VARIANT_TITLE</field>
+        </record>
+
+        <record id="shopify_collection_column_variant_compare_at_price" model="shopify.collection.condition.column.ts">
+            <field name="name">Compare at Price</field>
+            <field name="shopify_name">VARIANT_COMPARE_AT_PRICE</field>
+        </record>
+
+        <record id="shopify_collection_column_variant_weight" model="shopify.collection.condition.column.ts">
+            <field name="name">Weight</field>
+            <field name="shopify_name">VARIANT_WEIGHT</field>
+        </record>
+
+        <record id="shopify_collection_column_variant_inventory" model="shopify.collection.condition.column.ts">
+            <field name="name">Inventory Stock</field>
+            <field name="shopify_name">VARIANT_INVENTORY</field>
+        </record>
+
+        <record id="shopify_collection_column_variant_price" model="shopify.collection.condition.column.ts">
+            <field name="name">Price</field>
+            <field name="shopify_name">VARIANT_PRICE</field>
+        </record>
+
+        <record id="shopify_collection_column_product_taxonomy_node_id" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Category</field>
+            <field name="shopify_name">PRODUCT_TAXONOMY_NODE_ID</field>
+        </record>
+
+        <record id="shopify_collection_column_tag" model="shopify.collection.condition.column.ts">
+            <field name="name">Tag</field>
+            <field name="shopify_name">TAG</field>
+        </record>
+
+        <!-- Task: T8887 - condition types the 2026-07 model added. PRODUCT_CATEGORY_ID replaces
+             the deprecated PRODUCT_TAXONOMY_NODE_ID above; EXCLUDE_COLLECTION is exclusion-only. -->
+        <record id="shopify_collection_column_product_status" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Status</field>
+            <field name="shopify_name">PRODUCT_STATUS</field>
+        </record>
+
+        <record id="shopify_collection_column_product_category_id" model="shopify.collection.condition.column.ts">
+            <field name="name">Product Category</field>
+            <field name="shopify_name">PRODUCT_CATEGORY_ID</field>
+        </record>
+
+        <record id="shopify_collection_column_exclude_collection" model="shopify.collection.condition.column.ts">
+            <field name="name">In Collection</field>
+            <field name="shopify_name">EXCLUDE_COLLECTION</field>
+        </record>
+
+        <!-- Task: T8887 - The statuses the Product Status condition matches; Shopify accepts several on one condition. -->
+        <record id="shopify_collection_status_active" model="shopify.collection.condition.status.ts">
+            <field name="name">Active</field>
+            <field name="shopify_name">ACTIVE</field>
+        </record>
+
+        <record id="shopify_collection_status_archived" model="shopify.collection.condition.status.ts">
+            <field name="name">Archived</field>
+            <field name="shopify_name">ARCHIVED</field>
+        </record>
+
+        <record id="shopify_collection_status_draft" model="shopify.collection.condition.status.ts">
+            <field name="name">Draft</field>
+            <field name="shopify_name">DRAFT</field>
+        </record>
+
+        <record id="shopify_collection_status_unlisted" model="shopify.collection.condition.status.ts">
+            <field name="name">Unlisted</field>
+            <field name="shopify_name">UNLISTED</field>
+        </record>
+    </data>
+</odoo>

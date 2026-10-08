@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record id="shopify_shopify_sales_channels_view_tree" model="ir.ui.view">
+            <field name="name">shopify.sales.channels.ts.tree</field>
+            <field name="model">shopify.sales.channels.ts</field>
+            <field name="arch" type="xml">
+                <list string="Shopify Sales Channels" create="false">
+                    <field name="name" readonly="True"/>
+                    <field name="sales_channel_id" readonly="True"/>
+                    <field name="mk_instance_id" readonly="True"/>
+                </list>
+            </field>
+        </record>
+
+        <record id="action_shopify_sales_channels" model="ir.actions.act_window">
+            <field name="name">Sales Channels</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">shopify.sales.channels.ts</field>
+            <field name="view_mode">list</field>
+        </record>
+    </data>
+</odoo>

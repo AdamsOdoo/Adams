@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <record id="shopify_return_process_wiz_form" model="ir.ui.view">
+            <field name="name">shopify.return.process.wizard.form</field>
+            <field name="model">shopify.return.process.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Process Shopify Return">
+                    <sheet>
+                        <group>
+                            <field name="return_id" readonly="1" options="{'no_open': True}"/>
+                        </group>
+                        <group>
+                            <field name="do_process" widget="boolean_toggle"/>
+                            <field name="do_close" widget="boolean_toggle"/>
+                        </group>
+                        <p class="alert alert-info" role="alert" style="border-radius: 1em;">
+                            <strong>What happens:</strong>
+                            <ul>
+                                <li><i>Mark as Processed</i> tells Shopify the returned items were received.</li>
+                                <li><i>Close after Processing</i> marks the return as complete in Shopify.</li>
+                            </ul>
+                        </p>
+                    </sheet>
+                    <footer>
+                        <button string="Run" name="action_run" type="object" class="oe_highlight" data-hotkey="q"/>
+                        <button string="Cancel" class="btn btn-secondary" special="cancel" data-hotkey="z"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+    <record id="view_shopify_sales_channels_wizard_form" model="ir.ui.view">
+        <field name="name">shopify.sales.channels.wizard.form</field>
+        <field name="model">shopify.sales.channels.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Manage Sales Channels">
+                <group>
+                    <field name="shopify_sales_channel_ids" widget="many2many_tags" required="True" options="{'no_create': True, 'no_open': True}" domain="[('mk_instance_id.id', '=', context.get('default_mk_instance_id'))]"/>
+                </group>
+                <!--Information regarding Manage Sales Channels to Shopify-->
+                <!-- Description for Listings -->
+                <p class="alert alert-warning" role="alert" style="border-radius: 1em;" invisible="not shopify_sales_channel_ids or not context.get('active_model') == 'mk.listing'">
+                    <ul>
+                        <li>
+                            Click <strong>Publish</strong> to publish listings to the selected sales channels.
+                            This will not remove them from any channels where they are already published.
+                        </li>
+                        <li>
+                            Click <strong>Unpublish</strong> to unpublish listings from the selected sales channels.
+                            This will not affect their availability in any other active channels.
+                        </li>
+                    </ul>
+                </p>
+
+                <!-- Description for Listing Items -->
+                <p class="alert alert-warning" role="alert" style="border-radius: 1em;" invisible="not shopify_sales_channel_ids or not context.get('active_model') == 'mk.listing.item'">
+                    <ul>
+                        <li>
+                            Click <strong>Publish</strong> to publish listing items to the selected sales channels.
+                            This will not remove them from any channels where they are already published.
+                        </li>
+                        <li>
+                            Click <strong>Unpublish</strong> to unpublish listing items from the selected sales channels.
+                            This will not affect their availability in any other active channels.
+                        </li>
+                    </ul>
+                </p>
+
+                <!-- Description for Collections -->
+                <p class="alert alert-warning" role="alert" style="border-radius: 1em;"
+                   invisible="not shopify_sales_channel_ids or not context.get('active_model') == 'shopify.collection.ts'">
+                    <ul>
+                        <li>
+                            Click <strong>Publish</strong> to publish collections to the selected sales channels.
+                            This will not remove them from any channels where they are already published.
+                        </li>
+                        <li>
+                            Click <strong>Unpublish</strong> to unpublish collections from the selected sales channels.
+                            This will not affect their availability in any other active channels.
+                        </li>
+                    </ul>
+                </p>
+
+                <footer>
+                    <button string="Publish" type="object" name="action_manage_shopify_sales_channels" class="btn-primary"
+                            context="{'publish_shopify_product': True}"
+                            invisible="context.get('active_model') == 'shopify.collection.ts'"/>
+
+                    <button string="Unpublish" type="object" name="action_manage_shopify_sales_channels" class="btn-primary"
+                            context="{'unpublish_shopify_product': True}"
+                            invisible="context.get('active_model') == 'shopify.collection.ts' "/>
+
+                    <!--         only collection time show this button           -->
+
+                    <button string="Publish" type="object" name="action_manage_shopify_sales_channels" class="btn-primary"
+                            context="{'publish_shopify_collection': True}"
+                            invisible="context.get('active_model') != 'shopify.collection.ts'"/>
+
+                    <button string="Unpublish" type="object" name="action_manage_shopify_sales_channels" class="btn-primary"
+                            context="{'unpublish_shopify_collection': True}"
+                            invisible="context.get('active_model') != 'shopify.collection.ts'"/>
+
+                    <button string="Cancel" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_product_publications_wizard" model="ir.actions.act_window">
+        <field name="name">Manage Sales Channels</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">shopify.sales.channels.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

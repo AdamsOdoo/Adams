@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<odoo>
+    <data>
+        <record id="shopify_mk_listing_item_form_view" model="ir.ui.view">
+            <field name="name">shopify.mk.listing.item.form.view</field>
+            <field name="model">mk.listing.item</field>
+            <field name="inherit_id" ref="base_marketplace.mk_listing_item_form_view"/>
+            <field name="arch" type="xml">
+                <field name="is_listed" position="after">
+                    <field name="skip_listing_sync" invisible="1"/><!-- always invisible: technical field required by view logic -->
+                    <field name="shopify_sales_channel_ids" string="Sales Channels" invisible="marketplace != 'shopify'" widget="many2many_tags" options="{'no_create': True, 'no_open': True}" readonly="1"/>
+                </field>
+                <field name="sequence" position="after">
+                    <field name="inventory_item_id" invisible="marketplace != 'shopify'"/>
+                </field>
+                <field name="export_qty_value" position="after">
+                    <field name="shopify_last_stock_update_date" invisible="marketplace != 'shopify'" readonly="1" string="Last Stock Updated On"/>
+                </field>
+                <group name="inventory_2" position="inside">
+                    <field name="inventory_management" invisible="marketplace != 'shopify'"/>
+                    <field name="continue_selling" invisible="marketplace != 'shopify'"/>
+                </group>
+                <page name="other_info" position="inside">
+                    <group>
+                        <group>
+                            <field name="is_taxable" invisible="marketplace != 'shopify'"/>
+                        </group>
+                        <group>
+                            <field name="weight_unit" invisible="marketplace != 'shopify'"/>
+                        </group>
+                    </group>
+                </page>
+                <div class="oe_button_box" position="inside">
+                    <button name="open_shopify_inventory" type="object" class="oe_stat_button" icon="fa-cubes"
+                            help="It will display the exact inventory based on the location and the inventory management configuration of the listing items.">
+                        <field name="shopify_current_stock" widget="statinfo" string="Inventory"/>
+                    </button>
+                    <button class="oe_stat_button" name="shopify_open_manage_sales_channels_view" type="object" icon="fa-globe"
+                            invisible="not is_listed or marketplace != 'shopify' or skip_listing_sync"
+                            help="Manage the Shopify sales channels (publications) for the parent product of this variant.">
+                        <div class="o_stat_info o_field_widget">
+                            <span class="text-success">Manage Sales Channels</span>
+                        </div>
+                    </button>
+                </div>
+            </field>
+        </record>
+
+        <record id="shopify_mk_listing_item_search_view_inherit" model="ir.ui.view">
+            <field name="name">shopify.mk.listing.item.search.view.inherit</field>
+            <field name="model">mk.listing.item</field>
+            <field name="inherit_id" ref="base_marketplace.marketplace_listing_search_view"/>
+            <field name="arch" type="xml">
+
+                <!-- Add Group By filters at the top of the search view -->
+                <xpath expr="/search" position="inside">
+                     <separator string="Shopify"/>
+                    <filter string="Shopify Inventory Management" name="group_by_inventory"
+                            context="{'group_by': 'inventory_management'}"/>
+                    <filter string="Shopify Continue Selling" name="group_by_continue"
+                            context="{'group_by': 'continue_selling'}"/>
+                </xpath>
+
+            </field>
+        </record>
+
+        <record id="shopify_mk_listing_item_tree_view" model="ir.ui.view">
+            <field name="name">shopify.mk.listing.item.list.view</field>
+            <field name="model">mk.listing.item</field>
+            <field name="inherit_id" ref="base_marketplace.mk_listing_item_tree_view"/>
+            <field name="arch" type="xml">
+                <field name="default_code" position="after">
+                    <field name="shopify_current_stock" string="Inventory"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>
