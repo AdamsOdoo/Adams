@@ -218,7 +218,7 @@ class TestPosSalesReportTour(HttpCase):
         options = json.dumps({'domain': [], 'groupby': [], 'columns': ['qty'], 'mode': 'summary', 'filters': []})
         with mute_logger('odoo.http'):
             response = self.url_open('/report/html/adams_pos_sales_report.report_pos_sales?options=' + quote(options))
-        self.assertNotEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
         self.assertNotIn('Grand total', response.text)
 
     # A7: the Print button sends what the screen shows (default grouping, visible columns, filters).

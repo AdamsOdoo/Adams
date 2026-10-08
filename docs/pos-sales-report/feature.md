@@ -1,6 +1,6 @@
 # POS Sales Report
 
-Status: in progress (review) · Size: M · Branch: `feature/pos-sales-report` · Modules (version): `adams_pos_sales_report` (19.0.1.0.0) · Last tested commit: see the evidence record
+Status: delivered to the feature branch (Odoo.sh check pending) · Size: M · Branch: `feature/pos-sales-report` · Modules (version): `adams_pos_sales_report` (19.0.1.0.0) · Last tested commit: see the evidence record
 
 ## Requirement
 "A convenient report in the POS for reporting the sales that can be grouped by employee, product, session, date, etc. It should have all the necessary details and it can be printed as a report according to the visible fields, filters and grouping."
@@ -44,7 +44,7 @@ Goal: one list of POS sales lines that users filter, group and arrange on screen
 - Screens (English and Arabic, verified by `oh shot`, demo data seeded with `screens/seed.py`): `screens/en_US/odoo-pos-sales-report.png`, `screens/ar_001/odoo-pos-sales-report.png`.
 - Printout (report HTML, same template and data as the PDF; wkhtmltopdf is not installed locally): `screens/printout/sum-en.png`, `sum-ar.png` (Summary, Employee › Product), `det-en.png`, `det-ar.png` (Detailed, Employee).
 - Odoo.sh development build: not run yet. Check there the real PDF in English and Arabic (page breaks, header and footer of the company layout).
-- Review: independent (odoo-reviewer at f156a56; read-only not enforced in this environment). Fixed: Summary without grouping was refused above 5,000 lines (blocking; it now prints figures and totals only); amounts of several currencies were added under one currency (now refused, and the PDF uses the lines' currency); the taxes table counted lines after loading their ids (now counts first); tests added for the menu, the report URL, a filtered nested print, several currencies and the ungrouped Summary. Kept as is: grouping by Employee groups by name (two people with the same name share a group); the summary figure definitions are written above.
+- Review: independent (odoo-reviewer at f156a56; read-only not enforced in this environment). Fixed: Summary without grouping was refused above 5,000 lines (blocking; it now prints figures and totals only); amounts of several currencies were added under one currency (now refused, and the PDF uses the lines' currency); the taxes table counted lines after loading their ids (now counts first); tests added for the menu, the report URL, a filtered nested print, several currencies and the ungrouped Summary. Re-review of the fixes (b9cd300): blocking finding resolved, no new problem; its nit on the report-URL test applied (asserts 403). Kept as is: grouping by Employee groups by name (two people with the same name share a group); the summary figure definitions are written above.
 
 ## Upgrade impact
 New module, nothing deployed before: no migration. Uninstalling it removes the menu, report and fields; the extra joins stay in the `report.pos.order` database view (harmless) until `point_of_sale` is next updated, which recreates the view.
