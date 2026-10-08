@@ -19,6 +19,7 @@
   "enterprise_repo": null,
   "enterprise_ref": null,
   "enterprise_commit": null,
-  "base_branch": null,
-  "with_demo": true
+  "base_branch": "dev",
+  "with_demo": true,
+  "status_file": "docs/tracking/TASKS.md"
 }

@@ -53,8 +53,8 @@ An agent moves Proposed → Approved → Active only when:
 3. Its definition is added under `/.claude/agents/` with least-privilege tools
    and the project's citation/handoff rules baked in.
 
-<!-- odoo-harness:start (managed by odoo-harness 1.3.3; change it in the harness repo, not here) -->
-## Odoo development (odoo-harness 1.3.3)
+<!-- odoo-harness:start (managed by odoo-harness 1.4.0; change it in the harness repo, not here) -->
+## Odoo development (odoo-harness 1.4.0)
 
 This repository holds custom Odoo 19 Enterprise modules deployed on Odoo.sh. Project settings, including the production and staging branch names, are in `.odoo-harness/project.json`.
 
@@ -66,5 +66,5 @@ This repository holds custom Odoo 19 Enterprise modules deployed on Odoo.sh. Pro
 - Enforce access rules on the server (access rights, record rules, multi-company checks). New user-facing text needs English and Arabic, and layouts must work right-to-left. Figures come from Odoo's standard reports whenever one provides them.
 - Run tests, fix failures and re-run them without asking. Ask the user only for business decisions you can't infer from the code or data; otherwise state your assumption and continue.
 - The work is done when the acceptance criteria are met, the tests pass (locally and/or on the Odoo.sh build), the result records in `.odoo-harness/evidence/` (with their logs and screenshots) are committed with the change and `oh evidence` shows them intact and current, and the feature notes are updated. End with one outcome: **completed**; **blocked** (say why); or **not verified** (say what couldn't be checked). Say whether the review was independent or a self-review.
-- Keep sessions short: one milestone per session. At the end of a milestone, when the session grows long, or before stopping with work left, hand over: update `.odoo-harness/HANDOFF.md` (the active track only, under about 45 lines), commit and push the feature branch, and give the user the prompt for the next session (odoo-dev §7). When resuming, read `.odoo-harness/HANDOFF.md` first.
+- Keep sessions short: one milestone per session. At the end of a milestone, when the session grows long, or before stopping with work left, hand over: update the handoff (the active track only, at most 45 lines and 4 KB; finished work goes in the status file, `status_file` in `project.json`), commit and push the feature branch, and give the user the prompt for the next session (odoo-dev §7; the merge step and where the handoff lives are in its `references/delivery.md`). When resuming, read the handoff named in the prompt first.
 <!-- odoo-harness:end -->
