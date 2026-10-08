@@ -1,0 +1,89 @@
+// POS Sales Report PDF (report assets: mirrored for right-to-left languages by rtlcss).
+.o_psr {
+    font-size: 11px;
+
+    .o_psr_head h3 {
+        margin-bottom: 6px;
+    }
+    .o_psr_meta,
+    .o_psr_kpis {
+        width: 100%;
+        margin-bottom: 10px;
+        border-collapse: collapse;
+    }
+    .o_psr_meta td {
+        vertical-align: top;
+        padding: 0 16px 0 0;
+        width: 33%;
+    }
+    .o_psr_meta small,
+    .o_psr_kpis small {
+        display: block;
+        color: #666c74;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 8.5px;
+    }
+    .o_psr_kpis td {
+        border: 1px solid #cfd3d8;
+        padding: 4px 6px;
+        width: 12.5%;
+    }
+    .o_psr_kpis b {
+        font-size: 12.5px;
+    }
+    .o_psr_table {
+        th {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid #1d1d1f;
+        }
+        td {
+            padding-top: 2px;
+            padding-bottom: 2px;
+        }
+        tr.o_psr_group td {
+            font-weight: bold;
+        }
+        tr.o_psr_level_0 td {
+            background-color: #f2eef1;
+            border-top: 1px solid #cfd3d8;
+        }
+        tr.o_psr_level_1 td:first-child {
+            padding-left: 16px;
+        }
+        tr.o_psr_level_2 td:first-child {
+            padding-left: 28px;
+        }
+        tr.o_psr_line td:first-child {
+            padding-left: 22px;
+        }
+    }
+    .o_psr_count {
+        font-weight: normal;
+        color: #666c74;
+    }
+    tr.o_psr_total td {
+        border-top: 2px solid #1d1d1f;
+        font-weight: bold;
+    }
+    .o_psr_negative,
+    .o_psr_refund_tag {
+        color: #b42318;
+    }
+    .o_psr_refund_tag {
+        font-size: 9px;
+        margin-left: 4px;
+    }
+    .o_psr_lower h6 {
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 9.5px;
+        margin-top: 8px;
+    }
+    .o_psr_note {
+        color: #666c74;
+        font-size: 9.5px;
+    }
+}

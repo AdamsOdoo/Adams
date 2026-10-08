@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="paperformat_pos_sales_landscape" model="report.paperformat">
+        <field name="name">A4 Landscape (POS Sales Report)</field>
+        <field name="format">A4</field>
+        <field name="page_height">0</field>
+        <field name="page_width">0</field>
+        <field name="orientation">Landscape</field>
+        <field name="margin_top">40</field>
+        <field name="margin_bottom">25</field>
+        <field name="margin_left">0</field>
+        <field name="margin_right">0</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">35</field>
+        <field name="dpi">90</field>
+        <field name="css_margins" eval="True"/>
+    </record>
+
+    <record id="action_report_pos_sales" model="ir.actions.report">
+        <field name="name">POS Sales Report</field>
+        <field name="model">report.pos.order</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">adams_pos_sales_report.report_pos_sales</field>
+        <field name="report_file">adams_pos_sales_report.report_pos_sales</field>
+        <field name="print_report_name">'POS Sales Report'</field>
+        <field name="paperformat_id" ref="paperformat_pos_sales_landscape"/>
+    </record>
+
+    <!-- One group row, then its subgroups or its lines (recursive). -->
+    <template id="report_pos_sales_group">
+        <tr t-attf-class="o_psr_group o_psr_level_#{node['level']}">
+            <td t-att-colspan="max(len(label_columns), 1)">
+                <span t-out="node['label']"/>
+                <span class="o_psr_count">(<t t-out="node['count']"/>)</span>
+            </td>
+            <t t-foreach="value_columns" t-as="col">
+                <td class="text-end">
+                    <t t-if="col['sum']" t-call="adams_pos_sales_report.report_pos_sales_amount">
+                        <t t-set="value" t-value="node['sums'][col['name']]"/>
+                    </t>
+                </td>
+            </t>
+        </tr>
+        <t t-foreach="node['children']" t-as="child">
+            <t t-call="adams_pos_sales_report.report_pos_sales_group">
+                <t t-set="node" t-value="child"/>
+            </t>
+        </t>
+        <t t-foreach="node['lines']" t-as="line">
+            <t t-call="adams_pos_sales_report.report_pos_sales_line"/>
+        </t>
+    </template>
+
+    <template id="report_pos_sales_line">
+        <tr t-attf-class="o_psr_line #{'o_psr_refund' if line['is_refund'] else ''}">
+            <td t-if="not label_columns"/>
+            <t t-foreach="label_columns" t-as="col">
+                <td>
+                    <span t-out="line[col['name']]"/>
+                    <span t-if="col['name'] == 'order_id' and line['is_refund']" class="o_psr_refund_tag">Refund</span>
+                </td>
+            </t>
+            <t t-foreach="value_columns" t-as="col">
+                <td class="text-end">
+                    <t t-call="adams_pos_sales_report.report_pos_sales_amount">
+                        <t t-set="value" t-value="line[col['name']]"/>
+                    </t>
+                </td>
+            </t>
+        </tr>
+    </template>
+
+    <template id="report_pos_sales_amount">
+        <span t-if="col['money']" t-att-class="'o_psr_negative' if value &lt; 0 else None"
+              t-out="value" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+        <span t-else="" t-att-class="'o_psr_negative' if value &lt; 0 else None"
+              t-out="value" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/>
+    </template>
+
+    <template id="report_pos_sales">
+        <t t-call="web.html_container">
+            <t t-call="web.external_layout">
+                <div class="page o_psr">
+                    <div class="o_psr_head">
+                        <h3>POS Sales Report</h3>
+                        <table class="o_psr_meta">
+                            <tr>
+                                <td>
+                                    <small>Filters</small>
+                                    <div t-if="filters"><t t-out="' · '.join(filters)"/></div>
+                                    <div t-else="">None</div>
+                                </td>
+                                <td>
+                                    <small>Grouped by</small>
+                                    <div t-if="grouping"><t t-out="' › '.join(grouping)"/></div>
+                                    <div t-else="">None</div>
+                                </td>
+                                <td>
+                                    <small>Printed</small>
+                                    <div><t t-out="printed_by"/> · <t t-out="printed_at"/></div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <table class="o_psr_kpis">
+                        <tr>
+                            <td><small>Orders</small><b t-out="kpis['orders']"/></td>
+                            <td><small>Items sold</small><b t-out="kpis['qty']" t-options="{'widget': 'float', 'decimal_precision': 'Product Unit'}"/></td>
+                            <td><small>Net sales</small><b t-out="kpis['net']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                            <td><small>Tax</small><b t-out="kpis['tax']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                            <td><small>Total</small><b t-out="kpis['total']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                            <td><small>Discounts</small><b t-out="kpis['discount']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                            <td><small>Refunds</small><b t-att-class="'o_psr_negative' if kpis['refunds'] &lt; 0 else None" t-out="kpis['refunds']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                            <td><small>Avg. ticket</small><b t-out="kpis['average']" t-options="{'widget': 'monetary', 'display_currency': currency}"/></td>
+                        </tr>
+                    </table>
+
+                    <table class="table table-sm o_psr_table">
+                        <thead>
+                            <tr>
+                                <th t-if="mode == 'summary'"><t t-out="' / '.join(grouping)"/></th>
+                                <t t-else="">
+                                    <th t-if="not label_columns"/>
+                                    <th t-foreach="label_columns" t-as="col" t-out="col['label']"/>
+                                </t>
+                                <th t-foreach="value_columns" t-as="col" class="text-end" t-out="col['label']"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="groups" t-as="node">
+                                <t t-call="adams_pos_sales_report.report_pos_sales_group"/>
+                            </t>
+                            <t t-foreach="lines" t-as="line">
+                                <t t-call="adams_pos_sales_report.report_pos_sales_line"/>
+                            </t>
+                        </tbody>
+                        <tfoot>
+                            <tr class="o_psr_total">
+                                <td t-att-colspan="max(len(label_columns), 1)">Grand total</td>
+                                <t t-foreach="value_columns" t-as="col">
+                                    <td class="text-end">
+                                        <t t-if="col['sum']" t-call="adams_pos_sales_report.report_pos_sales_amount">
+                                            <t t-set="value" t-value="totals[col['name']]"/>
+                                        </t>
+                                    </td>
+                                </t>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <div class="row o_psr_lower">
+                        <div class="col-6">
+                            <h6>Payments received</h6>
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr><th>Method</th><th class="text-end">Payments</th><th class="text-end">Amount</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="payments" t-as="pay">
+                                        <td t-out="pay['name']"/>
+                                        <td class="text-end" t-out="pay['count']"/>
+                                        <td class="text-end" t-out="pay['amount']" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="o_psr_total">
+                                        <td>Total</td>
+                                        <td class="text-end" t-out="sum(p['count'] for p in payments)"/>
+                                        <td class="text-end" t-out="sum(p['amount'] for p in payments)" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            <p class="o_psr_note">Payments of the orders in this report, by method. An order paid with two methods is counted under both.</p>
+                        </div>
+                        <div class="col-6">
+                            <h6>Taxes</h6>
+                            <table t-if="taxes is not None" class="table table-sm">
+                                <thead>
+                                    <tr><th>Tax</th><th class="text-end">Base</th><th class="text-end">Amount</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="taxes" t-as="tax">
+                                        <td t-out="tax['name']"/>
+                                        <td class="text-end" t-out="tax['base_amount']" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                        <td class="text-end" t-out="tax['tax_amount']" t-options="{'widget': 'monetary', 'display_currency': currency}"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p t-else="" class="o_psr_note">
+                                Taxes by rate are listed for up to <t t-out="max_tax_lines"/> lines. Narrow the period or filters to see them.
+                            </p>
+                        </div>
+                    </div>
+                    <p class="o_psr_note">
+                        Amounts in <t t-out="currency.name"/>, tax excluded unless the column says otherwise. Refunds are negative.
+                        Draft and cancelled orders are not included.
+                    </p>
+                </div>
+            </t>
+        </t>
+    </template>
+</odoo>
