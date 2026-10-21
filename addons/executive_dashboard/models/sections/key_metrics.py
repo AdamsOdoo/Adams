@@ -6,10 +6,13 @@ corrections). Cancelled orders and invoices are never posted, so never counted. 
 is the Source (``source_id``) of the sales order an invoice line comes from; lines without
 a sales order, or whose order has no Source, are "No channel".
 
-Gross profit % is one calculation on the company totals of the period:
-(net sales - cost of goods sold) / net sales x 100, where cost of goods sold is the posted
-balance of the Cost of Revenue accounts (``expense_direct_cost``). Margins of products or
-channels are never averaged.
+Gross profit % is one calculation on the company totals of the period, from the Profit and
+Loss (the same revenue and gross profit as Finance): (revenue - cost of goods sold) /
+revenue x 100, where revenue is the Income accounts and cost of goods sold the Cost of
+Revenue accounts (``expense_direct_cost``). Both sides cover every posting, so income
+without a customer invoice (POS sessions, journal entries) and its costs are on both sides;
+net sales (invoices only) would leave that income out but not its costs. Margins of products
+or channels are never averaged.
 
 Working capital is taken at the period's end (never after today): available cash (the Bank
 and Cash accounts), inventory at cost (Odoo's stock valuation), receivables and payables
@@ -36,7 +39,7 @@ from odoo.tools import SQL, float_compare
 from odoo.tools.misc import format_date, formatLang
 
 from .sales import INVOICE_TYPES
-from .finance import DIRECT_COST, OPEN_TYPES
+from .finance import DIRECT_COST, INCOME, OPEN_TYPES
 
 OTIF_KINDS = ('ok', 'not_full', 'late', 'both')
 # Finance drawers and native screens shown from this section, under this section's keys.
@@ -50,21 +53,23 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _section_key_metrics(self, scope):
         """``currency``, ``net_sales``, ``gross_profit``, ``working_capital``, ``otif`` (None
-        without Sales and Inventory) and ``roas``."""
+        without Sales and Inventory), ``roas`` and ``checks``."""
         currency = scope['company'].currency_id
         net = self._key_net_sales(scope)
-        cogs = self._key_cogs(scope)
+        pnl = self._fin_pnl(scope)
         spend = self._key_ad_spend(scope)
+        bank = self._fin_bank_cash(scope)
+        open_items = {kind: self._fin_open_items(scope, kind) for kind in OPEN_TYPES}
         return {
             'currency': {'name': currency.name, 'symbol': currency.symbol,
                          'position': currency.position, 'digits': currency.decimal_places},
             'net_sales': net,
-            'gross_profit': {'revenue': net['total'], 'cogs': cogs, 'gross_profit': net['total'] - cogs,
-                             'percent': self._key_ratio(net['total'] - cogs, net['total'], 100)},
-            'working_capital': self._key_working_capital(scope),
+            'gross_profit': self._key_gross_profit(pnl, net['total']),
+            'working_capital': self._key_working_capital(scope, bank, open_items),
             'otif': self._key_otif(scope) if self._key_otif_ready() else None,
             'roas': {'sales': net['total'], 'spend': spend['total'], 'accounts': len(spend['accounts']),
                      'roas': self._key_ratio(net['total'], spend['total'])},
+            'checks': self._fin_checks(scope, 'key_metrics', pnl, bank, open_items),
         }
 
     # ------------------------------------------------------------------ helpers
@@ -198,8 +203,11 @@ class ExecutiveDashboard(models.AbstractModel):
             costs[account] += self._fin_convert(scope, balance, company, scope['date_to'])
         return costs
 
-    def _key_cogs(self, scope):
-        return sum(self._key_cogs_rows(scope).values())
+    def _key_gross_profit(self, pnl, net_sales):
+        """Gross profit % from the Profit and Loss figures (Finance's ``_fin_pnl``), with net sales for comparison."""
+        revenue, gross = pnl['revenue'], pnl['gross_profit']
+        return {'revenue': revenue, 'cogs': revenue - gross, 'gross_profit': gross,
+                'percent': self._key_ratio(gross, revenue, 100), 'net_sales': net_sales}
 
     # ------------------------------------------------------------------ working capital
 
@@ -231,11 +239,15 @@ class ExecutiveDashboard(models.AbstractModel):
             total += self._fin_convert(scope, sum(products.mapped('total_value')), company, scope['as_of'])
         return total
 
-    def _key_working_capital(self, scope):
-        cash = self._fin_bank_cash(scope)['total']
+    def _key_working_capital(self, scope, bank=None, open_items=None):
+        """Working capital at the period's end; ``bank`` and ``open_items`` are the Finance
+        figures when the caller already has them."""
+        bank = bank or self._fin_bank_cash(scope)
+        open_items = open_items or {kind: self._fin_open_items(scope, kind) for kind in OPEN_TYPES}
+        cash = bank['total']
         inventory = self._key_inventory(scope)
-        receivables = self._fin_open_items(scope, 'receivables')['total']
-        payables = self._fin_open_items(scope, 'payables')['total']
+        receivables = open_items['receivables']['total']
+        payables = open_items['payables']['total']
         return {'as_of': fields.Date.to_string(scope['as_of']), 'cash': cash, 'inventory': inventory,
                 'receivables': receivables, 'payables': payables,
                 'total': cash + (inventory or 0.0) + receivables - payables}
@@ -439,26 +451,38 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _drawer_key_metrics_gross_profit(self, args):
         scope, _ = self._key_scope(args), self.env._
-        net = self._key_total(scope)
+        gp = self._key_gross_profit(self._fin_pnl(scope), self._key_total(scope))
         costs = self._key_cogs_rows(scope)
-        cogs = sum(costs.values())
         period = self._key_period_args(args)
         currency = scope['company'].currency_id
-        percent = self._key_ratio(net - cogs, net, 100)
+        crumb = _('Gross profit %')
         cost_rows = [{'label': account.name, 'sub': self._fin_code(account), 'value': self._fin_format(cost),
                       'action': {'key': 'key_metrics.account', 'args': dict(period, account_id=account.id)}}
                      for account, cost in sorted(costs.items(), key=lambda item: -abs(item[1]))
                      if not currency.is_zero(cost)]
         groups = [{'title': _('Calculation'), 'rows': [
-            {'label': _('Net sales (excluding VAT)'), 'value': self._fin_format(net),
-             'open': {'key': 'key_metrics.net_sales', 'args': period, 'crumb': _('Gross profit %')}},
-            {'label': _('Cost of goods sold'), 'value': self._fin_format(-cogs)},
-            {'label': _('Gross profit'), 'value': self._fin_format(net - cogs)}]}]
+            {'label': _('Revenue (all income accounts)'), 'value': self._fin_format(gp['revenue']),
+             'open': {'key': 'key_metrics.revenue', 'args': period, 'crumb': crumb}},
+            {'label': _('Cost of goods sold'), 'value': self._fin_format(-gp['cogs'])},
+            {'label': _('Gross profit'), 'value': self._fin_format(gp['gross_profit'])}]}]
         if cost_rows:
             groups.append({'title': _('Cost of goods sold by account'), 'rows': cost_rows})
+        groups.append({'title': _('For comparison'), 'rows': [
+            {'label': _('Net sales (customer invoices only)'), 'value': self._fin_format(gp['net_sales']),
+             'open': {'key': 'key_metrics.net_sales', 'args': period, 'crumb': crumb}}]})
+        note = _('One calculation on the company totals of the Profit and Loss: (revenue - cost of goods sold) / '
+                 'revenue x 100. Product or channel margins are never averaged.')
+        if abs(gp['revenue'] - gp['net_sales']) >= 1:
+            note = '%s %s' % (note, _('Revenue differs from net sales by %(amount)s %(currency)s: income posted without '
+                                      'a customer invoice, such as POS sessions or journal entries.',
+                                      amount=self._fin_format(gp['revenue'] - gp['net_sales']), currency=currency.name))
+        if abs(sum(costs.values()) - gp['cogs']) >= 1:
+            note = '%s %s' % (note, _('The Profit and Loss report gives %(amount)s %(currency)s for the cost of goods '
+                                      'sold; the accounts above add up to their posted entries.',
+                                      amount=self._fin_format(gp['cogs']), currency=currency.name))
+        percent = gp['percent']
         return {'title': _('Gross profit %'), 'sub': self._key_period_label(scope),
-                'note': _('One calculation on the company totals: (net sales - cost of goods sold) / net sales x 100. '
-                          'Product or channel margins are never averaged.'),
+                'note': note,
                 'groups': groups,
                 'total': {'label': _('Gross profit %'),
                           'value': '%s%%' % self._key_pct(percent) if percent is not None else '—'},
@@ -467,6 +491,10 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _key_pct(self, value):
         return formatLang(self.env, value, digits=1)
+
+    def _drawer_key_metrics_revenue(self, args):
+        """Finance's revenue panel (income accounts with their totals) under this section's keys."""
+        return self._key_rekey(self._drawer_finance_profit(dict(args, figure='revenue')))
 
     def _drawer_key_metrics_bank_cash(self, args):
         return self._key_rekey(self.with_context(ed_account_key='key_metrics.account')._drawer_finance_bank_cash(args))
@@ -612,7 +640,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _check_key_metrics_account(self, args):
         account = self._fin_account(args)
-        if account.account_type not in ('asset_cash', *OPEN_TYPES.values(), *DIRECT_COST) \
+        if account.account_type not in ('asset_cash', *OPEN_TYPES.values(), *INCOME, *DIRECT_COST) \
                 and account not in self._key_ad_accounts(self._key_scope(args)):
             raise ValidationError(self.env._('Unknown detail.'))
         return account

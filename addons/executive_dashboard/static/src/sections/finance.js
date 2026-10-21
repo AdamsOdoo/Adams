@@ -54,7 +54,7 @@ export class FinanceSection extends Component {
         };
         return [
             { key: "revenue", icon: "coin", label: _t("Revenue"), value: k.revenue,
-              cap: _t("%s invoices · posted", k.invoices), open: () => this.openProfit("revenue") },
+              cap: _t("All income accounts · %s invoices", k.invoices), open: () => this.openProfit("revenue") },
             { key: "gross", icon: "scale", label: _t("Gross profit"), value: k.gross_profit,
               cap: margin(k.gross_profit), open: () => this.openProfit("gross_profit") },
             { key: "net", icon: "spark", label: _t("Net profit"), value: k.net_profit,
@@ -168,6 +168,15 @@ export class FinanceSection extends Component {
     }
 
     // ------------------------------------------------------------ side panel
+
+    /** Figures the books cannot hold (from the server), each opening the panel behind it. */
+    get checks() {
+        return this.w.checks || [];
+    }
+
+    openCheck(check) {
+        this.open(check.drawer.key.split(".")[1], { ...this.periodArgs, ...check.drawer.args });
+    }
 
     open(name, args, crumb = _t("Finance")) {
         this.props.openPanel({ kind: "drawer", key: `finance.${name}`, args, crumb, sec: "finance" });

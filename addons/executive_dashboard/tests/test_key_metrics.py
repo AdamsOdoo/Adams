@@ -86,7 +86,8 @@ class TestKeyMetrics(SalesCrmCase):
         self.assertEqual(keys[0], 'key_metrics')
         self.assertLess(keys.index('key_metrics'), keys.index('finance'))
         widgets = self.widgets()
-        self.assertEqual(set(widgets), {'currency', 'net_sales', 'gross_profit', 'working_capital', 'otif', 'roas'})
+        self.assertEqual(set(widgets), {'currency', 'net_sales', 'gross_profit', 'working_capital', 'otif', 'roas',
+                                       'checks'})
         self.company.executive_dashboard_key_metrics = False
         self.assertNotIn('key_metrics', [s['key'] for s in self.Dashboard.get_bootstrap()['sections']])
         with self.assertRaises(AccessError):
@@ -158,6 +159,32 @@ class TestKeyMetrics(SalesCrmCase):
         accounts = [row for group in panel['groups'][1:] for row in group['rows']]
         self.assertFalse(any(row.get('action') for row in accounts))
         self.assertTrue(any(row['label'] == self.cost_account.name for row in accounts))
+
+    def test_a3_gross_profit_uses_the_profit_and_loss_revenue(self):
+        """Income posted without a customer invoice counts in gross profit % (as its costs do),
+        not in net sales; revenue and gross profit equal Finance's."""
+        income = self.env['account.account'].create({'name': 'Example other sales', 'code': 'EDK410',
+                                                     'account_type': 'income'})
+        before = self.widgets()
+        move = self.env['account.move'].create({
+            'move_type': 'entry', 'date': self.today,
+            'line_ids': [fields.Command.create({'account_id': self.other_account.id, 'debit': 500.0, 'name': 'Example'}),
+                         fields.Command.create({'account_id': income.id, 'credit': 500.0, 'name': 'Example'})],
+        })
+        move.action_post()
+        after = self.widgets()
+        self.assertAlmostEqual(after['gross_profit']['revenue'] - before['gross_profit']['revenue'], 500.0)
+        self.assertAlmostEqual(after['net_sales']['total'], before['net_sales']['total'])
+        self.assertAlmostEqual(after['gross_profit']['net_sales'], after['net_sales']['total'])
+        finance = self.Dashboard._elevated()._section_finance(self.Dashboard._period_scope('finance', 'month'))
+        self.assertAlmostEqual(after['gross_profit']['revenue'], finance['kpis']['revenue'])
+        self.assertAlmostEqual(after['gross_profit']['gross_profit'], finance['kpis']['gross_profit'])
+        panel = self.drawer('gross_profit')
+        self.assertIn('differs from net sales', panel['note'])
+        revenue = self.drawer('revenue')
+        self.assertTrue(any(row['label'] == income.name for group in revenue['groups'] for row in group['rows']))
+        self.assertTrue(all(not row.get('action') or row['action']['key'] == 'key_metrics.account'
+                            for group in revenue['groups'] for row in group['rows']))
 
     # -- A4 working capital ------------------------------------------------------
 
@@ -251,7 +278,7 @@ class TestKeyMetrics(SalesCrmCase):
     # -- A7 side panels and arguments ------------------------------------------
 
     def test_a7_every_panel_opens(self):
-        for key, args in (('net_sales', {}), ('channel', {'source_id': False}), ('gross_profit', {}),
+        for key, args in (('net_sales', {}), ('channel', {'source_id': False}), ('gross_profit', {}), ('revenue', {}),
                           ('working_capital', {}), ('bank_cash', {}), ('roas', {}),
                           ('open_items', {'kind': 'payables', 'view': 'aged'})):
             panel = self.drawer(key, **args)

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="executive_dashboard.FinanceSection">
+        <t t-call="executive_dashboard.SectionChecks"/>
         <section class="ed-kpis" style="--n:6">
             <button t-foreach="kpis" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
                 <span class="ed-kic"><Icon name="kpi.icon"/></span>

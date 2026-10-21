@@ -59,7 +59,7 @@ export class KeyMetricsSection extends Component {
         const { net_sales: net, gross_profit: gp, working_capital: wc, otif, roas } = this.w;
         const list = [
             { key: "net", icon: "coin", label: _t("Net sales"), value: compact(net.total), money: true,
-              cap: _t("Excluding VAT"), open: () => this.open("net_sales") },
+              cap: _t("Customer invoices · excl. VAT"), open: () => this.open("net_sales") },
             { key: "gp", icon: "percent", label: _t("Gross profit %"), value: this.pct(gp.percent),
               cap: _t("Gross profit %s", compact(gp.gross_profit)), open: () => this.open("gross_profit") },
             { key: "wc", icon: "scale", label: _t("Working capital"), value: compact(wc.total), money: true,
@@ -171,6 +171,16 @@ export class KeyMetricsSection extends Component {
     }
 
     // ------------------------------------------------------------ side panel
+
+    /** Figures the books cannot hold (from the server), each opening the panel behind it. */
+    get checks() {
+        return this.w.checks || [];
+    }
+
+    openCheck(check) {
+        this.props.openPanel({ kind: "drawer", key: check.drawer.key, args: { ...this.periodArgs, ...check.drawer.args },
+                               crumb: _t("Key metrics"), sec: "key_metrics" });
+    }
 
     open(name, args = {}, crumb = _t("Key metrics")) {
         this.props.openPanel({ kind: "drawer", key: `key_metrics.${name}`, args: { ...this.periodArgs, ...args },
