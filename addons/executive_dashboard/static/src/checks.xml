@@ -3,7 +3,7 @@
     <!-- Figures the books cannot hold (``checks`` from the server), above a section's figures.
          Used with t-call inside a section that has ``checks`` and ``openCheck(check)``. -->
     <t t-name="executive_dashboard.SectionChecks">
-        <section t-if="checks.length" class="ed-checks" role="alert">
+        <section t-if="checks.length" class="ed-checks" role="status">
             <strong class="ed-checks-title">Check the books</strong>
             <button t-foreach="checks" t-as="check" t-key="check_index" type="button"
                     t-att-class="'ed-check ' + check.severity" t-on-click="() => this.openCheck(check)">

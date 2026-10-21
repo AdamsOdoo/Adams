@@ -18,7 +18,7 @@
                 <header class="ed-panel-head">
                     <div>
                         <h2>Net sales by channel</h2>
-                        <p>Customer invoices only · excluding VAT · after discounts, cancellations, returns and credit notes · channel = Source on the sales order</p>
+                        <p>Customer invoices and POS sales · excluding VAT · after discounts, cancellations, returns and credit notes · channel = Source on the sales order, or Point of Sale</p>
                     </div>
                     <button type="button" class="ed-link" t-on-click="() => this.open('net_sales')">
                         View all <Icon name="'arrow'" flip="true"/>
@@ -80,7 +80,7 @@
                     <dt class="ed-eq">= Gross profit</dt><dd class="ed-eq ed-num" t-esc="whole(w.gross_profit.gross_profit)"/>
                     <dt>÷ Revenue × 100</dt><dd class="ed-num" t-esc="pct(w.gross_profit.percent)"/>
                 </dl>
-                <p class="ed-note mt-2">Revenue = all income accounts, as in Finance; net sales above count customer invoices only. Never an average of product or channel margins.</p>
+                <p class="ed-note mt-2">Revenue = all income accounts, as in Finance; net sales above count customer invoices and POS sales only. Never an average of product or channel margins.</p>
             </section>
 
             <section t-if="w.otif" class="ed-panel ed-span-4">

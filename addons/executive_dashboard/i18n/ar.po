@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-21 13:06+0000\n"
-"PO-Revision-Date: 2026-10-21 13:06+0000\n"
+"POT-Creation-Date: 2026-10-21 13:19+0000\n"
+"PO-Revision-Date: 2026-10-21 13:19+0000\n"
 "Last-Translator: \n"
 "Language-Team: \n"
 "MIME-Version: 1.0\n"
@@ -20,16 +20,6 @@ msgstr ""
 #: code:addons/executive_dashboard/static/src/sections/finance.js:0
 msgid "%(count)s accounts · as of %(date)s"
 msgstr "%(count)s حسابات · في %(date)s"
-
-#. module: executive_dashboard
-#. odoo-python
-#: code:addons/executive_dashboard/models/sections/finance.py:0
-msgid ""
-"Bank or cash accounts below zero: %(count)s (%(amount)s). Check that the "
-"money received is recorded."
-msgstr ""
-"حسابات بنوك أو خزائن أقل من صفر: %(count)s (%(amount)s). تحقّق من تسجيل "
-"الأموال المحصّلة."
 
 #. module: executive_dashboard
 #. odoo-python
@@ -218,11 +208,11 @@ msgstr "= العائد على الإنفاق الإعلاني"
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid ""
-"A gross margin of %(margin)s%% is not possible: check the entries on the "
-"cost of goods sold accounts."
+"A gross margin of %(margin)s is not possible: the cost of goods sold is "
+"below zero. Check its entries."
 msgstr ""
-"هامش مجمل ربح قدره %(margin)s%% غير ممكن: راجع القيود على حسابات تكلفة "
-"البضاعة المباعة."
+"هامش مجمل ربح قدره %(margin)s غير ممكن: تكلفة البضاعة المباعة أقل من صفر. "
+"راجع قيودها."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -485,6 +475,16 @@ msgstr "قيود البنوك والنقدية"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid ""
+"Bank or cash accounts below zero: %(count)s (%(amount)s). Check that the "
+"money received is recorded."
+msgstr ""
+"حسابات بنوك أو خزائن أقل من صفر: %(count)s (%(amount)s). تحقّق من تسجيل "
+"الأموال المحصّلة."
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
 msgid "By account"
 msgstr "حسب الحساب"
 
@@ -629,6 +629,16 @@ msgid "Close"
 msgstr "إغلاق"
 
 #. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid ""
+"Closed POS sessions (orders without an invoice) and invoices of POS orders; "
+"refunds count as credit notes."
+msgstr ""
+"جلسات نقاط البيع المغلقة (طلبات بدون فاتورة) وفواتير طلبات نقاط البيع؛ "
+"وتُحسب المرتجعات كإشعارات دائن."
+
+#. module: executive_dashboard
 #. odoo-javascript
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/crm.py:0
@@ -732,17 +742,13 @@ msgstr "تحصيلات العملاء"
 #. odoo-javascript
 #: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 msgid ""
-"Customer invoices only · excluding VAT · after discounts, cancellations, "
-"returns and credit notes · channel = Source on the sales order"
+"Customer invoices and POS sales · excluding VAT · after discounts, "
+"cancellations, returns and credit notes · channel = Source on the sales "
+"order, or Point of Sale"
 msgstr ""
-"فواتير العملاء فقط · بدون ضريبة القيمة المضافة · بعد الخصومات والإلغاءات "
-"والمرتجعات وإشعارات الدائن · القناة = المصدر في أمر البيع"
-
-#. module: executive_dashboard
-#. odoo-javascript
-#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
-msgid "Customer invoices · excl. VAT"
-msgstr "فواتير العملاء · بدون ضريبة القيمة المضافة"
+"فواتير العملاء ومبيعات نقاط البيع · بدون ضريبة القيمة المضافة · بعد الخصومات"
+" والإلغاءات والمرتجعات وإشعارات الدائن · القناة = المصدر في أمر البيع، أو "
+"نقاط البيع"
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -1198,6 +1204,12 @@ msgid "Invoiced sales, orders, salespeople, products and customers"
 msgstr "المبيعات المفوترة والطلبات ومندوبو المبيعات والمنتجات والعملاء"
 
 #. module: executive_dashboard
+#. odoo-javascript
+#: code:addons/executive_dashboard/static/src/sections/key_metrics.js:0
+msgid "Invoices and POS · excl. VAT"
+msgstr "الفواتير ونقاط البيع · بدون ضريبة القيمة المضافة"
+
+#. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 msgid "Invoices and credit notes"
@@ -1359,14 +1371,14 @@ msgstr "صافي المبيعات"
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/key_metrics.py:0
-msgid "Net sales (customer invoices only)"
-msgstr "صافي المبيعات (فواتير العملاء فقط)"
+msgid "Net sales (excluding VAT)"
+msgstr "صافي المبيعات (بدون ضريبة القيمة المضافة)"
 
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/key_metrics.py:0
-msgid "Net sales (excluding VAT)"
-msgstr "صافي المبيعات (بدون ضريبة القيمة المضافة)"
+msgid "Net sales (invoices and POS)"
+msgstr "صافي المبيعات (الفواتير ونقاط البيع)"
 
 #. module: executive_dashboard
 #. odoo-python
@@ -2069,6 +2081,12 @@ msgstr "التخطيط"
 
 #. module: executive_dashboard
 #. odoo-python
+#: code:addons/executive_dashboard/models/sections/key_metrics.py:0
+msgid "Point of Sale"
+msgstr "نقاط البيع"
+
+#. module: executive_dashboard
+#. odoo-python
 #: code:addons/executive_dashboard/models/sections/sales.py:0
 msgid "Posted customer invoices and credit notes · untaxed"
 msgstr "فواتير العملاء وإشعارات الدائن المرحّلة · قبل الضريبة"
@@ -2374,20 +2392,23 @@ msgstr "الإيرادات (كل حسابات الإيرادات)"
 #: code:addons/executive_dashboard/static/src/sections/key_metrics.xml:0
 msgid ""
 "Revenue = all income accounts, as in Finance; net sales above count customer"
-" invoices only. Never an average of product or channel margins."
+" invoices and POS sales only. Never an average of product or channel "
+"margins."
 msgstr ""
 "الإيرادات = كل حسابات الإيرادات كما في قسم المالية؛ أما صافي المبيعات أعلاه "
-"فيحسب فواتير العملاء فقط. لا يُحسب أبدًا متوسط هوامش المنتجات أو القنوات."
+"فيحسب فواتير العملاء ومبيعات نقاط البيع فقط. لا يُحسب أبدًا متوسط هوامش "
+"المنتجات أو القنوات."
 
 #. module: executive_dashboard
 #. odoo-python
 #: code:addons/executive_dashboard/models/sections/key_metrics.py:0
 msgid ""
-"Revenue differs from net sales by %(amount)s %(currency)s: income posted "
-"without a customer invoice, such as POS sessions or journal entries."
+"Revenue differs from net sales by %(amount)s %(currency)s, for example "
+"income posted by journal entry, or invoice lines on accounts other than "
+"Income."
 msgstr ""
-"تختلف الإيرادات عن صافي المبيعات بمقدار %(amount)s %(currency)s: إيرادات "
-"مرحّلة بدون فاتورة عميل، مثل جلسات نقاط البيع أو القيود اليومية."
+"تختلف الإيرادات عن صافي المبيعات بمقدار %(amount)s %(currency)s، مثلًا "
+"إيرادات مرحّلة بقيد يومية، أو سطور فواتير على حسابات غير حسابات الإيرادات."
 
 #. module: executive_dashboard
 #. odoo-javascript
@@ -2630,6 +2651,16 @@ msgstr ""
 msgid ""
 "The Profit and Loss report gives %(amount)s %(currency)s for this figure."
 msgstr "يعرض تقرير الأرباح والخسائر %(amount)s %(currency)s لهذا الرقم."
+
+#. module: executive_dashboard
+#. odoo-python
+#: code:addons/executive_dashboard/models/sections/finance.py:0
+msgid ""
+"The gross margin is below zero (%(margin)s): costs exceed revenue. Check the"
+" entries on the cost of goods sold accounts."
+msgstr ""
+"هامش مجمل الربح أقل من صفر (%(margin)s): التكاليف تتجاوز الإيرادات. راجع "
+"القيود على حسابات تكلفة البضاعة المباعة."
 
 #. module: executive_dashboard
 #. odoo-javascript

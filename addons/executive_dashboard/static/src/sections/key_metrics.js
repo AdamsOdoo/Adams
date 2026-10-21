@@ -59,7 +59,7 @@ export class KeyMetricsSection extends Component {
         const { net_sales: net, gross_profit: gp, working_capital: wc, otif, roas } = this.w;
         const list = [
             { key: "net", icon: "coin", label: _t("Net sales"), value: compact(net.total), money: true,
-              cap: _t("Customer invoices · excl. VAT"), open: () => this.open("net_sales") },
+              cap: _t("Invoices and POS · excl. VAT"), open: () => this.open("net_sales") },
             { key: "gp", icon: "percent", label: _t("Gross profit %"), value: this.pct(gp.percent),
               cap: _t("Gross profit %s", compact(gp.gross_profit)), open: () => this.open("gross_profit") },
             { key: "wc", icon: "scale", label: _t("Working capital"), value: compact(wc.total), money: true,

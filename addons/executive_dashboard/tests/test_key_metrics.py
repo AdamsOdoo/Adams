@@ -104,7 +104,15 @@ class TestKeyMetrics(SalesCrmCase):
             ('move_type', 'in', ('out_invoice', 'out_refund')), ('state', '=', 'posted'),
             ('company_id', '=', self.company.id),
             ('date', '>=', scope['date_from']), ('date', '<=', scope['date_to'])])
-        self.assertAlmostEqual(net['total'], sum(moves.mapped('amount_untaxed_signed')), places=2)
+        expected = sum(moves.mapped('amount_untaxed_signed'))
+        if self.Dashboard._key_pos_ready():
+            # Closed POS sessions (orders without an invoice) are net sales too.
+            expected -= sum(self.env['account.move.line'].search([
+                ('parent_state', '=', 'posted'), ('move_id.pos_session_ids', '!=', False),
+                ('account_id.account_type', '=', 'income'), ('tax_line_id', '=', False),
+                ('company_id', '=', self.company.id),
+                ('date', '>=', scope['date_from']), ('date', '<=', scope['date_to'])]).mapped('balance'))
+        self.assertAlmostEqual(net['total'], expected, places=2)
         self.assertAlmostEqual(sum(c['net'] for c in net['channels']), net['total'], places=2)
         self.assertAlmostEqual(net['invoiced'] - net['refunds'], net['total'], places=2)
 

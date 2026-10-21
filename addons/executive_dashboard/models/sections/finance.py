@@ -105,22 +105,30 @@ class ExecutiveDashboard(models.AbstractModel):
         """Figures the books cannot hold, each opening the panel of the entries behind it:
         ``[{severity, text, drawer: {key, args}}]`` (the client adds the period to ``args``).
 
-        A gross margin outside 0-100 %, a bank or cash account below zero, and receivables or
-        payables below zero (payments not matched to invoices or bills). The dashboard shows
-        the books as they are; these say where they need checking.
+        A gross margin above 100 % (cost of goods sold below zero: not possible), a gross margin
+        below zero (costs above revenue), a bank or cash account below zero, and receivables or
+        payables below zero (payments not matched to invoices or bills). The dashboard shows the
+        books as they are; these say where they need checking.
         """
         _ = self.env._
         currency = scope['company'].currency_id
-        # Isolated left to right, so the sign and the currency stay in place in Arabic sentences.
-        money = lambda amount: '⁦%s %s⁩' % (self._fin_format(amount), currency.name)  # noqa: E731
+        # Isolated left to right, so signs and currencies stay in place in Arabic sentences.
+        ltr = lambda text: '\u2066%s\u2069' % text  # noqa: E731
+        money = lambda amount: ltr('%s %s' % (self._fin_format(amount), currency.name))  # noqa: E731
         checks = []
         revenue, gross = pnl['revenue'], pnl['gross_profit']
-        if currency.compare_amounts(revenue, 0) > 0 and not 0 <= gross / revenue * 100 <= 100:
+        if currency.compare_amounts(revenue, 0) > 0:
             drawer = {'key': 'finance.profit', 'args': {'figure': 'gross_profit'}} if section == 'finance' \
                 else {'key': 'key_metrics.gross_profit', 'args': {}}
-            checks.append({'severity': 'crit', 'drawer': drawer, 'text': _(
-                'A gross margin of %(margin)s%% is not possible: check the entries on the cost of goods sold accounts.',
-                margin=formatLang(self.env, gross / revenue * 100, digits=0))})
+            margin = ltr('%s%%' % formatLang(self.env, gross / revenue * 100, digits=1))
+            if currency.compare_amounts(gross, revenue) > 0:
+                checks.append({'severity': 'crit', 'drawer': drawer, 'text': _(
+                    'A gross margin of %(margin)s is not possible: the cost of goods sold is below zero. '
+                    'Check its entries.', margin=margin)})
+            elif currency.compare_amounts(gross, 0) < 0:
+                checks.append({'severity': 'warn', 'drawer': drawer, 'text': _(
+                    'The gross margin is below zero (%(margin)s): costs exceed revenue. Check the entries on the '
+                    'cost of goods sold accounts.', margin=margin)})
         negative = [row for row in bank['rows'] if currency.compare_amounts(row['balance'], 0) < 0]
         if negative:
             checks.append({'severity': 'warn', 'drawer': {'key': f'{section}.bank_cash', 'args': {}}, 'text': _(
