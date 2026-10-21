@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates xml:space="preserve">
     <t t-name="executive_dashboard.KeyMetricsSection">
+        <t t-call="executive_dashboard.SectionChecks"/>
         <t t-set="kpiList" t-value="kpis"/>
         <section class="ed-kpis" t-att-style="'--n:' + kpiList.length">
             <button t-foreach="kpiList" t-as="kpi" t-key="kpi.key" type="button" class="ed-kpi" t-on-click="kpi.open">
@@ -17,7 +18,7 @@
                 <header class="ed-panel-head">
                     <div>
                         <h2>Net sales by channel</h2>
-                        <p>Excluding VAT · after discounts, cancellations, returns and credit notes · channel = Source on the sales order</p>
+                        <p>Customer invoices and POS sales · excluding VAT · after discounts, cancellations, returns and credit notes · channel = Source on the sales order, or Point of Sale</p>
                     </div>
                     <button type="button" class="ed-link" t-on-click="() => this.open('net_sales')">
                         View all <Icon name="'arrow'" flip="true"/>
@@ -66,7 +67,7 @@
                 <header class="ed-panel-head">
                     <div>
                         <h2>Gross profit %</h2>
-                        <p>Whole company · from combined totals</p>
+                        <p>Whole company · Profit and Loss totals</p>
                     </div>
                     <button type="button" class="ed-link" t-on-click="() => this.open('gross_profit')">
                         Details <Icon name="'arrow'" flip="true"/>
@@ -74,12 +75,12 @@
                 </header>
                 <div class="ed-gauge"><span class="ed-big ed-num" t-esc="pct(w.gross_profit.percent)"/></div>
                 <dl class="ed-formula">
-                    <dt>Net sales</dt><dd class="ed-num" t-esc="whole(w.gross_profit.revenue)"/>
+                    <dt>Revenue</dt><dd class="ed-num" t-esc="whole(w.gross_profit.revenue)"/>
                     <dt>− Cost of goods sold</dt><dd class="ed-num" t-esc="whole(w.gross_profit.cogs)"/>
                     <dt class="ed-eq">= Gross profit</dt><dd class="ed-eq ed-num" t-esc="whole(w.gross_profit.gross_profit)"/>
-                    <dt>÷ Net sales × 100</dt><dd class="ed-num" t-esc="pct(w.gross_profit.percent)"/>
+                    <dt>÷ Revenue × 100</dt><dd class="ed-num" t-esc="pct(w.gross_profit.percent)"/>
                 </dl>
-                <p class="ed-note mt-2">Never an average of product or channel margins.</p>
+                <p class="ed-note mt-2">Revenue = all income accounts, as in Finance; net sales above count customer invoices and POS sales only. Never an average of product or channel margins.</p>
             </section>
 
             <section t-if="w.otif" class="ed-panel ed-span-4">

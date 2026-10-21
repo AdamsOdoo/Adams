@@ -4,3 +4,4 @@ from . import test_sales_crm
 from . import test_procurement_inventory
 from . import test_people
 from . import test_key_metrics
+from . import test_key_metrics_pos

@@ -2,14 +2,18 @@
 
 Net sales are the product lines of posted customer invoices and credit notes in the period
 (accounting date), untaxed, after line discounts: invoices minus credit notes (returns and
-corrections). Cancelled orders and invoices are never posted, so never counted. The channel
-is the Source (``source_id``) of the sales order an invoice line comes from; lines without
-a sales order, or whose order has no Source, are "No channel".
+corrections), plus the sales lines of closed POS sessions (orders without an invoice; an
+invoiced POS order is in its invoice). Cancelled orders and invoices are never posted, so
+never counted. The channel is the Source (``source_id``) of the sales order an invoice line
+comes from; POS sessions, and invoices of POS orders without a Source, are "Point of Sale";
+other lines without a sales order, or whose order has no Source, are "No channel".
 
-Gross profit % is one calculation on the company totals of the period:
-(net sales - cost of goods sold) / net sales x 100, where cost of goods sold is the posted
-balance of the Cost of Revenue accounts (``expense_direct_cost``). Margins of products or
-channels are never averaged.
+Gross profit % is one calculation on the company totals of the period, from the Profit and
+Loss (the same revenue and gross profit as Finance): (revenue - cost of goods sold) /
+revenue x 100, where revenue is the Income accounts and cost of goods sold the Cost of
+Revenue accounts (``expense_direct_cost``). Both sides cover every posting, so income posted
+without an invoice (journal entries) and its costs are on both sides; net sales would leave
+that income out but not its costs. Margins of products or channels are never averaged.
 
 Working capital is taken at the period's end (never after today): available cash (the Bank
 and Cash accounts), inventory at cost (Odoo's stock valuation), receivables and payables
@@ -36,9 +40,11 @@ from odoo.tools import SQL, float_compare
 from odoo.tools.misc import format_date, formatLang
 
 from .sales import INVOICE_TYPES
-from .finance import DIRECT_COST, OPEN_TYPES
+from .finance import DIRECT_COST, INCOME, OPEN_TYPES
 
 OTIF_KINDS = ('ok', 'not_full', 'late', 'both')
+# Channel key of POS sales (other channels are a ``utm.source`` id, or False for "No channel").
+POS = 'pos'
 # Finance drawers and native screens shown from this section, under this section's keys.
 FINANCE_KEYS = ('finance.account', 'finance.balance_sheet', 'finance.open_items', 'finance.pnl')
 
@@ -50,21 +56,23 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _section_key_metrics(self, scope):
         """``currency``, ``net_sales``, ``gross_profit``, ``working_capital``, ``otif`` (None
-        without Sales and Inventory) and ``roas``."""
+        without Sales and Inventory), ``roas`` and ``checks``."""
         currency = scope['company'].currency_id
         net = self._key_net_sales(scope)
-        cogs = self._key_cogs(scope)
+        pnl = self._fin_pnl(scope)
         spend = self._key_ad_spend(scope)
+        bank = self._fin_bank_cash(scope)
+        open_items = {kind: self._fin_open_items(scope, kind) for kind in OPEN_TYPES}
         return {
             'currency': {'name': currency.name, 'symbol': currency.symbol,
                          'position': currency.position, 'digits': currency.decimal_places},
             'net_sales': net,
-            'gross_profit': {'revenue': net['total'], 'cogs': cogs, 'gross_profit': net['total'] - cogs,
-                             'percent': self._key_ratio(net['total'] - cogs, net['total'], 100)},
-            'working_capital': self._key_working_capital(scope),
+            'gross_profit': self._key_gross_profit(pnl, net['total']),
+            'working_capital': self._key_working_capital(scope, bank, open_items),
             'otif': self._key_otif(scope) if self._key_otif_ready() else None,
             'roas': {'sales': net['total'], 'spend': spend['total'], 'accounts': len(spend['accounts']),
                      'roas': self._key_ratio(net['total'], spend['total'])},
+            'checks': self._fin_checks(scope, 'key_metrics', pnl, bank, open_items),
         }
 
     # ------------------------------------------------------------------ helpers
@@ -103,48 +111,69 @@ class ExecutiveDashboard(models.AbstractModel):
     # ------------------------------------------------------------------ net sales by channel
 
     def _key_sales_domain(self, scope):
-        """Product lines of posted customer invoices and credit notes in the period."""
-        return Domain([
-            ('parent_state', '=', 'posted'), ('move_id.move_type', 'in', INVOICE_TYPES),
-            ('display_type', '=', 'product'), ('company_id', 'in', scope['companies'].ids),
-            *self._key_dates(scope),
-        ])
+        """Product lines of posted customer invoices and credit notes in the period, and the
+        sales lines of closed POS sessions."""
+        sales = Domain([('move_id.move_type', 'in', INVOICE_TYPES), ('display_type', '=', 'product')])
+        if self._key_pos_ready():
+            sales |= self._key_pos_session_lines()
+        return Domain([('parent_state', '=', 'posted'), ('company_id', 'in', scope['companies'].ids),
+                       *self._key_dates(scope)]) & sales
+
+    def _key_pos_ready(self):
+        return 'pos_session_ids' in self.env['account.move']._fields and 'pos.order' in self.env
+
+    def _key_pos_session_lines(self):
+        """Sales lines of POS session entries: orders without an invoice, sales and refunds apart."""
+        return Domain([('move_id.pos_session_ids', '!=', False), ('account_id.account_type', 'in', INCOME),
+                       ('tax_line_id', '=', False)])
 
     def _key_channels_ready(self):
         return 'sale_line_ids' in self.env['account.move.line']._fields and 'source_id' in self.env['sale.order']._fields \
             if 'sale.order' in self.env else False
 
     def _key_channel_domain(self, source_id):
-        """Lines of the channel ``source_id`` (False: no sales order, or an order without a Source)."""
-        if source_id:
+        """Lines of the channel ``source_id``: a Source id, ``POS``, or False (no sales order, or an
+        order without a Source, and not from the Point of Sale)."""
+        if source_id and source_id != POS:
             return Domain('sale_line_ids.order_id.source_id', '=', source_id)
-        if not self._key_channels_ready():
-            return Domain.TRUE
-        return Domain('sale_line_ids', '=', False) | Domain('sale_line_ids.order_id.source_id', '=', False)
+        unsourced = Domain('sale_line_ids', '=', False) | Domain('sale_line_ids.order_id.source_id', '=', False) \
+            if self._key_channels_ready() else Domain.TRUE
+        pos = self._key_pos_session_lines() | (Domain('move_id.pos_order_ids', '!=', False) & unsourced) \
+            if self._key_pos_ready() else Domain.FALSE
+        return pos if source_id == POS else unsourced & ~pos
 
     def _key_channel_sums(self, scope, by_move=False):
-        """``{(company, move_type, source_id or False, move_id or None): balance}`` of the period's sales lines,
-        in one query. Each invoice line belongs to exactly one channel: the Source of the order of its first
-        sales order line (an invoice line rarely comes from several orders)."""
+        """``{(company, move_type, channel, move_id or None): balance}`` of the period's sales lines, in one
+        query; ``channel`` is a Source id, ``POS`` or False. Each invoice line belongs to exactly one channel:
+        the Source of the order of its first sales order line (an invoice line rarely comes from several
+        orders), else Point of Sale when the line comes from a POS session or a POS order's invoice. A POS
+        session's refund lines (debits) count as credit notes."""
         Line = self.env['account.move.line']
         query = Line._search(self._key_sales_domain(scope))
         self.env.flush_all()
         source = SQL('so.source_id') if self._key_channels_ready() else SQL('NULL::int')
+        # Only POS session lines are entries among the sales lines.
+        pos = SQL("(am.move_type = 'entry' OR EXISTS (SELECT 1 FROM pos_order po WHERE po.account_move = am.id))") \
+            if self._key_pos_ready() else SQL('FALSE')
         joins = SQL("""
             LEFT JOIN LATERAL (SELECT MIN(rel.order_line_id) AS line_id FROM sale_order_line_invoice_rel rel
                                WHERE rel.invoice_line_id = aml.id) first_line ON TRUE
             LEFT JOIN sale_order_line sol ON sol.id = first_line.line_id
             LEFT JOIN sale_order so ON so.id = sol.order_id""") if self._key_channels_ready() else SQL('')
         self.env.cr.execute(SQL("""
-            SELECT aml.company_id, am.move_type, %(source)s, %(move)s, SUM(aml.balance)
+            SELECT aml.company_id,
+                   CASE WHEN am.move_type = 'entry' AND aml.balance > 0 THEN 'out_refund' ELSE am.move_type END,
+                   %(source)s, %(pos)s, %(move)s, SUM(aml.balance)
               FROM account_move_line aml
               JOIN account_move am ON am.id = aml.move_id
               %(joins)s
              WHERE aml.id IN %(ids)s
-          GROUP BY 1, 2, 3, 4""", source=source, move=SQL('aml.move_id') if by_move else SQL('NULL::int'),
+          GROUP BY 1, 2, 3, 4, 5""", source=source, pos=pos, move=SQL('aml.move_id') if by_move else SQL('NULL::int'),
                                 joins=joins, ids=query.subselect()))
-        return {(company, move_type, source_id or False, move_id): balance
-                for company, move_type, source_id, move_id, balance in self.env.cr.fetchall()}
+        sums = defaultdict(float)
+        for company, move_type, source_id, is_pos, move_id, balance in self.env.cr.fetchall():
+            sums[company, move_type, source_id or (POS if is_pos else False), move_id] += balance
+        return sums
 
     def _key_signed(self, scope, company_id, move_type, balance):
         """``(invoiced, credit note)`` part of a balance, positive, in the dashboard currency."""
@@ -175,10 +204,14 @@ class ExecutiveDashboard(models.AbstractModel):
             inv, ref = self._key_signed(scope, company_id, move_type, balance)
             sums[source_id][0] += inv
             sums[source_id][1] += ref
-        sources = self.env['utm.source'].browse([s for s in sums if s]) if self._key_channels_ready() else ()
-        channels = sorted(({'id': source.id, 'name': source.name, 'invoiced': sums[source.id][0],
-                            'refunds': sums[source.id][1], 'net': sums[source.id][0] - sums[source.id][1]}
-                           for source in sources), key=lambda c: (-c['net'], c['name']))
+        sources = self.env['utm.source'].browse([s for s in sums if s and s != POS]) \
+            if self._key_channels_ready() else ()
+        names = {source.id: source.name for source in sources}
+        if POS in sums:
+            names[POS] = self.env._('Point of Sale')
+        channels = sorted(({'id': key, 'name': name, 'invoiced': sums[key][0], 'refunds': sums[key][1],
+                            'net': sums[key][0] - sums[key][1]} for key, name in names.items()),
+                          key=lambda c: (-c['net'], c['name']))
         if False in sums:
             channels.append({'id': False, 'name': self.env._('No channel'), 'invoiced': sums[False][0],
                              'refunds': sums[False][1], 'net': sums[False][0] - sums[False][1]})
@@ -198,8 +231,11 @@ class ExecutiveDashboard(models.AbstractModel):
             costs[account] += self._fin_convert(scope, balance, company, scope['date_to'])
         return costs
 
-    def _key_cogs(self, scope):
-        return sum(self._key_cogs_rows(scope).values())
+    def _key_gross_profit(self, pnl, net_sales):
+        """Gross profit % from the Profit and Loss figures (Finance's ``_fin_pnl``), with net sales for comparison."""
+        revenue, gross = pnl['revenue'], pnl['gross_profit']
+        return {'revenue': revenue, 'cogs': revenue - gross, 'gross_profit': gross,
+                'percent': self._key_ratio(gross, revenue, 100), 'net_sales': net_sales}
 
     # ------------------------------------------------------------------ working capital
 
@@ -231,11 +267,15 @@ class ExecutiveDashboard(models.AbstractModel):
             total += self._fin_convert(scope, sum(products.mapped('total_value')), company, scope['as_of'])
         return total
 
-    def _key_working_capital(self, scope):
-        cash = self._fin_bank_cash(scope)['total']
+    def _key_working_capital(self, scope, bank=None, open_items=None):
+        """Working capital at the period's end; ``bank`` and ``open_items`` are the Finance
+        figures when the caller already has them."""
+        bank = bank or self._fin_bank_cash(scope)
+        open_items = open_items or {kind: self._fin_open_items(scope, kind) for kind in OPEN_TYPES}
+        cash = bank['total']
         inventory = self._key_inventory(scope)
-        receivables = self._fin_open_items(scope, 'receivables')['total']
-        payables = self._fin_open_items(scope, 'payables')['total']
+        receivables = open_items['receivables']['total']
+        payables = open_items['payables']['total']
         return {'as_of': fields.Date.to_string(scope['as_of']), 'cash': cash, 'inventory': inventory,
                 'receivables': receivables, 'payables': payables,
                 'total': cash + (inventory or 0.0) + receivables - payables}
@@ -358,9 +398,10 @@ class ExecutiveDashboard(models.AbstractModel):
         return '%s %s' % (self._fin_format(amount), scope['company'].currency_id.name)
 
     def _key_source_arg(self, args):
+        """The channel argument: False ("No channel"), ``POS``, or an existing Source."""
         source_id = args.get('source_id')
-        if source_id is False:
-            return False
+        if source_id is False or (source_id == POS and self._key_pos_ready()):
+            return source_id
         if type(source_id) is not int or source_id <= 0 or not self._key_channels_ready():
             raise ValidationError(self.env._('Unknown detail.'))
         source = self.env['utm.source'].browse(source_id).exists()
@@ -386,17 +427,23 @@ class ExecutiveDashboard(models.AbstractModel):
                 'rows': rows, 'total': {'label': _('Net sales'), 'value': self._key_money(scope, net['total'])},
                 'action': {'key': 'key_metrics.lines', 'args': period}, 'dest': _('Journal Items')}
 
+    @staticmethod
+    def _key_channel_key(source):
+        """Channel key of a ``_key_source_arg`` result."""
+        return source if source in (False, POS) else source.id
+
     def _key_lines_domain(self, scope, source):
         domain = self._key_sales_domain(scope)
-        return domain if source is None else domain & self._key_channel_domain(source.id if source else False)
+        return domain if source is None else domain & self._key_channel_domain(self._key_channel_key(source))
 
     def _drawer_key_metrics_channel(self, args):
         source = self._key_source_arg(args)
+        key = self._key_channel_key(source)
         scope, _ = self._key_scope(args), self.env._
         by_move = defaultdict(float)
         invoiced = refunds = 0.0
         for (company_id, move_type, source_id, move_id), balance in self._key_channel_sums(scope, by_move=True).items():
-            if source_id == (source.id if source else False):
+            if source_id == key:
                 inv, ref = self._key_signed(scope, company_id, move_type, balance)
                 by_move[self.env['account.move'].browse(move_id)] += inv - ref
                 invoiced += inv
@@ -407,15 +454,21 @@ class ExecutiveDashboard(models.AbstractModel):
                                                          format_date(self.env, move.date, date_format='d MMM y')),
                  'value': self._fin_format(by_move[move]),
                  'action': {'key': 'key_metrics.move', 'args': {'move_id': move.id}}} for move in moves]
-        name = source.name if source else _('No channel')
+        if key == POS:
+            name, note = _('Point of Sale'), _('Closed POS sessions (orders without an invoice) and invoices of POS '
+                                               'orders; refunds count as credit notes.')
+        elif source:
+            name, note = source.name, False
+        else:
+            name, note = _('No channel'), _('Invoice lines without a sales order, or from an order without a Source.')
         return {'title': name, 'sub': _('Net sales · %s', self._key_period_label(scope)),
                 'groups': [{'title': _('Summary'), 'rows': [
                     {'label': _('Invoiced (untaxed)'), 'value': self._fin_format(invoiced)},
                     {'label': _('Credit notes (untaxed)'), 'value': self._fin_format(-refunds)}]}],
-                'note': False if source else _('Invoice lines without a sales order, or from an order without a Source.'),
+                'note': note,
                 'rows_title': _('Invoices and credit notes'), 'rows': rows, 'more': more,
                 'total': {'label': _('Net sales'), 'value': self._key_money(scope, invoiced - refunds)},
-                'action': {'key': 'key_metrics.lines', 'args': dict(period, source_id=source.id if source else False)},
+                'action': {'key': 'key_metrics.lines', 'args': dict(period, source_id=key)},
                 'dest': _('Journal Items')}
 
     def _action_key_metrics_lines(self, args):
@@ -425,7 +478,8 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _key_move(self, args):
         move = self.env['account.move'].browse(self._positive_id(args, 'move_id')).exists()
-        if not move or move.move_type not in INVOICE_TYPES:
+        pos_session = self._key_pos_ready() and move.pos_session_ids
+        if not move or (move.move_type not in INVOICE_TYPES and not pos_session):
             raise ValidationError(self.env._('Unknown detail.'))
         return self._check_company(move)
 
@@ -434,31 +488,44 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _action_key_metrics_move(self, args):
         move = self._key_move(args)
-        return self._window('account.action_move_out_invoice_type', move.name, 'account.move',
-                            [('id', '=', move.id)], res_id=move.id)
+        xmlid = 'account.action_move_out_invoice_type' if move.move_type in INVOICE_TYPES \
+            else 'account.action_move_journal_line'
+        return self._window(xmlid, move.name, 'account.move', [('id', '=', move.id)], res_id=move.id)
 
     def _drawer_key_metrics_gross_profit(self, args):
         scope, _ = self._key_scope(args), self.env._
-        net = self._key_total(scope)
+        gp = self._key_gross_profit(self._fin_pnl(scope), self._key_total(scope))
         costs = self._key_cogs_rows(scope)
-        cogs = sum(costs.values())
         period = self._key_period_args(args)
         currency = scope['company'].currency_id
-        percent = self._key_ratio(net - cogs, net, 100)
+        crumb = _('Gross profit %')
         cost_rows = [{'label': account.name, 'sub': self._fin_code(account), 'value': self._fin_format(cost),
                       'action': {'key': 'key_metrics.account', 'args': dict(period, account_id=account.id)}}
                      for account, cost in sorted(costs.items(), key=lambda item: -abs(item[1]))
                      if not currency.is_zero(cost)]
         groups = [{'title': _('Calculation'), 'rows': [
-            {'label': _('Net sales (excluding VAT)'), 'value': self._fin_format(net),
-             'open': {'key': 'key_metrics.net_sales', 'args': period, 'crumb': _('Gross profit %')}},
-            {'label': _('Cost of goods sold'), 'value': self._fin_format(-cogs)},
-            {'label': _('Gross profit'), 'value': self._fin_format(net - cogs)}]}]
+            {'label': _('Revenue (all income accounts)'), 'value': self._fin_format(gp['revenue']),
+             'open': {'key': 'key_metrics.revenue', 'args': period, 'crumb': crumb}},
+            {'label': _('Cost of goods sold'), 'value': self._fin_format(-gp['cogs'])},
+            {'label': _('Gross profit'), 'value': self._fin_format(gp['gross_profit'])}]}]
         if cost_rows:
             groups.append({'title': _('Cost of goods sold by account'), 'rows': cost_rows})
+        groups.append({'title': _('For comparison'), 'rows': [
+            {'label': _('Net sales (invoices and POS)'), 'value': self._fin_format(gp['net_sales']),
+             'open': {'key': 'key_metrics.net_sales', 'args': period, 'crumb': crumb}}]})
+        note = _('One calculation on the company totals of the Profit and Loss: (revenue - cost of goods sold) / '
+                 'revenue x 100. Product or channel margins are never averaged.')
+        if abs(gp['revenue'] - gp['net_sales']) >= 1:
+            note = '%s %s' % (note, _('Revenue differs from net sales by %(amount)s %(currency)s, for example income '
+                                      'posted by journal entry, or invoice lines on accounts other than Income.',
+                                      amount=self._fin_format(gp['revenue'] - gp['net_sales']), currency=currency.name))
+        if abs(sum(costs.values()) - gp['cogs']) >= 1:
+            note = '%s %s' % (note, _('The Profit and Loss report gives %(amount)s %(currency)s for the cost of goods '
+                                      'sold; the accounts above add up to their posted entries.',
+                                      amount=self._fin_format(gp['cogs']), currency=currency.name))
+        percent = gp['percent']
         return {'title': _('Gross profit %'), 'sub': self._key_period_label(scope),
-                'note': _('One calculation on the company totals: (net sales - cost of goods sold) / net sales x 100. '
-                          'Product or channel margins are never averaged.'),
+                'note': note,
                 'groups': groups,
                 'total': {'label': _('Gross profit %'),
                           'value': '%s%%' % self._key_pct(percent) if percent is not None else '—'},
@@ -467,6 +534,10 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _key_pct(self, value):
         return formatLang(self.env, value, digits=1)
+
+    def _drawer_key_metrics_revenue(self, args):
+        """Finance's revenue panel (income accounts with their totals) under this section's keys."""
+        return self._key_rekey(self._drawer_finance_profit(dict(args, figure='revenue')))
 
     def _drawer_key_metrics_bank_cash(self, args):
         return self._key_rekey(self.with_context(ed_account_key='key_metrics.account')._drawer_finance_bank_cash(args))
@@ -612,7 +683,7 @@ class ExecutiveDashboard(models.AbstractModel):
 
     def _check_key_metrics_account(self, args):
         account = self._fin_account(args)
-        if account.account_type not in ('asset_cash', *OPEN_TYPES.values(), *DIRECT_COST) \
+        if account.account_type not in ('asset_cash', *OPEN_TYPES.values(), *INCOME, *DIRECT_COST) \
                 and account not in self._key_ad_accounts(self._key_scope(args)):
             raise ValidationError(self.env._('Unknown detail.'))
         return account
