@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.adams_stock_no_negative</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="stock.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//block[@name='operations_setting_container']" position="inside">
+                <field name="adams_pos_installed" invisible="1"/>
+                <field name="adams_pos_allow_negative_stock" invisible="1"/>
+                <setting id="adams_allow_negative_stock" company_dependent="1"
+                         help="Allow stock operations to take on-hand quantities below zero. When off, they are refused.">
+                    <field name="adams_allow_negative_stock"/>
+                </setting>
+                <setting id="adams_pos_allow_negative_stock" company_dependent="1"
+                         invisible="not adams_pos_installed"
+                         help="Allow Point of Sale orders to deliver products that are not in stock. Included while the bypass for all stock operations is on.">
+                    <field name="adams_pos_bypass_shown" readonly="adams_allow_negative_stock"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

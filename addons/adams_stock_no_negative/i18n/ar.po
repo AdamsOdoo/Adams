@@ -1,0 +1,124 @@
+# Translation of Odoo Server.
+# This file contains the translation of the following modules:
+# 	* adams_stock_no_negative
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo Server 19.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-21 15:56+0000\n"
+"PO-Revision-Date: 2026-10-21 15:56+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,help:adams_stock_no_negative.field_res_company__adams_pos_allow_negative_stock
+#: model:ir.model.fields,help:adams_stock_no_negative.field_res_config_settings__adams_pos_allow_negative_stock
+msgid ""
+"Allow Point of Sale orders of this company to deliver products that are not "
+"in stock."
+msgstr ""
+"السماح لطلبات نقطة البيع في هذه الشركة بتسليم منتجات غير متوفرة في المخزون."
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,help:adams_stock_no_negative.field_res_config_settings__adams_pos_bypass_shown
+msgid "Allow Point of Sale orders to deliver products that are not in stock."
+msgstr "السماح لطلبات نقطة البيع بتسليم منتجات غير متوفرة في المخزون."
+
+#. module: adams_stock_no_negative
+#: model_terms:ir.ui.view,arch_db:adams_stock_no_negative.res_config_settings_view_form
+msgid ""
+"Allow Point of Sale orders to deliver products that are not in stock. "
+"Included while the bypass for all stock operations is on."
+msgstr ""
+"السماح لطلبات نقطة البيع بتسليم منتجات غير متوفرة في المخزون. يكون مفعّلاً "
+"تلقائياً ما دام التجاوز لجميع عمليات المخزون مفعّلاً."
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,help:adams_stock_no_negative.field_res_company__adams_allow_negative_stock
+#: model:ir.model.fields,help:adams_stock_no_negative.field_res_config_settings__adams_allow_negative_stock
+msgid ""
+"Allow stock operations of this company to take on-hand quantities below "
+"zero."
+msgstr "السماح لعمليات المخزون في هذه الشركة بجعل الكميات الفعلية أقل من صفر."
+
+#. module: adams_stock_no_negative
+#: model_terms:ir.ui.view,arch_db:adams_stock_no_negative.res_config_settings_view_form
+msgid ""
+"Allow stock operations to take on-hand quantities below zero. When off, they"
+" are refused."
+msgstr ""
+"السماح لعمليات المخزون بجعل الكميات الفعلية أقل من صفر. عند إيقافه، تُرفض "
+"هذه العمليات."
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_company__adams_pos_allow_negative_stock
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__adams_pos_bypass_shown
+msgid "Bypass negative consumption for Point of Sale"
+msgstr "تجاوز منع الاستهلاك بالسالب لنقطة البيع"
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_company__adams_allow_negative_stock
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__adams_allow_negative_stock
+msgid "Bypass negative consumption prevention"
+msgstr "تجاوز منع الاستهلاك بالسالب"
+
+#. module: adams_stock_no_negative
+#: model:ir.model,name:adams_stock_no_negative.model_res_company
+msgid "Companies"
+msgstr "الشركات"
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__adams_pos_allow_negative_stock
+msgid "Company's Point of Sale bypass"
+msgstr "تجاوز نقطة البيع الخاص بالشركة"
+
+#. module: adams_stock_no_negative
+#: model:ir.model,name:adams_stock_no_negative.model_res_config_settings
+msgid "Config Settings"
+msgstr "تهيئة الإعدادات"
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_company__display_name
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__display_name
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_stock_move__display_name
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_stock_move_line__display_name
+msgid "Display Name"
+msgstr "اسم العرض"
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_company__id
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__id
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_stock_move__id
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_stock_move_line__id
+msgid "ID"
+msgstr "المُعرف"
+
+#. module: adams_stock_no_negative
+#. odoo-python
+#: code:addons/adams_stock_no_negative/models/stock_move_line.py:0
+msgid ""
+"Not enough stock of %(products)s. This operation would make the on-hand "
+"quantity negative."
+msgstr ""
+"لا يوجد مخزون كافٍ من %(products)s. ستجعل هذه العملية الكمية الفعلية "
+"بالسالب."
+
+#. module: adams_stock_no_negative
+#: model:ir.model.fields,field_description:adams_stock_no_negative.field_res_config_settings__adams_pos_installed
+msgid "Point of Sale installed"
+msgstr "نقطة البيع مثبتة"
+
+#. module: adams_stock_no_negative
+#: model:ir.model,name:adams_stock_no_negative.model_stock_move_line
+msgid "Product Moves (Stock Move Line)"
+msgstr "تحركات المنتج (بنود حركة المخزون)"
+
+#. module: adams_stock_no_negative
+#: model:ir.model,name:adams_stock_no_negative.model_stock_move
+msgid "Stock Move"
+msgstr "حركة المخزون"
