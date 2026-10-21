@@ -72,7 +72,7 @@ class ExecutiveDashboard(models.AbstractModel):
     # ------------------------------------------------------------------ section
 
     def _section_finance(self, scope):
-        """Finance widgets: ``kpis``, ``trend``, ``bank_cash``, ``receivables``, ``payables``."""
+        """Finance widgets: ``kpis``, ``trend``, ``bank_cash``, ``receivables``, ``payables`` and ``checks``."""
         currency = scope['company'].currency_id
         pnl = self._fin_pnl(scope)
         bank = self._fin_bank_cash(scope)
@@ -98,7 +98,52 @@ class ExecutiveDashboard(models.AbstractModel):
             'trend': self._fin_trend(scope),
             'bank_cash': bank,
             **open_items,
+            'checks': self._fin_checks(scope, 'finance', pnl, bank, open_items),
         }
+
+    def _fin_checks(self, scope, section, pnl, bank, open_items):
+        """Figures the books cannot hold, each opening the panel of the entries behind it:
+        ``[{severity, text, drawer: {key, args}}]`` (the client adds the period to ``args``).
+
+        A gross margin above 100 % (cost of goods sold below zero: not possible), a gross margin
+        below zero (costs above revenue), a bank or cash account below zero, and receivables or
+        payables below zero (payments not matched to invoices or bills). The dashboard shows the
+        books as they are; these say where they need checking.
+        """
+        _ = self.env._
+        currency = scope['company'].currency_id
+        # Isolated left to right, so signs and currencies stay in place in Arabic sentences.
+        ltr = lambda text: '\u2066%s\u2069' % text  # noqa: E731
+        money = lambda amount: ltr('%s %s' % (self._fin_format(amount), currency.name))  # noqa: E731
+        checks = []
+        revenue, gross = pnl['revenue'], pnl['gross_profit']
+        if currency.compare_amounts(revenue, 0) > 0:
+            drawer = {'key': 'finance.profit', 'args': {'figure': 'gross_profit'}} if section == 'finance' \
+                else {'key': 'key_metrics.gross_profit', 'args': {}}
+            margin = ltr('%s%%' % formatLang(self.env, gross / revenue * 100, digits=1))
+            if currency.compare_amounts(gross, revenue) > 0:
+                checks.append({'severity': 'crit', 'drawer': drawer, 'text': _(
+                    'A gross margin of %(margin)s is not possible: the cost of goods sold is below zero. '
+                    'Check its entries.', margin=margin)})
+            elif currency.compare_amounts(gross, 0) < 0:
+                checks.append({'severity': 'warn', 'drawer': drawer, 'text': _(
+                    'The gross margin is below zero (%(margin)s): costs exceed revenue. Check the entries on the '
+                    'cost of goods sold accounts.', margin=margin)})
+        negative = [row for row in bank['rows'] if currency.compare_amounts(row['balance'], 0) < 0]
+        if negative:
+            checks.append({'severity': 'warn', 'drawer': {'key': f'{section}.bank_cash', 'args': {}}, 'text': _(
+                'Bank or cash accounts below zero: %(count)s (%(amount)s). Check that the money received is recorded.',
+                count=len(negative), amount=money(sum(row['balance'] for row in negative)))})
+        for kind in OPEN_TYPES:
+            total = open_items[kind]['total']
+            if currency.compare_amounts(total, 0) >= 0:
+                continue
+            text = _('Receivables are below zero (%s): customer payments are not matched to their invoices.',
+                     money(total)) if kind == 'receivables' else \
+                _('Payables are below zero (%s): supplier payments are not matched to their bills.', money(total))
+            checks.append({'severity': 'warn', 'text': text, 'drawer': {
+                'key': f'{section}.open_items', 'args': {'kind': kind, 'view': 'aged', 'side': 'credits'}}})
+        return checks
 
     # ------------------------------------------------------------------ helpers
 

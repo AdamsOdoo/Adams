@@ -75,7 +75,7 @@ class TestFinance(AccountTestInvoicingCommon):
 
     def test_widget_keys(self):
         widgets = self.finance()
-        self.assertEqual(set(widgets), {'currency', 'kpis', 'trend', 'bank_cash', 'receivables', 'payables'})
+        self.assertEqual(set(widgets), {'currency', 'kpis', 'trend', 'bank_cash', 'receivables', 'payables', 'checks'})
         self.assertEqual(len(widgets['trend']['months']), 12)
         self.assertEqual(widgets['trend']['months'][-1]['month'], fields.Date.to_string(self.today.replace(day=1)))
         self.assertEqual([b['key'] for b in widgets['receivables']['expected']],
@@ -85,6 +85,51 @@ class TestFinance(AccountTestInvoicingCommon):
             self.assertEqual(widgets['kpis']['source'], 'journal')
             self.assertEqual([b['key'] for b in widgets['receivables']['aged']],
                              ['not_due', 'd30', 'd60', 'd90', 'older'])
+
+    def test_checks_flag_figures_the_books_cannot_hold(self):
+        """A gross margin outside 0-100 %, a bank account below zero and receivables below zero
+        are flagged in Finance and in Key metrics; each check opens its panel."""
+        self.assertEqual(self.finance()['checks'], [])
+        self._move('out_invoice', self.partner, self.revenue_account, 1000.0, 10)
+        entry = self.env['account.move'].create({'move_type': 'entry', 'date': self.today, 'line_ids': [
+            fields.Command.create({'account_id': self.cost_account.id, 'debit': 5000.0, 'name': 'Example cost'}),
+            fields.Command.create({'account_id': self.company_data['default_journal_bank'].default_account_id.id,
+                                   'credit': 2000.0, 'name': 'Example payment'}),
+            fields.Command.create({'account_id': self.company_data['default_account_receivable'].id,
+                                   'partner_id': self.partner.id, 'credit': 3000.0, 'name': 'Example receipt'}),
+        ]})
+        entry.action_post()
+        keys = {'finance': ['finance.profit', 'finance.bank_cash', 'finance.open_items'],
+                'key_metrics': ['key_metrics.gross_profit', 'key_metrics.bank_cash', 'key_metrics.open_items']}
+        for section, expected in keys.items():
+            dashboard_module.cache_clear()
+            checks = self.Dashboard.get_section(section, 'month')['widgets']['checks']
+            self.assertEqual([check['drawer']['key'] for check in checks], expected)
+            self.assertEqual([check['severity'] for check in checks], ['warn', 'warn', 'warn'])
+            self.assertIn('-400', checks[0]['text'])
+            for check in checks:
+                panel = self.Dashboard.get_drawer(check['drawer']['key'], dict(check['drawer']['args'], period='month'))
+                self.assertTrue(panel['title'])
+
+    def test_checks_margin_above_100_and_payables(self):
+        """Cost of goods sold below zero makes a margin above 100 % (not possible); a supplier
+        payment without a bill makes payables below zero."""
+        self._move('out_invoice', self.partner, self.revenue_account, 1000.0, 10)
+        payable = self.company_data['default_account_payable']
+        bank = self.company_data['default_journal_bank'].default_account_id
+        entry = self.env['account.move'].create({'move_type': 'entry', 'date': self.today, 'line_ids': [
+            fields.Command.create({'account_id': bank.id, 'debit': 300.0, 'name': 'Example'}),
+            fields.Command.create({'account_id': self.cost_account.id, 'credit': 300.0, 'name': 'Example negative cost'}),
+            fields.Command.create({'account_id': payable.id, 'partner_id': self.vendor.id, 'debit': 500.0,
+                                   'name': 'Example supplier payment'}),
+            fields.Command.create({'account_id': bank.id, 'credit': 200.0, 'name': 'Example payment'}),
+            fields.Command.create({'account_id': self.revenue_account.id, 'credit': 300.0, 'name': 'Example'}),
+        ]})
+        entry.action_post()
+        checks = self.finance()['checks']
+        self.assertEqual([(check['severity'], check['drawer']['key']) for check in checks],
+                         [('crit', 'finance.profit'), ('warn', 'finance.open_items')])
+        self.assertEqual(checks[1]['drawer']['args']['kind'], 'payables')
 
     def test_profit_figures_follow_posted_entries(self):
         before = self.finance()['kpis']
