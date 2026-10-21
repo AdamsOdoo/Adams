@@ -20,6 +20,7 @@ class TestNoNegativeStockPosSession(TestPoSCommon):
         cls.config = cls.basic_config
         cls.company.adams_allow_negative_stock = False
         cls.company.adams_pos_allow_negative_stock = False
+        cls.company.point_of_sale_update_stock_quantities = "real"
         cls.item = cls.create_product("Out of Stock Item", cls.categ_basic, 10.0, 5.0)
         cls.source = cls.config.picking_type_id.default_location_src_id
 
@@ -58,6 +59,7 @@ class TestNoNegativeStockPosSession(TestPoSCommon):
         session = self._sell_and_close()
         self.assertTrue(session.update_stock_at_closing)
         self.assertNotIn("done", session.picking_ids.mapped("state"))
+        self.assertTrue(session.failed_pickings)
         self.assertEqual(self._on_hand(), 0)
 
         self.company.adams_pos_allow_negative_stock = True

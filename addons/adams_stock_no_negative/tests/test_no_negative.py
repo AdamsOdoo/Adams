@@ -576,6 +576,18 @@ class TestNoNegativeStock(TestStockCommon):
         self.assertIn("Test Part", message)
         self.assertNotIn(self.stock_location.complete_name, message)
 
+    # A8
+    def test_a8_message_in_arabic(self):
+        """An Arabic user gets the refusal in Arabic, naming the product."""
+        self.env["res.lang"]._activate_lang("ar_001")
+        self.env["ir.module.module"]._load_module_terms(["adams_stock_no_negative"], ["ar_001"], overwrite=True)
+        self._stock(self.part, self.stock_location, 1)
+        picking = self._deliver(self.part, 2).with_context(lang="ar_001")
+        with self.assertRaisesRegex(UserError, "لا يوجد مخزون كافٍ") as error, self.env.cr.savepoint():
+            picking.button_validate()
+        self.assertIn("Test Part", str(error.exception))
+        self.assertNotIn(NOT_ENOUGH, str(error.exception))
+
 
 @tagged("post_install", "-at_install")
 class TestNoNegativeStockPos(TestStockCommon):

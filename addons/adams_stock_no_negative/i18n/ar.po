@@ -105,7 +105,7 @@ msgid ""
 "Not enough stock of %(products)s. This operation would make the on-hand "
 "quantity negative."
 msgstr ""
-"لا يوجد مخزون كافٍ من %(products)s. ستجعل هذه العملية الكمية الفعلية "
+"لا يوجد مخزون كافٍ من %(products)s. هذه العملية ستجعل الكمية المتوفرة "
 "بالسالب."
 
 #. module: adams_stock_no_negative

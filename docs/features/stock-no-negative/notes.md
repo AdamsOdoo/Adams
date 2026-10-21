@@ -34,7 +34,7 @@ Tests in `addons/adams_stock_no_negative/tests/`.
 - A5 Consumables, partner/virtual locations, inter-company transit not checked → `test_a5_*`
 - A6 Company bypass allows negative stock for that company only → `test_a6_company_bypass`
 - A7 Only Settings administrators change the bypasses → `test_a7_*`
-- A8 Message names the product, not the location → `test_a8_*`
+- A8 Message names the product, not the location; an Arabic user gets it in Arabic → `test_a8_message_names_the_product`, `test_a8_message_in_arabic`
 - A9 PoS pickings refused by default, allowed by the PoS bypass, which opens nothing else → `TestNoNegativeStockPos.test_a9_*`
 - A10 Manufacturing consumption beyond stock refused → `TestNoNegativeStockMrp.test_a10_*`
 - A11 Settings in English and Arabic (right to left) → screenshots `screens/{en_US,ar_001}/`
@@ -46,7 +46,15 @@ Tests in `addons/adams_stock_no_negative/tests/`.
 - A17 The bypass follows the company of the stock, not the user's current company → `test_a17_check_follows_the_company_of_the_stock`
 
 ## Test results
-RESULTS_PLACEHOLDER
+Local runs, Odoo 19.0 Community @ 8d05257d, demo data, 2026-10-21 (evidence records are git-ignored in this public repo; this is the summary):
+- As committed (depends on `stock`; Point of Sale is installed in the local database because `adams_pos_sales_report` needs it): `oh test adams_stock_no_negative --require TestNoNegativeStock --require TestNoNegativeStockPos --require TestNoNegativeStockPosSession` → **PASSED**, 27 executed, 3 skipped (A10 and the A12 MRP test: Manufacturing not installed; the A14 class: Subcontracting not installed), 0 failed.
+- With `point_of_sale` and `mrp_subcontracting` added to `depends` temporarily (not committed), so the PoS, Manufacturing and Subcontracting tests run: **PASSED**, 33 executed, 0 skipped, 0 failed.
+- The subcontracting fix is needed: with the source module's rule (only the company's subcontracting location skipped), `test_a14_subcontractor_own_location` errors with the refusal.
+- `oh check` passed, pylint-odoo 0 warnings. `oh i18n`: `ar.po` regenerated, 0 untranslated.
+- Screens: Inventory Settings EN/AR, `oh shot` 2 of 2 ok (`screens/`); the Arabic screen was opened and checked: right to left, both settings and their help translated.
+- Odoo.sh: not built from here. The A10/A12-MRP/A14 tests skip on a build without Manufacturing and Subcontracting; to run them there, install `mrp_subcontracting` in the build.
+
+Review: independent (`odoo-reviewer`, read-only not enforced) of bca3de2: no blocking finding. Fixed: the Arabic refusal message and its test (`test_a8_message_in_arabic`, as in the source module's later version 19.0.1.0.2); A16 tests set the real-time stock mode explicitly and check failed pickings in closing mode. Recorded as assumptions: the subcontracting skip also covers moves out of a subcontractor location (below); licence (below). Not changed: calling standard `is_subcontract()` instead of the same parent check (identical today).
 
 ## Before installing on production
 - **Correct the negative stock first.** On production two products are below zero today: **Bulk - FP00011 at −22,228 g** and **RM00043 at −0.52 kg**. Existing negative stock stays as it is after the install and only further decreases are refused, so any delivery, MO or PoS sale of these would be refused (PoS: the picking stays open). Correct them by a receipt or an inventory count (Inventory > Physical Inventory) before installing, and list any others with Inventory > Reporting > Stock, filter *Negative Stock*.
@@ -66,5 +74,6 @@ Uninstall *Adams Stock No Negative* (Apps). It adds two boolean fields on the co
 - Concurrent validation by two users is handled by a waiting lock (`FOR NO KEY UPDATE` where a key falls below zero) but has no automated test.
 - Code that writes quants directly without a stock operation (no standard flow does) isn't checked.
 - Package grain is strict (loose stock doesn't cover a line that takes from a package), as standard reservation does.
-- License LGPL-3 and author "Adams", as the other Adams modules (the source was proprietary to its project).
+- **Owner to confirm before merge:** licence LGPL-3 and author "Adams", as the other Adams modules. The source module is "Qamah Solutions", "Other proprietary", and is now published in this public repository.
+- The subcontracting skip covers every move out of a subcontractor location, not only component consumption: a return of components from Shira's location to WH/Stock that Shira never received is accepted, leaving Shira's location negative and the components in our stock. Narrowing it to consumption would refuse the receipt's own lines (the finished product leaves the subcontracting location), so it stays broad; return components from Shira only after sending them.
 - Standard Odoo 19 recomputes untracked subcontract components from the produced quantity when the receipt is validated; the test checks that recording more is accepted, not the consumed figure.
